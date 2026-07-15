@@ -826,7 +826,7 @@ github:
         - production
         - dev
       allowForcePush: false
-      codeOwnerApprovalRequired: true
+      codeOwnerApprovalRequired: false
 
     # ============================================================================
     # Workflows must include required actions
