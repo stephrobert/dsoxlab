@@ -26,3 +26,9 @@ variable "provider_config" {
   type        = map(string)
   default     = {}
 }
+
+variable "target_hosts" {
+  description = "Restreint la création des ressources dédiées à ces hôtes (ciblage `dsoxlab provision/destroy --host`). Vide = tous les hôtes. Utilisé pour scoper le for_each des disques additionnels afin qu'un ciblage --host ne crée pas le disque d'un autre hôte (dsoxlab issue #1)."
+  type        = list(string)
+  default     = []
+}

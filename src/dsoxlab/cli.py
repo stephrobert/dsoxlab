@@ -1188,7 +1188,10 @@ def provision(
         # Étape 2 : terraform apply avec progress bar par ressource
         result = _run_terraform_with_progress(
             "provision",
-            lambda cb: tf.apply(repo_meta, on_event=cb, targets=targets or None),
+            lambda cb: tf.apply(
+                repo_meta, on_event=cb,
+                targets=targets or None, target_hosts=list(host) if host else None,
+            ),
         )
     except ProviderNotImplemented as exc:
         error(str(exc))
@@ -1250,7 +1253,10 @@ def destroy(
         )
         _run_terraform_with_progress(
             "destroy",
-            lambda cb: tf.destroy(repo_meta, on_event=cb, targets=targets or None),
+            lambda cb: tf.destroy(
+                repo_meta, on_event=cb,
+                targets=targets or None, target_hosts=list(host) if host else None,
+            ),
         )
     except ProviderNotImplemented as exc:
         error(str(exc))

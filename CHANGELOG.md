@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.1.1] - 2026-07-15
+
+### Fixed
+
+- **incus**: `provision --host X` no longer creates the additional disk of
+  *other* hosts, and `destroy --host X` now removes that host's own additional
+  disk. A `target_hosts` Terraform variable scopes the extra-volume `for_each`,
+  and `host_targets` targets the host's own volume so `-target` cleans it up.
+  ([#1](https://github.com/stephrobert/dsoxlab/issues/1))
+
 ## [0.1.0] - 2026-07-15
 
 Initial public release.
