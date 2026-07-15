@@ -1,5 +1,7 @@
 # Releasing dsoxlab
 
+**Language:** [English](./RELEASING.md) · [Français](./RELEASING.fr.md)
+
 Releases are published to [PyPI](https://pypi.org/project/dsoxlab/) by the
 `release.yml` workflow using **Trusted Publishing** (OIDC) — no API token is
 ever stored in the repository.

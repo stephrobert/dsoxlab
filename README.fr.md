@@ -245,7 +245,7 @@ uv run mypy src/dsoxlab                     # typage (strict)
 uv run pytest                               # tests
 ```
 
-Voir [CONTRIBUTING.md](./CONTRIBUTING.md) pour le workflow, les conventions de
+Voir [CONTRIBUTING.fr.md](./CONTRIBUTING.fr.md) pour le workflow, les conventions de
 commit et les règles non négociables (le moteur reste neutre vis-à-vis du
 domaine, toute chaîne affichée passe par `_()` dans les deux langues).
 
@@ -270,9 +270,9 @@ est scanné par son propre outillage à chaque push et pull request.
   durable et embarquent des attestations
   [PEP 740](https://peps.python.org/pep-0740/) (`release.yml`).
 - **Scan de secrets en pre-commit.** TruffleHog et la détection de clés privées
-  tournent en local avant chaque commit (voir [CONTRIBUTING.md](./CONTRIBUTING.md)).
+  tournent en local avant chaque commit (voir [CONTRIBUTING.fr.md](./CONTRIBUTING.fr.md)).
 
-Pour signaler une vulnérabilité, suivez [SECURITY.md](./SECURITY.md).
+Pour signaler une vulnérabilité, suivez [SECURITY.fr.md](./SECURITY.fr.md).
 
 ## Licence et attribution
 

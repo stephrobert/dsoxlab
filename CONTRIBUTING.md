@@ -1,5 +1,7 @@
 # Contributing to dsoxlab
 
+**Language:** [English](./CONTRIBUTING.md) · [Français](./CONTRIBUTING.fr.md)
+
 Thanks for your interest in improving `dsoxlab`. This document explains how to
 set up the project, the conventions we follow, and the rules that keep the
 engine healthy.

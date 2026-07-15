@@ -1,5 +1,7 @@
 # Security Policy
 
+**Language:** [English](./SECURITY.md) · [Français](./SECURITY.fr.md)
+
 ## Supported versions
 
 `dsoxlab` is in active development. Security fixes are applied to the latest
