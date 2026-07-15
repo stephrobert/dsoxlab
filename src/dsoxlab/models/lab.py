@@ -38,6 +38,7 @@ class LabDefinition:
     lab_type: str = "lab"       # "lab" | "challenge" | "capstone"
     bloc: int = 0               # bloc number 1-8; 0 = unassigned
     bloc_order: int = 0         # position within the bloc; 0 = unassigned
+    bloc_name: str = ""         # nom lisible du bloc (section meta.yml), ex. "Fondamentaux (l1)"
 
     # Translatable fields — overridden by lab.<lang>.yaml when available
     _TRANSLATABLE = ("title", "description")
