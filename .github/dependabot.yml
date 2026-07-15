@@ -7,6 +7,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    # Wait before proposing a brand-new release: a compromised package is
+    # usually yanked within days, so a cooldown shrinks the exposure window.
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -14,3 +18,5 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(ci)"
+    cooldown:
+      default-days: 7
