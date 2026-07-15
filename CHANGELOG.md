@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.1.3] - 2026-07-15
+
+### Added
+
+- **multi-host labs**: a `runtime.targets[].roles` mapping (e.g.
+  `roles: {server: alma-rhcsa-2.lab}`) lets a `vm` lab use several hosts at once.
+  Each role becomes an Ansible group `lab_<role>` (alongside `lab_target`, the
+  primary host where tests run), so `setup.yaml` / `solution.yaml` /
+  `cleanup.yaml` can configure a server and a client without hard-coding a FQDN.
+  The role hosts are validated against the provisioned inventory at run time.
+  Backward compatible: no `roles` means a single-host lab as before.
+
 ## [0.1.2] - 2026-07-15
 
 ### Added

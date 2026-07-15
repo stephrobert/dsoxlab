@@ -60,6 +60,14 @@ class Target:
     label_fr: str = ""
     """Description courte (français)."""
 
+    roles: dict[str, str] = field(default_factory=dict)
+    """Hôtes additionnels utilisés simultanément par le lab, par rôle —
+    ex. ``{"server": "alma-rhcsa-2.lab"}``. Chaque rôle devient un groupe
+    Ansible ``lab_<role>`` dans l'inventory du ``setup.yaml`` /
+    ``solution.yaml`` / ``cleanup.yaml``, en plus de ``lab_target`` (l'hôte
+    primaire, où tournent les tests). Vide = lab mono-hôte (défaut). Les FQDN
+    doivent être déclarés dans ``meta.yml: infra.hosts[]`` et provisionnés."""
+
     def label(self, lang: str = "en") -> str:
         """Retourne le label dans la langue demandée, fallback EN."""
         if lang == "fr" and self.label_fr:

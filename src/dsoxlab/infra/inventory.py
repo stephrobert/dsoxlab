@@ -40,6 +40,7 @@ def build_inventory(
     ssh_user: str = "student",
     terraform_outputs: dict[str, Any] | None = None,
     target_fqdn: str | None = None,
+    roles: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Construit un inventory Ansible (format dict) depuis meta + outputs.
 
@@ -139,6 +140,20 @@ def build_inventory(
             )
         children["lab_target"] = {
             "hosts": {target_fqdn: {}},
+        }
+
+    # Labs multi-hôtes : chaque rôle devient un groupe ``lab_<role>`` (ex.
+    # ``lab_server``) que le setup/solution/cleanup peut cibler, en plus de
+    # ``lab_target``. Les host_vars restent hérités du groupe ``labenv``.
+    for role_name, role_fqdn in (roles or {}).items():
+        if role_fqdn not in inventory_hosts:
+            raise ValueError(
+                f"role '{role_name}' → '{role_fqdn}' n'est pas dans la liste "
+                f"des hôtes connus : {sorted(inventory_hosts)} "
+                "(host non déclaré dans meta.yml ou non provisionné)."
+            )
+        children[f"lab_{role_name}"] = {
+            "hosts": {role_fqdn: {}},
         }
 
     return {"all": {"children": children}}

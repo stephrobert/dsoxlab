@@ -81,11 +81,18 @@ class LabDefinition:
                     f"{lab_yaml}: runtime.targets[{idx}] doit contenir "
                     f"'name' et 'host'."
                 )
+            roles_raw = t.get("roles") or {}
+            if not isinstance(roles_raw, dict):
+                raise ValueError(
+                    f"{lab_yaml}: runtime.targets[{idx}].roles doit être un "
+                    f"mapping role→fqdn, reçu : {type(roles_raw).__name__}"
+                )
             targets.append(Target(
                 name=str(t["name"]),
                 host=str(t["host"]),
                 label_en=str(t.get("label_en", "")),
                 label_fr=str(t.get("label_fr", "")),
+                roles={str(k): str(v) for k, v in roles_raw.items()},
             ))
 
         runtime = RuntimeConfig(
