@@ -271,10 +271,17 @@ class VmRuntime(BaseRuntime):
     def _inventory(
         self, repo_meta: RepoMetadata, target: Target
     ) -> dict[str, Any]:
-        """Inventory filtré au seul host de la target choisie."""
+        """Inventory du lab : ``lab_target`` = host primaire, plus un groupe
+        ``lab_<role>`` par rôle déclaré (labs multi-hôtes serveur/client).
+
+        Le groupe ``labenv`` contient de toute façon tous les hôtes
+        provisionnés ; les groupes synthétiques ne font que nommer les rôles
+        pour que les playbooks n'aient pas à coder un FQDN en dur.
+        """
         tf_outputs = read_terraform_outputs(repo_meta)
         return build_inventory(
             repo_meta,
             terraform_outputs=tf_outputs,
             target_fqdn=target.host,
+            roles=target.roles or None,
         )

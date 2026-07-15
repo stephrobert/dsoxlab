@@ -13,6 +13,18 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 - Rien pour l'instant.
 
+## [0.1.3] - 2026-07-15
+
+### Ajouté
+
+- **labs multi-hôtes** : un mapping `runtime.targets[].roles` (ex.
+  `roles: {server: alma-rhcsa-2.lab}`) permet à un lab `vm` d'utiliser plusieurs
+  hôtes à la fois. Chaque rôle devient un groupe Ansible `lab_<role>` (en plus de
+  `lab_target`, l'hôte primaire où tournent les tests), pour que `setup.yaml` /
+  `solution.yaml` / `cleanup.yaml` configurent un serveur et un client sans coder
+  de FQDN en dur. Les hôtes de rôle sont validés contre l'inventory provisionné
+  au runtime. Rétro-compatible : sans `roles`, lab mono-hôte comme avant.
+
 ## [0.1.2] - 2026-07-15
 
 ### Ajouté
