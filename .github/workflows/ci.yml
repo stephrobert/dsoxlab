@@ -1,8 +1,9 @@
-# Contribution gate. Every push and pull request to `main` must pass code
-# quality (ruff + mypy + pytest across supported Python versions) and a zizmor
-# static analysis of the workflows themselves. Deeper CI/CD policy scanning and
-# the compliance score live in plumber.yml; supply-chain posture in
-# scorecard.yml.
+# Contribution gate. zizmor statically analyzes the workflows first, as a fast
+# security gate; the heavier jobs (quality matrix, CodeQL) only run once it
+# passes, so an insecure workflow fails fast without burning runners.
+#
+# Deeper CI/CD policy scanning and the compliance score live in plumber.yml
+# (trusted context only); supply-chain posture in scorecard.yml.
 #
 # Hardening baseline: every action is pinned to a full commit SHA, the default
 # token has no permissions, each job grants only what it needs, checkout never
@@ -23,8 +24,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast security gate — the quality and CodeQL jobs depend on it.
+  zizmor:
+    name: Zizmor (workflow static analysis)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Gate-only (no SARIF upload) so the check also passes on pull requests
+      # from forks, where the token cannot write to code scanning. Findings in
+      # the Security tab come from CodeQL and plumber.yml on same-repo events.
+      - name: Zizmor
+        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          version: "1.26.1"
+          advanced-security: false
+
   quality:
     name: Lint, type-check and test (py${{ matrix.python-version }})
+    needs: zizmor
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -64,23 +88,27 @@ jobs:
       - name: Test (pytest)
         run: uv run pytest
 
-  zizmor:
-    name: Zizmor (workflow static analysis)
+  codeql:
+    name: CodeQL analyze (python)
+    needs: zizmor
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
+      security-events: write   # upload the CodeQL results to Code Scanning
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
-      # Gate-only (no SARIF upload) so the check also passes on pull requests
-      # from forks, where the token cannot write to code scanning. Findings in
-      # the Security tab come from plumber.yml on same-repo events.
-      - name: Zizmor
-        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
-          version: "1.26.1"
-          advanced-security: false
+          languages: python
+          build-mode: none   # Python is interpreted, no build step to observe
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          category: "/language:python"
