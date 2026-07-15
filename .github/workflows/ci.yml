@@ -88,6 +88,48 @@ jobs:
       - name: Test (pytest)
         run: uv run pytest
 
+  # Parity gate — run EVERY pre-commit hook (commit AND push stages) exactly as
+  # a contributor's local pre-commit would, from this project's locked env. The
+  # quality matrix above proves the code works on every supported Python; this
+  # job proves nothing enforced locally (hygiene, ruff, mypy, trufflehog,
+  # pytest) can be slipped past with `git commit --no-verify`. It runs the
+  # committed .pre-commit-config.yaml itself — no hand-maintained copy to drift.
+  pre-commit:
+    name: Pre-commit parity (all hooks)
+    needs: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # trufflehog walks git history
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.26"
+          enable-cache: true
+
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen
+
+      - name: Install trufflehog (version-pinned; the hook runs with --no-update)
+        # Official installer, pinned to the same version as the local pre-commit
+        # toolchain so CI and developer machines scan identically.
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/v3.95.2/scripts/install.sh \
+            | sh -s -- -b /usr/local/bin v3.95.2
+
+      - name: Run every hook (commit stage)
+        run: uv run pre-commit run --all-files --show-diff-on-failure --color always
+
+      - name: Run every hook (push stage)
+        run: uv run pre-commit run --all-files --hook-stage pre-push --show-diff-on-failure --color always
+
   codeql:
     name: CodeQL analyze (python)
     needs: zizmor
