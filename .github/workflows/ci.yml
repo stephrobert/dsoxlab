@@ -1,0 +1,86 @@
+# Contribution gate. Every push and pull request to `main` must pass code
+# quality (ruff + mypy + pytest across supported Python versions) and a zizmor
+# static analysis of the workflows themselves. Deeper CI/CD policy scanning and
+# the compliance score live in plumber.yml; supply-chain posture in
+# scorecard.yml.
+#
+# Hardening baseline: every action is pinned to a full commit SHA, the default
+# token has no permissions, each job grants only what it needs, checkout never
+# persists credentials, and jobs are time-boxed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Deny-by-default: jobs opt into the scopes they need, nothing is inherited.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, type-check and test (py${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    env:
+      # Passed through the environment (not template-expanded into run blocks)
+      # so no context value is ever interpolated into shell code.
+      PYTHON_VERSION: ${{ matrix.python-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.26"
+          enable-cache: true
+
+      - name: Install Python ${{ matrix.python-version }}
+        run: uv python install "$PYTHON_VERSION"
+
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen --python "$PYTHON_VERSION"
+
+      - name: Lint and security (ruff)
+        run: uv run ruff check src/dsoxlab tests
+
+      - name: Type-check (mypy strict)
+        run: uv run mypy src/dsoxlab
+
+      - name: Test (pytest)
+        run: uv run pytest
+
+  zizmor:
+    name: Zizmor (workflow static analysis)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Gate-only (no SARIF upload) so the check also passes on pull requests
+      # from forks, where the token cannot write to code scanning. Findings in
+      # the Security tab come from plumber.yml on same-repo events.
+      - name: Zizmor
+        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          version: "1.26.1"
+          advanced-security: false

@@ -1,0 +1,50 @@
+# Validates dsoxlab's own CI/CD with Plumber (getplumber.io): it analyzes the
+# repo's GitHub Actions workflows and repository settings against .plumber.yaml,
+# uploads findings to Code Scanning, publishes the compliance score to the
+# README badge, and fails below the threshold. The action verifies the
+# downloaded Plumber binary's SLSA build-provenance attestation before running.
+name: Plumber compliance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plumber:
+    name: Plumber analyze
+    # Uploading SARIF to Code Scanning needs GitHub Advanced Security (free on
+    # public repos), and the repo-settings checks (branch protection) can only
+    # be evaluated against the live public repository. Skips while private,
+    # activates automatically once the repo is public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to Code Scanning
+      actions: read            # read the workflow run for Plumber status
+      id-token: write          # OIDC to publish the score to score.getplumber.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Plumber compliance scan
+        uses: getplumber/plumber@fdd2a2d0555bb3b33cbb2efff3b955dea5a6bbf0 # v0.4.3
+        with:
+          version: "v0.4.3"
+          verify-attestation: "true"   # check the binary's SLSA provenance before running
+          threshold: "100"
+          upload-sarif: "true"
+          upload-artifacts: "true"
+          score-push: "true"           # publish the score to the README badge

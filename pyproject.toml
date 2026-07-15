@@ -1,0 +1,115 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dsoxlab"
+version = "0.1.0"
+description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "CC-BY-4.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Stéphane Robert" },
+]
+keywords = ["education", "labs", "devops", "linux", "ansible", "kubernetes", "training"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: System :: Systems Administration",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13",
+    "pyyaml>=6",
+    "click>=8",
+    # ansible-runner pilote ansible-core programmatiquement (API officielle
+    # Red Hat utilisée par AAP et ansible-navigator). Tire ansible-core en
+    # transitive — environ 100 MB sur disque ; acceptable pour un outil de
+    # formation devops.
+    "ansible-runner>=2.4",
+    # pytest + pytest-testinfra : dsoxlab check les invoque pour valider
+    # les labs. Embarqués dans le tool install pour que l'apprenant n'ait
+    # rien à installer localement (cohérent avec la philosophie "dsoxlab
+    # pilote tout").
+    "pytest>=8",
+    "pytest-testinfra>=10",
+]
+
+[project.scripts]
+dsoxlab = "dsoxlab.cli:app"
+
+[project.urls]
+Homepage = "https://blog.stephane-robert.info/"
+Documentation = "https://blog.stephane-robert.info/docs/"
+Repository = "https://github.com/stephrobert/dsoxlab"
+Issues = "https://github.com/stephrobert/dsoxlab/issues"
+Changelog = "https://github.com/stephrobert/dsoxlab/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+# `packages` walks src/dsoxlab and includes every file under it — Python
+# modules, the PEP 561 `py.typed` marker, and the provisioning templates
+# (Terraform HCL + cloud-init) consumed via importlib.resources. No
+# force-include is needed (and it would duplicate the templates package).
+packages = ["src/dsoxlab"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "mypy>=1.9",
+    "ruff>=0.4",
+    "types-PyYAML>=6",
+    "pre-commit>=3.5",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+# E/F are on by default; add flake8-bandit (S) as a lightweight security gate
+# so a single tool covers lint + security (mirrored in CI and pre-commit).
+extend-select = ["S"]
+ignore = [
+    # Inherent to a CLI that orchestrates external tools; not vulnerabilities.
+    "S603",  # subprocess called with an argument list (no shell) — the safe form
+    "S607",  # partial executable path — tools (git, ssh, terraform…) resolved via PATH
+    "S101",  # assert used for type narrowing in typed code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assertions are the whole point of a test
+
+[tool.mypy]
+strict = true
+files = ["src/dsoxlab"]
+
+# ansible-runner ne publie ni stubs ni marqueur py.typed. On neutralise
+# l'erreur d'import ici plutôt que par des « type: ignore » dispersés
+# dans infra/ansible.py : la dépendance est non typée en amont, ce n'est
+# pas un défaut de notre code.
+[[tool.mypy.overrides]]
+module = ["ansible_runner.*"]
+ignore_missing_imports = true
+
+# typer.completion expose get_completion_script à l'exécution mais ne le
+# ré-exporte pas explicitement ; sous --strict (no_implicit_reexport),
+# mypy le refuse. Quirk d'empaquetage de typer, pas un défaut de notre
+# code : on tolère le réexport implicite pour ce seul module.
+[[tool.mypy.overrides]]
+module = ["typer.completion"]
+implicit_reexport = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

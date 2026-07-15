@@ -1,0 +1,314 @@
+"""Génération dynamique de l'inventory Ansible.
+
+L'inventory est dérivé de deux sources :
+
+1. ``meta.yml: infra.hosts[]`` du dépôt fournisseur (FQDN, distro, role).
+2. Les **outputs Terraform** du provider courant — typiquement une map
+   ``hosts: { fqdn: ip, ... }`` produite par ``infra/terraform/<provider>/
+   outputs.tf``.
+
+En MVP, si Terraform n'a pas encore été appliqué, on tombe en mode
+**fallback meta.yml** qui utilise le champ legacy ``ip:`` des hosts
+(toujours utilisable pour le provider kvm avec DHCP statique).
+
+L'inventory généré reste un **dict Python** consommé directement par
+``ansible-runner`` — pas de fichier .ini écrit sur disque, sauf demande
+explicite via ``write_inventory_file()`` (utile pour debug ou pour
+``dsoxlab ssh``).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from pathlib import Path
+from typing import Any
+
+from ..models.repo import RepoMetadata
+
+logger = logging.getLogger(__name__)
+
+
+def build_inventory(
+    repo_meta: RepoMetadata,
+    *,
+    ssh_private_key: Path | None = None,
+    ssh_user: str = "student",
+    terraform_outputs: dict[str, Any] | None = None,
+    target_fqdn: str | None = None,
+) -> dict[str, Any]:
+    """Construit un inventory Ansible (format dict) depuis meta + outputs.
+
+    Args:
+        repo_meta: ``RepoMetadata`` du dépôt fournisseur.
+        ssh_private_key: Chemin vers la clé privée du lab. Si None,
+            cherche ``<repo>/ssh/id_ed25519``.
+        ssh_user: Utilisateur SSH (par défaut ``student``).
+        terraform_outputs: Outputs JSON de Terraform. Si fourni, l'IP de
+            chaque host est lue depuis ``outputs["hosts"][fqdn]``.
+            Sinon, fallback sur ``meta.yml: hosts[].ip``.
+        target_fqdn: Si fourni, l'inventory contient en plus un groupe
+            ``lab_target`` qui ne contient que ce host. C'est ce groupe
+            que les playbooks de lab (``setup.yaml``/``cleanup.yaml``/
+            ``solution.yaml``) doivent cibler via ``hosts: lab_target``.
+
+    Returns:
+        Dict au format inventory Ansible standard. Le groupe ``labenv``
+        contient tous les hosts ; si ``target_fqdn`` est fourni, le
+        groupe ``lab_target`` contient ce seul host (réutilise les
+        host_vars du groupe labenv).
+    """
+    if ssh_private_key is None:
+        ssh_private_key = repo_meta.path / "ssh" / "id_ed25519"
+
+    tf_hosts: dict[str, str] = {}
+    if terraform_outputs:
+        # Format attendu : {"hosts": {"value": {"fqdn1": "ip1", ...}}}
+        # ou directement {"fqdn1": "ip1"} selon que c'est `terraform output -json`.
+        raw = terraform_outputs.get("hosts")
+        if isinstance(raw, dict):
+            tf_hosts = {
+                k: str(v) for k, v in (raw.get("value", raw)).items()
+            }
+
+    # Bastion : extrait via bastion_info() pour bénéficier de la
+    # priorité meta.yml > output Terraform sur le user (cf.
+    # REFACTORING-PLAN §11.8 + commits du test E2E Outscale).
+    bastion = bastion_info(terraform_outputs, repo_meta=repo_meta)
+
+    # -F /dev/null : ignore la config SSH perso de l'apprenant
+    # (~/.ssh/config) qui peut contenir un ProxyJump appliqué par
+    # pattern d'IP (ex: "Host 10.*" → bastion d'un autre projet).
+    # Sans ça, ansible-runner va router le SSH lab via ce bastion
+    # tiers qui ne répond pas → "Connection to UNKNOWN port 65535".
+    base_ssh_args = "-F /dev/null -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    if bastion:
+        proxy_target = bastion["fqdn"] or bastion["public_ip"]
+        # On utilise ProxyCommand (et pas ProxyJump) pour pouvoir
+        # injecter explicitement -i <ssh_key> sur le hop bastion. En
+        # effet, OpenSSH n'applique pas l'option ``-i`` aux hops
+        # ProxyJump : il prend la clé par défaut ``~/.ssh/id_ed25519``
+        # qui ne matche pas le keypair du lab → "Permission denied".
+        base_ssh_args += (
+            f" -o ProxyCommand='ssh -F /dev/null -W %h:%p"
+            f" -i {ssh_private_key}"
+            f" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            f" {bastion['user']}@{proxy_target}'"
+        )
+
+    inventory_hosts: dict[str, dict[str, Any]] = {}
+    for host_def in repo_meta.infra.hosts:
+        ip = tf_hosts.get(host_def.name) or host_def.ip
+        if not ip:
+            logger.warning(
+                "Host %s sans IP : ni outputs Terraform ni meta.yml ip:. "
+                "Lance d'abord 'dsoxlab provision'.",
+                host_def.name,
+            )
+            continue
+
+        inventory_hosts[host_def.name] = {
+            "ansible_host": ip,
+            "ansible_user": ssh_user,
+            "ansible_ssh_private_key_file": str(ssh_private_key),
+            "ansible_ssh_common_args": base_ssh_args,
+            # Métadonnées propagées comme host_vars (utile pour les
+            # conditions Ansible : when distro == "alma10").
+            "distro": host_def.distro,
+            "role": host_def.role,
+        }
+
+    children: dict[str, Any] = {
+        "labenv": {"hosts": inventory_hosts},
+    }
+
+    # Groupe synthétique ``lab_target`` ciblé par les playbooks de lab.
+    # Contient uniquement le host correspondant à la target choisie.
+    # Les host_vars sont hérités via ``children`` du groupe labenv (les
+    # hosts ne sont pas redéfinis, on liste juste leur nom dans
+    # ``hosts:`` — Ansible résout les vars depuis labenv).
+    if target_fqdn:
+        if target_fqdn not in inventory_hosts:
+            raise ValueError(
+                f"target_fqdn '{target_fqdn}' n'est pas dans la liste des "
+                f"hôtes connus : {sorted(inventory_hosts)}"
+            )
+        children["lab_target"] = {
+            "hosts": {target_fqdn: {}},
+        }
+
+    return {"all": {"children": children}}
+
+
+def bastion_info(
+    terraform_outputs: dict[str, Any] | None,
+    repo_meta: "RepoMetadata | None" = None,
+) -> dict[str, str] | None:
+    """Extrait les infos du bastion depuis les outputs Terraform.
+
+    Retourne ``{user, fqdn, public_ip}`` ou ``None`` si aucun bastion
+    n'est configuré (cas KVM/Vagrant — accès direct).
+
+    Le ``user`` est lu en priorité depuis ``meta.yml: providers.<name>
+    .bastion_user`` si fourni (via ``repo_meta``). Cela permet de
+    changer l'utilisateur SSH du bastion sans avoir à re-applier
+    Terraform pour rafraîchir l'output.
+    """
+    if not terraform_outputs:
+        return None
+    raw = terraform_outputs.get("bastion")
+    if not isinstance(raw, dict):
+        return None
+    value = raw.get("value", raw)
+    if not isinstance(value, dict) or not value.get("public_ip"):
+        return None
+    # User : priorité meta.yml > output Terraform > défaut "ec2-user"
+    user = ""
+    if repo_meta is not None:
+        user = repo_meta.infra.provider_config().get("bastion_user", "")
+    if not user:
+        user = str(value.get("user", "ec2-user"))
+    return {
+        "user": user,
+        "fqdn": str(value.get("fqdn", "")),
+        "public_ip": str(value["public_ip"]),
+    }
+
+
+def inventory_path(repo_meta: RepoMetadata) -> Path:
+    """Retourne le chemin du fichier inventory cache (XDG)."""
+    cache_root = _xdg_cache_home() / "dsoxlab" / repo_meta.id
+    cache_root.mkdir(parents=True, exist_ok=True)
+    return cache_root / "inventory.json"
+
+
+def ssh_config_path(repo_meta: RepoMetadata) -> Path:
+    """Retourne le chemin du ssh_config OpenSSH généré pour ce repo."""
+    cache_root = _xdg_cache_home() / "dsoxlab" / repo_meta.id
+    cache_root.mkdir(parents=True, exist_ok=True)
+    return cache_root / "ssh_config"
+
+
+def write_ssh_config(
+    inventory: dict[str, Any], repo_meta: RepoMetadata
+) -> Path:
+    """Génère un ``ssh_config`` OpenSSH depuis l'inventory et l'écrit (XDG).
+
+    Utile pour les outils tiers (testinfra, scp, rsync, IDE) qui ne savent
+    pas parser des ``ansible_ssh_common_args`` complexes contenant un
+    ProxyCommand entre quotes. Avec un fichier ssh_config par-Host,
+    OpenSSH applique automatiquement le ProxyCommand bastion.
+
+    Returns:
+        Path du fichier ``ssh_config`` généré.
+    """
+    hosts = (
+        inventory.get("all", {})
+        .get("children", {})
+        .get("labenv", {})
+        .get("hosts", {})
+    )
+
+    lines: list[str] = [
+        "# Auto-généré par dsoxlab — ne pas éditer.",
+        "# Source : inventory dynamique (Terraform outputs + meta.yml).",
+        "",
+    ]
+    for name, vars_ in hosts.items():
+        ip = vars_.get("ansible_host", "")
+        user = vars_.get("ansible_user", "student")
+        identity = vars_.get("ansible_ssh_private_key_file", "")
+        extra = vars_.get("ansible_ssh_common_args", "") or ""
+
+        lines.append(f"Host {name}")
+        if ip:
+            lines.append(f"  HostName {ip}")
+        lines.append(f"  User {user}")
+        if identity:
+            lines.append(f"  IdentityFile {identity}")
+            lines.append("  IdentitiesOnly yes")
+        lines.append("  StrictHostKeyChecking no")
+        lines.append("  UserKnownHostsFile /dev/null")
+        # Extrait le ProxyCommand des ansible_ssh_common_args.
+        m = re.search(r"-o ProxyCommand=(?:'([^']*)'|\"([^\"]*)\")", extra)
+        if m:
+            proxy_cmd = m.group(1) or m.group(2)
+            lines.append(f"  ProxyCommand {proxy_cmd}")
+        lines.append("")
+
+    path = ssh_config_path(repo_meta)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+def write_inventory_file(
+    inventory: dict[str, Any], repo_meta: RepoMetadata
+) -> Path:
+    """Écrit l'inventory en JSON dans le cache XDG. Retourne le chemin.
+
+    Le format JSON est natif pour Ansible (``ANSIBLE_INVENTORY_ENABLED``
+    inclut le plugin ``constructed`` qui lit JSON). Plus simple que
+    ``ini`` à générer programmatiquement.
+    """
+    path = inventory_path(repo_meta)
+    path.write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    return path
+
+
+def read_terraform_outputs(repo_meta: RepoMetadata) -> dict[str, Any] | None:
+    """Lit les outputs Terraform du provider courant si disponibles.
+
+    Retourne None si le state Terraform n'existe pas encore ou si
+    ``terraform`` n'est pas installé. Les outputs sont au format JSON
+    natif (``terraform output -json``).
+
+    Note : le work-dir Terraform vit dans XDG state
+    (``~/.local/state/dsoxlab/<repo>/terraform/<provider>/``), pas dans
+    le dépôt training. Voir ``infra/terraform.py:workdir()``.
+    """
+    # Délégation à infra/terraform.py — single source of truth pour le path.
+    try:
+        from .terraform import ProviderNotImplemented, workdir
+
+        try:
+            tf_dir = workdir(repo_meta)
+        except ProviderNotImplemented:
+            return None
+    except ImportError:
+        return None
+
+    state_file = tf_dir / "terraform.tfstate"
+    if not state_file.is_file():
+        return None
+
+    try:
+        from ..utils.shell import run_command
+
+        result = run_command(
+            ["terraform", "-chdir=" + str(tf_dir), "output", "-json"],
+            check=False,
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        logger.debug("Lecture outputs Terraform impossible : %s", exc)
+        return None
+
+    if not result.ok or not result.stdout.strip():
+        return None
+
+    try:
+        outputs: dict[str, Any] = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    return outputs
+
+
+def _xdg_cache_home() -> Path:
+    """Retourne ``$XDG_CACHE_HOME`` ou ``~/.cache``."""
+    import os
+
+    env = os.environ.get("XDG_CACHE_HOME")
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path.home() / ".cache"

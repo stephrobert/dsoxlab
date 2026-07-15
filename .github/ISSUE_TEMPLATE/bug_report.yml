@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a defect in the dsoxlab CLI
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in the fields
+        below so we can reproduce and fix it quickly.
+        For security issues, do not open a public issue — see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I run `dsoxlab check ...`, it fails with ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, run from which directory / lab repository.
+      placeholder: |
+        1. cd ~/Projets/linux-training
+        2. dsoxlab run linux.depanner.service-crash-loop
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: dsoxlab version
+      description: Output of `dsoxlab --version`.
+      placeholder: dsoxlab 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04 / Fedora 41 / ...
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime involved
+      options:
+        - shell
+        - incus
+        - kvm
+        - not applicable
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Relevant output. This will be rendered as code, no backticks needed.
+      render: shell
+    validations:
+      required: false

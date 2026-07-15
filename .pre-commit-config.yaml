@@ -1,0 +1,66 @@
+# Pre-commit hooks for dsoxlab. This repository ships public, so the hooks are a
+# hard stop against leaking secrets/keys and against pushing artifacts that do
+# not belong in the tree.
+#
+# Install once:  uv run pre-commit install --install-hooks
+# (this wires both the pre-commit and pre-push stages)
+# Run on everything:  uv run pre-commit run --all-files
+#
+# The ruff/mypy/pytest hooks call `uv run …` on purpose: the tool versions come
+# from this project's lockfile, so the hooks behave exactly like CI — one source
+# of truth, no drift between a mirrored hook and the project's own toolchain.
+
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  # General hygiene + a hard stop on committing secrets and private keys.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '(^LICENSE$|\.md$)'
+      - id: end-of-file-fixer
+        exclude: '^LICENSE$'
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=2048']
+      - id: detect-private-key           # blocks SSH keys — dsoxlab generates lab keys
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Project toolchain — lint + security (ruff S rules), strict typing, tests.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint + security)
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run mypy src/dsoxlab
+        language: system
+        pass_filenames: false
+        files: ^src/dsoxlab/.*\.py$
+
+      - id: trufflehog
+        name: trufflehog (secret scan)
+        # --no-update: never auto-fetch a new binary at hook time (supply-chain hardening).
+        entry: trufflehog git file://. --since-commit HEAD --results=verified --fail --no-update
+        language: system
+        pass_filenames: false
+
+      # Full test suite runs on push (kept off the per-commit path for speed).
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

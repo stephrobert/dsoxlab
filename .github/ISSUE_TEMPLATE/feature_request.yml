@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an idea or improvement for dsoxlab
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remember the golden rule: the engine stays domain-agnostic. Domain
+        logic belongs in a lab repository's contract, not in dsoxlab itself.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How could dsoxlab solve it? CLI command, contract field, runtime…
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: agnostic
+    attributes:
+      label: Domain-agnostic check
+      options:
+        - label: This request keeps the engine free of domain-specific logic.
+          required: true

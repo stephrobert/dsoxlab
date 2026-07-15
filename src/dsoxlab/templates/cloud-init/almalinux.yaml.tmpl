@@ -1,0 +1,62 @@
+#cloud-config
+# Cloud-init AlmaLinux 10 — VMs lab dsoxlab.
+# Variables Terraform substituées via templatefile() : hostname, ssh_pubkey.
+
+hostname: ${hostname}
+fqdn: ${hostname}.lab
+manage_etc_hosts: true
+preserve_hostname: false
+
+users:
+  - name: student
+    groups: [wheel]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    # lock_passwd: false + passwd: '*' : sshd 9+ (AlmaLinux 10, Ubuntu
+    # 24.04) rejette les comptes ``locked`` (hash préfixé par ``!``)
+    # même en authentification par clé publique. Cloud-init applique
+    # ``lock_passwd: true`` par défaut → préfixe ``!`` devant tout
+    # passwd. On force explicitement ``false`` pour empêcher ce
+    # préfixe, et ``passwd: '*'`` rend le compte sans password
+    # possible (mais débloqué côté shadow → SSH key OK).
+    lock_passwd: false
+    passwd: "*"
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+
+disable_root: true
+ssh_pwauth: false
+
+# Outils minimum pour les labs RHCSA — diagnostic et observabilité.
+# Les paquets spécifiques (lvm2, parted, xfsprogs, firewalld) sont
+# déjà dans l'image AlmaLinux Cloud par défaut.
+packages:
+  # openssh-server : NON préinstallé sur les images Incus cloud (Incus
+  # assume incus exec via l'agent virtio). On l'installe pour avoir un
+  # flow SSH unifié avec les autres providers (kvm, outscale).
+  - openssh-server
+  - vim-enhanced
+  - tmux
+  - bash-completion
+  - tree
+  - lsof
+  - strace
+  - tcpdump
+  - bind-utils
+  - net-tools
+  # qemu-guest-agent : laisse libvirt récupérer l'IP via virtio channel
+  # (``virsh domifaddr --source agent``). Indispensable côté provider kvm
+  # quand on ne veut pas dépendre du DHCP lease (qui peut être lent ou
+  # absent sur les premiers boots).
+  - qemu-guest-agent
+
+# Sécurité par défaut (cohérent avec la directive sécurité du framework) :
+# SELinux reste enforcing. Firewalld reste activé.
+runcmd:
+  # Garde-fou anti-locking : si cloud-init (ou autre) a verrouillé le
+  # compte, on force le hash à '*' (pas de password possible mais
+  # compte débloqué côté shadow). Idempotent.
+  - [ usermod, -p, "*", student ]
+  - [ systemctl, enable, --now, sshd ]
+  - [ systemctl, enable, --now, firewalld ]
+  - [ systemctl, enable, --now, qemu-guest-agent ]
