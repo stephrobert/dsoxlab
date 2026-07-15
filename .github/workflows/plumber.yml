@@ -3,13 +3,19 @@
 # uploads findings to Code Scanning, publishes the compliance score to the
 # README badge, and fails below the threshold. The action verifies the
 # downloaded Plumber binary's SLSA build-provenance attestation before running.
+#
+# This workflow runs ONLY in trusted contexts (push to main, schedule, manual):
+# it needs a privileged token (Administration:read) to verify branch protection,
+# and that secret must never be exposed to pull_request runs — especially from
+# forks. Pull requests are gated for workflow security by zizmor in ci.yml,
+# which uses no secrets.
 name: Plumber compliance
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: '30 2 * * 1'
   workflow_dispatch:
 
 permissions: {}
@@ -21,13 +27,14 @@ concurrency:
 jobs:
   plumber:
     name: Plumber analyze
-    # Uploading SARIF to Code Scanning needs GitHub Advanced Security (free on
-    # public repos), and the repo-settings checks (branch protection) can only
-    # be evaluated against the live public repository. Skips while private,
-    # activates automatically once the repo is public.
+    # Skips while private (SARIF upload needs Advanced Security, free on public
+    # repos); activates automatically once the repo is public.
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # The privileged token lives in this protected environment, which is
+    # restricted to the main branch — it is unreachable from pull_request runs.
+    environment: security
     permissions:
       contents: read
       security-events: write   # upload SARIF to Code Scanning
@@ -48,10 +55,7 @@ jobs:
           upload-sarif: "true"
           upload-artifacts: "true"
           score-push: "true"           # publish the score to the README badge
-          # Branch protection IS enforced on main, but verifying it needs a token
-          # with Administration:read, which the default GITHUB_TOKEN cannot carry.
-          # OpenSSF Scorecard (scorecard.yml) independently audits branch
-          # protection, so we keep Plumber focused on the workflow controls here.
-          # To also gate branch protection, pass a fine-grained PAT with
-          # Administration:read via the `github-token` input and drop this skip.
-          skip-controls: "branchMustBeProtected"
+          # Fine-grained PAT (Administration + Contents + Metadata = Read),
+          # stored as an environment secret in the protected `security`
+          # environment, so branchMustBeProtected is verified for real.
+          github-token: ${{ secrets.PLUMBER_ADMIN_TOKEN }}
