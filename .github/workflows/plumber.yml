@@ -48,3 +48,10 @@ jobs:
           upload-sarif: "true"
           upload-artifacts: "true"
           score-push: "true"           # publish the score to the README badge
+          # Branch protection IS enforced on main, but verifying it needs a token
+          # with Administration:read, which the default GITHUB_TOKEN cannot carry.
+          # OpenSSF Scorecard (scorecard.yml) independently audits branch
+          # protection, so we keep Plumber focused on the workflow controls here.
+          # To also gate branch protection, pass a fine-grained PAT with
+          # Administration:read via the `github-token` input and drop this skip.
+          skip-controls: "branchMustBeProtected"
