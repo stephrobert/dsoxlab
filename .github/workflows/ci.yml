@@ -117,12 +117,23 @@ jobs:
       - name: Sync dependencies (locked)
         run: uv sync --frozen
 
-      - name: Install trufflehog (version-pinned; the hook runs with --no-update)
-        # Official installer, pinned to the same version as the local pre-commit
-        # toolchain so CI and developer machines scan identically.
+      - name: Install trufflehog (verified release binary; the hook runs with --no-update)
+        # Download the pinned release tarball and verify its SHA-256 against the
+        # published checksums before use — no piped remote script (Plumber
+        # ISSUE-411). Same version as the local pre-commit toolchain.
+        env:
+          TRUFFLEHOG_VERSION: "3.95.2"
         run: |
-          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/v3.95.2/scripts/install.sh \
-            | sh -s -- -b /usr/local/bin v3.95.2
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}"
+          asset="trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/checksums.txt" "${base}/trufflehog_${TRUFFLEHOG_VERSION}_checksums.txt"
+          (cd "${workdir}" && grep " ${asset}$" checksums.txt | sha256sum -c -)
+          tar -xzf "${workdir}/${asset}" -C "${workdir}" trufflehog
+          sudo install -m 0755 "${workdir}/trufflehog" /usr/local/bin/trufflehog
+          trufflehog --version
 
       - name: Run every hook (commit stage)
         run: uv run pre-commit run --all-files --show-diff-on-failure --color always
