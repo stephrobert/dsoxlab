@@ -496,11 +496,11 @@ def print_lab_welcome(lab: LabDefinition) -> None:
 
 
 def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
-    """Display the challenge brief (challenge/README.md or README_FR.md) for a lab."""
+    """Display the challenge brief (challenge/README.md or README.<lang>.md)."""
     from rich.markdown import Markdown
     from rich.rule import Rule
 
-    localised = lab.path / "challenge" / f"README_{lang.upper()}.md"
+    localised = lab.path / "challenge" / f"README.{lang}.md"
     challenge_file = (
         localised
         if lang != "en" and localised.exists()

@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.1.5] - 2026-07-15
+
+### Added
+
+- **hints i18n**: the modern hint format (`text_en` / `text_fr`) now also accepts
+  base64-encoded values, so hints can be both bilingual and obfuscated in the
+  file. The loader tries base64 first and falls back to plain text.
+
+### Changed
+
+- **challenge i18n**: the localized challenge brief is resolved as
+  `challenge/README.<lang>.md` (e.g. `README.fr.md`), consistent with
+  `scenario.<lang>.md` and the root `README.<lang>.md` — instead of the old
+  `README_FR.md` naming.
+
 ## [0.1.4] - 2026-07-15
 
 ### Fixed
