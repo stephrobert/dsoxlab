@@ -278,6 +278,7 @@ def apply(
     auto_approve: bool = True,
     on_event: Callable[[dict[str, Any]], None] | None = None,
     targets: list[str] | None = None,
+    target_hosts: list[str] | None = None,
 ) -> ProvisionResult:
     """Lance ``terraform apply`` et retourne les outputs.
 
@@ -314,6 +315,12 @@ def apply(
         cmd.append("-auto-approve")
     for t in targets or []:
         cmd.append(f"-target={t}")
+    # Scope les ressources dédiées (disques additionnels) aux hôtes ciblés,
+    # complément indispensable de -target : sans lui, le for_each extra
+    # créerait le disque d'autres hôtes (issue #1). Templates ignorant la
+    # variable la déclarent quand même (default []), donc -var est sûr.
+    if target_hosts:
+        cmd += ["-var", f"target_hosts={json.dumps(target_hosts)}"]
     if on_event is not None:
         cmd.append("-json")
         _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
@@ -400,6 +407,7 @@ def destroy(
     auto_approve: bool = True,
     on_event: Callable[[dict[str, Any]], None] | None = None,
     targets: list[str] | None = None,
+    target_hosts: list[str] | None = None,
 ) -> None:
     """Lance ``terraform destroy``.
 
@@ -424,6 +432,11 @@ def destroy(
         cmd.append("-auto-approve")
     for t in targets or []:
         cmd.append(f"-target={t}")
+    # Même scoping qu'à l'apply : sur un destroy --host, ne détruire que le
+    # disque additionnel de l'hôte ciblé (le for_each extra est filtré par
+    # target_hosts). Vide = tous les hôtes.
+    if target_hosts:
+        cmd += ["-var", f"target_hosts={json.dumps(target_hosts)}"]
     if on_event is not None:
         cmd.append("-json")
         _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
@@ -466,10 +479,15 @@ def host_targets(provider: str, fqdn: str) -> list[str]:
             f'outscale_vm.host["{fqdn}"]',
         ]
     if provider == "incus":
-        # incus_instance contient déjà disque + NIC + cloud-init en
-        # config inline → une seule ressource à cibler par host.
+        # Instance + son volume extra dédié. À l'apply, -target de
+        # l'instance suffit à créer le volume (dépendance amont) ; mais au
+        # destroy, le volume amont N'EST PAS détruit par -target de la seule
+        # instance → on le cible explicitement pour que `destroy --host X`
+        # le nettoie. Le for_each extra étant filtré par target_hosts
+        # (issue #1), cibler extra["<host sans disque>"] est un no-op bénin.
         return [
             f'incus_instance.host["{fqdn}"]',
+            f'incus_storage_volume.extra["{fqdn}"]',
         ]
     raise NotImplementedError(
         f"--host non implémenté pour le provider '{provider}'"

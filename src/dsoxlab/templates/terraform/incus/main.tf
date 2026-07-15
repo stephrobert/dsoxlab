@@ -43,10 +43,25 @@ locals {
   hosts_with_idx = [
     for idx, h in var.hosts : merge(h, {
       idx = idx
-      mac = format("00:16:3e:cd:00:%02x", idx + 16)  # OUI Xen/LXC
+      mac = format("00:16:3e:cd:00:%02x", idx + 16) # OUI Xen/LXC
       ip  = cidrhost(var.network_cidr, idx + 11)
     })
   ]
+
+  # Hôtes dont on crée réellement le disque additionnel : ceux qui en
+  # déclarent un (extra_disk_gb > 0) ET, si un ciblage --host est actif
+  # (var.target_hosts non vide), qui sont dans la cible. Sinon TOUS les
+  # hôtes à disque. Ce filtrage évite que `provision --host X` ne crée le
+  # volume extra d'un AUTRE hôte : terraform -target de l'instance tire le
+  # for_each extra en entier, mais ce for_each ne contient alors que les
+  # volumes des hôtes ciblés (issue #1). La référence de ressource est
+  # conservée dans le device → l'ordre create/destroy reste correct.
+  in_scope_extra = {
+    for h in local.hosts_with_idx : h.name => h
+    if h.extra_disk_gb > 0 && (
+      length(var.target_hosts) == 0 || contains(var.target_hosts, h.name)
+    )
+  }
 }
 
 # ── Réseau Incus dédié (bridge NAT) ───────────────────────────────────────────
@@ -82,9 +97,7 @@ resource "incus_network" "lab" {
 # (pas formaté) que la VM voit comme /dev/sdb (virtio-scsi sur Incus).
 
 resource "incus_storage_volume" "extra" {
-  for_each = {
-    for h in local.hosts_with_idx : h.name => h if h.extra_disk_gb > 0
-  }
+  for_each = local.in_scope_extra
 
   name         = "${replace(each.value.name, ".", "-")}-extra"
   pool         = "default"
@@ -109,12 +122,12 @@ resource "incus_instance" "host" {
   running = true
 
   config = {
-    "limits.cpu"               = tostring(each.value.vcpu)
-    "limits.memory"            = "${each.value.ram_mb}MiB"
-    "boot.autostart"           = "true"
+    "limits.cpu"     = tostring(each.value.vcpu)
+    "limits.memory"  = "${each.value.ram_mb}MiB"
+    "boot.autostart" = "true"
     # Cloud-init NoCloud-style : Incus pose le seed via virtio-fs ou
     # config drive selon la version. user-data = full YAML cloud-config.
-    "cloud-init.user-data"     = templatefile(
+    "cloud-init.user-data" = templatefile(
       "${path.module}/../../cloud-init/${local.distro_to_template[each.value.distro]}.yaml.tmpl",
       {
         hostname   = each.value.name
@@ -123,7 +136,7 @@ resource "incus_instance" "host" {
     )
     # Réservation DHCP statique côté Incus : la NIC reçoit toujours la
     # même IP au sein du bridge.
-    "user.lab.ip"  = each.value.ip
+    "user.lab.ip"   = each.value.ip
     "user.lab.role" = each.value.role
   }
 
@@ -133,10 +146,10 @@ resource "incus_instance" "host" {
     name = "eth0"
     type = "nic"
     properties = {
-      "name"           = "eth0"
-      "network"        = incus_network.lab.name
-      "ipv4.address"   = each.value.ip
-      "hwaddr"         = each.value.mac
+      "name"         = "eth0"
+      "network"      = incus_network.lab.name
+      "ipv4.address" = each.value.ip
+      "hwaddr"       = each.value.mac
     }
   }
 
@@ -167,11 +180,13 @@ resource "incus_instance" "host" {
     }
   }
 
-  # Disque additionnel optionnel (extra_disk_gb > 0). Apparaît dans
-  # la VM comme /dev/sdb (virtio-scsi). On utilise dynamic pour ne
-  # créer le device QUE pour les hosts concernés.
+  # Disque additionnel optionnel. Apparaît dans la VM comme /dev/sdb
+  # (virtio-scsi). On n'attache le device QUE quand le volume extra de
+  # cet hôte est réellement créé (cf. local.in_scope_extra) : ainsi le
+  # ciblage --host reste cohérent (pas de référence à un volume filtré)
+  # et la référence de ressource garde l'ordre create/destroy.
   dynamic "device" {
-    for_each = each.value.extra_disk_gb > 0 ? [each.value] : []
+    for_each = contains(keys(local.in_scope_extra), each.value.name) ? [each.value] : []
     content {
       name = "extra"
       type = "disk"
