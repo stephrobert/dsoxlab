@@ -22,6 +22,10 @@ domaine ne vit dans le moteur.
 > Compagnon des tutoriels de
 > [blog.stephane-robert.info](https://blog.stephane-robert.info).
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/stephrobert/dsoxlab/main/docs/demo.gif" alt="dsoxlab en action : list-labs et show" width="820">
+</p>
+
 ---
 
 ## Pourquoi dsoxlab
@@ -69,7 +73,7 @@ Les labs vivent dans leurs propres dépôts, publiés séparément du moteur.
 Clonez-en un d'abord, puis lancez `dsoxlab` depuis l'intérieur :
 
 ```bash
-# 1. Cloner un catalogue de labs (ex. linux-dsoxlab-training, à venir)
+# 1. Cloner un catalogue de labs (ex. linux-dsoxlab-training)
 git clone https://github.com/stephrobert/linux-dsoxlab-training.git
 cd linux-dsoxlab-training
 

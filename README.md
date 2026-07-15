@@ -23,6 +23,10 @@ about a specific domain lives in the engine.
 > Companion to the tutorials on
 > [blog.stephane-robert.info](https://blog.stephane-robert.info).
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/stephrobert/dsoxlab/main/docs/demo.gif" alt="dsoxlab in action: list-labs and show" width="820">
+</p>
+
 ---
 
 ## Why dsoxlab
@@ -69,7 +73,7 @@ Labs live in their own repositories, published separately from the engine.
 Clone one first, then run `dsoxlab` from inside it:
 
 ```bash
-# 1. Clone a lab catalog (e.g. linux-dsoxlab-training — coming soon)
+# 1. Clone a lab catalog (e.g. linux-dsoxlab-training)
 git clone https://github.com/stephrobert/linux-dsoxlab-training.git
 cd linux-dsoxlab-training
 
