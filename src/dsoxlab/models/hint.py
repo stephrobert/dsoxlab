@@ -31,6 +31,22 @@ from pathlib import Path
 import yaml
 
 
+def _decode_hint(raw: object) -> str:
+    """Décode un texte d'indice : base64 si possible, sinon plain text.
+
+    Permet d'obfusquer les indices (les garder illisibles en clair dans le
+    fichier) tout en supportant du texte brut. S'applique aux champs
+    ``text_en``/``text_fr`` (i18n) comme au ``text`` legacy.
+    """
+    text = str(raw or "")
+    if not text:
+        return ""
+    try:
+        return base64.b64decode(text.encode(), validate=True).decode().rstrip("\n")
+    except (ValueError, binascii.Error, UnicodeDecodeError):
+        return text.rstrip("\n")
+
+
 @dataclass
 class Hint:
     text_en: str = ""
@@ -63,19 +79,15 @@ class HintFile:
             text_en = ""
             text_fr = ""
 
-            # Format moderne i18n
+            # Format moderne i18n. text_en/text_fr acceptent aussi le base64
+            # (même obfuscation que le legacy) : on tente le décodage, fallback
+            # plain text.
             if "text_en" in h or "text_fr" in h:
-                text_en = str(h.get("text_en", "")).rstrip("\n")
-                text_fr = str(h.get("text_fr", "")).rstrip("\n")
+                text_en = _decode_hint(h.get("text_en", ""))
+                text_fr = _decode_hint(h.get("text_fr", ""))
             # Format legacy : text unique (base64 ou plain)
             elif "text" in h:
-                raw = str(h["text"])
-                # Tente base64 d'abord ; sinon fallback en plain text
-                try:
-                    decoded = base64.b64decode(raw.encode(), validate=True).decode()
-                    text_en = decoded
-                except (ValueError, binascii.Error, UnicodeDecodeError):
-                    text_en = raw
+                text_en = _decode_hint(h["text"])
 
             hints.append(
                 Hint(

@@ -13,6 +13,22 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 - Rien pour l'instant.
 
+## [0.1.5] - 2026-07-15
+
+### Ajouté
+
+- **hints i18n** : le format moderne d'indice (`text_en` / `text_fr`) accepte
+  désormais aussi des valeurs encodées en base64, pour que les indices soient à
+  la fois bilingues et obfusqués dans le fichier. Le loader tente le base64
+  d'abord, avec repli sur le texte brut.
+
+### Modifié
+
+- **challenge i18n** : le brief de challenge localisé est résolu en
+  `challenge/README.<lang>.md` (ex. `README.fr.md`), cohérent avec
+  `scenario.<lang>.md` et le `README.<lang>.md` racine — au lieu de l'ancien
+  nommage `README_FR.md`.
+
 ## [0.1.4] - 2026-07-15
 
 ### Corrigé
