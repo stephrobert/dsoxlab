@@ -86,6 +86,17 @@ def _assign_section(
         # par défaut on prend la catégorie du dépôt.
         if not lab.section or lab.section == "linux":
             lab.section = repo_meta.category
+        # Rattache le lab à sa section pédagogique du meta.yml (l1, l2, …) pour
+        # que ``dsoxlab progress`` affiche un nom de bloc clair au lieu de « ? ».
+        try:
+            rel = yaml_path.parent.relative_to(root / "labs").as_posix()
+        except ValueError:
+            rel = ""
+        for idx, section in enumerate(repo_meta.sections, start=1):
+            if rel in section.labs:
+                lab.bloc = lab.bloc or idx
+                lab.bloc_name = section.title or section.id
+                break
         return
 
     # Mode legacy : inférence depuis le chemin (compat ancienne

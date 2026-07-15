@@ -13,6 +13,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 - Rien pour l'instant.
 
+## [0.1.4] - 2026-07-15
+
+### Corrigé
+
+- **progress** : `dsoxlab progress` affiche désormais un nom de bloc clair (le
+  titre de la section meta.yml, ex. « Fondamentaux (l1) ») au lieu de `?`, et la
+  colonne Bloc est alignée à gauche. Chaque lab est rattaché à sa section
+  meta.yml à la découverte (`bloc` + nouveau `bloc_name`), donc le récapitulatif
+  regroupe par vraie section plutôt que par un `bloc=0` non affecté.
+
 ## [0.1.3] - 2026-07-15
 
 ### Ajouté

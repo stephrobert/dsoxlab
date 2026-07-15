@@ -267,7 +267,7 @@ def print_progress_table(
         blocs.setdefault(lab.bloc, []).append(lab)
 
     table = Table(title=_("progress_table_title"), show_lines=True)
-    table.add_column(_("col_bloc_num"), justify="center", style="bold")
+    table.add_column(_("col_bloc_num"), justify="left", style="bold")
     table.add_column(_("col_bloc_done"), justify="center")
     table.add_column(_("col_bloc_avg"), justify="center")
     table.add_column(_("col_challenge"), justify="center")
@@ -316,7 +316,11 @@ def print_progress_table(
         else:
             capstone_text = "—"
 
-        bloc_label = str(bloc_num) if bloc_num else "?"
+        # Nom de bloc lisible (titre de la section meta.yml) plutôt qu'un
+        # numéro nu ou « ? ». Fallback : numéro, puis « ? » si vraiment non
+        # rattaché (ex. lab hors de toute section).
+        bloc_name = next((lab.bloc_name for lab in bloc_labs if lab.bloc_name), "")
+        bloc_label = bloc_name or (str(bloc_num) if bloc_num else "?")
         table.add_row(bloc_label, done_text, avg_text, challenge_text, capstone_text)
 
     console.print(table)

@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.1.4] - 2026-07-15
+
+### Fixed
+
+- **progress**: `dsoxlab progress` now shows a clear bloc name (the meta.yml
+  section title, e.g. "Fondamentaux (l1)") instead of `?`. Each lab is attached
+  to its meta.yml section during discovery (`bloc` + new `bloc_name`), so the
+  summary groups by real section instead of an unassigned `bloc=0`.
+
 ## [0.1.3] - 2026-07-15
 
 ### Added
