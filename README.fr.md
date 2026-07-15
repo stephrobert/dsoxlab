@@ -65,11 +65,15 @@ locale attendue par les runtimes : SSH, Terraform, libvirt/Incus et la pile
 
 ## Prise en main
 
-```bash
-# Se placer dans un dépôt qui héberge des labs (linux-training, ansible-training…)
-cd ~/Projets/linux-training
+Les labs vivent dans leurs propres dépôts, publiés séparément du moteur.
+Clonez-en un d'abord, puis lancez `dsoxlab` depuis l'intérieur :
 
-# Le contexte actif est détecté automatiquement via le meta.yml du dépôt
+```bash
+# 1. Cloner un catalogue de labs (ex. linux-dsoxlab-training, à venir)
+git clone https://github.com/stephrobert/linux-dsoxlab-training.git
+cd linux-dsoxlab-training
+
+# 2. Le contexte actif est détecté automatiquement via le meta.yml du dépôt
 dsoxlab list-labs
 dsoxlab show linux.depanner.service-crash-loop
 dsoxlab run linux.depanner.service-crash-loop

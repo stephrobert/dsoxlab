@@ -65,11 +65,15 @@ embedded `pytest` stack.
 
 ## Quickstart
 
-```bash
-# Move into a repository that hosts labs (linux-training, ansible-training, …)
-cd ~/Projets/linux-training
+Labs live in their own repositories, published separately from the engine.
+Clone one first, then run `dsoxlab` from inside it:
 
-# The active context is detected automatically from the repo's meta.yml
+```bash
+# 1. Clone a lab catalog (e.g. linux-dsoxlab-training — coming soon)
+git clone https://github.com/stephrobert/linux-dsoxlab-training.git
+cd linux-dsoxlab-training
+
+# 2. The active context is detected automatically from the repo's meta.yml
 dsoxlab list-labs
 dsoxlab show linux.depanner.service-crash-loop
 dsoxlab run linux.depanner.service-crash-loop
