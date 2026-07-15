@@ -183,6 +183,10 @@ def info(msg: str) -> None:
     console.print(f"[cyan]ℹ[/cyan] {msg}")
 
 
+def warn(msg: str) -> None:
+    console.print(f"[yellow]⚠[/yellow] {msg}")
+
+
 def error(msg: str) -> None:
     err_console.print(f"✘ {msg}")
 
