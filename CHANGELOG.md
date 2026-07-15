@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.1.2] - 2026-07-15
+
+### Added
+
+- **provision**: after `terraform apply`, `dsoxlab provision` now waits for each
+  host to become truly reachable — `sshd` up, the `student` account created, and
+  cloud-init finished (`cloud-init status --wait`) — before returning. This
+  removes the "unreachable" (dark) failure that hit the very first `dsoxlab run`
+  right after provisioning, so no manual retry is needed. A `HostReadyTimeout`
+  falls back to a warning (the VM may still be booting).
+
+### Fixed
+
+- **version**: `__version__` is now read from the installed package metadata
+  instead of a hard-coded string, so `dsoxlab --version` stays in sync with
+  `pyproject.toml` (it was stuck at `0.1.0`).
+
 ## [0.1.1] - 2026-07-15
 
 ### Fixed

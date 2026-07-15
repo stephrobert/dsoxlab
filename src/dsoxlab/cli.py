@@ -64,6 +64,7 @@ from .reporting import (
     print_lab_course,
     print_lab_welcome,
     success,
+    warn,
 )
 from .models import (
     CourseManifest,
@@ -1202,6 +1203,45 @@ def provision(
     except Exception as exc:  # noqa: BLE001 — message utilisateur direct
         error(_("provision_failed", error=str(exc)))
         raise typer.Exit(4)
+
+    # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
+    # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
+    # échoue en « unreachable » car la VM boote encore.
+    from .infra.inventory import HostReadyTimeout, wait_for_hosts_ready
+
+    ready_hosts = sorted(result.hosts)
+    if ready_hosts:
+        from rich.progress import (
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold]{task.description}"),
+            TimeElapsedColumn(),
+            transient=True,
+            console=console,
+        ) as progress:
+            task = progress.add_task(_("provision_waiting_ssh"), total=None)
+
+            def _on_attempt(fqdn: str, attempt: int) -> None:
+                progress.update(
+                    task,
+                    description=_(
+                        "provision_waiting_ssh_host", host=fqdn, attempt=attempt
+                    ),
+                )
+
+            try:
+                wait_for_hosts_ready(
+                    repo_meta, ready_hosts, on_attempt=_on_attempt
+                )
+            except HostReadyTimeout as exc:
+                progress.stop()
+                warn(_("provision_ssh_timeout", error=str(exc)))
 
     success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):

@@ -22,6 +22,7 @@ from .console import (
     print_scores_table,
     print_structure_reports,
     success,
+    warn,
 )
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "print_scores_table",
     "print_structure_reports",
     "success",
+    "warn",
 ]

@@ -22,6 +22,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import subprocess
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -241,6 +244,90 @@ def write_ssh_config(
     path.write_text("\n".join(lines), encoding="utf-8")
     path.chmod(0o600)
     return path
+
+
+class HostReadyTimeout(RuntimeError):
+    """Levée quand un host ne devient pas joignable en SSH dans le délai imparti."""
+
+
+def wait_for_hosts_ready(
+    repo_meta: RepoMetadata,
+    hosts: list[str],
+    *,
+    timeout: float = 180.0,
+    poll_interval: float = 3.0,
+    connect_timeout: int = 8,
+    on_attempt: Callable[[str, int], None] | None = None,
+) -> None:
+    """Attend que chaque host soit réellement utilisable après ``terraform apply``.
+
+    Juste après le provisioning, la VM boote encore : ``sshd`` démarre, puis
+    cloud-init crée l'utilisateur ``student`` et configure sudo. Tant que ce
+    n'est pas terminé, la première commande ``dsoxlab run`` échoue en
+    *unreachable* (« dark ») côté Ansible. On sonde donc une connexion SSH
+    réelle sous le compte ``student`` — ce qui prouve à la fois que ``sshd``
+    répond et que le compte existe — puis on laisse ``cloud-init status --wait``
+    bloquer jusqu'à la fin de la configuration.
+
+    Args:
+        repo_meta: métadonnées du dépôt (pour construire le ssh_config).
+        hosts: FQDN à attendre (typiquement ``result.hosts`` du provision).
+        timeout: délai global maximum, en secondes, par host.
+        poll_interval: pause entre deux tentatives, en secondes.
+        connect_timeout: ``ConnectTimeout`` SSH de chaque tentative, en secondes.
+        on_attempt: callback ``(fqdn, numéro_tentative)`` pour l'affichage.
+
+    Raises:
+        HostReadyTimeout: si un host reste injoignable au-delà de ``timeout``.
+    """
+    if not hosts:
+        return
+
+    inventory = build_inventory(
+        repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
+    )
+    ssh_cfg = write_ssh_config(inventory, repo_meta)
+
+    # SSH réussit dès que sshd répond ET que student existe ; on enchaîne sur
+    # `cloud-init status --wait` (best-effort) pour ne rendre la main qu'une fois
+    # la VM entièrement configurée. Le `|| true` évite d'échouer sur un état
+    # cloud-init « degraded » : ce qui compte, c'est qu'il ait terminé.
+    remote_cmd = (
+        "command -v cloud-init >/dev/null 2>&1 "
+        "&& cloud-init status --wait >/dev/null 2>&1 || true"
+    )
+
+    for fqdn in hosts:
+        deadline = time.monotonic() + timeout
+        attempt = 0
+        while True:
+            attempt += 1
+            if on_attempt is not None:
+                on_attempt(fqdn, attempt)
+            proc = subprocess.run(
+                [
+                    "ssh",
+                    "-F",
+                    str(ssh_cfg),
+                    "-o",
+                    f"ConnectTimeout={connect_timeout}",
+                    "-o",
+                    "BatchMode=yes",
+                    fqdn,
+                    remote_cmd,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode == 0:
+                logger.info("Host %s prêt (tentative %d).", fqdn, attempt)
+                break
+            if time.monotonic() >= deadline:
+                raise HostReadyTimeout(
+                    f"{fqdn} injoignable en SSH après {timeout:.0f}s "
+                    "(cloud-init trop long, ou VM en échec de démarrage)."
+                )
+            time.sleep(poll_interval)
 
 
 def write_inventory_file(
