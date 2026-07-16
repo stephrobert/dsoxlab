@@ -33,6 +33,16 @@ from ..models.repo import RepoMetadata
 logger = logging.getLogger(__name__)
 
 
+class InfraNotProvisioned(RuntimeError):
+    """L'infrastructure du lab n'est pas provisionnée (aucun hôte joignable).
+
+    Levée quand le ``meta.yml`` déclare des hôtes mais qu'aucun n'a d'adresse :
+    Terraform n'a pas tourné. C'est une situation NORMALE (premier lancement,
+    après un ``destroy``), pas un bug — la CLI la rend en une phrase, jamais en
+    traceback.
+    """
+
+
 def build_inventory(
     repo_meta: RepoMetadata,
     *,
@@ -122,6 +132,16 @@ def build_inventory(
             "distro": host_def.distro,
             "role": host_def.role,
         }
+
+    # Le dépôt déclare des hôtes mais AUCUN n'a d'IP : l'infrastructure n'est
+    # pas provisionnée. C'est le cas le plus fréquent chez un débutant, et il
+    # ne doit surtout pas se manifester par une traceback : on lève une erreur
+    # que la CLI sait rendre en une phrase actionnable.
+    if repo_meta.infra.hosts and not inventory_hosts:
+        raise InfraNotProvisioned(
+            "Aucun hôte n'a d'adresse : l'infrastructure du lab n'est pas "
+            "provisionnée."
+        )
 
     children: dict[str, Any] = {
         "labenv": {"hosts": inventory_hosts},

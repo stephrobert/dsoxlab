@@ -24,6 +24,7 @@ STRINGS: dict[str, str] = {
     "opt_run_target":     "Cible pour cette exécution (override le défaut de 'use'). Doit matcher un runtime.targets[].name.",
     "opt_check_target":   "Cible sur laquelle valider (override la cible de session). Doit matcher un runtime.targets[].name — les tests tournent sur cet hôte.",
     "unknown_target":     "Cible '{target}' inconnue pour ce lab. Cibles déclarées : {declared}.",
+    "infra_not_provisioned": "Ce lab a besoin d'une VM, et aucune ne tourne : l'infrastructure du lab n'est pas provisionnée.\nMonte-la d'abord :\n  dsoxlab provision",
     "opt_lang":           "Langue pour le contenu des labs (ex: en, fr). Remplace l'auto-détection.",
     "cmd_list_labs_help": "Liste tous les labs disponibles (filtrés par contexte actif si défini).",
     "cmd_progress_help": "Affiche la progression par bloc (labs complétés, score moyen, challenges et capstones).",

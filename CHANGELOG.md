@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-07-16
+
+### Fixed
+
+- **No more Python traceback when the infrastructure is not provisioned**: a
+  learner running a VM lab before `dsoxlab provision` (first run, or after a
+  `destroy`) got a raw `ValueError: target_fqdn '...' is not in the list of
+  known hosts: []`. This is a normal situation, not a bug — `build_inventory()`
+  now raises `InfraNotProvisioned`, rendered by the CLI as one actionable
+  sentence (EN+FR) telling the learner to run `dsoxlab provision`. A `main()`
+  entry point catches it for every command, so no command can surface a
+  traceback for it.
+- **`check` no longer records a 0/100 when there is no infrastructure**: pytest
+  runs in a subprocess, so the missing-host error could not reach the CLI — the
+  run was scored as a learner failure and saved to their history. `check`/
+  `submit` now verify the inventory before scoring, and exit without recording.
+
 ## [0.1.7] - 2026-07-16
 
 ### Added

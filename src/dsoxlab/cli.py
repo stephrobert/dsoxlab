@@ -33,6 +33,7 @@ from .config import (
     set_active_provider, set_course_pos, write_context,
 )
 from .i18n import _, get_lang, set_lang
+from .infra.inventory import InfraNotProvisioned
 from .models.hint import HintFile
 from .sessions.store import (
     get_best_scores,
@@ -498,6 +499,11 @@ def run(
             )
         else:
             run_lab(lab, target_name=target)
+    except InfraNotProvisioned:
+        # Avant le except RuntimeError : InfraNotProvisioned en hérite, et
+        # mérite la phrase actionnable plutôt que son message technique.
+        error(_("infra_not_provisioned"))
+        raise typer.Exit(2) from None
     except RuntimeError as exc:
         error(str(exc))
         raise typer.Exit(2)
@@ -724,6 +730,26 @@ def _run_check(
     ``target`` (option ``--target``) l'emporte sur la target active de la
     session ; à défaut, la target ``default`` du lab s'applique.
     """
+    # Même logique que pour --target : on refuse de NOTER ce qui n'a pas pu
+    # tourner. Un lab VM sans infrastructure n'est pas un échec de l'apprenant
+    # et ne doit pas lui coûter un 0/100 dans son historique. pytest tourne en
+    # sous-processus, donc l'erreur du conftest ne remonterait pas jusqu'ici :
+    # il faut vérifier AVANT.
+    if lab.runtime.type.value in ("vm", "kvm", "incus"):
+        from .discovery.repo import read_repo_metadata
+        from .infra.inventory import build_inventory, read_terraform_outputs
+
+        repo_meta = read_repo_metadata(root)
+        if repo_meta is not None:
+            try:
+                build_inventory(
+                    repo_meta,
+                    terraform_outputs=read_terraform_outputs(repo_meta),
+                )
+            except InfraNotProvisioned:
+                error(_("infra_not_provisioned"))
+                raise typer.Exit(2) from None
+
     # Un --target explicite et inconnu est une ERREUR : on sort avant de
     # lancer quoi que ce soit, sinon une faute de frappe enregistrerait un
     # 0/100 dans l'historique de l'apprenant.
@@ -1817,3 +1843,23 @@ def instructor_bootstrap(
 @app.command("fullhelp", help=_("cmd_fullhelp_help"))
 def fullhelp() -> None:
     print_fullhelp()
+
+
+# ── point d'entrée console ────────────────────────────────────────────────────
+
+def main() -> None:
+    """Point d'entrée de la commande ``dsoxlab``.
+
+    Enveloppe l'app Typer pour rendre les erreurs ATTENDUES en une phrase
+    actionnable, jamais en traceback Python. Une infrastructure non
+    provisionnée est une situation normale (premier lancement, après un
+    ``destroy``) : l'apprenant doit lire quoi faire, pas une pile d'appels.
+
+    Les erreurs inattendues, elles, continuent de remonter avec leur
+    traceback — c'est ce qu'on veut pour un vrai bug.
+    """
+    try:
+        app()
+    except InfraNotProvisioned:
+        error(_("infra_not_provisioned"))
+        raise SystemExit(1) from None

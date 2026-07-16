@@ -25,6 +25,7 @@ STRINGS: dict[str, str] = {
     "opt_run_target":    "Execution target for this run (overrides --target from 'use'). Must match a runtime.targets[].name.",
     "opt_check_target":  "Target to validate against (overrides the session target). Must match a runtime.targets[].name — the tests run on that host.",
     "unknown_target":    "Unknown target '{target}' for this lab. Declared targets: {declared}.",
+    "infra_not_provisioned": "This lab needs a VM, and none is running: the lab infrastructure is not provisioned.\nBring it up first:\n  dsoxlab provision",
     "cmd_list_labs_help":"List all available labs (filtered by active context if set).",
     "cmd_progress_help": "Show progression by bloc (labs completed, average score, challenges and capstones).",
     "cmd_next_help":     "Recommend the next lab or challenge to complete in the active context.",
