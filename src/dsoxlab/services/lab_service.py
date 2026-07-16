@@ -33,18 +33,41 @@ class CheckResult:
 
 
 def _parse_counts(output: str) -> tuple[int, int]:
-    """Extrait (passed, total) depuis la sortie verbose de pytest."""
-    passed = len(re.findall(r" PASSED", output))
-    failed = len(re.findall(r" FAILED", output))
-    errors = len(re.findall(r" ERROR", output))
-    total = passed + failed + errors
+    """Extrait (passed, total) depuis la sortie de pytest.
+
+    On lit la ligne de RÉSUMÉ que pytest produit lui-même ("3 failed, 1 passed
+    in 0.02s") : c'est la seule source fiable.
+
+    Compter les occurrences de " PASSED"/" FAILED"/" ERROR" dans la sortie
+    brute — ce que faisait cette fonction — est faux dès qu'un lab manipule ces
+    mots : les messages d'assertion les affichent. Un lab qui filtre des lignes
+    « ERROR » (l1-get-help, l1-grep-regex, l1-redirections-pipes…) gonflait son
+    total, et le score de l'apprenant s'en trouvait FAUSSÉ : 1/5 au lieu de
+    1/4. Bug vécu, trouvé en jouant les labs.
+    """
+    # La dernière ligne qui porte un compte est le résumé final : les lignes
+    # de verdict par test ("… PASSED [ 25%]") n'ont pas ce format.
+    resumes = [
+        ligne
+        for ligne in output.splitlines()
+        if re.search(r"\b\d+ (passed|failed|error|skipped)", ligne)
+    ]
+    resume = resumes[-1] if resumes else ""
+
+    def _compte(mot: str) -> int:
+        m = re.search(rf"(\d+) {mot}", resume)
+        return int(m.group(1)) if m else 0
+
+    passed = _compte("passed")
+    total = passed + _compte("failed") + _compte("error") + _compte("skipped")
+
     if total == 0:
-        # Fallback sur la ligne récapitulative : "3 passed, 2 failed in 0.03s"
-        m_p = re.search(r"(\d+) passed", output)
-        m_f = re.search(r"(\d+) failed", output)
-        passed = int(m_p.group(1)) if m_p else 0
-        failed = int(m_f.group(1)) if m_f else 0
-        total = passed + failed
+        # Aucun résumé exploitable (pytest a planté avant) : on retombe sur le
+        # comptage des verdicts, ancré sur le format "<nodeid> VERDICT" pour ne
+        # pas ramasser les mots présents dans les messages.
+        verdicts = re.findall(r"::\S+\s+(PASSED|FAILED|ERROR)\b", output)
+        passed = verdicts.count("PASSED")
+        total = len(verdicts)
     return passed, total
 
 
