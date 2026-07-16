@@ -1153,6 +1153,21 @@ def provision(
         raise typer.Exit(1)
 
     provider = _require_provider(repo_meta)
+
+    # Garde-fou cohabitation : incus et KVM partagent le nom de réseau et le
+    # subnet du lab → ils ne peuvent pas coexister. Si un AUTRE provider a
+    # encore de l'infra debout, on guide l'apprenant (destroy) plutôt que de
+    # le laisser buter sur « Network is already in use ».
+    conflicts = tf.other_active_providers(repo_meta)
+    if conflicts:
+        error(_(
+            "provision_provider_conflict",
+            current=provider,
+            others=", ".join(conflicts),
+            other=conflicts[0],
+        ))
+        raise typer.Exit(5)
+
     info(_("provision_starting", provider=provider))
 
     # Garde-fou : la clé SSH du repo doit exister avant tout provision.

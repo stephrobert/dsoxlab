@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..models.repo import RepoMetadata
+from ..models.repo import ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
 from . import credentials as creds_mod
@@ -272,6 +272,46 @@ def init(
         run_command(cmd, timeout=600, env=_provider_env(repo_meta))
 
 
+def _state_has_resources(state_file: Path) -> bool:
+    """True si le tfstate existe et contient au moins une ressource.
+
+    Après un ``terraform destroy``, ``resources`` devient ``[]`` → False.
+    """
+    if not state_file.is_file():
+        return False
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(data.get("resources"))
+
+
+def other_active_providers(repo_meta: RepoMetadata) -> list[str]:
+    """Autres providers candidats ayant de l'infra active (state non vide).
+
+    incus, KVM (et les autres providers locaux) dérivent le nom de réseau et
+    le subnet du lab de ``meta.yml`` : ils occupent le **même** bridge et le
+    **même** CIDR, donc ne peuvent pas coexister sur une même machine. Avant
+    un provision, on détecte un provider concurrent déjà debout pour guider
+    l'apprenant (il doit ``dsoxlab destroy`` l'autre d'abord) plutôt que de le
+    laisser buter sur l'erreur Terraform « Network is already in use ».
+
+    Retourne la liste des providers concurrents actifs (hors provider courant).
+    """
+    try:
+        current = repo_meta.infra.require_provider()
+    except ProviderUnresolved:
+        return []
+    candidates = repo_meta.infra.providers_available or [current]
+    base = _xdg_state_home() / "dsoxlab" / repo_meta.id / "terraform"
+    return [
+        prov
+        for prov in candidates
+        if prov != current
+        and _state_has_resources(base / prov / "terraform.tfstate")
+    ]
+
+
 def apply(
     repo_meta: RepoMetadata,
     *,
@@ -326,6 +366,27 @@ def apply(
         _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
     else:
         run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
+
+    # Un apply ``-target`` n'évalue pas les outputs racine (comportement
+    # documenté de Terraform). Sans outputs, l'inventory (conftest de test,
+    # dsoxlab status/ssh) ne peut pas résoudre les IPs des hôtes dont
+    # l'adresse vient de l'output ``hosts`` (KVM/libvirt DHCP notamment) →
+    # « Aucun host dans l'inventory » pour tout lab de ce provider. On force
+    # un refresh-only pour recalculer le map ``hosts`` sans recréer ni
+    # détruire de ressource.
+    if targets:
+        run_command(
+            [
+                "terraform",
+                f"-chdir={tf_dir}",
+                "apply",
+                "-refresh-only",
+                "-input=false",
+                "-auto-approve",
+            ],
+            timeout=600,
+            env=_provider_env(repo_meta),
+        )
 
     return _read_outputs(tf_dir, env=_provider_env(repo_meta))
 
