@@ -1,3 +1,8 @@
+variable "repo_id" {
+  description = "Identifiant du dépôt de labs (meta.yml: repo.id). Préfixe les ressources partagées entre dépôts au sein d'un même hyperviseur, pour que deux catalogues utilisant la même distro ne se disputent pas le volume de base."
+  type        = string
+}
+
 variable "network_name" {
   description = "Nom du réseau libvirt à créer (ex. lab-linux)."
   type        = string

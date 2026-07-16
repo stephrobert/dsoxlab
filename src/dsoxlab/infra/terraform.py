@@ -202,6 +202,12 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
     )
 
     payload = {
+        # Identifiant du dépôt de labs : sert à nommer les ressources qui vivent
+        # dans un espace partagé entre dépôts (le pool libvirt, par exemple).
+        # Sans lui, deux dépôts utilisant la même distro se disputent le volume
+        # de base, alors que chacun a son propre state Terraform et ignore
+        # l'autre.
+        "repo_id": repo_meta.id,
         "network_name": repo_meta.infra.network,
         "network_cidr": network_cidr,
         "hosts": [
