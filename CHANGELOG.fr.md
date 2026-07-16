@@ -7,7 +7,30 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Unreleased]
+## [Non publié]
+
+## [0.1.7] - 2026-07-16
+
+### Ajouté
+
+- **Les labs multi-distrib deviennent réels** : `check`/`submit` acceptent
+  `--target/-t` et exportent le FQDN de la cible résolue aux tests via
+  `DSOXLAB_TARGET_HOST`. Jusqu'ici `runtime.targets[]` n'était que déclaratif —
+  un lab pouvait déclarer une cible Ubuntu pendant que ses tests codaient
+  l'hôte RHEL en dur : choisir Ubuntu ne changeait rien et le contrat mentait.
+  Les tests demandent désormais l'hôte choisi (helper `lab_target_host()` dans
+  le `conftest.py` du dépôt), donc un même lab peut être réellement validé sur
+  plusieurs distributions.
+
+### Corrigé
+
+- **Une faute de frappe dans `--target` n'enregistre plus un 0/100** : une
+  cible explicite inconnue est désormais une erreur (`unknown_target`, EN+FR)
+  levée avant le lancement des tests, au lieu d'un check échoué sauvegardé dans
+  l'historique de l'apprenant.
+- **Une cible de session ne casse plus les labs qui ne la déclarent pas** :
+  l'`active_target` persistée par `use --target` n'est appliquée qu'aux labs
+  qui la déclarent ; les labs shell et mono-cible l'ignorent silencieusement.
 
 ## [0.1.6] - 2026-07-16
 

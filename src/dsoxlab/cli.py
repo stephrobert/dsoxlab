@@ -648,9 +648,14 @@ def _resolve_lab(
         raise typer.Exit(1)
 
 
-def _run_check_with_progress(lab: LabDefinition) -> CheckResult:
+def _run_check_with_progress(
+    lab: LabDefinition, target: str | None = None
+) -> CheckResult:
     """Lance ``check_lab`` en streamant les verdicts pytest dans une
     progress bar Rich.
+
+    ``target`` sélectionne la target du lab sur laquelle valider (labs
+    multi-distrib). None = la target ``default`` du lab.
 
     Affiche un ✔/✘/⊘ par test et une barre M of N. En cas d'échec,
     le caller imprime le résumé/traceback contenu dans ``result.output``.
@@ -705,16 +710,38 @@ def _run_check_with_progress(lab: LabDefinition) -> CheckResult:
             # Les autres lignes (log/header/traceback) sont gardées dans
             # result.output et imprimées seulement si le check échoue.
 
-        result = check_lab(lab, on_event=on_event)
+        result = check_lab(lab, target=target, on_event=on_event)
         progress.update(task, description=f"Tests {lab.id} terminés")
 
     return result
 
 
-def _run_check(root: Path, lab: LabDefinition) -> tuple[CheckResult, int, int]:
-    """Lance les tests, enregistre le résultat, retourne (result, score, max_score)."""
+def _run_check(
+    root: Path, lab: LabDefinition, target: str | None = None
+) -> tuple[CheckResult, int, int]:
+    """Lance les tests, enregistre le résultat, retourne (result, score, max_score).
+
+    ``target`` (option ``--target``) l'emporte sur la target active de la
+    session ; à défaut, la target ``default`` du lab s'applique.
+    """
+    # Un --target explicite et inconnu est une ERREUR : on sort avant de
+    # lancer quoi que ce soit, sinon une faute de frappe enregistrerait un
+    # 0/100 dans l'historique de l'apprenant.
+    if target is not None and lab.runtime.target(target) is None:
+        declared = ", ".join(t.name for t in lab.runtime.targets) or "—"
+        error(_("unknown_target", target=target, declared=declared))
+        raise typer.Exit(1)
+
+    # À défaut, la target de session. Elle vaut pour TOUS les labs du dépôt :
+    # si celui-ci ne la déclare pas (lab shell, lab mono-target), on l'ignore
+    # simplement — ce n'est pas une erreur de l'apprenant.
+    if target is None:
+        session_target = read_context(root).active_target
+        if session_target and lab.runtime.target(session_target) is not None:
+            target = session_target
+
     info(_("validating", lab_id=lab.id))
-    result = _run_check_with_progress(lab)
+    result = _run_check_with_progress(lab, target)
     if not result.ok:
         # En cas d'échec, dump l'output brut (tracebacks, summary pytest)
         # pour que l'apprenant voie les erreurs détaillées.
@@ -747,11 +774,13 @@ def _run_check(root: Path, lab: LabDefinition) -> tuple[CheckResult, int, int]:
 @app.command("check", help=_("cmd_check_help"))
 def check(
     lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_check_arg"), shell_complete=_complete_lab_id)] = None,
+    target: Annotated[Optional[str], typer.Option("--target", "-t",
+        help=_("opt_check_target"))] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    result, _score, _max_score = _run_check(root, lab)
+    result, _score, _max_score = _run_check(root, lab, target)
     if result.ok:
         success(_("all_tests_passed"))
         info(_("check_tip_submit"))
@@ -765,11 +794,13 @@ def check(
 @app.command("submit", help=_("cmd_submit_help"))
 def submit(
     lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_submit_arg"), shell_complete=_complete_lab_id)] = None,
+    target: Annotated[Optional[str], typer.Option("--target", "-t",
+        help=_("opt_check_target"))] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    result, score, max_score = _run_check(root, lab)
+    result, score, max_score = _run_check(root, lab, target)
 
     if result.ok:
         success(_("submit_success", score=score, max_score=max_score))
