@@ -116,7 +116,14 @@ resource "libvirt_network" "lab" {
 resource "libvirt_volume" "base_image" {
   for_each = local.unique_distros
 
-  name = "dsoxlab-base-${each.key}.qcow2"
+  # Le nom porte le repo_id : le pool libvirt est PARTAGÉ entre tous les dépôts
+  # de labs, alors que chacun a son propre state Terraform et ignore les autres.
+  # Sans ce préfixe, deux catalogues utilisant la même distro (linux et ansible
+  # sur alma10, par exemple) se disputent « dsoxlab-base-alma10.qcow2 » : le
+  # second à provisionner échoue sur « storage volume exists already », puisque
+  # son state ne contient pas le volume créé par le premier.
+  # Coût assumé : l'image cloud est dupliquée par dépôt (sparse, ~600 Mo à 2 Go).
+  name = "dsoxlab-base-${var.repo_id}-${each.key}.qcow2"
   pool = "default"
 
   # 10 GiB : capacity requise quand le serveur HTTP ne renvoie pas de

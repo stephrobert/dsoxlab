@@ -9,6 +9,36 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.9] - 2026-07-16
+
+### Corrigé
+
+- **KVM : deux dépôts de labs ne se disputent plus le même volume de base.**
+  L'image de base libvirt s'appelait `dsoxlab-base-<distro>.qcow2`, sans
+  l'identifiant du dépôt. Or le pool libvirt est *partagé* entre tous les
+  dépôts, alors que chacun garde son **propre** state Terraform. Le second
+  dépôt à provisionner sur une distro déjà utilisée par un autre échouait donc
+  sur `storage volume 'dsoxlab-base-alma10.qcow2' exists already` : son state
+  ignorait simplement le volume créé par le premier. Concrètement,
+  `linux-dsoxlab-training` (alma10) bloquait `ansible-training` (alma10) sur la
+  même machine. Le volume devient `dsoxlab-base-<repo-id>-<distro>.qcow2` : les
+  catalogues cohabitent vraiment, comme le contrat le promet déjà avec leurs
+  réseaux libvirt séparés. L'image cloud est dupliquée par dépôt (sparse, ~600 Mo
+  à 2 Go) : c'est le prix de l'isolation.
+
+  Terraform reçoit une variable `repo_id`, déclarée par les trois providers
+  (`kvm`, `incus`, `outscale`) puisque les tfvars sont communs ; seul `kvm` crée
+  un volume local, lui seul était touché. Incus tire des alias d'images publiques
+  et Outscale utilise des AMI : aucune collision possible.
+
+  **Impact à la mise à jour.** Sur un dépôt provisionné en ≤ 0.1.8, le prochain
+  `dsoxlab provision` renomme le volume de base, ce que Terraform traite comme un
+  *remplacement* : les VMs sont recréées. Rien n'est perdu (les VMs de labs sont
+  jetables par conception, et le travail de l'apprenant vit dans le dépôt,
+  `challenge/`, jamais sur la VM), mais l'état des labs en cours sur les VMs
+  disparaît. Enchaîner `dsoxlab destroy` puis `dsoxlab provision` pour un cycle
+  propre.
+
 ## [0.1.8] - 2026-07-16
 
 ### Corrigé
