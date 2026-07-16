@@ -11,6 +11,7 @@ from . import terraform as terraform_mod
 from .ansible import AnsibleNotInstalled, PlaybookResult, run_playbook
 from .inventory import (
     bastion_info,
+    InfraNotProvisioned,
     build_inventory,
     inventory_path,
     read_terraform_outputs,
@@ -36,6 +37,7 @@ __all__ = [
     "TerraformNotInstalled",
     "ansible",
     "bastion_info",
+    "InfraNotProvisioned",
     "build_inventory",
     "inventory_path",
     "read_terraform_outputs",

@@ -9,6 +9,24 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.8] - 2026-07-16
+
+### Corrigé
+
+- **Plus de traceback Python quand l'infrastructure n'est pas provisionnée** :
+  un apprenant qui lançait un lab VM avant `dsoxlab provision` (premier
+  lancement, ou après un `destroy`) recevait un `ValueError: target_fqdn '...'
+  n'est pas dans la liste des hôtes connus : []` brut. C'est une situation
+  normale, pas un bug — `build_inventory()` lève désormais
+  `InfraNotProvisioned`, que la CLI rend en une phrase actionnable (EN+FR)
+  indiquant de lancer `dsoxlab provision`. Un point d'entrée `main()` l'attrape
+  pour toutes les commandes : aucune ne peut plus afficher de traceback pour ça.
+- **`check` n'enregistre plus un 0/100 en l'absence d'infrastructure** : pytest
+  tourne en sous-processus, donc l'erreur d'hôte manquant ne pouvait pas
+  remonter jusqu'à la CLI — l'exécution était notée comme un échec de
+  l'apprenant et sauvegardée dans son historique. `check`/`submit` vérifient
+  maintenant l'inventory avant de noter, et sortent sans rien enregistrer.
+
 ## [0.1.7] - 2026-07-16
 
 ### Ajouté
