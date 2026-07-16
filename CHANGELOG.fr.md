@@ -9,9 +9,23 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-16
+
+### Corrigé
+
+- **Inventory KVM après un provision ciblé** : `terraform apply -target`
+  n'évalue pas les outputs racine, donc les IP des hôtes KVM (DHCP libvirt)
+  manquaient et `dsoxlab check` échouait « Aucun host dans l'inventory » pour
+  tout lab KVM. `apply()` lance désormais un `terraform apply -refresh-only`
+  après un apply ciblé pour recalculer le map d'outputs `hosts` sans recréer de
+  ressource.
+
 ### Ajouté
 
-- Rien pour l'instant.
+- **Détection de conflit de provider** : `dsoxlab provision` s'arrête avec un
+  message d'aide (EN + FR) si un autre provider (incus/KVM) a encore de l'infra
+  active — ils partagent le nom de réseau et le subnet du lab et ne peuvent pas
+  tourner en même temps.
 
 ## [0.1.5] - 2026-07-15
 
