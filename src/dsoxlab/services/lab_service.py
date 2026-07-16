@@ -188,9 +188,17 @@ def _collect_test_count(
 def check_lab(
     lab: LabDefinition,
     *,
+    target: str | None = None,
     on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> CheckResult:
     """Lance les tests pytest du lab et retourne un CheckResult détaillé.
+
+    ``target`` sélectionne la target du lab (``runtime.targets[].name``) sur
+    laquelle les tests doivent porter. Son FQDN est exporté aux tests via
+    ``DSOXLAB_TARGET_HOST`` : c'est ce qui permet à un lab multi-distrib
+    d'être réellement validé sur la distrib choisie, au lieu que les tests
+    codent un hôte en dur. Si ``target`` est None, la target ``default`` du
+    lab est utilisée.
 
     Si ``on_event`` est fourni, les évènements suivants sont émis pour
     afficher une progress bar côté CLI :
@@ -227,6 +235,23 @@ def check_lab(
     # côté formateur, écrasant le travail manuel de l'apprenant).
     env = os.environ.copy()
     env.setdefault("LAB_NO_REPLAY", "1")
+
+    # Expose aux tests le FQDN de la target choisie. Sans ça, un lab
+    # multi-distrib ne peut que coder son hôte en dur : la target Ubuntu
+    # serait déclarée mais jamais testée — le contrat mentirait.
+    resolved = lab.runtime.target(target)
+    if target and resolved is None:
+        declared = ", ".join(t.name for t in lab.runtime.targets) or "aucune"
+        return CheckResult(
+            ok=False,
+            output=(
+                f"Target '{target}' inconnue pour le lab {lab.id}.\n"
+                f"Targets déclarées : {declared}."
+            ),
+            passed=0, total=0,
+        )
+    if resolved is not None and resolved.host:
+        env["DSOXLAB_TARGET_HOST"] = resolved.host
 
     if on_event is None:
         # Mode legacy : capture en bloc, pas de streaming.

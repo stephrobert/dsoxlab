@@ -23,6 +23,8 @@ STRINGS: dict[str, str] = {
     "opt_lang":          "Language for lab content (e.g.: en, fr). Overrides auto-detection.",
     "opt_target":        "Default execution target name (must match runtime.targets[].name in lab.yaml).",
     "opt_run_target":    "Execution target for this run (overrides --target from 'use'). Must match a runtime.targets[].name.",
+    "opt_check_target":  "Target to validate against (overrides the session target). Must match a runtime.targets[].name — the tests run on that host.",
+    "unknown_target":    "Unknown target '{target}' for this lab. Declared targets: {declared}.",
     "cmd_list_labs_help":"List all available labs (filtered by active context if set).",
     "cmd_progress_help": "Show progression by bloc (labs completed, average score, challenges and capstones).",
     "cmd_next_help":     "Recommend the next lab or challenge to complete in the active context.",

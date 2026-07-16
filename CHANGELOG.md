@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-07-16
+
+### Added
+
+- **Multi-distro labs are now real**: `check`/`submit` accept `--target/-t` and
+  export the resolved target's FQDN to the tests via `DSOXLAB_TARGET_HOST`.
+  Until now `runtime.targets[]` was declarative only — a lab could declare an
+  Ubuntu target while its tests hard-coded the RHEL host, so selecting Ubuntu
+  changed nothing and the contract lied. Tests now ask for the chosen host
+  (`lab_target_host()` helper in the repo's `conftest.py`), so one lab can be
+  genuinely validated on several distributions.
+
+### Fixed
+
+- **A typo in `--target` no longer records a 0/100**: an unknown explicit
+  target is now an error (`unknown_target`, EN+FR) raised before the tests run,
+  instead of a failed check saved to the learner's history.
+- **A session target no longer breaks labs that don't declare it**: the
+  `active_target` persisted by `use --target` is applied only to labs that
+  actually declare it; shell and single-target labs silently ignore it.
+
 ## [0.1.6] - 2026-07-16
 
 ### Fixed
