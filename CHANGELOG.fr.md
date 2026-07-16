@@ -9,6 +9,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.10] - 2026-07-16
+
+### Corrigé
+
+- **Les scores étaient faux sur les labs dont les données contiennent
+  « ERROR », « PASSED » ou « FAILED »** : `_parse_counts()` comptait les
+  occurrences de ces mots dans la sortie brute de pytest, messages d'assertion
+  compris. Un lab qui filtre des lignes `ERROR` (`l1-get-help`,
+  `l1-grep-regex`, `l1-redirections-pipes`, `l3-service-diagnose`…) gonflait son
+  propre total — `dsoxlab check` annonçait `1/5` pour un lab de 4 tests, et le
+  score de l'apprenant s'en trouvait sous-évalué (20 pts au lieu de 25). La
+  ligne de résumé que pytest produit lui-même fait désormais foi, avec un repli
+  ancré sur les node-ids.
+
 ## [0.1.9] - 2026-07-16
 
 ### Corrigé
