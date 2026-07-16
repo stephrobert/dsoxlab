@@ -84,6 +84,7 @@ STRINGS: dict[str, str] = {
     "provision_no_ssh_key": "Clé SSH du lab manquante : {path}\nSans elle, le keypair cloud serait vide et les VMs inaccessibles.\nLance d'abord : dsoxlab instructor bootstrap",
     "provision_done":      "Provisionnement terminé — {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
+    "provision_provider_conflict": "Impossible de provisionner sur « {current} » : le provider « {others} » a encore une infra de lab active.\nincus et KVM partagent le nom de réseau et le subnet du lab, ils ne peuvent pas tourner en même temps.\nTermine ou détruis l'autre d'abord :\n  DSOXLAB_PROVIDER={other} dsoxlab destroy",
     "provision_waiting_ssh": "Attente que les hôtes soient joignables (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Attente de {host} (SSH + cloud-init), tentative {attempt}…",
     "provision_ssh_timeout": "Délai d'attente dépassé : {error}\nLa VM démarre peut-être encore — relance `dsoxlab run` dans un instant.",
