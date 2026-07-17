@@ -74,3 +74,9 @@ todo/
 # Terraform validate artefacts dans les templates packagés (non committables)
 src/dsoxlab/templates/terraform/*/.terraform/
 src/dsoxlab/templates/terraform/*/.terraform.lock.hcl
+
+# Fuzzing — reproducteurs écrits par libFuzzer à la racine en cas de crash.
+# Les graines, elles, sont versionnées sous fuzz/corpus/.
+crash-*
+leak-*
+timeout-*

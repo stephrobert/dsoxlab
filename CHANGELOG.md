@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-07-17
+
+### Fixed
+
+- **A malformed `lab.yaml` or `meta.yml` could crash the CLI instead of being
+  skipped.** `discovery/scanner.py` catches `(KeyError, ValueError,
+  yaml.YAMLError)` and ignores the offending lab with a warning — but the
+  parsers could raise outside that contract, and the exception then surfaced as
+  a raw traceback on an unrelated command (`list-labs`, `progress`…). Since a
+  `lab.yaml` comes from a *lab-provider repository*, this is the engine's
+  untrusted input. Five cases, all found by the new fuzz harnesses:
+  - an **empty** `lab.yaml` (or one holding only comments) → `AttributeError`,
+    because `yaml.safe_load` returns `None`;
+  - a document whose **root is a list or a scalar**, in either file;
+  - **`runtime: vm`** written instead of the `runtime:` block, and
+    `runtime.targets: true` → `AttributeError` / `TypeError`;
+  - **`infra.hosts:` written as a mapping** instead of a list → `TypeError` on
+    `h["name"]`, the iteration walking the keys;
+  - a **present-but-empty key** such as `vcpu:` or `bloc:` → `int(None)` raises
+    `TypeError`, because `.get("vcpu", 1)` returns `None` rather than the
+    default when the key exists.
+
+  Every one of these now raises `ValueError` with the file path and the
+  offending field, so the lab is skipped and the rest of the catalogue still
+  loads. An empty `ip:` no longer yields the literal string `"None"` either.
+
+### Added
+
+- **Fuzz harnesses over the untrusted-YAML contract** (`fuzz/`), run as a short
+  regression in CI. They assert the *contract* — any exception outside
+  `(KeyError, ValueError, yaml.YAMLError)` fails the run — rather than merely
+  executing the parsers. Ships a seed corpus and a libFuzzer dictionary of the
+  contract's keywords; `uv sync --group fuzz` installs atheris (kept out of the
+  `dev` group).
+- **`actionlint` and `poutine` as CI gates**, alongside the existing zizmor job,
+  both installed from a release binary whose SHA-256 is verified against the
+  published checksums. `poutine --fail-on-violation` makes it a gate, not a
+  report. The heavier jobs now wait on all three scanners.
+- **`step-security/harden-runner`** as the first step of every job
+  (`egress-policy: audit`), and `.poutine.yml` acknowledging three hand-vetted
+  actions per purl rather than disabling the rule.
+- **Build provenance attached to the GitHub Release** as
+  `provenance.intoto.jsonl`. The existing attestation is recorded on GitHub's
+  attestation API, which is a *different* artifact from the release asset that
+  OpenSSF Scorecard's Signed-Releases control looks for.
+
 ## [0.1.10] - 2026-07-16
 
 ### Fixed

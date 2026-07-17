@@ -510,19 +510,6 @@ gitlab:
       # Supports wildcards (e.g., https://internal-artifacts.example.com/*).
       trustedUrls: []
       # - https://internal-artifacts.example.com/*
-    # ── Pipeline must not leak secrets in configuration ─────────────
-    #
-    # Runs gitleaks against the resolved pipeline YAML to detect hardcoded
-    # secrets (API tokens, private keys, passwords) committed directly in
-    # the CI configuration. Requires gitleaks to be installed and available
-    # on PATH (or configured via gitleaksPath).
-    pipelineMustNotLeakSecretsInConfig:
-      # Set to true to enable this control (requires gitleaks)
-      enabled: false
-      # Path to the gitleaks binary. Defaults to "gitleaks" (PATH lookup).
-      # gitleaksPath: /usr/local/bin/gitleaks
-      # Optional path to a custom gitleaks configuration file.
-      # gitleaksConfigPath: /path/to/gitleaks.toml
     # ── Pipeline must not use Docker-in-Docker ──────────────────────
     #
     # Detects CI/CD jobs that use Docker-in-Docker (dind) services.
@@ -548,22 +535,6 @@ gitlab:
 # ============================================================================
 github:
   controls:
-    # ── Pipeline must not leak secrets in configuration ─────────────
-    #
-    # Runs gitleaks against every workflow file under
-    # .github/workflows/ to detect hardcoded secrets (API tokens,
-    # private keys, passwords) committed directly into the YAML.
-    # Requires gitleaks to be installed and available on PATH (or
-    # configured via gitleaksPath). Disabled by default because
-    # gitleaks is an external dependency.
-    pipelineMustNotLeakSecretsInConfig:
-      # Set to true to enable this control (requires gitleaks)
-      enabled: false
-      # Path to the gitleaks binary. Defaults to "gitleaks" (PATH lookup).
-      # gitleaksPath: /usr/local/bin/gitleaks
-      # Optional path to a custom gitleaks configuration file.
-      # gitleaksConfigPath: /path/to/gitleaks.toml
-
     # ===========================================
     # Actions must be pinned by commit SHA
     # ===========================================
@@ -610,6 +581,7 @@ github:
       trustedGithubActions:
         - getplumber/plumber # Plumber's own GitHub Action
         - zizmorcore/zizmor-action # GitHub Actions static analysis (zizmor)
+        - step-security/harden-runner # runner egress monitoring, first step of every job
         - astral-sh/setup-uv # uv installer (Astral, maintainer of ruff/uv)
         - pypa/gh-action-pypi-publish # official PyPA publisher (Trusted Publishing)
         - ossf/scorecard-action

@@ -9,6 +9,54 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.11] - 2026-07-17
+
+### Corrigé
+
+- **Un `lab.yaml` ou un `meta.yml` malformé pouvait faire planter la CLI au lieu
+  d'être ignoré.** `discovery/scanner.py` rattrape `(KeyError, ValueError,
+  yaml.YAMLError)` et ignore le lab fautif avec un warning — mais les parsers
+  pouvaient lever hors de ce contrat, et l'exception remontait alors en
+  traceback brut sur une commande sans rapport (`list-labs`, `progress`…).
+  Comme un `lab.yaml` provient d'un *dépôt fournisseur de labs*, c'est l'entrée
+  non fiable du moteur. Cinq cas, tous trouvés par les nouveaux harnais de
+  fuzzing :
+  - un `lab.yaml` **vide** (ou réduit à des commentaires) → `AttributeError`,
+    `yaml.safe_load` rendant `None` ;
+  - un document dont la **racine est une liste ou un scalaire**, dans les deux
+    fichiers ;
+  - **`runtime: vm`** écrit à la place du bloc `runtime:`, et
+    `runtime.targets: true` → `AttributeError` / `TypeError` ;
+  - **`infra.hosts:` écrit en mapping** au lieu d'une liste → `TypeError` sur
+    `h["name"]`, l'itération portant sur les clés ;
+  - une **clé présente mais vide** comme `vcpu:` ou `bloc:` → `int(None)` lève
+    `TypeError`, `.get("vcpu", 1)` rendant `None` et non le défaut quand la clé
+    existe.
+
+  Chacun de ces cas lève désormais un `ValueError` portant le chemin du fichier
+  et le champ fautif : le lab est ignoré et le reste du catalogue se charge. Un
+  `ip:` vide ne donne plus non plus la chaîne littérale « None ».
+
+### Ajouté
+
+- **Des harnais de fuzzing sur le contrat YAML non fiable** (`fuzz/`), rejoués
+  en régression courte dans la CI. Ils vérifient le *contrat* — toute exception
+  hors de `(KeyError, ValueError, yaml.YAMLError)` fait échouer le run — plutôt
+  que de simplement exécuter les parsers. Livrés avec un corpus de graines et un
+  dictionnaire libFuzzer des mots-clés du contrat ; `uv sync --group fuzz`
+  installe atheris (tenu hors du groupe `dev`).
+- **`actionlint` et `poutine` en gates CI**, aux côtés du job zizmor existant,
+  tous deux installés depuis un binaire de release dont le SHA-256 est vérifié
+  contre les checksums publiés. `poutine --fail-on-violation` en fait une gate,
+  pas un rapport. Les jobs lourds attendent désormais les trois scanners.
+- **`step-security/harden-runner`** en premier step de chaque job
+  (`egress-policy: audit`), et un `.poutine.yml` qui acquitte trois actions
+  vérifiées à la main par leur purl, sans désactiver la règle.
+- **La provenance de build attachée à la Release GitHub** sous le nom
+  `provenance.intoto.jsonl`. L'attestation existante est enregistrée sur l'API
+  d'attestation de GitHub, qui est un artefact *distinct* de l'asset de release
+  qu'attend le contrôle Signed-Releases d'OpenSSF Scorecard.
+
 ## [0.1.10] - 2026-07-16
 
 ### Corrigé

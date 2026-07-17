@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.10"
+version = "0.1.11"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -70,6 +70,12 @@ dev = [
     "ruff>=0.4",
     "types-PyYAML>=6",
     "pre-commit>=3.5",
+]
+# Kept out of `dev` on purpose: atheris builds a native libFuzzer extension and
+# is not needed to lint, type-check or test. Only the fuzzing job installs it.
+#   uv run --group fuzz python fuzz/fuzz_lab_yaml.py -atheris_runs=50000
+fuzz = [
+    "atheris>=2.3",
 ]
 
 [tool.ruff]

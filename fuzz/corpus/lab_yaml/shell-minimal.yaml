@@ -1,0 +1,10 @@
+id: l1-log-parsing
+title: Parse an access log
+level: beginner
+skills: [awk, cut]
+distros: [any]
+doc_url: https://blog.stephane-robert.info/docs/linux/logs/
+runtime:
+  type: shell
+  workdir: challenge/work
+  fixtures: [acces.log]

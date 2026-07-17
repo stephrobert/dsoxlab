@@ -1,0 +1,31 @@
+id: l2-swap-management
+title: Manage swap space
+level: intermediate
+lab_type: lab
+section: linux
+description: Create, activate and persist a swap file.
+skills: [swap, fstab, systemd]
+distros: [alma10, ubuntu24]
+doc_url: https://blog.stephane-robert.info/docs/linux/swap/
+track: [rhcsa]
+difficulty: intermediate
+estimated_time: "30m"
+certification_tags: [rhcsa, lfcs]
+runtime:
+  type: vm
+  targets:
+    - name: rhel
+      host: alma-rhcsa-1.lab
+      label_en: "AlmaLinux 10"
+      label_fr: "AlmaLinux 10"
+      roles:
+        server: alma-rhcsa-2.lab
+    - name: debian
+      host: ubuntu-lfcs-1.lab
+      label_en: "Ubuntu 24.04"
+  default: rhel
+  snapshot_required: false
+validation:
+  functional: true
+  security: false
+  persistence_after_reboot: true

@@ -1,0 +1,36 @@
+repo:
+  id: linux-dsoxlab-training
+  category: linux
+  title: Linux hands-on labs
+  blog_url: https://blog.stephane-robert.info
+  description: |
+    Labs Linux pour la préparation RHCSA et LFCS.
+
+infra:
+  provider: kvm
+  network: lab-linux
+  cidr: 10.10.10.0/24
+  hosts:
+    - name: alma-rhcsa-1.lab
+      distro: alma10
+      role: target
+      ram_mb: 2048
+      vcpu: 2
+      disk_gb: 20
+      extra_disk_gb: 5
+    - name: ubuntu-lfcs-1.lab
+      distro: ubuntu24
+  providers:
+    outscale:
+      network: lab-linux-osc
+
+sections:
+  - id: l1
+    title: Fondamentaux (l1)
+    description: Prise en main du système
+    labs:
+      - linux/l1/l1-log-parsing
+  - id: l2
+    title: Stockage (l2)
+    labs:
+      - linux/l2/l2-swap-management
