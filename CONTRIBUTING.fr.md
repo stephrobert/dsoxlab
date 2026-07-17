@@ -15,6 +15,9 @@ commit sont rédigés en anglais pour que tout le monde puisse participer.
 - [Règles fondamentales](#règles-fondamentales)
 - [Mise en place](#mise-en-place)
 - [Contrôles qualité](#contrôles-qualité)
+  - [Scanners de workflow](#scanners-de-workflow)
+  - [Fuzzer le contrat non fiable](#fuzzer-le-contrat-non-fiable)
+- [Hooks pre-commit](#hooks-pre-commit)
 - [Internationalisation (i18n)](#internationalisation-i18n)
 - [Conventions de commit](#conventions-de-commit)
 - [Pull requests](#pull-requests)
@@ -53,7 +56,8 @@ Testez sur un vrai dépôt de labs pour valider la neutralité (au moins deux,
 par exemple `linux-training` et `ansible-training`) :
 
 ```bash
-cd ~/Projets/linux-training && dsoxlab list-labs
+cd ~/Projets/linux-dsoxlab-training && dsoxlab list-labs
+cd ~/Projets/ansible-training && dsoxlab list-labs
 ```
 
 ## Contrôles qualité
@@ -61,10 +65,71 @@ cd ~/Projets/linux-training && dsoxlab list-labs
 À lancer avant d'ouvrir une pull request. La CI exécute les mêmes contrôles.
 
 ```bash
-uv run ruff check src/dsoxlab tests   # lint + sécurité (règles flake8-bandit S)
-uv run mypy src/dsoxlab               # typage (strict)
-uv run pytest                         # tests
+uv run ruff check src/dsoxlab tests fuzz   # lint + sécurité (règles flake8-bandit S)
+uv run mypy src/dsoxlab                    # typage (strict)
+uv run pytest                              # tests
 ```
+
+### Scanners de workflow
+
+Si vous touchez à `.github/workflows/`, quatre scanners bloquent la CI et
+doivent rester à **zéro finding**. Ils analysent le YAML des workflows, donc ils
+tournent sans aucune dépendance du projet :
+
+```bash
+actionlint                                    # syntaxe, scopes de permission invalides, shellcheck
+zizmor --offline .github/workflows/           # failles de workflow
+poutine analyze_local . --fail-on-violation   # chaînes d'exploitation CI/CD
+plumber analyze                               # graphe de confiance + réglages du dépôt
+```
+
+Les règles qu'ils imposent, à connaître avant d'écrire une ligne de YAML :
+
+- **Chaque action est épinglée par un SHA de commit de 40 caractères**, suivi
+  d'un commentaire `# vX.Y.Z`. Jamais `@v4`, jamais `@main` : un tag est
+  mutable, donc c'est un trou de supply chain.
+- **`step-security/harden-runner` est le premier step de chaque job.**
+- `permissions: {}` au niveau workflow, permissions minimales par job.
+- `actions/checkout` avec `persist-credentials: false`, un runner figé
+  (`ubuntu-24.04`, pas `ubuntu-latest`), un `timeout-minutes` et un `name:`.
+- **Ne jamais interpoler `${{ … }}` dans un bloc `run:`.** Passez la valeur par
+  un bloc `env:`, sinon zizmor signale une injection de template.
+- Une nouvelle action tierce doit être ajoutée à `trustedGithubActions` dans
+  `.plumber.yaml`. Si son créateur n'est pas vérifié sur le Marketplace,
+  acquittez-la dans `.poutine.yml` **par son purl exact** — jamais en
+  désactivant la règle, ce qui la rendrait aveugle à toutes les autres actions.
+
+Un piège mérite sa propre ligne : **les status checks requis portent les noms de
+jobs exacts**. Renommer un job fait taire silencieusement l'ancien check, qui
+n'est alors plus jamais satisfait, et les pull requests restent bloquées. Ne
+renommez qu'en mettant à jour la protection de branche dans le même geste.
+
+### Fuzzer le contrat non fiable
+
+`lab.yaml` et `meta.yml` viennent des dépôts fournisseurs de labs : ce sont les
+entrées non fiables du moteur. `discovery/scanner.py` rattrape
+`(KeyError, ValueError, yaml.YAMLError)` et ignore le lab fautif avec un
+warning — **toute exception hors de ce tuple échappe au filet et fait planter la
+CLI** sur une commande sans rapport.
+
+Les harnais de `fuzz/` vérifient ce contrat, et un run court amorcé bloque la
+CI. Lancez une campagne plus longue en local dès que vous touchez à un parser :
+
+```bash
+uv sync --group fuzz
+mkdir -p /tmp/fuzz-lab
+uv run --group fuzz python fuzz/fuzz_lab_yaml.py \
+    /tmp/fuzz-lab fuzz/corpus/lab_yaml/ \
+    -dict=fuzz/dict/yaml_contract.dict -atheris_runs=100000
+```
+
+Passez le répertoire de travail **en premier** : libFuzzer écrit ses trouvailles
+dans le premier dossier de corpus, et `fuzz/corpus/` est un jeu de graines
+choisi à la main. Un crash écrit un reproducteur `crash-*` que vous rejouez en
+le passant comme unique argument. Si vous ajoutez un champ au contrat, ajoutez
+une graine : des octets aléatoires ne reconstruisent jamais un mot-clé par
+hasard, donc le corpus et `fuzz/dict/yaml_contract.dict` sont ce qui permet au
+fuzzer d'atteindre votre code.
 
 ## Hooks pre-commit
 
@@ -114,7 +179,7 @@ Nous utilisons les Conventional Commits avec un scope de module :
 <type>(<module>): <description courte>
 ```
 
-Types : `feat`, `fix`, `docs`, `refactor`, `chore`, `test`. Exemples :
+Types : `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `ci`. Exemples :
 
 - `feat(discovery): support multi-repo via ~/.config/dsoxlab/config.yaml`
 - `fix(runtimes/kvm): make snapshot revert idempotent when snapshot is absent`
@@ -125,9 +190,18 @@ consultez `git log --oneline -5` pour coller au style.
 
 ## Pull requests
 
-- Partez de `main`, gardez un périmètre restreint, remplissez le gabarit de PR.
-- Assurez-vous que lint, typage et tests sont verts.
-- Mettez à jour la documentation et `CHANGELOG.md` quand le comportement change.
+- Partez d'un `main` à jour, gardez un périmètre restreint, remplissez le
+  gabarit de PR. Supprimez la branche une fois mergée.
+- Assurez-vous que lint, typage et tests sont verts — plus les scanners de
+  workflow si vous avez touché à `.github/workflows/`.
+- Quand le comportement change, mettez à jour **les deux** fichiers
+  `CHANGELOG.md` et `CHANGELOG.fr.md`. Le projet est bilingue : une entrée en
+  anglais seul est une entrée incomplète.
+- Quand le comportement change, bumpez aussi la version dans `pyproject.toml` et
+  régénérez `uv.lock` (`uv lock`). Il n'y a rien à bumper dans
+  `src/dsoxlab/__init__.py` : `__version__` est lu depuis les métadonnées du
+  paquet installé, précisément pour qu'il ne puisse pas diverger de
+  `pyproject.toml`.
 - Si vous ajoutez une commande ou une option, confirmez la checklist i18n
   ci-dessus.
 
