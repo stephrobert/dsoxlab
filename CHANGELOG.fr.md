@@ -9,6 +9,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.12] - 2026-07-17
+
 ### Corrigé
 
 - **La provenance de build n'atteste plus un fichier qui n'est pas publié.**
@@ -259,7 +261,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...HEAD
+[0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/stephrobert/dsoxlab/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/stephrobert/dsoxlab/compare/v0.1.8...v0.1.9
