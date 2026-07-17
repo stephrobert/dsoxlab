@@ -3,7 +3,7 @@
 [![CI](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml/badge.svg)](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/stephrobert/dsoxlab?label=OpenSSF%20Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/stephrobert/dsoxlab)
 [![Plumber compliance](https://score.getplumber.io/github.com/stephrobert/dsoxlab.svg)](https://score.getplumber.io/github.com/stephrobert/dsoxlab)
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](./LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Code style: ruff](https://img.shields.io/badge/lint-ruff-orange.svg)](https://github.com/astral-sh/ruff)
 
@@ -282,11 +282,19 @@ To report a vulnerability, follow [SECURITY.md](./SECURITY.md).
 
 ## License & attribution
 
-Licensed under the **Creative Commons Attribution 4.0 International**
-license (CC BY 4.0) — see [LICENSE](./LICENSE).
+Licensed under the **Apache License 2.0** — see [LICENSE](./LICENSE) and
+[NOTICE](./NOTICE).
 
 You may use, share and adapt this project, including commercially, **provided
 you give appropriate credit to Stephane Robert and link back to
 <https://blog.stephane-robert.info>**, and indicate whether changes were made.
+Apache-2.0 keeps those same two obligations — attribution and stating your
+changes — and adds an express patent grant.
+
+Up to and including **0.1.12**, dsoxlab was distributed under Creative Commons
+Attribution 4.0 (CC BY 4.0). That grant is irrevocable, so those releases remain
+available under CC BY 4.0. From **0.1.13** onwards the project is Apache-2.0:
+Creative Commons licences are not designed for software, and this one left the
+patent question open while marking the package as `Other/NOASSERTION` on PyPI.
 
 © 2026 Stephane Robert.

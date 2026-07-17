@@ -1,0 +1,39 @@
+dsoxlab — DevSecOps XL Labs CLI
+Copyright 2026 Stéphane Robert
+
+This product includes software developed by Stéphane Robert
+(https://blog.stephane-robert.info).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+
+Attribution
+-----------
+
+Section 4 of the License requires that this NOTICE be carried in any
+derivative work. Please credit Stéphane Robert and link back to
+https://blog.stephane-robert.info, and state whether you changed the
+files — the same courtesy the project asked for under its previous
+Creative Commons Attribution licence.
+
+Prior licensing
+---------------
+
+Up to and including version 0.1.12, dsoxlab was distributed under the
+Creative Commons Attribution 4.0 International licence (CC BY 4.0).
+That grant is irrevocable: releases up to 0.1.12 remain available under
+CC BY 4.0 to anyone who received them. Version 0.1.13 onwards is
+licensed under Apache-2.0, which is the closest software licence to the
+previous terms — it likewise requires attribution and the statement of
+changes, and it adds an express patent grant that CC BY 4.0 lacks.
