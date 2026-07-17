@@ -61,11 +61,20 @@ jobs:
       # SLSA build provenance for the wheel and sdist, verifiable with
       # `gh attestation verify <artifact> --repo stephrobert/dsoxlab` or
       # slsa-verifier. Complements the PEP 740 attestations PyPI records.
+      #
+      # The two artifacts are listed explicitly rather than globbed with
+      # `dist/*`: `uv build` also drops a one-byte `dist/.gitignore`, and this
+      # action's glob matches dotfiles (unlike the shell glob that feeds
+      # `gh release create` below). v0.1.11 therefore attested `.gitignore`
+      # alongside the distributions — harmless, but an attestation should name
+      # exactly what is published, nothing more.
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: 'dist/*'
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
 
       # The attestation above is recorded on GitHub's attestation API, which is
       # what `gh attestation verify` reads. It is NOT what OpenSSF Scorecard's
