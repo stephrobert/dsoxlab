@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-07-17
+
+### Changed
+
+- **Licence : CC BY 4.0 → Apache-2.0.** Creative Commons
+  [advises against its licences for software](https://creativecommons.org/faq/#can-i-apply-a-creative-commons-license-to-software):
+  they carry no patent grant, their terms are written for creative works rather
+  than code, and PyPI could only mark the package as `Other/NOASSERTION`. For a
+  CLI published on PyPI and imported by third-party lab repositories, that left
+  real legal ambiguity for users.
+
+  **Apache-2.0 is the closest software licence to the previous terms.** It keeps
+  both obligations CC BY 4.0 imposed — give credit, and state whether you changed
+  the files (§4.b) — and adds the express patent grant CC BY 4.0 lacks.
+  Attribution now lives in the [NOTICE](./NOTICE) file, which §4.d requires
+  derivative works to carry.
+
+  **Releases up to and including 0.1.12 remain under CC BY 4.0**: that grant is
+  irrevocable for anyone who received them. Only 0.1.13 onwards is Apache-2.0.
+
 ## [0.1.12] - 2026-07-17
 
 ### Fixed
@@ -248,7 +268,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/stephrobert/dsoxlab/compare/v0.1.9...v0.1.10

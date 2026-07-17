@@ -3,7 +3,7 @@
 [![CI](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml/badge.svg)](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/stephrobert/dsoxlab?label=OpenSSF%20Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/stephrobert/dsoxlab)
 [![Conformité Plumber](https://score.getplumber.io/github.com/stephrobert/dsoxlab.svg)](https://score.getplumber.io/github.com/stephrobert/dsoxlab)
-[![Licence : CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](./LICENSE)
+[![Licence : Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Style : ruff](https://img.shields.io/badge/lint-ruff-orange.svg)](https://github.com/astral-sh/ruff)
 
@@ -284,12 +284,21 @@ Pour signaler une vulnérabilité, suivez [SECURITY.fr.md](./SECURITY.fr.md).
 
 ## Licence et attribution
 
-Distribué sous licence **Creative Commons Attribution 4.0 International**
-(CC BY 4.0), voir [LICENSE](./LICENSE).
+Distribué sous **licence Apache 2.0**, voir [LICENSE](./LICENSE) et
+[NOTICE](./NOTICE).
 
 Vous pouvez utiliser, partager et adapter ce projet, y compris à des fins
 commerciales, **à condition de créditer Stéphane Robert et de renvoyer par un
 lien vers <https://blog.stephane-robert.info>**, en indiquant si des
-modifications ont été apportées.
+modifications ont été apportées. Apache-2.0 conserve ces deux mêmes obligations,
+l'attribution et la mention des modifications, et y ajoute une concession de
+brevet explicite.
+
+Jusqu'à la version **0.1.12** incluse, dsoxlab était distribué sous Creative
+Commons Attribution 4.0 (CC BY 4.0). Cette concession est irrévocable : ces
+versions restent disponibles sous CC BY 4.0. À partir de la **0.1.13**, le
+projet passe sous Apache-2.0 : les licences Creative Commons ne sont pas conçues
+pour du logiciel, et celle-ci laissait la question des brevets ouverte tout en
+faisant classer le paquet en `Other/NOASSERTION` sur PyPI.
 
 © 2026 Stéphane Robert.
