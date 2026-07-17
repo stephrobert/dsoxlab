@@ -25,6 +25,10 @@ jobs:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # The privileged token lives in this protected environment, restricted to
+    # the main branch. This workflow never runs on `pull_request`, so the token
+    # is unreachable from a fork. Same model as plumber.yml.
+    environment: security
     permissions:
       contents: read
       security-events: write   # upload SARIF to Code Scanning
@@ -46,6 +50,21 @@ jobs:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
+          # Without this, Branch-Protection cannot be evaluated at all: the
+          # default GITHUB_TOKEN may not read *classic* branch protection, and
+          # the check returned `-1` — an internal error, silently excluded from
+          # the average rather than scored.
+          #
+          # A fine-grained PAT with `Administration: Read` (plus the Metadata
+          # that comes with it) is what Scorecard documents for this case. The
+          # token is reused from plumber.yml, which needs the exact same right
+          # for `branchMustBeProtected` — one privileged credential to rotate,
+          # not two.
+          #
+          # Note: had this repository used a *ruleset* instead of classic branch
+          # protection, no token would be needed — rulesets are readable by the
+          # default GITHUB_TOKEN.
+          repo_token: ${{ secrets.PLUMBER_ADMIN_TOKEN }}
 
       - name: Upload SARIF to Code Scanning
         uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
