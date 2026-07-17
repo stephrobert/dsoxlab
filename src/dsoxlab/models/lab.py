@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
 from .runtime import RuntimeConfig, RuntimeType, Target
 
 
@@ -54,40 +55,47 @@ class LabDefinition:
         with lab_yaml.open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
 
+        # Un fichier vide ou réduit à des commentaires donne None ; une racine
+        # en liste ou en scalaire donne un list/int. Sans ce garde-fou, l'accès
+        # suivant lèverait AttributeError, hors du contrat (KeyError,
+        # ValueError, YAMLError) que discovery/scanner.py rattrape : le lab
+        # ferait planter la CLI au lieu d'être ignoré avec un warning.
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"{lab_yaml}: le document doit être un mapping YAML "
+                f"(reçu : {type(data).__name__})."
+            )
+
         # Fusion des traductions
         if lang and lang != "en":
             lang_yaml = lab_yaml.parent / f"lab.{lang[:2].lower()}.yaml"
             if lang_yaml.exists():
                 try:
                     with lang_yaml.open(encoding="utf-8") as fh:
-                        overrides = yaml.safe_load(fh) or {}
+                        overrides = yaml.safe_load(fh)
+                    if not isinstance(overrides, dict):
+                        overrides = {}
                     for key in cls._TRANSLATABLE:
                         if key in overrides:
                             data[key] = overrides[key]
                 except yaml.YAMLError:
                     pass  # fichier de traduction invalide — on garde les valeurs de base
 
-        runtime_data = data.get("runtime", {}) or {}
+        # `runtime: vm` au lieu du bloc `runtime:\n  type: vm` est la faute la
+        # plus naturelle du contrat : elle donne une str, pas un mapping.
+        runtime_data = as_mapping(data.get("runtime"), "runtime", lab_yaml)
 
-        targets_raw = runtime_data.get("targets") or []
+        targets_raw = as_mapping_list(runtime_data.get("targets"), "runtime.targets", lab_yaml)
         targets: list[Target] = []
         for idx, t in enumerate(targets_raw):
-            if not isinstance(t, dict):
-                raise ValueError(
-                    f"{lab_yaml}: runtime.targets[{idx}] doit être un dict, "
-                    f"reçu : {type(t).__name__}"
-                )
             if "name" not in t or "host" not in t:
                 raise ValueError(
                     f"{lab_yaml}: runtime.targets[{idx}] doit contenir "
                     f"'name' et 'host'."
                 )
-            roles_raw = t.get("roles") or {}
-            if not isinstance(roles_raw, dict):
-                raise ValueError(
-                    f"{lab_yaml}: runtime.targets[{idx}].roles doit être un "
-                    f"mapping role→fqdn, reçu : {type(roles_raw).__name__}"
-                )
+            roles_raw = as_mapping(
+                t.get("roles"), f"runtime.targets[{idx}].roles", lab_yaml
+            )
             targets.append(Target(
                 name=str(t["name"]),
                 host=str(t["host"]),
@@ -102,11 +110,11 @@ class LabDefinition:
             default=str(runtime_data.get("default", "")),
             snapshot_required=bool(runtime_data.get("snapshot_required", False)),
             workdir=runtime_data.get("workdir", "challenge/work"),
-            fixtures=list(runtime_data.get("fixtures") or []),
+            fixtures=as_str_list(runtime_data.get("fixtures"), "runtime.fixtures", lab_yaml),
             topology=runtime_data.get("topology", "local"),
         )
 
-        validation_data = data.get("validation", {})
+        validation_data = as_mapping(data.get("validation"), "validation", lab_yaml)
         validation = ValidationConfig(
             functional=validation_data.get("functional", True),
             security=validation_data.get("security", False),
@@ -117,19 +125,21 @@ class LabDefinition:
             id=data["id"],
             title=data["title"],
             level=data["level"],
-            skills=data.get("skills", []),
+            skills=as_str_list(data.get("skills"), "skills", lab_yaml),
             runtime=runtime,
-            distros=data.get("distros", []),
+            distros=as_str_list(data.get("distros"), "distros", lab_yaml),
             doc_url=data.get("doc_url", ""),
             validation=validation,
             path=lab_yaml.parent,
             section=data.get("section", "linux"),
             description=data.get("description", ""),
-            track=data.get("track", []),
+            track=as_str_list(data.get("track"), "track", lab_yaml),
             difficulty=data.get("difficulty", "beginner"),
             estimated_time=data.get("estimated_time", "30m"),
-            certification_tags=data.get("certification_tags", []),
+            certification_tags=as_str_list(
+                data.get("certification_tags"), "certification_tags", lab_yaml
+            ),
             lab_type=data.get("lab_type", "lab"),
-            bloc=int(data.get("bloc", 0)),
-            bloc_order=int(data.get("bloc_order", 0)),
+            bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
+            bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),
         )

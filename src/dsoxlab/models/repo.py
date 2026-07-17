@@ -38,6 +38,31 @@ from typing import Any
 
 import yaml
 
+from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
+
+
+def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, Any]]:
+    """Valide ``infra.providers`` : un mapping provider → mapping d'overrides."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"{meta_path}: 'infra.providers' doit être un mapping "
+            f"(reçu : {type(value).__name__})."
+        )
+    overrides: dict[str, dict[str, Any]] = {}
+    for name, cfg in value.items():
+        if cfg is None:
+            overrides[str(name)] = {}
+        elif isinstance(cfg, dict):
+            overrides[str(name)] = dict(cfg)
+        else:
+            raise ValueError(
+                f"{meta_path}: 'infra.providers.{name}' doit être un mapping "
+                f"(reçu : {type(cfg).__name__})."
+            )
+    return overrides
+
 
 class ProviderUnresolved(ValueError):
     """Aucun provider d'infrastructure n'est résolu pour ce dépôt.
@@ -287,15 +312,29 @@ class RepoMetadata:
         with meta_path.open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
 
+        # `or {}` couvre le fichier vide, pas une racine en liste ou en scalaire
+        # (ni un bloc `repo:` qui ne serait pas un mapping) : l'accès `.get`
+        # lèverait alors AttributeError au lieu du ValueError attendu par la CLI.
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"{meta_path}: le document doit être un mapping YAML "
+                f"(reçu : {type(data).__name__})."
+            )
+
         repo = data.get("repo") or {}
+        if not isinstance(repo, dict):
+            raise ValueError(
+                f"{meta_path}: le bloc 'repo' doit être un mapping "
+                f"(reçu : {type(repo).__name__})."
+            )
         if not repo.get("id") or not repo.get("category"):
             raise ValueError(
                 f"{meta_path}: les champs 'repo.id' et 'repo.category' "
                 "sont requis (contrat dsoxlab)."
             )
 
-        infra_data = data.get("infra") or {}
-        hosts_data = infra_data.get("hosts") or []
+        infra_data = as_mapping(data.get("infra"), "infra", meta_path)
+        hosts_data = as_mapping_list(infra_data.get("hosts"), "infra.hosts", meta_path)
         # Provider courant : env > contexte session > meta.yml (string OU
         # liste à 1 élément) > non résolu ("") si liste à plusieurs sans
         # choix — voir InfraDefinition.require_provider().
@@ -312,32 +351,33 @@ class RepoMetadata:
             cidr=infra_data.get("cidr", ""),
             hosts=[
                 HostDefinition(
-                    name=h["name"],
+                    name=str(h["name"]),
+                    # `or ""` plutôt que le défaut de .get() : une clé présente
+                    # mais vide rend None, que str() transformerait en "None".
                     # ip est legacy/optionnel — calculé par Terraform en MVP
-                    ip=str(h.get("ip", "")),
-                    distro=h.get("distro", ""),
-                    role=h.get("role", ""),
-                    ram_mb=int(h.get("ram_mb", 1024)),
-                    vcpu=int(h.get("vcpu", 1)),
-                    disk_gb=int(h.get("disk_gb", 10)),
-                    extra_disk_gb=int(h.get("extra_disk_gb", 0)),
+                    ip=str(h.get("ip") or ""),
+                    distro=str(h.get("distro") or ""),
+                    role=str(h.get("role") or ""),
+                    ram_mb=as_int(h.get("ram_mb"), 1024, "infra.hosts[].ram_mb", meta_path),
+                    vcpu=as_int(h.get("vcpu"), 1, "infra.hosts[].vcpu", meta_path),
+                    disk_gb=as_int(h.get("disk_gb"), 10, "infra.hosts[].disk_gb", meta_path),
+                    extra_disk_gb=as_int(
+                        h.get("extra_disk_gb"), 0, "infra.hosts[].extra_disk_gb", meta_path
+                    ),
                 )
                 for h in hosts_data
             ],
-            providers={
-                str(name): dict(cfg or {})
-                for name, cfg in (infra_data.get("providers") or {}).items()
-            },
+            providers=_provider_overrides(infra_data.get("providers"), meta_path),
         )
 
         sections = [
             SectionDefinition(
-                id=s["id"],
+                id=str(s["id"]),
                 title=s.get("title", ""),
                 description=s.get("description", ""),
-                labs=list(s.get("labs") or []),
+                labs=as_str_list(s.get("labs"), "sections[].labs", meta_path),
             )
-            for s in (data.get("sections") or [])
+            for s in as_mapping_list(data.get("sections"), "sections", meta_path)
         ]
 
         return cls(
