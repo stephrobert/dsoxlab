@@ -1,9 +1,13 @@
-# Contribution gate. zizmor statically analyzes the workflows first, as a fast
-# security gate; the heavier jobs (quality matrix, CodeQL) only run once it
-# passes, so an insecure workflow fails fast without burning runners.
+# Contribution gate. Three workflow scanners run first, in parallel, as a fast
+# security gate: zizmor (workflow vulnerabilities), actionlint (syntax, invalid
+# permission scopes, shellcheck) and poutine (CI/CD exploitation chains). The
+# heavier jobs (quality matrix, pre-commit parity, fuzzing, CodeQL) only run
+# once all three pass, so an insecure workflow fails fast without burning
+# runners.
 #
-# Deeper CI/CD policy scanning and the compliance score live in plumber.yml
-# (trusted context only); supply-chain posture in scorecard.yml.
+# The compliance score and the repository-settings checks live in plumber.yml
+# (trusted context only — it needs a privileged token); supply-chain posture in
+# scorecard.yml.
 #
 # Hardening baseline: every action is pinned to a full commit SHA, the default
 # token has no permissions, each job grants only what it needs, checkout never
@@ -32,6 +36,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      # First step of every job: monitor egress and block the runner from being
+      # tampered with. `audit` records outbound calls without failing the run —
+      # the recorded list is what a future `block` policy would be built from.
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -46,9 +58,90 @@ jobs:
           version: "1.26.1"
           advanced-security: false
 
+  # Workflow syntax gate. actionlint is what refuses an invalid runner label, a
+  # malformed ${{ }} expression or a permission scope that does not exist — the
+  # class of mistake that silently disables a control rather than failing loudly.
+  # It also runs shellcheck over every `run:` block.
+  actionlint:
+    name: Actionlint (workflow syntax)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Verified release binary rather than a third-party action: the scanner
+      # that guards the pipeline must not itself widen the trust boundary.
+      # Same pattern as the trufflehog install below (no piped remote script).
+      - name: Install actionlint (verified release binary)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          asset="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/checksums.txt" "${base}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          (cd "${workdir}" && grep " ${asset}$" checksums.txt | sha256sum -c -)
+          tar -xzf "${workdir}/${asset}" -C "${workdir}" actionlint
+          sudo install -m 0755 "${workdir}/actionlint" /usr/local/bin/actionlint
+          actionlint --version
+
+      - name: Actionlint
+        run: actionlint -color
+
+  # CI/CD exploitation-chain gate. poutine models triggers, permissions and data
+  # flow to surface complete attack scenarios, and flags actions from unverified
+  # creators. Acknowledged false positives live in .poutine.yml, per purl.
+  poutine:
+    name: Poutine (CI/CD exploitation chains)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install poutine (verified release binary)
+        env:
+          POUTINE_VERSION: "1.1.6"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://github.com/boostsecurityio/poutine/releases/download/v${POUTINE_VERSION}"
+          asset="poutine_Linux_x86_64.tar.gz"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/checksums.txt" "${base}/poutine_${POUTINE_VERSION}_checksums.txt"
+          (cd "${workdir}" && grep " ${asset}$" checksums.txt | sha256sum -c -)
+          tar -xzf "${workdir}/${asset}" -C "${workdir}" poutine
+          sudo install -m 0755 "${workdir}/poutine" /usr/local/bin/poutine
+          poutine version
+
+      # --fail-on-violation makes this a gate (exit 10) instead of a report.
+      - name: Poutine
+        run: poutine analyze_local . --fail-on-violation --quiet
+
   quality:
     name: Lint, type-check and test (py${{ matrix.python-version }})
-    needs: zizmor
+    needs: [zizmor, actionlint, poutine]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -62,6 +155,11 @@ jobs:
       # so no context value is ever interpolated into shell code.
       PYTHON_VERSION: ${{ matrix.python-version }}
     steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -80,7 +178,7 @@ jobs:
         run: uv sync --frozen --python "$PYTHON_VERSION"
 
       - name: Lint and security (ruff)
-        run: uv run ruff check src/dsoxlab tests
+        run: uv run ruff check src/dsoxlab tests fuzz
 
       - name: Type-check (mypy strict)
         run: uv run mypy src/dsoxlab
@@ -96,12 +194,17 @@ jobs:
   # committed .pre-commit-config.yaml itself — no hand-maintained copy to drift.
   pre-commit:
     name: Pre-commit parity (all hooks)
-    needs: zizmor
+    needs: [zizmor, actionlint, poutine]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
     steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -141,15 +244,85 @@ jobs:
       - name: Run every hook (push stage)
         run: uv run pre-commit run --all-files --hook-stage pre-push --show-diff-on-failure --color always
 
+  # Short fuzzing regression over the untrusted-YAML contract. lab.yaml and
+  # meta.yml come from lab-provider repositories, so they are this engine's
+  # main untrusted input; discovery/scanner.py only rattrape (KeyError,
+  # ValueError, YAMLError), and anything else crashes the CLI on an unrelated
+  # command. These harnesses assert that contract.
+  #
+  # This is a regression gate, not a fuzzing campaign: a short seeded run keeps
+  # the harnesses alive and catches the obvious breakages. Deep runs are done
+  # locally with a persistent corpus.
+  fuzz:
+    name: Fuzz the untrusted-YAML contract (short run)
+    needs: [zizmor, actionlint, poutine]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.26"
+          enable-cache: true
+
+      - name: Sync dependencies (locked, with the fuzz group)
+        run: uv sync --frozen --group fuzz
+
+      # Scratch dir first, seed corpus second: libFuzzer writes what it finds
+      # into the first directory, and fuzz/corpus/ is a curated seed set.
+      - name: Fuzz the lab.yaml parser
+        run: |
+          mkdir -p "${RUNNER_TEMP}/fuzz-lab"
+          uv run --group fuzz python fuzz/fuzz_lab_yaml.py \
+            "${RUNNER_TEMP}/fuzz-lab" fuzz/corpus/lab_yaml/ \
+            -dict=fuzz/dict/yaml_contract.dict \
+            -atheris_runs=20000 -max_len=4096
+
+      - name: Fuzz the meta.yml parser
+        run: |
+          mkdir -p "${RUNNER_TEMP}/fuzz-meta"
+          uv run --group fuzz python fuzz/fuzz_meta_yaml.py \
+            "${RUNNER_TEMP}/fuzz-meta" fuzz/corpus/meta_yml/ \
+            -dict=fuzz/dict/yaml_contract.dict \
+            -atheris_runs=20000 -max_len=4096
+
+      # A crash writes a `crash-*` reproducer next to the harness. Keep it: it
+      # is the exact input needed to replay the failure locally.
+      - name: Upload crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crashes
+          path: crash-*
+          if-no-files-found: ignore
+          retention-days: 7
+
   codeql:
     name: CodeQL analyze (python)
-    needs: zizmor
+    needs: [zizmor, actionlint, poutine]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
       security-events: write   # upload the CodeQL results to Code Scanning
     steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

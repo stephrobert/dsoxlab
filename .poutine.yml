@@ -1,0 +1,24 @@
+# Poutine configuration — CI/CD exploitation-chain scanner (boostsecurity.io).
+#
+# Poutine's `github_action_from_unverified_creator_used` rule flags every action
+# whose author is not a Marketplace "verified creator". That signal is useful and
+# stays ON for every other action: it is what catches a typo-squatted or freshly
+# re-registered action slipping into the pipeline.
+#
+# The three entries below are acknowledged one purl at a time — never by turning
+# the rule off globally. Each is an action this pipeline vets by hand, pins to a
+# full commit SHA, and already lists in `.plumber.yaml` under
+# `trustedGithubActions` (the two allowlists are kept in sync on purpose).
+skip:
+  - rule: github_action_from_unverified_creator_used
+    purl:
+      # Astral's own uv installer. Astral maintains uv and ruff, both of which
+      # this project already depends on: the action adds no new trust root.
+      - pkg:githubactions/astral-sh/setup-uv
+      # Official action of the plumber scanner (getplumber.io) used by
+      # .github/workflows/plumber.yml. It verifies the SLSA build provenance of
+      # the binary it downloads before running it (`verify-attestation: true`).
+      - pkg:githubactions/getplumber/plumber
+      # Official action of the zizmor workflow analyzer, published by the
+      # zizmor project itself (zizmorcore). Runs in ci.yml as the security gate.
+      - pkg:githubactions/zizmorcore/zizmor-action

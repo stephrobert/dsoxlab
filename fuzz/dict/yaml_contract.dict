@@ -1,0 +1,99 @@
+# libFuzzer dictionary for the dsoxlab YAML contract.
+#
+# Random mutations almost never rebuild a contract keyword by chance, so the
+# fuzzer stalls on the first validation gate (`repo.id`/`repo.category` are
+# required, `id`/`title`/`level` are required). Feeding it the real tokens lets
+# it assemble documents that reach the field logic instead of bouncing off
+# safe_load. Use with:
+#     -dict=fuzz/dict/yaml_contract.dict
+#
+# Keys mirror the contract documented in CLAUDE.md. Keep in sync when the
+# contract gains a field.
+
+# ── YAML syntax ──
+# libFuzzer dictionaries only understand \xNN escapes, not \n / \t.
+colon_space=": "
+newline="\x0a"
+indent="  "
+dash="- "
+key_newline=":\x0a"
+nested_key="\x0a  "
+list_item="\x0a    - "
+null="null"
+true="true"
+false="false"
+empty_map="{}"
+empty_list="[]"
+anchor="&a "
+alias="*a"
+
+# ── meta.yml : racine ──
+repo="repo:"
+id="id:"
+category="category:"
+title="title:"
+blog_url="blog_url:"
+description="description:"
+
+# ── meta.yml : infra ──
+infra="infra:"
+provider="provider:"
+network="network:"
+cidr="cidr:"
+hosts="hosts:"
+name="name:"
+distro="distro:"
+role="role:"
+ram_mb="ram_mb:"
+vcpu="vcpu:"
+disk_gb="disk_gb:"
+extra_disk_gb="extra_disk_gb:"
+providers="providers:"
+kvm="kvm"
+incus="incus"
+outscale="outscale"
+
+# ── meta.yml : sections ──
+sections="sections:"
+labs="labs:"
+
+# ── lab.yaml ──
+level="level:"
+skills="skills:"
+distros="distros:"
+doc_url="doc_url:"
+lab_type="lab_type:"
+section="section:"
+track="track:"
+difficulty="difficulty:"
+estimated_time="estimated_time:"
+certification_tags="certification_tags:"
+bloc="bloc:"
+bloc_order="bloc_order:"
+
+# ── lab.yaml : runtime ──
+runtime="runtime:"
+type="type:"
+targets="targets:"
+host="host:"
+label_en="label_en:"
+label_fr="label_fr:"
+roles="roles:"
+default="default:"
+snapshot_required="snapshot_required:"
+workdir="workdir:"
+fixtures="fixtures:"
+topology="topology:"
+vm="vm"
+shell="shell"
+
+# ── lab.yaml : validation ──
+validation="validation:"
+functional="functional:"
+security="security:"
+persistence="persistence_after_reboot:"
+
+# ── valeurs énumérées ──
+lab="lab"
+challenge="challenge"
+capstone="capstone"
