@@ -22,11 +22,18 @@ ever stored in the repository.
 
 ## Cutting a release
 
-1. Bump the version in `pyproject.toml` and `src/dsoxlab/__init__.py`.
-2. Move the `Unreleased` entries in [CHANGELOG.md](./CHANGELOG.md) under a new
-   `## [X.Y.Z]` heading and update the comparison links.
+1. Bump the version in `pyproject.toml`, then refresh the lockfile with
+   `uv lock`. There is **nothing to bump** in `src/dsoxlab/__init__.py`:
+   `__version__` is read from the installed package metadata precisely so it
+   cannot drift from `pyproject.toml`.
+2. Move the `Unreleased` entries under a new `## [X.Y.Z]` heading in **both**
+   [CHANGELOG.md](./CHANGELOG.md) and [CHANGELOG.fr.md](./CHANGELOG.fr.md), and
+   update the comparison links at the bottom of each file. The project is
+   bilingual: an English-only entry is an incomplete entry.
 3. Commit through a pull request and merge to `main`.
-4. Tag the release and push the tag:
+4. **Wait for CI to be green on `main`.** The tag builds from that commit, and
+   PyPI is final: a version number can never be republished.
+5. Tag the release and push the tag:
 
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z"
@@ -36,7 +43,31 @@ ever stored in the repository.
 Pushing the tag triggers `release.yml`, which:
 
 - builds the sdist and wheel with `uv build` and checks them with `twine`,
-- publishes to PyPI via OIDC, attaching PEP 740 build attestations.
+- records **SLSA build provenance** for both artifacts
+  (`actions/attest-build-provenance`),
+- publishes to PyPI via OIDC, attaching PEP 740 build attestations,
+- creates the **GitHub Release** with the CHANGELOG section for the tag, the
+  distributions, and `provenance.intoto.jsonl`.
+
+Two details of that pipeline are deliberate. The `publish` job runs no project
+code and holds `id-token: write` only; and `github_release` runs after PyPI
+succeeds, so no Release ever advertises a version that failed to upload.
+
+`provenance.intoto.jsonl` is attached as a release asset on purpose: it is a
+*distinct* artifact from the attestation recorded on GitHub's API, and it is the
+one OpenSSF Scorecard's Signed-Releases control looks for. That control scores
+the **five most recent** releases, so it only reaches its maximum once five
+consecutive releases carry the asset.
+
+## Verifying a release
+
+Anyone can verify that a published artifact really came from this repository's
+workflow, and from which commit:
+
+```bash
+gh release download vX.Y.Z --repo stephrobert/dsoxlab --pattern '*.whl'
+gh attestation verify dsoxlab-X.Y.Z-py3-none-any.whl --repo stephrobert/dsoxlab
+```
 
 ## Versioning
 

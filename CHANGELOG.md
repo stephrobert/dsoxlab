@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The build provenance no longer attests a file that is not published.**
+  `uv build` drops a one-byte `dist/.gitignore`, and `attest-build-provenance`
+  globs dotfiles (unlike the shell glob feeding `gh release create`), so the
+  v0.1.11 attestation listed `.gitignore` next to the wheel and the sdist. The
+  artifacts are now named explicitly. Harmless in itself, but an attestation
+  should name exactly what is published, nothing more.
+
 ## [0.1.11] - 2026-07-17
 
 ### Fixed
@@ -237,5 +246,16 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/stephrobert/dsoxlab/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/stephrobert/dsoxlab/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/stephrobert/dsoxlab/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/stephrobert/dsoxlab/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/stephrobert/dsoxlab/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/stephrobert/dsoxlab/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/stephrobert/dsoxlab/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/stephrobert/dsoxlab/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/stephrobert/dsoxlab/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/stephrobert/dsoxlab/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/stephrobert/dsoxlab/releases/tag/v0.1.0

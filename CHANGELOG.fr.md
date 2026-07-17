@@ -9,6 +9,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **La provenance de build n'atteste plus un fichier qui n'est pas publié.**
+  `uv build` dépose un `dist/.gitignore` d'un octet, et
+  `attest-build-provenance` inclut les fichiers cachés dans son glob (au
+  contraire du glob shell qui alimente `gh release create`) : l'attestation de
+  la v0.1.11 listait donc `.gitignore` à côté de la wheel et du sdist. Les
+  artefacts sont désormais nommés explicitement. Anodin en soi, mais une
+  attestation doit nommer exactement ce qui est publié, rien de plus.
+
 ## [0.1.11] - 2026-07-17
 
 ### Corrigé
@@ -249,5 +259,16 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/stephrobert/dsoxlab/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/stephrobert/dsoxlab/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/stephrobert/dsoxlab/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/stephrobert/dsoxlab/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/stephrobert/dsoxlab/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/stephrobert/dsoxlab/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/stephrobert/dsoxlab/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/stephrobert/dsoxlab/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/stephrobert/dsoxlab/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/stephrobert/dsoxlab/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/stephrobert/dsoxlab/releases/tag/v0.1.0
