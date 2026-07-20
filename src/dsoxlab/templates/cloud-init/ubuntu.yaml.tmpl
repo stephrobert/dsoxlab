@@ -69,7 +69,16 @@ runcmd:
   - [ usermod, -p, "*", student ]
   - [ usermod, -p, "*", ansible ]
   - [ systemctl, enable, --now, ssh ]
-  - [ systemctl, enable, --now, qemu-guest-agent ]
+  # `enable` SANS `--now` : l'unité déclare
+  # `BindsTo=dev-virtio\x2dports-org.qemu.guest_agent.0.device`, or le
+  # provider KVM ne déclare aucun channel virtio (cf. la note dans
+  # templates/terraform/kvm/main.tf). Le device n'existe donc jamais, et
+  # `--now` attendait 90 s avant d'échouer : le script runcmd sortait en 1,
+  # cloud-init finissait en `status: error`, et `dsoxlab provision` restait
+  # bloqué sur son attente alors que la VM était prête.
+  # L'activation est conservée : le jour où un channel est déclaré (ou sur
+  # un provider qui en fournit un), le service démarrera au boot.
+  - [ systemctl, enable, qemu-guest-agent ]
 
 # Sécurité par défaut : AppArmor reste activé. UFW est installé mais
 # pas activé par défaut — c'est aux labs LFCS de l'activer
