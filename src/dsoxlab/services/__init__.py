@@ -18,6 +18,7 @@ from .lab_service import (
     validate_all_metadata,
     validate_all_structure,
 )
+from .guide_service import guide_url
 from .progress_service import (
     BlocProgress,
     build_progress,
@@ -36,6 +37,7 @@ __all__ = [
     "evaluate_lab",
     "get_all_labs",
     "get_lab",
+    "guide_url",
     "lab_session_spec",
     "lab_status",
     "next_pending_lab",

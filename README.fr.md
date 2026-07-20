@@ -80,9 +80,29 @@ cd linux-dsoxlab-training
 # 2. Le contexte actif est détecté automatiquement via le meta.yml du dépôt
 dsoxlab list-labs
 dsoxlab show linux.depanner.service-crash-loop
+dsoxlab guide linux.depanner.service-crash-loop   # lire le cours dans le navigateur
 dsoxlab run linux.depanner.service-crash-loop
 dsoxlab check linux.depanner.service-crash-loop
 ```
+
+### Lire le cours
+
+Le cours n'est pas embarqué dans le dépôt de labs : chaque lab déclare un
+`doc_url` qui pointe vers le site du formateur. `dsoxlab guide` ouvre cette page
+dans un vrai onglet de navigateur, donc elle s'affiche telle qu'elle est publiée,
+avec ses images, ses blocs de code et sa navigation.
+
+```bash
+dsoxlab guide                 # le lab actif
+dsoxlab guide <id>            # un lab précis
+dsoxlab guide <id> --print    # affiche l'URL au lieu de l'ouvrir (utile en SSH)
+```
+
+L'URL porte des paramètres de campagne (`utm_source=dsoxlab`, `utm_medium=lab`,
+`utm_campaign=<lab_id>`), ce qui permet à un formateur de voir quels labs amènent
+réellement des lecteurs vers quels guides. Un lien ouvert depuis une interface
+locale ne transmet aucun referrer exploitable : sans ce marquage, ces lectures
+seraient indistinguables du trafic direct.
 
 Changer de langue à la volée :
 
@@ -167,6 +187,7 @@ test référencés sont présents.
 | `dsoxlab list-labs` | Liste les labs du dépôt courant (filtre `--section`/`--level`/`--type`/`--bloc`) |
 | `dsoxlab show <id>` | Détail d'un lab |
 | `dsoxlab course [section]` | Affiche une section de cours ou la table des matières |
+| `dsoxlab guide [id]` | Ouvre le guide en ligne du lab dans le navigateur (`--print` affiche l'URL) |
 | `dsoxlab run <id>` | Prépare et démarre l'environnement du lab |
 | `dsoxlab challenge <id>` | Affiche la mission de challenge d'un lab |
 | `dsoxlab hint <id>` | Révèle un indice (déduit du score) |

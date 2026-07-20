@@ -31,6 +31,12 @@ STRINGS: dict[str, str] = {
     "cmd_next_help":     "Recommande le prochain lab ou challenge à compléter dans le contexte actif.",
     "cmd_show_help":      "Affiche le détail et le statut d'un lab.",
     "cmd_show_arg":       "Identifiant du lab (ex: l1-01-navigation-fichiers)",
+    "cmd_guide_help":     "Ouvre le guide en ligne du lab dans le navigateur.",
+    "cmd_guide_arg":      "Identifiant du lab (optionnel si un lab est actif)",
+    "cmd_guide_opt_print": "Affiche l'URL au lieu d'ouvrir un navigateur.",
+    "guide_opening":      "Ouverture du guide de {lab_id} dans le navigateur…",
+    "guide_no_url":       "Le lab {lab_id} ne déclare pas de doc_url : aucun guide à ouvrir.",
+    "guide_no_browser":   "Aucun navigateur n'a pu être ouvert. Copiez l'URL ci-dessus.",
     "cmd_run_help":       "Prépare et démarre l'environnement du lab.",
     "cmd_run_arg":        "Identifiant du lab",
     "cmd_course_help":    "Affiche une section du cours, ou le sommaire si aucune section n'est précisée.",
@@ -170,6 +176,13 @@ Chaque lab expose :
   [cyan]run <id>[/cyan]             Démarre l'environnement du lab (shell, incus ou KVM).
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Réaffiche les exercices guidés (scenario.md).
+                       [dim]<id>[/dim] est optionnel si un lab est actif en session.
+
+  [cyan]guide[/cyan] [dim][<id>][/dim]         Ouvre le guide en ligne du lab dans le navigateur.
+                       Le cours vit sur le site du formateur : la page s'ouvre dans
+                       un vrai onglet, donc elle s'affiche telle qu'elle est publiée.
+    [dim]--print[/dim]              Affiche l'URL au lieu d'ouvrir un navigateur
+                       (utile en SSH, où aucun navigateur n'est disponible).
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]challenge[/cyan] [dim][<id>][/dim]     Affiche la mission du challenge (challenge/README.md).

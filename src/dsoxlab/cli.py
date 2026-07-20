@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import webbrowser
 import shutil
 import subprocess
 import sys
@@ -79,6 +80,7 @@ from .services import (
     evaluate_lab,
     get_all_labs,
     get_lab,
+    guide_url,
     lab_status,
     next_pending_lab,
     open_lab_session,
@@ -597,6 +599,44 @@ def challenge_cmd(
 
 
 # ── hint ──────────────────────────────────────────────────────────────────────
+
+@app.command("guide", help=_("cmd_guide_help"))
+def guide(
+    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_guide_arg"), shell_complete=_complete_lab_id)] = None,
+    print_only: Annotated[bool, typer.Option("--print", help=_("cmd_guide_opt_print"))] = False,
+    lab_home: LabHomeOption = None,
+) -> None:
+    """Ouvre le guide en ligne du lab dans le navigateur.
+
+    Le cours est publié sur le site du formateur, pas embarqué dans le dépôt :
+    on ouvre donc la vraie page plutôt que d'en rapatrier le contenu. Elle
+    s'affiche telle qu'elle est publiée, et la lecture compte comme une visite
+    réelle du site.
+    """
+    root = _root(lab_home)
+    lang = _lang(root)
+    lab = _resolve_lab(root, lab_id, lang)
+
+    url = guide_url(lab)
+    if url is None:
+        error(_("guide_no_url", lab_id=lab.id))
+        raise typer.Exit(1)
+
+    # soft_wrap : une URL coupée sur deux lignes n'est plus copiable ni
+    # exploitable dans un pipe. Elle doit sortir d'un seul tenant, même
+    # au-delà de la largeur du terminal.
+    if print_only:
+        console.print(url, soft_wrap=True)
+        return
+
+    info(_("guide_opening", lab_id=lab.id))
+    console.print(url, soft_wrap=True)
+    # L'URL reste affichée : sur une machine sans navigateur (session SSH,
+    # serveur), webbrowser rend False sans rien ouvrir, et l'apprenant doit
+    # pouvoir la copier.
+    if not webbrowser.open(url):
+        error(_("guide_no_browser"))
+
 
 @app.command("hint", help=_("cmd_hint_help"))
 def hint(

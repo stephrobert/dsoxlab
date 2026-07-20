@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.16] - 2026-07-20
+
+### Ajouté
+
+- **`dsoxlab guide [<id>]` ouvre le cours en ligne d'un lab dans le navigateur.**
+  Le cours n'est pas embarqué dans le dépôt de labs : chaque lab déclare un
+  `doc_url` qui pointe vers le site du formateur. Ouvrir la vraie page, plutôt que
+  d'en rapatrier le contenu, la laisse s'afficher telle qu'elle est publiée (images,
+  blocs de code, navigation) et évite d'avoir à suivre la structure HTML d'un site
+  tiers. `--print` écrit l'URL au lieu d'ouvrir un navigateur : c'est ce qu'on veut
+  en SSH, où `webbrowser` n'a rien à ouvrir.
+
+- **`guide_url()` dans le nouveau `services/guide_service.py`**, une fonction pure
+  qui compose l'URL et n'ouvre rien. Elle ajoute des paramètres de campagne
+  (`utm_source=dsoxlab`, `utm_medium=lab`, `utm_campaign=<lab_id>`) pour qu'un
+  formateur puisse voir quels labs amènent réellement des lecteurs vers quels
+  guides.
+
+  Ce marquage est nécessaire, pas décoratif : un lien suivi depuis une interface
+  locale transmet au mieux `http://localhost:<port>` comme referrer, au pire rien du
+  tout, si bien que ces lectures seraient sinon indistinguables du trafic direct.
+  Les paramètres de requête déjà présents et les ancres `#section` sont conservés,
+  donc un lab peut viser une section précise d'un guide. `source` et `medium` sont
+  surchargeables, ce qui permettra à une future interface web de se distinguer de la
+  CLI.
+
 ## [0.1.15] - 2026-07-20
 
 ### Ajouté
@@ -386,7 +412,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...HEAD
+[0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
