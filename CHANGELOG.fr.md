@@ -9,6 +9,58 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.15] - 2026-07-20
+
+### Ajouté
+
+- **`services/progress_service.py`** : `build_progress()`, `next_pending_lab()` et
+  `pedagogical_sort_key()` exposent la progression de l'apprenant sous forme de
+  données typées (`BlocProgress`), et non plus de balisage terminal.
+- **`evaluate_lab()` et `compute_score()`** dans `services/lab_service.py` : noter
+  une exécution et l'enregistrer devient un seul appel de service, qui rend un
+  `ScoreResult`.
+- **`SessionSpec` et `Runtime.session_spec()`** : un runtime peut désormais
+  *décrire* sa session interactive au lieu de l'ouvrir, et `lab_session_spec()`
+  l'expose comme service. `SessionSpec.display()` rend la commande telle qu'un
+  apprenant la taperait, quoting compris.
+
+  `open_session()` appelle `subprocess.call`, qui s'empare du terminal courant. Cela
+  rendait deux choses impossibles : montrer la commande plutôt que l'exécuter, et
+  laisser une interface qui ne peut pas céder son TTY choisir son mode
+  d'attachement. L'exécution est maintenant à un seul endroit
+  (`BaseRuntime.open_session`), et chaque runtime ne fait plus que décrire.
+
+### Corrigé
+
+- **`dsoxlab ssh`, `dsoxlab status` et la session interactive VM se connectaient
+  encore en `student`.** La 0.1.14 a basculé l'inventaire et le `ssh_config` généré
+  vers le compte de service `ansible`, mais avait laissé `student@` codé en dur à
+  trois endroits : ces commandes et le `ssh_config` généré n'étaient donc pas
+  d'accord sur le compte de connexion. Sur un lab qui restreint `AllowUsers` au
+  compte de l'automatisation, `dsoxlab ssh` se retrouvait verrouillé hors du nœud
+  qu'il venait de provisionner. Le compte est désormais lu depuis l'inventaire
+  (`ansible_user`) dans les trois cas, et il ne reste plus aucun compte codé en dur
+  dans le paquet.
+
+### Modifié
+
+- **La logique métier ne vit plus dans la couche de présentation.** La formule de
+  score était dans `cli.py` (`_run_check`), entrelacée avec des `typer.Exit` et des
+  appels d'affichage, et l'agrégation de progression était dans
+  `reporting/console.py`, qui produisait du balisage Rich au fil du calcul. Les deux
+  étaient donc inatteignables depuis ailleurs et intestables sans capturer une
+  sortie terminal : toute seconde interface aurait dû réimplémenter la formule de
+  score et la règle « quelle est la prochaine étape ».
+
+  Ce sont désormais des fonctions pures sur des données simples.
+  `print_progress_table()` ne fait plus que du rendu, la commande `next` ne fait
+  plus que présenter, et les règles qu'elles portent sont couvertes par des tests
+  unitaires (14 nouveaux tests, dont celui qui compte le plus : un indice abaisse le
+  plafond, il n'est pas soustrait du score final).
+
+  Aucun changement de comportement : mêmes scores, même ordre, même rendu, vérifié
+  sur `ansible-training` et sur `linux-dsoxlab-training`.
+
 ## [0.1.14] - 2026-07-20
 
 ### Ajouté
@@ -334,7 +386,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12

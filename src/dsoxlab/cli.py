@@ -39,10 +39,8 @@ from .sessions.store import (
     get_best_scores,
     get_results,
     hints_cost_total,
-    hints_used_count,
     next_hint_index,
     record_hint,
-    record_result,
     reset_hints,
 )
 from .reporting import (
@@ -78,9 +76,11 @@ from .services import (
     CheckResult,
     check_lab,
     clean_lab,
+    evaluate_lab,
     get_all_labs,
     get_lab,
     lab_status,
+    next_pending_lab,
     open_lab_session,
     reset_lab,
     run_lab,
@@ -773,26 +773,18 @@ def _run_check(
         # pour que l'apprenant voie les erreurs détaillées.
         console.print(result.output)
 
-    hint_file = HintFile.load(lab.path / "challenge")
-    max_score = hint_file.points
-    hints_cost = hints_cost_total(root, lab.id)
-    used = hints_used_count(root, lab.id)
-    base = max(0, max_score - hints_cost)
-    score = round((result.passed / result.total) * base) if result.total else 0
-
-    record_result(
-        root,
-        lab_id=lab.id,
-        section=lab.section,
-        score=score,
-        max_score=max_score,
-        passed_tests=result.passed,
-        total_tests=result.total,
-        hints_used=used,
+    evaluation = evaluate_lab(root, lab, result)
+    print_check_result(
+        lab.id,
+        result.passed,
+        result.total,
+        evaluation.max_score,
+        evaluation.score,
+        evaluation.hints_used,
+        evaluation.hints_cost,
     )
-    print_check_result(lab.id, result.passed, result.total, max_score, score, used, hints_cost)
-    info(_("check_result_saved", score=score, max_score=max_score))
-    return result, score, max_score
+    info(_("check_result_saved", score=evaluation.score, max_score=evaluation.max_score))
+    return result, evaluation.score, evaluation.max_score
 
 
 # ── check ─────────────────────────────────────────────────────────────────────
@@ -910,22 +902,13 @@ def next_lab(
     if ctx.level:
         labs = [lab for lab in labs if lab.level == ctx.level]
 
-    # Sort: plain labs first (by bloc, order), then challenges, then capstones
-    def _sort_key(lab: LabDefinition) -> tuple[int, int, int, str]:
-        type_order = {"lab": 0, "challenge": 1, "capstone": 2}.get(lab.lab_type, 3)
-        return (lab.bloc, type_order, lab.bloc_order, lab.id)
+    scores_data = get_best_scores(root, [lab.id for lab in labs])
 
-    labs = sorted(labs, key=_sort_key)
-
-    lab_ids = [lab.id for lab in labs]
-    scores_data = get_best_scores(root, lab_ids)
-
-    for lab in labs:
-        if lab.id not in scores_data:
-            success(_("next_suggestion", lab_id=lab.id, title=lab.title))
-            return
-
-    success(_("next_all_done"))
+    upcoming = next_pending_lab(labs, scores_data)
+    if upcoming is None:
+        success(_("next_all_done"))
+        return
+    success(_("next_suggestion", lab_id=upcoming.id, title=upcoming.title))
 
 
 # ── reset ─────────────────────────────────────────────────────────────────────
@@ -1694,7 +1677,7 @@ def status(
                     f"{bastion['user']}@{proxy_target}"
                 ),
             ]
-        cmd += [f"student@{ip}", "true"]
+        cmd += [f"{host_vars.get('ansible_user', 'ansible')}@{ip}", "true"]
         result = subprocess.run(cmd, capture_output=True, timeout=15)  # noqa: S603
         if result.returncode == 0:
             success(f"  ✔ {fqdn} ({ip})")
@@ -1777,7 +1760,7 @@ def ssh_cmd(
                 bastion=proxy_target))
     else:
         info(_("ssh_connecting", host=target_fqdn, ip=ip))
-    cmd.append(f"student@{ip}")
+    cmd.append(f"{host_vars.get('ansible_user', 'ansible')}@{ip}")
     os.execvp("ssh", cmd)  # noqa: S606 — exec direct de ssh sans shell, argv construit en interne
 
 

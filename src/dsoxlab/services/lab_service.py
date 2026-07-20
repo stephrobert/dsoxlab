@@ -14,9 +14,11 @@ from typing import Any
 
 from ..discovery.repo import find_meta_yml
 from ..discovery.scanner import discover_labs
+from ..models.hint import HintFile
 from ..models.lab import LabDefinition
-from ..runtimes.base import EventCallback
+from ..runtimes.base import EventCallback, SessionSpec
 from ..runtimes.manager import RuntimeManager
+from ..sessions.store import hints_cost_total, hints_used_count, record_result
 from ..utils.shell import CommandError, run_command
 from ..validators.metadata import MetadataReport, validate_metadata
 from ..validators.structure import StructureReport, validate_structure
@@ -30,6 +32,23 @@ class CheckResult:
     output: str
     passed: int
     total: int
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    """Un lab validé et noté : ce que les tests ont donné, et ce que ça vaut.
+
+    ``hints_cost`` est ce que les indices demandés ont retiré du barème, et
+    ``max_score`` reste le barème PLEIN du lab (pas le barème amputé) : on veut
+    pouvoir afficher « 70/100, dont 20 de pénalité d'indices » plutôt qu'un
+    « 70/80 » qui masquerait le coût des indices.
+    """
+
+    check: CheckResult
+    score: int
+    max_score: int
+    hints_used: int
+    hints_cost: int
 
 
 def _parse_counts(output: str) -> tuple[int, int]:
@@ -71,6 +90,57 @@ def _parse_counts(output: str) -> tuple[int, int]:
     return passed, total
 
 
+def compute_score(passed: int, total: int, max_score: int, hints_cost: int) -> int:
+    """Note un lab : proportion de tests réussis, appliquée au barème amputé des indices.
+
+    Le coût des indices est retiré du barème AVANT la règle de trois, et non du
+    score final : demander de l'aide plafonne ce qu'on peut obtenir, plutôt que
+    de pénaliser après coup quelqu'un qui a tout réussi. Le barème ne descend
+    jamais sous zéro, donc un apprenant qui a consommé tous les indices obtient
+    0, jamais un score négatif.
+
+    ``total`` à zéro (pytest n'a pas pu collecter) rend 0 : on ne devine pas un
+    score depuis une exécution qui n'a rien mesuré.
+    """
+    if total <= 0:
+        return 0
+    base = max(0, max_score - hints_cost)
+    return round((passed / total) * base)
+
+
+def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreResult:
+    """Note un ``CheckResult`` et l'enregistre dans l'historique de l'apprenant.
+
+    Cette fonction était le cœur de ``_run_check`` dans ``cli.py``, où elle
+    était entrelacée avec des ``typer.Exit`` et des appels d'affichage : toute
+    autre interface (TUI, export) aurait dû redupliquer la formule de score.
+    Elle n'imprime rien et ne traduit rien ; l'appelant présente le résultat.
+    """
+    hint_file = HintFile.load(lab.path / "challenge")
+    max_score = hint_file.points
+    hints_cost = hints_cost_total(root, lab.id)
+    used = hints_used_count(root, lab.id)
+    score = compute_score(result.passed, result.total, max_score, hints_cost)
+
+    record_result(
+        root,
+        lab_id=lab.id,
+        section=lab.section,
+        score=score,
+        max_score=max_score,
+        passed_tests=result.passed,
+        total_tests=result.total,
+        hints_used=used,
+    )
+    return ScoreResult(
+        check=result,
+        score=score,
+        max_score=max_score,
+        hints_used=used,
+        hints_cost=hints_cost,
+    )
+
+
 def get_all_labs(root: Path, lang: str = "en") -> list[LabDefinition]:
     return discover_labs(root, lang=lang)
 
@@ -98,6 +168,16 @@ def open_lab_session(lab: LabDefinition) -> None:
     """Ouvre une session interactive dans le répertoire du lab (bloquant pour shell)."""
     runtime = _manager.get(lab)
     runtime.open_session(lab)
+
+
+def lab_session_spec(lab: LabDefinition) -> SessionSpec | None:
+    """Décrit la session interactive du lab sans l'ouvrir.
+
+    Permet d'afficher la commande à taper plutôt que de l'exécuter, et laisse
+    une interface qui ne peut pas céder son TTY choisir son mode d'attachement.
+    """
+    runtime = _manager.get(lab)
+    return runtime.session_spec(lab)
 
 
 def stop_lab(lab: LabDefinition, target_name: str | None = None) -> None:
