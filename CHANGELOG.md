@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.17] - 2026-07-20
+## [0.1.18] - 2026-07-20
+
+> **0.1.17 was never released.** Its tag landed on the 0.1.16 commit, so the
+> GitHub Release `v0.1.17` carries `dsoxlab-0.1.16` artifacts and PyPI stayed on
+> 0.1.16. The fix below, announced for 0.1.17, ships in this version instead.
 
 ### Fixed
 
@@ -406,8 +410,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.17...HEAD
-[0.1.17]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.17
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.18...HEAD
+[0.1.18]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.18
 [0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14

@@ -9,7 +9,12 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-## [0.1.17] - 2026-07-20
+## [0.1.18] - 2026-07-20
+
+> **La 0.1.17 n'a jamais été publiée.** Son tag a été posé sur le commit de la
+> 0.1.16 : la Release GitHub `v0.1.17` porte donc des artefacts `dsoxlab-0.1.16`,
+> et PyPI est resté à la 0.1.16. Le correctif ci-dessous, annoncé pour la 0.1.17,
+> est livré par cette version.
 
 ### Corrigé
 
@@ -433,8 +438,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.17...HEAD
-[0.1.17]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.17
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.18...HEAD
+[0.1.18]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.18
 [0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
