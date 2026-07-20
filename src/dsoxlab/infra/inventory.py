@@ -327,9 +327,15 @@ def wait_for_hosts_ready(
     # `cloud-init status --wait` (best-effort) pour ne rendre la main qu'une fois
     # la VM entièrement configurée. Le `|| true` évite d'échouer sur un état
     # cloud-init « degraded » : ce qui compte, c'est qu'il ait terminé.
+    #
+    # `sudo -n` est indispensable : sans privilèges, la commande sort en
+    # `PermissionError: /run/cloud-init/cloud.cfg` (mesuré sur AlmaLinux 9), donc
+    # rc=1. Le `|| true` avalait cet échec et l'attente ne garantissait plus rien :
+    # on rendait la main avant la fin de cloud-init, en croyant l'avoir attendue.
+    # `-n` (non interactif) évite de bloquer si sudo réclamait un mot de passe.
     remote_cmd = (
         "command -v cloud-init >/dev/null 2>&1 "
-        "&& cloud-init status --wait >/dev/null 2>&1 || true"
+        "&& sudo -n cloud-init status --wait >/dev/null 2>&1 || true"
     )
 
     for fqdn in hosts:

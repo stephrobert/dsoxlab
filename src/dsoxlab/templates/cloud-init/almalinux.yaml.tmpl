@@ -44,10 +44,11 @@ disable_root: true
 ssh_pwauth: false
 
 # Outils minimum pour les labs RHCSA — diagnostic et observabilité.
-# lvm2, parted, xfsprogs sont dans l'image AlmaLinux Cloud par défaut, mais
-# PAS firewalld (image minimale) : on l'installe explicitement, sinon tout lab
-# qui manipule le pare-feu échoue et `systemctl enable firewalld` plus bas cible
-# un service inexistant.
+# Ce que l'image cloud AlmaLinux fournit varie selon la MAJEURE : ne rien
+# supposer. parted, xfsprogs et e2fsprogs sont là en 9 comme en 10 ; firewalld
+# et lvm2 ne le sont pas (vérifié sur AlmaLinux 9.8), alors que la 10 livrait
+# lvm2. Sans eux, `systemctl enable firewalld` cible un service inexistant et
+# tout module LVM échoue sur « Failed to find required executable "vgs" ».
 packages:
   # openssh-server : NON préinstallé sur les images Incus cloud (Incus
   # assume incus exec via l'agent virtio). On l'installe pour avoir un
@@ -75,6 +76,10 @@ packages:
   # ports/contextes SELinux). Absente de l'image minimale, alors que c'est
   # l'outil RHCSA de référence pour SELinux (et ce que les tests inspectent).
   - policycoreutils-python-utils
+  # lvm2 : fournit vgs/lvs/pvs, requis par les modules community.general.lvg
+  # et lvol. Absent de l'image cloud AlmaLinux 9 (présent en 10) : sans lui,
+  # tout lab de stockage échoue au premier appel de module, pas au montage.
+  - lvm2
   # qemu-guest-agent : laisse libvirt récupérer l'IP via virtio channel
   # (``virsh domifaddr --source agent``). Indispensable côté provider kvm
   # quand on ne veut pas dépendre du DHCP lease (qui peut être lent ou
