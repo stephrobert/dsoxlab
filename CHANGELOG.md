@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-07-20
+
+### Fixed
+
+- **cloud-init ended in `status: error` on every KVM node, and `dsoxlab provision`
+  hung on its readiness wait.** The runcmd ran `systemctl enable --now
+  qemu-guest-agent`, but that unit declares
+  `BindsTo=dev-virtio\x2dports-org.qemu.guest_agent.0.device` and the KVM provider
+  deliberately declares **no virtio channel** (see the note in
+  `templates/terraform/kvm/main.tf`: the libvirt provider's schema made it
+  impractical). The device therefore never appears: `--now` waited **90 seconds
+  per node**, failed, and the runcmd script exited 1 — which cloud-init reports as
+  a failed `scripts_user` module.
+
+  The node was fully functional throughout (accounts created, packages installed,
+  sshd and firewalld enabled), so the symptom was purely a provisioning that never
+  returned. Dropping `--now` keeps the unit enabled for the day a channel exists,
+  and the command now returns in **0 s instead of 90**.
+
 ## [0.1.18] - 2026-07-20
 
 > **0.1.17 was never released.** Its tag landed on the 0.1.16 commit, so the
@@ -410,7 +429,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.18...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.19...HEAD
+[0.1.19]: https://github.com/stephrobert/dsoxlab/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.18
 [0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
