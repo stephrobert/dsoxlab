@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-07-20
+
+### Added
+
+- **`services/progress_service.py`**: `build_progress()`, `next_pending_lab()` and
+  `pedagogical_sort_key()` expose a learner's progression as typed data
+  (`BlocProgress`) rather than as terminal markup.
+- **`evaluate_lab()` and `compute_score()`** in `services/lab_service.py`: scoring a
+  run and recording it is now a single service call returning a `ScoreResult`.
+- **`SessionSpec` and `Runtime.session_spec()`**: a runtime can now *describe* its
+  interactive session instead of opening it, and `lab_session_spec()` exposes it as
+  a service. `SessionSpec.display()` renders the command as a learner would type it,
+  quoting included.
+
+  `open_session()` calls `subprocess.call`, which seizes the current terminal. That
+  made two things impossible: showing the command instead of running it, and letting
+  an interface that cannot yield its TTY choose how to attach. Execution now lives in
+  a single place (`BaseRuntime.open_session`), and each runtime only describes.
+
+### Fixed
+
+- **`dsoxlab ssh`, `dsoxlab status` and the VM interactive session still connected as
+  `student`.** Version 0.1.14 moved the inventory and the generated `ssh_config` to
+  the `ansible` service account but left `student@` hardcoded in three places, so
+  those commands and the generated `ssh_config` disagreed about who connects. On a
+  lab that restricts `AllowUsers` to the automation account, `dsoxlab ssh` was
+  locked out of the node it had just provisioned. The account is now read from the
+  inventory (`ansible_user`) in all three, so there is no hardcoded account left in
+  the package.
+
+### Changed
+
+- **Business logic no longer lives in the presentation layer.** The scoring formula
+  sat in `cli.py` (`_run_check`), interleaved with `typer.Exit` and console output,
+  and the progression aggregation sat inside `reporting/console.py`, emitting Rich
+  markup as it computed. Both were therefore unreachable from anywhere else and
+  untestable without capturing terminal output: any second front-end would have had
+  to reimplement the score formula and the "what comes next" rule.
+
+  They are now plain functions over plain data. `print_progress_table()` only
+  renders, the `next` command only presents, and the rules they encode are covered
+  by unit tests (14 new tests, including the one that matters most: a hint lowers
+  the ceiling, it is not subtracted from the final score).
+
+  No behaviour change: same scores, same ordering, same rendering, verified against
+  both `ansible-training` and `linux-dsoxlab-training`.
+
 ## [0.1.14] - 2026-07-20
 
 ### Added
@@ -316,7 +363,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12
