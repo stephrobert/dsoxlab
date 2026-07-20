@@ -22,6 +22,19 @@ users:
     ssh_authorized_keys:
       - ${ssh_pubkey}
 
+  # ansible : compte de SERVICE d'automatisation, distinct du compte humain
+  # ``student``. C'est lui que dsoxlab et les playbooks des labs utilisent pour
+  # se connecter (ansible_user: ansible). Même durcissement : clé SSH uniquement,
+  # sans mot de passe. NOPASSWD:ALL volontaire (automatisation généraliste).
+  - name: ansible
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: "*"
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+
 disable_root: true
 ssh_pwauth: false
 
@@ -54,6 +67,7 @@ runcmd:
   # Garde-fou anti-locking : force le hash à '*' (cf. commentaire dans
   # la section users). Idempotent.
   - [ usermod, -p, "*", student ]
+  - [ usermod, -p, "*", ansible ]
   - [ systemctl, enable, --now, ssh ]
   - [ systemctl, enable, --now, qemu-guest-agent ]
 

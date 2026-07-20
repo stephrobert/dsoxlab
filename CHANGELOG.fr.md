@@ -9,6 +9,57 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.14] - 2026-07-20
+
+### Ajouté
+
+- **Un compte de service `ansible` dédié sur chaque nœud provisionné.** Les
+  gabarits cloud-init (AlmaLinux et Ubuntu) créent désormais un compte `ansible`
+  à côté du compte humain `student`, avec le même durcissement : clé SSH
+  uniquement, aucun mot de passe de connexion, appartenance à `wheel`/`sudo` et
+  `sudo NOPASSWD:ALL`.
+
+  Séparer le compte de *service* utilisé par l'automatisation du compte *humain*
+  est la bonne pratique : la traçabilité garde du sens et chaque compte peut être
+  révoqué sans verrouiller l'autre. `student` reste le compte humain sur le
+  control node ; `ansible` est le compte par lequel dsoxlab et les playbooks des
+  labs se connectent. Le `NOPASSWD:ALL` global est assumé, car ce compte pilote
+  une automatisation généraliste (dnf, systemd, LVM, SELinux, firewalld) : la
+  sécurité vient de la dédicace du compte, pas d'un bridage de ses règles sudo.
+
+- **Les paquets absents de l'image cloud minimale AlmaLinux.** `firewalld` n'est
+  pas fourni dans l'image cloud AlmaLinux 10 : `systemctl enable --now firewalld`
+  visait donc une unité inexistante et tous les labs de pare-feu échouaient.
+  Ajoutés avec lui :
+
+  - `python3-firewall`, requis par le module `ansible.posix.firewalld`, qui sinon
+    échoue sur *Failed to import the required Python library (firewall)*.
+  - `policycoreutils-python-utils`, qui fournit `semanage`, l'outil RHCSA de
+    référence pour la gestion des ports et des contextes SELinux.
+
+  Ce sont des *prérequis d'exécution* Ansible : leur place est dans l'image de
+  base, pour que chaque nœud managé soit prêt pour Ansible sans amorçage par lab.
+
+### Modifié
+
+- **CASSANT : le compte SSH par défaut devient `ansible`, et non plus
+  `student`.** `build_inventory()` et `write_ssh_config()` utilisent désormais
+  `ansible` comme valeur par défaut de `ssh_user` : l'inventaire et le
+  `ssh_config` générés se connectent avec le compte de service.
+
+### Migration
+
+Les nœuds provisionnés avant la 0.1.14 n'ont pas de compte `ansible` et
+deviennent injoignables avec ce nouveau défaut. Il faut les reprovisionner :
+
+```console
+dsoxlab destroy && dsoxlab provision
+```
+
+Dans les dépôts de labs, tout ce qui restreint la connexion (`AllowUsers`,
+`remote_user`, `ansible_user`) doit désormais viser `ansible`, jamais `student`.
+Le pointer sur `student` verrouille l'automatisation hors du nœud.
+
 ## [0.1.13] - 2026-07-17
 
 ### Modifié
@@ -283,7 +334,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
