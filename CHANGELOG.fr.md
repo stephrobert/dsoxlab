@@ -9,6 +9,27 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.17] - 2026-07-20
+
+### Corrigé
+
+- **`alma9` et `ubuntu22` étaient déclarés mais inutilisables sur le provider
+  `kvm`.** Tous deux figurent dans la table Terraform `distro_to_template` : un
+  dépôt de labs pouvait donc légitimement écrire `distro: alma9` dans son
+  `meta.yml`, alors qu'aucun des deux n'avait d'entrée dans `default_image_urls`.
+  Le `coalesce()` qui résout l'image n'avait plus rien à quoi se raccrocher et le
+  plan échouait, sauf si le dépôt surchargeait à la main
+  `providers.kvm.image_url_<distro>`.
+
+  Les deux embarquent désormais leur image cloud amont, comme les distributions
+  déjà listées. Toute distribution que le provider mappe a de nouveau une URL ; le
+  provider `incus` gérait déjà `alma9` (`images:almalinux/9/cloud`), et `outscale`
+  attend légitimement une OMI pinée par le dépôt.
+
+  Le point compte particulièrement pour la formation RHCE : l'examen EX294 se passe
+  sur RHEL 9, donc un catalogue qui le vise a besoin que `alma9` fonctionne sans
+  bricolage.
+
 ## [0.1.16] - 2026-07-20
 
 ### Ajouté
@@ -412,7 +433,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.17...HEAD
+[0.1.17]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14

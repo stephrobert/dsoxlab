@@ -34,7 +34,9 @@ locals {
   # peut surcharger via providers.kvm.image_url_<distro> dans meta.yml.
   default_image_urls = {
     alma10   = "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2"
+    alma9    = "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2"
     ubuntu24 = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+    ubuntu22 = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
     debian12 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
   }
 
