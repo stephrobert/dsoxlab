@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-07-20
+
+### Fixed
+
+- **`lvm2` is missing from the AlmaLinux 9 cloud image**, and every storage lab
+  failed on `Failed to find required executable "vgs"` — not at mount time, but at
+  the very first LVM module call. The template's comment claimed "lvm2, parted and
+  xfsprogs ship in the AlmaLinux Cloud image": true on 10, false on 9. It now states
+  what was actually verified on 9.8, and installs `lvm2` explicitly. Measured on a
+  lab catalogue: **78 test errors** traced back to this single package.
+
+- **`cloud-init status --wait` was run without privileges**, so it exited
+  `PermissionError: /run/cloud-init/cloud.cfg` (rc=1) on AlmaLinux 9. The trailing
+  `|| true` swallowed that failure, so `wait_for_hosts_ready` returned *before*
+  cloud-init had finished while appearing to have waited for it. Now `sudo -n`,
+  which returns rc=0. `-n` keeps it non-interactive: a host where sudo asked for a
+  password would hang instead of failing.
+
 ## [0.1.19] - 2026-07-20
 
 ### Fixed
@@ -429,7 +447,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.19...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.20...HEAD
+[0.1.20]: https://github.com/stephrobert/dsoxlab/compare/v0.1.19...v0.1.20
 [0.1.19]: https://github.com/stephrobert/dsoxlab/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/stephrobert/dsoxlab/compare/v0.1.16...v0.1.18
 [0.1.16]: https://github.com/stephrobert/dsoxlab/compare/v0.1.15...v0.1.16
