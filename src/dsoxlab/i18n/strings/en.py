@@ -31,6 +31,12 @@ STRINGS: dict[str, str] = {
     "cmd_next_help":     "Recommend the next lab or challenge to complete in the active context.",
     "cmd_show_help":     "Show details and status of a lab.",
     "cmd_show_arg":      "Lab identifier (e.g.: l1-01-navigation-fichiers)",
+    "cmd_guide_help":    "Open the lab's online guide in your web browser.",
+    "cmd_guide_arg":     "Lab identifier (optional if a lab is active)",
+    "cmd_guide_opt_print": "Print the URL instead of opening a browser.",
+    "guide_opening":     "Opening the guide for {lab_id} in your browser…",
+    "guide_no_url":      "Lab {lab_id} declares no doc_url: no guide to open.",
+    "guide_no_browser":  "No browser could be opened. Copy the URL above.",
     "cmd_run_help":      "Prepare and start the lab environment.",
     "cmd_run_arg":       "Lab identifier",
     "cmd_course_help":    "Display a course section, or the table of contents if no section is given.",
@@ -170,6 +176,13 @@ Each lab exposes:
   [cyan]run <id>[/cyan]             Start the lab environment (shell, incus or KVM).
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Re-display the guided exercises (scenario.md).
+                       [dim]<id>[/dim] is optional if a lab is active in the session.
+
+  [cyan]guide[/cyan] [dim][<id>][/dim]         Open the lab's online guide in your web browser.
+                       The course lives on the trainer's site: the page opens in a
+                       real tab, so it renders exactly as published.
+    [dim]--print[/dim]              Print the URL instead of opening a browser
+                       (useful over SSH, where no browser is available).
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md).

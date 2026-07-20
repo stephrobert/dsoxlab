@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.15"
+version = "0.1.16"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"

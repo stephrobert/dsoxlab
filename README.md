@@ -80,9 +80,28 @@ cd linux-dsoxlab-training
 # 2. The active context is detected automatically from the repo's meta.yml
 dsoxlab list-labs
 dsoxlab show linux.depanner.service-crash-loop
+dsoxlab guide linux.depanner.service-crash-loop   # read the course in your browser
 dsoxlab run linux.depanner.service-crash-loop
 dsoxlab check linux.depanner.service-crash-loop
 ```
+
+### Reading the course
+
+The course itself is not bundled in the lab repository: each lab declares a
+`doc_url` pointing to the trainer's site. `dsoxlab guide` opens that page in a
+real browser tab, so it renders exactly as published, with its images, code
+blocks and navigation.
+
+```bash
+dsoxlab guide                 # the active lab
+dsoxlab guide <id>            # a specific lab
+dsoxlab guide <id> --print    # print the URL instead (useful over SSH)
+```
+
+The URL carries campaign parameters (`utm_source=dsoxlab`, `utm_medium=lab`,
+`utm_campaign=<lab_id>`), so a trainer can see which labs actually drive readers
+to which guides. A link opened from a local interface carries no usable referrer,
+so without this marking those reads would be indistinguishable from direct traffic.
 
 Switch language on the fly:
 
@@ -165,6 +184,7 @@ scripts and test files are present.
 | `dsoxlab list-labs` | List labs of the current repo (filter by `--section`/`--level`/`--type`/`--bloc`) |
 | `dsoxlab show <id>` | Show a lab's details |
 | `dsoxlab course [section]` | Display a course section, or the table of contents |
+| `dsoxlab guide [id]` | Open the lab's online guide in a browser (`--print` shows the URL) |
 | `dsoxlab run <id>` | Prepare and start the lab environment |
 | `dsoxlab challenge <id>` | Show the challenge mission for a lab |
 | `dsoxlab hint <id>` | Reveal a hint (deducted from the score) |
