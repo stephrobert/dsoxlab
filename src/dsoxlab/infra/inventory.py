@@ -47,7 +47,7 @@ def build_inventory(
     repo_meta: RepoMetadata,
     *,
     ssh_private_key: Path | None = None,
-    ssh_user: str = "student",
+    ssh_user: str = "ansible",
     terraform_outputs: dict[str, Any] | None = None,
     target_fqdn: str | None = None,
     roles: dict[str, str] | None = None,
@@ -58,7 +58,7 @@ def build_inventory(
         repo_meta: ``RepoMetadata`` du dépôt fournisseur.
         ssh_private_key: Chemin vers la clé privée du lab. Si None,
             cherche ``<repo>/ssh/id_ed25519``.
-        ssh_user: Utilisateur SSH (par défaut ``student``).
+        ssh_user: Utilisateur SSH (par défaut ``ansible``, le compte de service).
         terraform_outputs: Outputs JSON de Terraform. Si fourni, l'IP de
             chaque host est lue depuis ``outputs["hosts"][fqdn]``.
             Sinon, fallback sur ``meta.yml: hosts[].ip``.
@@ -255,7 +255,7 @@ def write_ssh_config(
     ]
     for name, vars_ in hosts.items():
         ip = vars_.get("ansible_host", "")
-        user = vars_.get("ansible_user", "student")
+        user = vars_.get("ansible_user", "ansible")
         identity = vars_.get("ansible_ssh_private_key_file", "")
         extra = vars_.get("ansible_ssh_common_args", "") or ""
 
@@ -297,12 +297,12 @@ def wait_for_hosts_ready(
     """Attend que chaque host soit réellement utilisable après ``terraform apply``.
 
     Juste après le provisioning, la VM boote encore : ``sshd`` démarre, puis
-    cloud-init crée l'utilisateur ``student`` et configure sudo. Tant que ce
-    n'est pas terminé, la première commande ``dsoxlab run`` échoue en
+    cloud-init crée le compte de service ``ansible`` et configure sudo. Tant que
+    ce n'est pas terminé, la première commande ``dsoxlab run`` échoue en
     *unreachable* (« dark ») côté Ansible. On sonde donc une connexion SSH
-    réelle sous le compte ``student`` — ce qui prouve à la fois que ``sshd``
-    répond et que le compte existe — puis on laisse ``cloud-init status --wait``
-    bloquer jusqu'à la fin de la configuration.
+    réelle sous le compte ``ansible`` (le compte de connexion de l'automatisation),
+    ce qui prouve à la fois que ``sshd`` répond et que le compte existe, puis on
+    laisse ``cloud-init status --wait`` bloquer jusqu'à la fin de la configuration.
 
     Args:
         repo_meta: métadonnées du dépôt (pour construire le ssh_config).
@@ -323,7 +323,7 @@ def wait_for_hosts_ready(
     )
     ssh_cfg = write_ssh_config(inventory, repo_meta)
 
-    # SSH réussit dès que sshd répond ET que student existe ; on enchaîne sur
+    # SSH réussit dès que sshd répond ET que le compte ansible existe ; on enchaîne sur
     # `cloud-init status --wait` (best-effort) pour ne rendre la main qu'une fois
     # la VM entièrement configurée. Le `|| true` évite d'échouer sur un état
     # cloud-init « degraded » : ce qui compte, c'est qu'il ait terminé.

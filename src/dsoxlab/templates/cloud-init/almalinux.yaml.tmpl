@@ -24,12 +24,30 @@ users:
     ssh_authorized_keys:
       - ${ssh_pubkey}
 
+  # ansible : compte de SERVICE d'automatisation, distinct du compte humain
+  # ``student``. C'est lui que dsoxlab et les playbooks des labs utilisent pour
+  # se connecter (ansible_user: ansible). Séparer le compte de service du compte
+  # humain est la bonne pratique : traçabilité et révocation indépendantes. Même
+  # durcissement que student : clé SSH uniquement, sans mot de passe. Le
+  # NOPASSWD:ALL est volontaire (automatisation généraliste : dnf, systemd, LVM,
+  # SELinux, firewalld) ; la sécurité tient à la dédicace du compte, pas au bridage.
+  - name: ansible
+    groups: [wheel]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: "*"
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+
 disable_root: true
 ssh_pwauth: false
 
 # Outils minimum pour les labs RHCSA — diagnostic et observabilité.
-# Les paquets spécifiques (lvm2, parted, xfsprogs, firewalld) sont
-# déjà dans l'image AlmaLinux Cloud par défaut.
+# lvm2, parted, xfsprogs sont dans l'image AlmaLinux Cloud par défaut, mais
+# PAS firewalld (image minimale) : on l'installe explicitement, sinon tout lab
+# qui manipule le pare-feu échoue et `systemctl enable firewalld` plus bas cible
+# un service inexistant.
 packages:
   # openssh-server : NON préinstallé sur les images Incus cloud (Incus
   # assume incus exec via l'agent virtio). On l'installe pour avoir un
@@ -44,6 +62,19 @@ packages:
   - tcpdump
   - bind-utils
   - net-tools
+  # firewalld : le service de pare-feu. Absent de l'image AlmaLinux 10 minimale,
+  # alors que de nombreux labs (et l'EX294) le manipulent. Activé dans runcmd.
+  - firewalld
+  # python3-firewall : binding Python requis par le module
+  # ``ansible.posix.firewalld``. Sans lui, tout play qui touche firewalld échoue
+  # « Failed to import the required Python library (firewall) ». Prérequis
+  # d'exécution Ansible : sa place est dans la base, pour que chaque nœud managé
+  # soit « prêt pour Ansible ».
+  - python3-firewall
+  # policycoreutils-python-utils : fournit la commande `semanage` (gestion des
+  # ports/contextes SELinux). Absente de l'image minimale, alors que c'est
+  # l'outil RHCSA de référence pour SELinux (et ce que les tests inspectent).
+  - policycoreutils-python-utils
   # qemu-guest-agent : laisse libvirt récupérer l'IP via virtio channel
   # (``virsh domifaddr --source agent``). Indispensable côté provider kvm
   # quand on ne veut pas dépendre du DHCP lease (qui peut être lent ou
@@ -57,6 +88,7 @@ runcmd:
   # compte, on force le hash à '*' (pas de password possible mais
   # compte débloqué côté shadow). Idempotent.
   - [ usermod, -p, "*", student ]
+  - [ usermod, -p, "*", ansible ]
   - [ systemctl, enable, --now, sshd ]
   - [ systemctl, enable, --now, firewalld ]
   - [ systemctl, enable, --now, qemu-guest-agent ]

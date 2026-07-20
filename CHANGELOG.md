@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-07-20
+
+### Added
+
+- **A dedicated `ansible` service account on every provisioned node.** The
+  cloud-init templates (AlmaLinux and Ubuntu) now create an `ansible` account
+  next to the human `student` account, with the same hardening: SSH key only, no
+  login password, membership of `wheel`/`sudo`, and `sudo NOPASSWD:ALL`.
+
+  Separating the *service* account automation uses from the *human* account is
+  the standard practice: it keeps audit trails meaningful and lets either account
+  be revoked without locking the other one out. `student` remains the human
+  account on the control node; `ansible` is what dsoxlab and the lab playbooks
+  connect as. The blanket `NOPASSWD:ALL` is deliberate, since the account drives
+  general-purpose automation (dnf, systemd, LVM, SELinux, firewalld): the safety
+  comes from the account being dedicated, not from narrowing its sudo rules.
+
+- **Packages missing from the AlmaLinux minimal cloud image.** `firewalld` is not
+  shipped in the AlmaLinux 10 cloud image, so `systemctl enable --now firewalld`
+  targeted a unit that did not exist and every firewall lab failed. Added with it:
+
+  - `python3-firewall`, required by the `ansible.posix.firewalld` module, which
+    otherwise fails with *Failed to import the required Python library (firewall)*.
+  - `policycoreutils-python-utils`, which provides `semanage`, the reference RHCSA
+    tool for SELinux port and context management.
+
+  These are Ansible *execution prerequisites*: they belong in the base image, so
+  that every managed node is Ansible-ready without a per-lab bootstrap step.
+
+### Changed
+
+- **BREAKING: the default SSH account is now `ansible`, not `student`.**
+  `build_inventory()` and `write_ssh_config()` default `ssh_user` to `ansible`,
+  so the generated inventory and `ssh_config` connect as the service account.
+
+### Migration
+
+Nodes provisioned before 0.1.14 have no `ansible` account and become unreachable
+under the new default. Re-provision them:
+
+```console
+dsoxlab destroy && dsoxlab provision
+```
+
+In lab repositories, anything that restricts the connection (`AllowUsers`,
+`remote_user`, `ansible_user`) must now target `ansible`, never `student`.
+Pointing it at `student` locks automation out of the node.
+
 ## [0.1.13] - 2026-07-17
 
 ### Changed
@@ -268,7 +316,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/stephrobert/dsoxlab/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/stephrobert/dsoxlab/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/stephrobert/dsoxlab/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/stephrobert/dsoxlab/compare/v0.1.10...v0.1.11
