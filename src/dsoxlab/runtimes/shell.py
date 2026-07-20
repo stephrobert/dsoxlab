@@ -25,11 +25,10 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import subprocess
 from pathlib import Path
 
 from ..models.lab import LabDefinition
-from .base import BaseRuntime, EventCallback
+from .base import BaseRuntime, EventCallback, SessionSpec
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +77,8 @@ class ShellRuntime(BaseRuntime):
             shutil.copy2(src, dst)
             logger.info("fixture %s → %s", rel, dst)
 
-    def open_session(self, lab: LabDefinition) -> None:
-        """Ouvre un sous-shell dans ``<workdir>/``.
+    def session_spec(self, lab: LabDefinition) -> SessionSpec:
+        """Un sous-shell dans ``<workdir>/``.
 
         Pose ``DSOXLAB_LAB_SESSION=<lab_id>`` dans l'env du sous-shell
         pour que les commandes lancées depuis ce shell (notamment
@@ -88,12 +87,11 @@ class ShellRuntime(BaseRuntime):
         exit pour revenir") sans risque de fausse instruction quand
         l'apprenant exécute la commande depuis son shell parent.
         """
-        shell = os.environ.get("SHELL", "bash")
-        workdir = self._workdir_path(lab)
-        workdir.mkdir(parents=True, exist_ok=True)
-        env = os.environ.copy()
-        env["DSOXLAB_LAB_SESSION"] = lab.id
-        subprocess.call([shell], cwd=workdir, env=env)
+        return SessionSpec(
+            command=[os.environ.get("SHELL", "bash")],
+            cwd=self._workdir_path(lab),
+            env={"DSOXLAB_LAB_SESSION": lab.id},
+        )
 
     def stop(self, lab: LabDefinition, target_name: str | None = None) -> None:
         del lab, target_name

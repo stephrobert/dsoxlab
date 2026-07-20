@@ -38,7 +38,7 @@ from ..infra import snapshot as snapshot_infra
 from ..infra.inventory import build_inventory, read_terraform_outputs
 from ..models.lab import LabDefinition
 from ..models.runtime import Target
-from .base import BaseRuntime, EventCallback
+from .base import BaseRuntime, EventCallback, SessionSpec
 
 logger = logging.getLogger(__name__)
 
@@ -144,20 +144,21 @@ class VmRuntime(BaseRuntime):
         del lab, target_name
         return "ready"
 
-    def open_session(self, lab: LabDefinition) -> None:
-        """Ouvre une session SSH interactive sur la target résolue.
+    def session_spec(self, lab: LabDefinition) -> SessionSpec:
+        """La session SSH interactive sur la target résolue.
 
         L'apprenant se retrouve directement loggé sur la VM cible
         (via bastion ProxyCommand si réseau privé) — il peut alors
         taper ``systemctl status demo-crashloop``, ``journalctl``,
         etc. comme s'il avait ssh manuellement.
 
-        Bloquant : retour au shell dsoxlab quand l'apprenant tape
-        ``exit``. Permet à ``dsoxlab run`` de continuer son flow
-        (set_active_lab(None), message de fin).
+        Le compte de connexion est lu depuis l'inventaire
+        (``ansible_user``) et non codé en dur : c'est le même compte que
+        celui du ``ssh_config`` généré, donc ``dsoxlab ssh`` et un
+        ``ssh -F <ssh_config>`` mènent au même endroit. Un lab qui
+        restreint ``AllowUsers`` au compte de l'automatisation ne
+        verrouille donc pas cette session.
         """
-        import subprocess
-
         from ..infra.inventory import bastion_info, build_inventory, read_terraform_outputs
 
         target = self._resolve_target(lab, None)
@@ -195,10 +196,8 @@ class VmRuntime(BaseRuntime):
                     f"{bastion['user']}@{proxy_target}"
                 ),
             ]
-        cmd.append(f"student@{ip}")
-        # subprocess.call : on attend que l'apprenant tape exit.
-        # Le flow dsoxlab run continue ensuite (cleanup contexte).
-        subprocess.call(cmd)
+        cmd.append(f"{host_vars.get('ansible_user', 'ansible')}@{ip}")
+        return SessionSpec(command=cmd)
 
     # ─── helpers ──────────────────────────────────────────────────────
 

@@ -12,6 +12,7 @@ from typing import Any
 
 from ..models.lab import LabDefinition
 from ..models.course import CourseManifest, CourseSection
+from ..services.progress_service import build_progress
 from ..validators.structure import StructureReport
 from ..i18n import _
 
@@ -261,11 +262,6 @@ def print_progress_table(
         console.print(f"[yellow]{_('progress_no_labs')}[/yellow]")
         return
 
-    # Group by bloc, keeping bloc=0 as a separate "unassigned" group
-    blocs: dict[int, list[LabDefinition]] = {}
-    for lab in labs:
-        blocs.setdefault(lab.bloc, []).append(lab)
-
     table = Table(title=_("progress_table_title"), show_lines=True)
     table.add_column(_("col_bloc_num"), justify="left", style="bold")
     table.add_column(_("col_bloc_done"), justify="center")
@@ -273,55 +269,34 @@ def print_progress_table(
     table.add_column(_("col_challenge"), justify="center")
     table.add_column(_("col_capstone"), justify="center")
 
-    for bloc_num in sorted(blocs.keys()):
-        bloc_labs = sorted(blocs[bloc_num], key=lambda lab: lab.bloc_order)
-        plain_labs = [lab for lab in bloc_labs if lab.lab_type == "lab"]
-        challenges = [lab for lab in bloc_labs if lab.lab_type == "challenge"]
-        capstones = [lab for lab in bloc_labs if lab.lab_type == "capstone"]
+    def _status(validated: bool | None) -> str:
+        if validated is None:
+            return "—"
+        return _("progress_validated") if validated else _("progress_pending")
 
-        # Compute validated labs
-        validated_labs = [lab for lab in plain_labs if lab.id in scores]
-        done_text = f"{len(validated_labs)}/{len(plain_labs)}"
-        if len(plain_labs) > 0 and len(validated_labs) == len(plain_labs):
+    for bloc in build_progress(labs, scores):
+        done_text = f"{bloc.validated}/{bloc.total}"
+        if bloc.complete:
             done_text = f"[green]{done_text}[/green]"
-        elif len(validated_labs) > 0:
+        elif bloc.started:
             done_text = f"[yellow]{done_text}[/yellow]"
         else:
             done_text = f"[dim]{done_text}[/dim]"
 
-        # Average score across validated labs
-        if validated_labs:
-            total_pct = sum(
-                int(scores[lab.id][0] * 100 / scores[lab.id][1])
-                if scores[lab.id][1] else 0
-                for lab in validated_labs
-            )
-            avg_pct = total_pct // len(validated_labs)
-            avg_color = "green" if avg_pct >= 80 else "yellow" if avg_pct >= 50 else "red"
-            avg_text = f"[{avg_color}]{avg_pct} %[/{avg_color}]"
-        else:
+        if bloc.average_pct is None:
             avg_text = _("progress_pending")
-
-        # Challenge status
-        if challenges:
-            c = challenges[0]
-            challenge_text = _("progress_validated") if c.id in scores else _("progress_pending")
         else:
-            challenge_text = "—"
+            avg = bloc.average_pct
+            avg_color = "green" if avg >= 80 else "yellow" if avg >= 50 else "red"
+            avg_text = f"[{avg_color}]{avg} %[/{avg_color}]"
 
-        # Capstone status
-        if capstones:
-            cap = capstones[0]
-            capstone_text = _("progress_validated") if cap.id in scores else _("progress_pending")
-        else:
-            capstone_text = "—"
-
-        # Nom de bloc lisible (titre de la section meta.yml) plutôt qu'un
-        # numéro nu ou « ? ». Fallback : numéro, puis « ? » si vraiment non
-        # rattaché (ex. lab hors de toute section).
-        bloc_name = next((lab.bloc_name for lab in bloc_labs if lab.bloc_name), "")
-        bloc_label = bloc_name or (str(bloc_num) if bloc_num else "?")
-        table.add_row(bloc_label, done_text, avg_text, challenge_text, capstone_text)
+        table.add_row(
+            bloc.label or "?",
+            done_text,
+            avg_text,
+            _status(bloc.challenge_validated),
+            _status(bloc.capstone_validated),
+        )
 
     console.print(table)
 
