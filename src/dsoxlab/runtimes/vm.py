@@ -161,8 +161,20 @@ class VmRuntime(BaseRuntime):
         """
         from ..infra.inventory import bastion_info, build_inventory, read_terraform_outputs
 
-        target = self._resolve_target(lab, None)
         repo_meta = self._repo_meta(lab)
+
+        if lab.runtime.session == "local":
+            # Lab piloté depuis le poste : les hôtes restent provisionnés et
+            # travaillés par le setup.yaml, mais l'apprenant écrit son code ici,
+            # et ses commandes visent les cibles depuis la racine du dépôt —
+            # c'est de là que les chemins des énoncés sont relatifs.
+            return SessionSpec(
+                command=[os.environ.get("SHELL", "bash")],
+                cwd=repo_meta.path,
+                env={"DSOXLAB_LAB_SESSION": lab.id},
+            )
+
+        target = self._resolve_target(lab, None)
         tf_outputs = read_terraform_outputs(repo_meta)
         inventory = build_inventory(
             repo_meta,

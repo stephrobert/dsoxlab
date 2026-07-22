@@ -109,6 +109,7 @@ class LabDefinition:
             targets=targets,
             default=str(runtime_data.get("default", "")),
             snapshot_required=bool(runtime_data.get("snapshot_required", False)),
+            session=str(runtime_data.get("session", "target")),
             workdir=runtime_data.get("workdir", "challenge/work"),
             fixtures=as_str_list(runtime_data.get("fixtures"), "runtime.fixtures", lab_yaml),
             topology=runtime_data.get("topology", "local"),

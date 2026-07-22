@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-07-22
+
+### Added
+
+- **`runtime.session` in `lab.yaml`** — a `vm` lab can now declare where its
+  interactive session opens: `target` (default, SSH onto `targets[].host`,
+  unchanged behaviour) or `local`, a subshell on the learner's own machine, at
+  the repository root.
+
+  Some catalogues are driven *from* the workstation rather than *inside* the
+  machine: the learner writes code in the repository and runs commands against
+  the lab hosts, which stay provisioned and are still targeted by `setup.yaml`.
+  For those, `dsoxlab run` used to open an SSH session on a host holding
+  neither the repository nor its tooling — the session opened, but there was
+  nothing to do in it. The welcome panel now states where you landed, and
+  `validate-structure` rejects any value outside the two accepted ones, which
+  would otherwise fall back silently to SSH.
+
+### Fixed
+
+- **`dsoxlab run` announced the wrong location.** The ready message stated
+  "You are now in `challenge/work/`" for every runtime, including `vm` labs,
+  where that directory is never where the learner lands. It now names the
+  actual place: the workdir for `shell`, the connected host for a `target`
+  session, the repository root for a `local` one. The `shell` message also
+  reads the real `runtime.workdir` instead of assuming the default.
+
+- **The welcome panel listed commands that could not be typed.** For a `vm`
+  lab it displayed six `dsoxlab …` commands and then opened an SSH session on
+  the lab host, where dsoxlab is not installed and never has been: every one
+  of them answered `command not found`. The panel now names the host it is
+  about to connect to and states that those commands live on the learner's
+  own machine, behind `exit`. For a `local` session it names the lab
+  directory the mission paths are relative to, and points to `dsoxlab
+  challenge` as the starting point.
+
+- **Machine-readable output**: `--json` on `list-labs`, `progress`, `check` and
+  `status`. Each document carries a `schema` version, and standard output holds
+  nothing but JSON — the ambient messages, the pytest progress bar and the
+  active-context notice are all silenced in that mode.
+
+  This is what any integration needs: an editor extension, a dashboard or a
+  tracking script would otherwise have to parse the Rich output, whose tables,
+  colours and line wrapping depend on the terminal width and are meant to keep
+  changing.
+
 ## [0.1.20] - 2026-07-20
 
 ### Fixed
