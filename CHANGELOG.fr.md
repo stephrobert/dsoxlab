@@ -9,6 +9,53 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.22] - 2026-07-22
+
+### Corrigé
+
+- **`check --json` polluait sa propre sortie.** En cas d'échec, la sortie brute
+  de pytest précédait le document JSON, rendant le flux inanalysable. Le garde
+  manquait sur cette seule branche, et c'est le cas le plus fréquent en usage
+  réel : un lab qui passe ne l'emprunte jamais, ce qui explique précisément que
+  le contrôle initial soit passé à côté. Le texte reste disponible pour
+  l'appelant dans `check.output`.
+
+- **`status --json` n'émettait aucun document** quand le `meta.yml` ne déclare
+  aucun hôte. Un catalogue entièrement `shell` est un cas normal, pas une
+  erreur : il rend désormais un document avec `total: 0`, au lieu d'une phrase
+  Rich et d'un code de sortie 0.
+
+- **Les plans Terraform redeviennent stables, donc `provision` est rejouable.**
+  L'`instance-id` du cloud-init était construit avec `timestamp()`, donc il
+  changeait à chaque exécution : Terraform planifiait un remplacement du disque
+  cloud-init à chaque fois, et le provider libvirt le refuse (« Storage volumes
+  cannot be updated »). Rejouer un provision échouait donc sur n'importe quel
+  dépôt, ne laissant que `destroy` puis `provision` comme issue. L'identifiant
+  dérive désormais d'un hachage du contenu cloud-init, et le nom du volume
+  aussi : plan stable quand rien n'a bougé, remplacement propre quand quelque
+  chose a bougé.
+
+### Ajouté
+
+- **Un fragment SSH par formation, dans `~/.ssh/config.d/<repo-id>.conf`.**
+  Écrit par `provision`, rafraîchi par `status`, retiré par `destroy`. Les
+  énoncés demandent de se connecter à une machine par son nom, mais ce nom
+  n'est ni dans le DNS ni dans `/etc/hosts` : un `ssh alma-rhcsa-1.lab`
+  échouait. Il fonctionne désormais, sans `-F` ni préfixe `dsoxlab`. Un
+  avertissement est émis quand `~/.ssh/config` ne contient pas la ligne
+  `Include ~/.ssh/config.d/*.conf`, car le fragment serait écrit mais jamais
+  lu. Il est retiré au `destroy`, pour ne laisser aucune configuration pointant
+  des adresses recyclées.
+
+- **Le panneau d'accueil nomme la machine du lab** pour un lab en
+  `session: local` qui se joue malgré tout sur un hôte : l'apprenant sait où se
+  connecter sans avoir à deviner le nom.
+
+- **`bloc` et `bloc_order` dans le catalogue JSON.** La CLI trie dessus, mais
+  ils n'étaient pas publiés : une intégration ne pouvait regrouper que par
+  `section`, laquelle vaut `repo.category` par défaut. Mesuré : 84 labs sous un
+  nœud unique dans `linux-dsoxlab-training`.
+
 ## [0.1.21] - 2026-07-22
 
 ### Ajouté

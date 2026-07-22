@@ -281,6 +281,72 @@ def write_ssh_config(
     return path
 
 
+def user_ssh_config_path(repo_meta: RepoMetadata) -> Path:
+    """Le fragment déposé dans le ``~/.ssh/config.d`` de l'apprenant."""
+    return Path.home() / ".ssh" / "config.d" / f"{repo_meta.id}.conf"
+
+
+def ssh_config_include_present() -> bool:
+    """``~/.ssh/config`` charge-t-il bien le répertoire de fragments ?
+
+    Sans cette ligne, le fragment est écrit mais jamais lu, et ``ssh web1.lab``
+    continue d'échouer : mieux vaut le dire que laisser croire.
+    """
+    principal = Path.home() / ".ssh" / "config"
+    if not principal.is_file():
+        return False
+    try:
+        contenu = principal.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return any(
+        ligne.strip().lower().startswith("include")
+        and "config.d" in ligne
+        for ligne in contenu.splitlines()
+    )
+
+
+def write_user_ssh_config(
+    inventory: dict[str, Any], repo_meta: RepoMetadata
+) -> Path:
+    """Écrit le fragment SSH de la formation dans ``~/.ssh/config.d``.
+
+    Le ``ssh_config`` du cache sert dsoxlab et les tests, mais il impose un
+    ``-F`` que personne ne tape. Or les énoncés demandent de se connecter à une
+    machine par son nom, et ce nom n'est ni dans le DNS ni dans ``/etc/hosts`` :
+    sans ce fragment, un ``ssh alma-rhcsa-1.lab`` échoue.
+
+    Le fichier porte le ``repo.id``, donc une formation par fichier : deux
+    catalogues provisionnés en parallèle ne s'écrasent pas. Il est réécrit à
+    chaque provision, les adresses changeant à chaque cycle.
+    """
+    contenu = ssh_config_path(repo_meta).read_text(encoding="utf-8")
+    entete = (
+        f"# Généré par dsoxlab pour la formation « {repo_meta.id} ».\n"
+        f"# Réécrit à chaque provision, retiré au destroy : ne pas éditer.\n"
+    )
+    cible = user_ssh_config_path(repo_meta)
+    cible.parent.mkdir(parents=True, exist_ok=True)
+    cible.parent.chmod(0o700)
+    cible.write_text(entete + contenu, encoding="utf-8")
+    cible.chmod(0o600)
+    return cible
+
+
+def remove_user_ssh_config(repo_meta: RepoMetadata) -> bool:
+    """Retire le fragment. Rend True s'il existait.
+
+    Laisser derrière soi un fichier pointant des adresses mortes est le
+    scénario que ce projet a déjà connu : une configuration figée qui envoie
+    vers des IP recyclées est pire que pas de configuration du tout.
+    """
+    cible = user_ssh_config_path(repo_meta)
+    if not cible.exists():
+        return False
+    cible.unlink()
+    return True
+
+
 class HostReadyTimeout(RuntimeError):
     """Levée quand un host ne devient pas joignable en SSH dans le délai imparti."""
 

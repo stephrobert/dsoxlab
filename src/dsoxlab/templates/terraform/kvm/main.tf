@@ -59,9 +59,9 @@ locals {
 # https://registry.terraform.io/providers/dmacvicar/libvirt/latest/docs/resources/network
 
 locals {
-  network_prefix = tonumber(split("/", var.network_cidr)[1])
+  network_prefix  = tonumber(split("/", var.network_cidr)[1])
   network_gateway = cidrhost(var.network_cidr, 1)
-  bridge_name    = lookup(var.provider_config, "bridge_name", "virbr-${replace(var.network_name, "lab-", "")}")
+  bridge_name     = lookup(var.provider_config, "bridge_name", "virbr-${replace(var.network_name, "lab-", "")}")
 }
 
 resource "libvirt_network" "lab" {
@@ -179,19 +179,43 @@ resource "libvirt_volume" "host" {
 # le ISO sur le filesystem libvirt et expose son path via .path). On
 # l'attache ensuite à la VM via devices.disks[] en mode "cdrom".
 
+# Le contenu cloud-init est calculé ici plutôt que dans la ressource, pour
+# pouvoir en dériver un instance-id stable (voir plus bas).
+locals {
+  cloudinit_user_data = {
+    for h in local.hosts_with_idx : h.name => templatefile(
+      "${path.module}/../../cloud-init/${local.distro_to_template[h.distro]}.yaml.tmpl",
+      {
+        hostname   = h.name
+        ssh_pubkey = local.ssh_pubkey
+      }
+    )
+  }
+}
+
 resource "libvirt_cloudinit_disk" "host" {
   for_each = { for h in local.hosts_with_idx : h.name => h }
 
-  name = "${each.value.name}-seed.iso"
-  user_data = templatefile(
-    "${path.module}/../../cloud-init/${local.distro_to_template[each.value.distro]}.yaml.tmpl",
-    {
-      hostname   = each.value.name
-      ssh_pubkey = local.ssh_pubkey
-    }
-  )
+  # Le nom porte lui aussi le hachage. Sans cela, un remplacement réutilise le
+  # même nom de volume, le provider y voit une mise à jour et refuse : c'est
+  # l'autre moitié du blocage. Avec un nom distinct, le nouveau volume est créé
+  # puis l'ancien supprimé, ce que le provider sait faire.
+  name      = "${each.value.name}-seed-${substr(md5(local.cloudinit_user_data[each.value.name]), 0, 8)}.iso"
+  user_data = local.cloudinit_user_data[each.value.name]
+
+  # L'instance-id dérive du HACHAGE du cloud-init, et non de l'heure courante.
+  #
+  # Avec « timestamp() », il changeait à chaque plan : Terraform voulait donc
+  # remplacer le disque à chaque exécution, et le provider libvirt refuse de
+  # remplacer un volume (« Update Not Supported : storage volumes cannot be
+  # updated »). Conséquence, tout provision rejoué sur une infrastructure
+  # existante échouait, quel que soit le dépôt de labs.
+  #
+  # Avec un hachage, le plan est stable tant que le cloud-init ne bouge pas, et
+  # l'identifiant change quand il bouge réellement : c'est précisément ce qui
+  # doit conduire cloud-init à rejouer sa configuration au prochain démarrage.
   meta_data = yamlencode({
-    instance-id    = "${each.value.name}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+    instance-id    = "${each.value.name}-${substr(md5(local.cloudinit_user_data[each.value.name]), 0, 12)}"
     local-hostname = each.value.name
   })
   # Pas de network_config explicite : cloud-init applique sa logique
@@ -248,7 +272,7 @@ resource "libvirt_volume" "cloudinit" {
 resource "libvirt_domain" "host" {
   for_each = { for h in local.hosts_with_idx : h.name => h }
 
-  name      = each.value.name
+  name = each.value.name
   # 0.9.x : memory est en KiB (pas MiB). 2048 MB → 2 097 152 KiB.
   memory    = each.value.ram_mb * 1024
   vcpu      = each.value.vcpu
