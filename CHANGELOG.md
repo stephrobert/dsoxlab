@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.22] - 2026-07-22
+## [0.1.23] - 2026-07-22
+
+> The `v0.1.22` tag was created on the wrong commit, before its pull request was
+> merged: the release workflow republished 0.1.21 and PyPI never received a
+> 0.1.22. Everything that version carried is therefore released here.
 
 ### Fixed
 
