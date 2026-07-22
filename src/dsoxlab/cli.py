@@ -852,9 +852,15 @@ def _run_check(
     if not quiet:
         info(_("validating", lab_id=lab.id))
     result = _run_check_with_progress(lab, target, quiet=quiet)
-    if not result.ok:
+    if not result.ok and not quiet:
         # En cas d'échec, dump l'output brut (tracebacks, summary pytest)
         # pour que l'apprenant voie les erreurs détaillées.
+        #
+        # « and not quiet » : sans lui, la sortie pytest précédait le document
+        # JSON sur stdout dès qu'un test échouait, et le flux n'était plus
+        # analysable. Le cas le plus fréquent en usage réel, et le plus facile
+        # à manquer : un lab qui passe n'emprunte jamais cette branche.
+        # L'appelant en mode machine retrouve ce texte dans check.output.
         console.print(result.output)
 
     evaluation = evaluate_lab(root, lab, result)
@@ -1743,6 +1749,16 @@ def status(
         raise typer.Exit(1)
 
     if not repo_meta.infra.hosts:
+        # Un dépôt sans infrastructure est un cas normal (catalogue 100 % shell),
+        # pas une erreur. En mode machine il faut tout de même un document :
+        # une phrase Rich et un code 0 laissaient l'appelant sans rien à lire.
+        if as_json:
+            machine.emit({
+                "provider": None,
+                "hosts": [],
+                "summary": {"reachable": 0, "total": 0},
+            })
+            return
         info(_("status_no_hosts"))
         return
 

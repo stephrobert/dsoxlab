@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-07-22
+
+### Fixed
+
+- **`check --json` polluted its own output.** On failure, the raw pytest output
+  was printed before the JSON document, leaving the stream unparseable. The
+  guard was missing on that one branch, and it is the most common case in real
+  use: a lab that passes never takes it, which is exactly why the initial check
+  missed it. The text is still available to callers in `check.output`.
+
+- **`status --json` emitted nothing** when `meta.yml` declares no host. A
+  catalogue made entirely of `shell` labs is a normal case, not an error: it now
+  returns a document with `total: 0` instead of a Rich sentence and exit code 0.
+
+### Added
+
+- **`bloc` and `bloc_order` in the JSON catalogue.** The CLI sorts on them, but
+  they were not published, leaving an integration with only `section` to group
+  by, which defaults to `repo.category`. Measured: 84 labs under a single node
+  in `linux-dsoxlab-training`.
+
 ## [0.1.21] - 2026-07-22
 
 ### Added

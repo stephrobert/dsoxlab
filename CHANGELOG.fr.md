@@ -9,6 +9,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.22] - 2026-07-22
+
+### Corrigé
+
+- **`check --json` polluait sa propre sortie.** En cas d'échec, la sortie brute
+  de pytest précédait le document JSON, rendant le flux inanalysable. Le garde
+  manquait sur cette seule branche, et c'est le cas le plus fréquent en usage
+  réel : un lab qui passe ne l'emprunte jamais, ce qui explique précisément que
+  le contrôle initial soit passé à côté. Le texte reste disponible pour
+  l'appelant dans `check.output`.
+
+- **`status --json` n'émettait aucun document** quand le `meta.yml` ne déclare
+  aucun hôte. Un catalogue entièrement `shell` est un cas normal, pas une
+  erreur : il rend désormais un document avec `total: 0`, au lieu d'une phrase
+  Rich et d'un code de sortie 0.
+
+### Ajouté
+
+- **`bloc` et `bloc_order` dans le catalogue JSON.** La CLI trie dessus, mais
+  ils n'étaient pas publiés : une intégration ne pouvait regrouper que par
+  `section`, laquelle vaut `repo.category` par défaut. Mesuré : 84 labs sous un
+  nœud unique dans `linux-dsoxlab-training`.
+
 ## [0.1.21] - 2026-07-22
 
 ### Ajouté

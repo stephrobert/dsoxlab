@@ -79,3 +79,22 @@ def test_accents_are_not_escaped(capsys) -> None:
     sortie = capsys.readouterr().out
 
     assert "Préparer les nœuds gérés" in sortie
+
+
+def test_a_failing_check_still_prints_only_json(monkeypatch, capsys) -> None:
+    """Un lab en échec ne doit pas préfixer le JSON de sa sortie pytest.
+
+    C'est le cas le plus fréquent en usage réel, et le plus facile à manquer :
+    un lab qui passe n'emprunte jamais la branche fautive. Le contrôle initial
+    avait été fait sur un lab à 14/14, donc sur le seul cas favorable.
+    """
+    from dsoxlab import cli
+    from dsoxlab.services.lab_service import CheckResult
+
+    echec = CheckResult(ok=False, output="=== test session starts ===\nFAILED", passed=1, total=3)
+    monkeypatch.setattr(cli, "_run_check_with_progress", lambda *a, **k: echec)
+    monkeypatch.setattr(cli, "evaluate_lab", lambda *a, **k: type("E", (), {"score": 30, "max_score": 100})())
+
+    cli._run_check(Path("/repo"), _lab(), None, quiet=True)
+
+    assert capsys.readouterr().out == "", "le mode machine doit rester muet"

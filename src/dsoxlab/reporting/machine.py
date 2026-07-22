@@ -48,6 +48,12 @@ def lab_dict(
         "id": lab.id,
         "title": lab.title,
         "section": lab.section,
+        # Les blocs pédagogiques : la CLI trie dessus, une interface qui ne les
+        # voit pas ne peut que regrouper par « section », laquelle vaut
+        # repo.category par défaut. Mesuré : 84 labs sous une section unique
+        # côté linux-dsoxlab-training, donc un seul nœud illisible.
+        "bloc": lab.bloc or None,
+        "bloc_order": lab.bloc_order or None,
         "level": lab.level,
         "type": lab.lab_type,
         "difficulty": lab.difficulty or None,
