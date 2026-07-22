@@ -37,6 +37,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **`dsoxlab course` affiche désormais le README du lab, et non le seul
+  scenario.** Les deux fichiers sont complémentaires et étaient traités comme
+  concurrents : `scenario` pose la situation en quelques lignes, `README`
+  explique les commandes et déroule les exercices. Seul le premier était
+  affiché, si bien que la moitié la plus riche n'était atteignable par aucune
+  commande (mesuré : 10 465 lignes de code dans les README d'un seul dépôt,
+  exposées par rien). L'apprenant en concluait qu'il n'y avait pas de cours et
+  allait chercher la réponse dans l'énoncé du challenge. `course` affiche
+  maintenant le scenario, puis le README, dans la langue demandée.
+
 - **Un fragment SSH par formation, dans `~/.ssh/config.d/<repo-id>.conf`.**
   Écrit par `provision`, rafraîchi par `status`, retiré par `destroy`. Les
   énoncés demandent de se connecter à une machine par son nom, mais ce nom

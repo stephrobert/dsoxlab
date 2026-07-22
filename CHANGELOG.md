@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`dsoxlab course` now shows the lab README, not just the scenario.** The two
+  files are complementary and were treated as rivals: `scenario` sets the
+  situation in a few lines, `README` explains the commands and walks through the
+  exercises. Only the first was ever displayed, so the richer half was reachable
+  by no command at all (measured: 10 465 lines of code sitting in the READMEs of
+  a single repository, exposed by nothing). Learners concluded there was no
+  course and went looking for the answer in the challenge brief. `course` now
+  prints the scenario, then the README, in the requested language.
+
 - **An SSH fragment per course, in `~/.ssh/config.d/<repo-id>.conf`.** Written
   by `provision`, refreshed by `status`, removed by `destroy`. Briefs ask
   learners to connect to a machine by name, but that name is in neither DNS nor
