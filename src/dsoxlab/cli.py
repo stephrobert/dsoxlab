@@ -1425,6 +1425,37 @@ def provision(
                 progress.stop()
                 warn(_("provision_ssh_timeout", error=str(exc)))
 
+    # Le fragment SSH, écrit à CHAQUE provision et non seulement quand des
+    # machines viennent d'être créées : relancer un provision sur une infra
+    # déjà en place laissait sinon l'apprenant sans fragment, alors que c'est
+    # le moment où il en a besoin. Il doit refléter l'état courant, pas le
+    # delta du dernier terraform apply.
+    from .infra.inventory import (
+        build_inventory,
+        read_terraform_outputs,
+        ssh_config_include_present,
+        user_ssh_config_path,
+        write_ssh_config,
+        write_user_ssh_config,
+    )
+
+    fragment = user_ssh_config_path(repo_meta)
+    try:
+        inv = build_inventory(
+            repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
+        )
+        write_ssh_config(inv, repo_meta)
+        write_user_ssh_config(inv, repo_meta)
+    except (OSError, RuntimeError) as exc:
+        # Un fragment manquant ne doit pas faire échouer un provision réussi.
+        warn(_("ssh_fragment_failed", error=str(exc)))
+
+    if fragment.is_file():
+        if ssh_config_include_present():
+            info(_("ssh_fragment_written", path=fragment))
+        else:
+            warn(_("ssh_fragment_no_include", path=fragment))
+
     success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
         info(f"  {fqdn} → {ip}")
@@ -1489,6 +1520,14 @@ def destroy(
     except Exception as exc:  # noqa: BLE001
         error(_("destroy_failed", error=str(exc)))
         raise typer.Exit(4)
+
+    # Le fragment SSH pointe désormais des machines mortes : le laisser
+    # enverrait l'apprenant vers des adresses recyclées, ce qui est pire que
+    # pas de configuration du tout.
+    from .infra.inventory import remove_user_ssh_config
+
+    if remove_user_ssh_config(repo_meta):
+        info(_("ssh_fragment_removed", repo=repo_meta.id))
 
     success(_("destroy_done"))
 
@@ -1775,6 +1814,19 @@ def status(
     if not ssh_key.is_file():
         error(_("status_no_key", path=ssh_key))
         raise typer.Exit(1)
+
+    # On rafraîchit le fragment SSH au passage : « provision » ne peut pas
+    # toujours être rejoué (le provider libvirt refuse certaines mises à jour
+    # avec « Update Not Supported »), et l'apprenant se retrouverait alors sans
+    # moyen de régénérer sa configuration. « status » est la commande qu'on
+    # lance justement quand on doute de l'état de l'infra.
+    from .infra.inventory import write_user_ssh_config
+
+    try:
+        write_user_ssh_config(inventory, repo_meta)
+    except OSError as exc:
+        if not as_json:
+            warn(_("ssh_fragment_failed", error=str(exc)))
 
     hotes: list[dict[str, Any]] = []
     if not as_json:

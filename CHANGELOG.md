@@ -23,7 +23,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalogue made entirely of `shell` labs is a normal case, not an error: it now
   returns a document with `total: 0` instead of a Rich sentence and exit code 0.
 
+- **Terraform plans are stable again, so `provision` can be replayed.** The
+  cloud-init `instance-id` was built from `timestamp()`, so it changed on every
+  run: Terraform planned a replacement of the cloud-init disk each time, and the
+  libvirt provider refuses it (« Storage volumes cannot be updated »). Replaying
+  a provision therefore failed on any repository, which left `destroy` then
+  `provision` as the only option. The id now derives from a hash of the
+  cloud-init content, and so does the volume name: a stable plan when nothing
+  changed, a clean replacement when it did.
+
 ### Added
+
+- **An SSH fragment per course, in `~/.ssh/config.d/<repo-id>.conf`.** Written
+  by `provision`, refreshed by `status`, removed by `destroy`. Briefs ask
+  learners to connect to a machine by name, but that name is in neither DNS nor
+  `/etc/hosts`: `ssh alma-rhcsa-1.lab` simply failed. It now works, with no
+  `-F` and no `dsoxlab` prefix. A warning is raised when `~/.ssh/config` lacks
+  the `Include ~/.ssh/config.d/*.conf` line, since the fragment would be written
+  but never read. It is removed on `destroy` so that no configuration is left
+  pointing at recycled addresses.
+
+- **The welcome panel names the lab machine** for a `session: local` lab that
+  still runs on a host, so the learner knows where to connect without having to
+  guess the hostname.
 
 - **`bloc` and `bloc_order` in the JSON catalogue.** The CLI sorts on them, but
   they were not published, leaving an integration with only `section` to group

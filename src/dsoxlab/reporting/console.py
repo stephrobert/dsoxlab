@@ -468,10 +468,15 @@ def print_lab_welcome(lab: LabDefinition) -> None:
         lines += [
             _("lab_welcome_session_local"),
             _("lab_welcome_labdir", labdir=labdir),
-            "",
-            _("lab_welcome_start_here"),
-            "",
         ]
+        # Un lab piloté depuis le poste peut malgré tout se jouer SUR une
+        # machine (cas des labs système). On donne alors la commande de
+        # connexion : la taper soi-même fait partie de l'apprentissage, mais
+        # deviner le nom d'hôte, non.
+        cible = lab.runtime.target()
+        if cible is not None:
+            lines.append(_("lab_welcome_local_ssh", host=cible.host))
+        lines += ["", _("lab_welcome_start_here"), ""]
     elif lab.runtime.type.value in ("vm", "kvm", "incus"):
         # La session s'ouvre en SSH sur la VM, où dsoxlab n'est PAS installé.
         # Sans cet avertissement, le panneau annonce six commandes juste avant
