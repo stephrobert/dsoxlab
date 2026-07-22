@@ -9,7 +9,11 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-## [0.1.22] - 2026-07-22
+## [0.1.23] - 2026-07-22
+
+> Le tag `v0.1.22` a été posé sur le mauvais commit, avant la fusion de sa pull
+> request : le workflow a republié la 0.1.21 et PyPI n'a jamais reçu de 0.1.22.
+> Tout ce que cette version portait est donc livré ici.
 
 ### Corrigé
 
