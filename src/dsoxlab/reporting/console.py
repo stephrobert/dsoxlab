@@ -456,7 +456,33 @@ def print_lab_welcome(lab: LabDefinition) -> None:
     from rich.panel import Panel
 
     title = _("lab_welcome_title")
-    lines = [
+    lines = []
+    # Dire où l'on atterrit ET où travailler. Sans ces deux lignes, l'apprenant
+    # arrive dans un shell à la racine du dépôt sans savoir quel répertoire le
+    # concerne : le panneau listait des commandes, jamais un point de départ.
+    if lab.runtime.session == "local":
+        parts = lab.path.parts
+        labdir = (
+            "/".join(parts[parts.index("labs"):]) if "labs" in parts else lab.path.name
+        )
+        lines += [
+            _("lab_welcome_session_local"),
+            _("lab_welcome_labdir", labdir=labdir),
+            "",
+            _("lab_welcome_start_here"),
+            "",
+        ]
+    elif lab.runtime.type.value in ("vm", "kvm", "incus"):
+        # La session s'ouvre en SSH sur la VM, où dsoxlab n'est PAS installé.
+        # Sans cet avertissement, le panneau annonce six commandes juste avant
+        # de déposer l'apprenant là où aucune ne répond.
+        tgt = lab.runtime.target()
+        lines += [
+            _("lab_welcome_session_target", host=tgt.host if tgt else "?"),
+            _("lab_welcome_commands_here"),
+            "",
+        ]
+    lines += [
         _("lab_welcome_course"),
         _("lab_welcome_challenge"),
         "",

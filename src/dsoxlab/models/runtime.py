@@ -97,6 +97,22 @@ class RuntimeConfig:
     """Si True, ``dsoxlab run`` prend un snapshot avant le ``setup.yaml``
     pour permettre un rollback simple via ``dsoxlab restore``."""
 
+    session: str = "target"
+    """Où s'ouvre la session interactive de ``dsoxlab run``.
+
+    - ``target`` (défaut) : session SSH sur ``targets[].host``. L'apprenant
+      travaille **dans** la machine, cas des labs système.
+    - ``local`` : sous-shell sur le poste, à la racine du dépôt. Le poste est
+      alors le poste de pilotage : l'apprenant y écrit son code et lance ses
+      commandes vers les hôtes du lab, qui restent provisionnés et ciblés par
+      le ``setup.yaml``.
+
+    Ce choix n'a de sens que pour ``runtime: vm`` : un lab ``shell`` ouvre
+    déjà un sous-shell local, dans son ``workdir``.
+
+    Sans ce champ, un lab piloté depuis le poste déposait l'apprenant en SSH
+    sur un hôte qui ne contient ni le dépôt ni ses outils."""
+
     # ── Pour runtime: shell ───────────────────────────────────────────
     workdir: str = "challenge/work"
     """Chemin relatif du répertoire de travail créé par ``dsoxlab run``.

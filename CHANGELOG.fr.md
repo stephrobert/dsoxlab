@@ -9,6 +9,54 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.21] - 2026-07-22
+
+### Ajouté
+
+- **`runtime.session` dans `lab.yaml`** — un lab `vm` déclare désormais où
+  s'ouvre sa session interactive : `target` (défaut, session SSH sur
+  `targets[].host`, comportement inchangé) ou `local`, un sous-shell sur le
+  poste de l'apprenant, à la racine du dépôt.
+
+  Certains catalogues se pilotent **depuis** le poste et non **dans** la
+  machine : l'apprenant écrit son code dans le dépôt et lance ses commandes
+  vers les hôtes du lab, qui restent provisionnés et ciblés par le
+  `setup.yaml`. Pour ceux-là, `dsoxlab run` ouvrait une session SSH sur un
+  hôte ne contenant ni le dépôt ni ses outils : la session s'ouvrait, mais il
+  n'y avait rien à y faire. Le panneau d'accueil annonce maintenant où l'on
+  atterrit, et `validate-structure` refuse toute valeur hors des deux
+  acceptées, qui retomberait silencieusement sur le SSH.
+
+### Corrigé
+
+- **`dsoxlab run` annonçait un mauvais emplacement.** Le message de démarrage
+  affirmait « Vous êtes dans `challenge/work/` » quel que soit le runtime, y
+  compris pour les labs `vm`, où l'apprenant n'atterrit jamais dans ce
+  répertoire. Il nomme désormais l'endroit réel : le workdir pour `shell`,
+  l'hôte connecté pour une session `target`, la racine du dépôt pour une
+  session `local`. Le message `shell` lit en outre le vrai `runtime.workdir`
+  au lieu de supposer la valeur par défaut.
+
+- **Le panneau d'accueil listait des commandes intapables.** Pour un lab `vm`,
+  il affichait six commandes `dsoxlab …` puis ouvrait une session SSH sur
+  l'hôte du lab, où dsoxlab n'est pas installé et ne l'a jamais été : toutes
+  répondaient `command not found`. Le panneau nomme désormais l'hôte auquel
+  il va connecter et précise que ces commandes vivent sur le poste de
+  l'apprenant, derrière `exit`. Pour une session `local`, il nomme le
+  répertoire du lab auquel les chemins de la mission se rapportent, et amorce
+  par `dsoxlab challenge`.
+
+- **Sortie lisible par un programme** : `--json` sur `list-labs`, `progress`,
+  `check` et `status`. Chaque document porte une version de `schema`, et la
+  sortie standard ne contient rien d'autre que du JSON : les messages
+  d'ambiance, la barre de progression pytest et le rappel du contexte actif
+  sont tus dans ce mode.
+
+  C'est ce dont toute intégration a besoin : sans cela, une extension
+  d'éditeur, un tableau de bord ou un script de suivi devraient analyser la
+  sortie Rich, dont les tableaux, les couleurs et les retours à la ligne
+  dépendent de la largeur du terminal et ont vocation à changer.
+
 ## [0.1.20] - 2026-07-20
 
 ### Corrigé

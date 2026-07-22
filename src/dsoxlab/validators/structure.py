@@ -85,6 +85,20 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
                         ),
                     )
                 )
+        # runtime.session : énuméré. Une valeur libre passerait silencieusement
+        # et retomberait sur la session SSH, soit l'inverse de l'intention.
+        if lab.runtime.session not in ("target", "local"):
+            report.issues.append(
+                StructureIssue(
+                    path=base / "lab.yaml",
+                    message=(
+                        f"runtime.session='{lab.runtime.session}' inconnu. "
+                        "Valeurs acceptées : 'target' (session SSH sur "
+                        "targets[].host, défaut) ou 'local' (sous-shell sur le "
+                        "poste, pour un lab piloté depuis le dépôt)."
+                    ),
+                )
+            )
         # Présence interdite de scripts bash legacy (signal de migration
         # incomplète vers le tout-déclaratif).
         _forbid_file(base / "cleanup.sh", report,

@@ -7,6 +7,7 @@ STRINGS: dict[str, str] = {
     # ── Options globales ──────────────────────────────────────────────────────
     "opt_help":       "Affiche ce message et quitte.",
     "opt_lab_home":   "Racine du dépôt linux-training (défaut : auto-détecté).",
+    "opt_json":           "Sortie JSON, destinée aux programmes (extension d'éditeur, tableau de bord). Aucun autre affichage.",
     "opt_level":      "Filtre par niveau (l1, l2, lfcs, rhcsa)",
     "opt_section":    "Filtre par section (linux, ansible, terraform, docker…)",
     "opt_type":       "Filtre par type : lab, challenge ou capstone",
@@ -269,7 +270,9 @@ Les titres et descriptions des labs peuvent s'afficher dans plusieurs langues.
 
     # ── run ───────────────────────────────────────────────────────────────────
     "lab_starting":       "Démarrage du lab [bold]{lab_id}[/bold] (runtime: {runtime})…",
-    "lab_ready":          "Lab {lab_id} prêt. Vous êtes dans [bold]challenge/work/[/bold] — votre répertoire de travail isolé.",
+    "lab_ready":          "Lab {lab_id} prêt. Vous êtes dans [bold]{workdir}/[/bold], votre répertoire de travail isolé.",
+    "lab_ready_local":    "Lab {lab_id} prêt. Vous êtes sur [bold]votre poste[/bold], à la racine du dépôt.",
+    "lab_ready_target":   "Lab {lab_id} prêt. Vous êtes connecté à [bold]{host}[/bold].",
     "lab_subshell_tip":   "Tapez [bold]dsoxlab check[/bold] pour valider votre travail, ou [bold]exit[/bold] pour quitter la session.",
     "lab_welcome_title":  "Comment fonctionne ce lab",
     "lab_welcome_course": "[bold cyan]dsoxlab course[/bold cyan] [dim][<id>][/dim]   Affiche les exercices guidés ([dim]scenario.md[/dim]).",
@@ -277,8 +280,14 @@ Les titres et descriptions des labs peuvent s'afficher dans plusieurs langues.
     "lab_welcome_check":  "[bold cyan]dsoxlab check[/bold cyan] [dim][<id>][/dim]   Lance les tests et affiche votre score — [bold]rien n'est enregistré[/bold].",
     "lab_welcome_submit": "[bold cyan]dsoxlab submit[/bold cyan] [dim][<id>][/dim]  Soumission finale : lance les tests, [bold]enregistre le résultat[/bold] en base, puis [bold]quitte[/bold] la session.",
     "lab_welcome_hint":   "[bold cyan]dsoxlab hint[/bold cyan] [dim][<id>][/dim]   Révèle l'indice suivant — [red]déduit des points[/red] de votre score final.",
+    "lab_welcome_session_local": "Vous êtes sur [bold]votre poste[/bold], à la racine du dépôt : c'est d'ici que vous écrivez votre code et lancez vos commandes vers les hôtes du lab.",
     "lab_welcome_exit":   "Tapez [bold]exit[/bold] à tout moment pour quitter la session sans enregistrer.",
+    "lab_welcome_session_target": "Vous allez être connecté à [bold]{host}[/bold] : travaillez-y comme sur une machine réelle.",
+    "lab_welcome_commands_here": "Votre mission est affichée juste au-dessus : dsoxlab n'existe pas sur la machine, gardez-la sous les yeux. Les commandes ci-dessous se lancent depuis [bold]votre poste[/bold] — après [bold]exit[/bold], ou dans un second terminal.",
+    "lab_welcome_labdir":  "Le lab vit dans [bold]{labdir}/[/bold] : les chemins de la mission sont relatifs à ce répertoire.",
+    "lab_welcome_start_here": "Commencez par [bold]dsoxlab challenge[/bold] : la mission dit quels fichiers créer et ce qui sera vérifié.",
     "lab_session_ended":  "Session terminée pour [bold]{lab_id}[/bold]. Retour à votre répertoire d'origine.",
+    "lab_session_ended_local": "Session terminée pour [bold]{lab_id}[/bold]. Votre travail est conservé : relancez [bold]dsoxlab check[/bold] quand vous voulez.",
     "no_active_lab":      "Aucun lab actif en session. Exécutez [bold]dsoxlab run <id>[/bold] d'abord, ou passez l'identifiant explicitement.",
     "course_missing":      "Aucun fichier scenario.md trouvé pour ce lab.",
     "course_tip":          "Challenge prêt : dsoxlab challenge {id}",

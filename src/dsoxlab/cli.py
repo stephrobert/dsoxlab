@@ -72,6 +72,7 @@ from .models import (
     ProviderUnresolved,
     RepoMetadata,
 )
+from .reporting import machine
 from .runtimes.base import EventCallback
 from .services import (
     CheckResult,
@@ -427,6 +428,7 @@ def list_labs(
     section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("opt_section"))] = None,
     lab_type: Annotated[Optional[str], typer.Option("--type", "-t", help=_("opt_type"))] = None,
     bloc: Annotated[Optional[int], typer.Option("--bloc", "-b", help=_("opt_bloc"))] = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
@@ -434,7 +436,9 @@ def list_labs(
     effective_section = section or ctx.section
     effective_level = level or ctx.level
 
-    if ctx.section or ctx.level:
+    # En mode machine, aucun message d'ambiance : la sortie doit être un
+    # document JSON et rien d'autre.
+    if (ctx.section or ctx.level) and not as_json:
         info(_("context_active", label=ctx.label()))
 
     lang = _lang(root)
@@ -449,6 +453,12 @@ def list_labs(
         labs = [lab for lab in labs if lab.bloc == bloc]
     lab_ids = [lab.id for lab in labs]
     scores = get_best_scores(root, lab_ids)
+    if as_json:
+        machine.emit({
+            "labs": [machine.lab_dict(lab, scores.get(lab.id)) for lab in labs],
+            "count": len(labs),
+        })
+        return
     print_labs_table(labs, scores)
 
 
@@ -511,7 +521,24 @@ def run(
         raise typer.Exit(2)
 
     set_active_lab(root, lab.id)
-    success(_("lab_ready", lab_id=lab.id))
+    # Dire où l'on atterrit vraiment. Le message historique annonçait
+    # « challenge/work/ » quel que soit le runtime : faux pour tout lab vm,
+    # qui ouvre une session SSH ou, désormais, un shell à la racine du dépôt.
+    if lab.runtime.type.value in ("vm", "kvm", "incus"):
+        if lab.runtime.session == "local":
+            success(_("lab_ready_local", lab_id=lab.id))
+        else:
+            resolved = lab.runtime.target(target)
+            success(_("lab_ready_target", lab_id=lab.id,
+                      host=resolved.host if resolved else "?"))
+    else:
+        success(_("lab_ready", lab_id=lab.id, workdir=lab.runtime.workdir))
+    # La session SSH s'ouvre sur un hôte dépourvu de dsoxlab : une fois dedans,
+    # l'apprenant ne peut plus afficher sa mission. On la lui met sous les yeux
+    # avant d'entrer, elle reste dans le défilement du terminal.
+    if lab.runtime.type.value in ("vm", "kvm", "incus") and lab.runtime.session != "local":
+        print_lab_challenge(lab, lang=lang)
+
     print_lab_welcome(lab)
 
     open_lab_session(lab)   # bloquant : sous-shell interactif
@@ -520,7 +547,15 @@ def run(
     # ``dsoxlab check`` et ``dsoxlab submit`` (sans argument) sachent
     # quel lab valider. L'active_lab est libéré au submit (cf. cmd
     # submit) ou écrasé par un prochain ``dsoxlab run <autre_lab>``.
-    success(_("lab_session_ended", lab_id=lab.id))
+    # En session locale, on n'a jamais quitté son répertoire : annoncer un
+    # « retour » n'aurait aucun sens. Ce qui compte alors, c'est que le travail
+    # reste là et que check puisse être relancé.
+    if lab.runtime.session == "local":
+        success(_("lab_session_ended_local", lab_id=lab.id))
+    else:
+        success(_("lab_session_ended", lab_id=lab.id))
+
+
 
 
 # ── course ───────────────────────────────────────────────────────────────────
@@ -536,6 +571,8 @@ def course(
     root = _root(lab_home)
     lang = _lang(root)
     lab = _resolve_lab(root, lab_id, lang)
+
+
     manifest = CourseManifest.load(lab.path, lang=lang)
 
     if manifest is None:
@@ -695,7 +732,7 @@ def _resolve_lab(
 
 
 def _run_check_with_progress(
-    lab: LabDefinition, target: str | None = None
+    lab: LabDefinition, target: str | None = None, *, quiet: bool = False,
 ) -> CheckResult:
     """Lance ``check_lab`` en streamant les verdicts pytest dans une
     progress bar Rich.
@@ -716,6 +753,12 @@ def _run_check_with_progress(
     )
 
     state: dict[str, Any] = {"done": 0, "task_id": None}
+
+    # Mode machine : la barre et les verdicts partent sur stdout et
+    # rendraient le document JSON illisible. On lance les tests sans rien
+    # afficher — mesuré, sans cela la sortie commence par « ℹ Validation… ».
+    if quiet:
+        return check_lab(lab, target=target)
 
     with Progress(
         SpinnerColumn(),
@@ -763,7 +806,7 @@ def _run_check_with_progress(
 
 
 def _run_check(
-    root: Path, lab: LabDefinition, target: str | None = None
+    root: Path, lab: LabDefinition, target: str | None = None, *, quiet: bool = False,
 ) -> tuple[CheckResult, int, int]:
     """Lance les tests, enregistre le résultat, retourne (result, score, max_score).
 
@@ -806,14 +849,20 @@ def _run_check(
         if session_target and lab.runtime.target(session_target) is not None:
             target = session_target
 
-    info(_("validating", lab_id=lab.id))
-    result = _run_check_with_progress(lab, target)
+    if not quiet:
+        info(_("validating", lab_id=lab.id))
+    result = _run_check_with_progress(lab, target, quiet=quiet)
     if not result.ok:
         # En cas d'échec, dump l'output brut (tracebacks, summary pytest)
         # pour que l'apprenant voie les erreurs détaillées.
         console.print(result.output)
 
     evaluation = evaluate_lab(root, lab, result)
+    if quiet:
+        # Mode machine : le tableau Rich et le message de confirmation
+        # pollueraient le document JSON. Le résultat est tout de même
+        # enregistré, comme dans le mode normal.
+        return result, evaluation.score, evaluation.max_score
     print_check_result(
         lab.id,
         result.passed,
@@ -834,11 +883,29 @@ def check(
     lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_check_arg"), shell_complete=_complete_lab_id)] = None,
     target: Annotated[Optional[str], typer.Option("--target", "-t",
         help=_("opt_check_target"))] = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    result, _score, _max_score = _run_check(root, lab, target)
+    result, score, max_score = _run_check(root, lab, target, quiet=as_json)
+    if as_json:
+        # La sortie brute de pytest est conservée : c'est là que l'appelant
+        # trouve le détail des échecs, qu'aucun compteur ne résume.
+        machine.emit({
+            "lab": machine.lab_dict(lab),
+            "check": {
+                "ok": result.ok,
+                "passed": result.passed,
+                "total": result.total,
+                "score": score,
+                "max_score": max_score,
+                "output": result.output,
+            },
+        })
+        if not result.ok:
+            raise typer.Exit(1)
+        return
     if result.ok:
         success(_("all_tests_passed"))
         info(_("check_tip_submit"))
@@ -900,6 +967,7 @@ def progress(
     lab_home: LabHomeOption = None,
     section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("opt_section"))] = None,
     level: Annotated[Optional[str], typer.Option("--level", "-l", help=_("opt_level"))] = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
@@ -919,6 +987,18 @@ def progress(
 
     lab_ids = [lab.id for lab in labs]
     scores_data = get_best_scores(root, lab_ids)
+    if as_json:
+        faits = [i for i in lab_ids if i in scores_data]
+        machine.emit({
+            "labs": [machine.lab_dict(lab, scores_data.get(lab.id)) for lab in labs],
+            "summary": {
+                "total": len(labs),
+                "attempted": len(faits),
+                "points": sum(scores_data[i][0] for i in faits),
+                "max_points": sum(scores_data[i][1] for i in faits),
+            },
+        })
+        return
     print_progress_table(labs, scores_data)
 
 
@@ -1066,6 +1146,7 @@ def doctor(
 
     # Shell runtime
     checks.append((_("check_shell"), True, _("detail_shell_always"), None))
+
 
     # Incus : binaire + daemon + permissions user + init storage/network.
     # Le simple ``which incus`` ne suffit pas : sans daemon actif ni
@@ -1650,6 +1731,7 @@ def _run_terraform_with_progress(
 @app.command("status", help=_("cmd_status_help"))
 def status(
     lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     """Vérifie la connectivité SSH des hosts du meta.yml."""
     from .infra.inventory import build_inventory, read_terraform_outputs
@@ -1678,7 +1760,9 @@ def status(
         error(_("status_no_key", path=ssh_key))
         raise typer.Exit(1)
 
-    info(_("status_checking", count=len(hosts_dict)))
+    hotes: list[dict[str, Any]] = []
+    if not as_json:
+        info(_("status_checking", count=len(hosts_dict)))
     if bastion:
         info(_("status_via_bastion",
                bastion=bastion["fqdn"] or bastion["public_ip"]))
@@ -1719,14 +1803,30 @@ def status(
             ]
         cmd += [f"{host_vars.get('ansible_user', 'ansible')}@{ip}", "true"]
         result = subprocess.run(cmd, capture_output=True, timeout=15)  # noqa: S603
-        if result.returncode == 0:
+        joignable = result.returncode == 0
+        raison = None
+        if not joignable:
+            stderr_tail = result.stderr.decode(errors="replace").strip().splitlines()[-1:]
+            raison = stderr_tail[0] if stderr_tail else "timeout"
+        hotes.append({"fqdn": fqdn, "ip": ip, "reachable": joignable, "reason": raison})
+        if as_json:
+            ok_count += 1 if joignable else 0
+            continue
+        if joignable:
             success(f"  ✔ {fqdn} ({ip})")
             ok_count += 1
         else:
-            stderr_tail = result.stderr.decode(errors="replace").strip().splitlines()[-1:]
-            reason = stderr_tail[0] if stderr_tail else "timeout"
-            error(f"  ✘ {fqdn} ({ip}) — {reason}")
+            error(f"  ✘ {fqdn} ({ip}) — {raison}")
 
+    if as_json:
+        machine.emit({
+            "provider": provider,
+            "hosts": hotes,
+            "summary": {"reachable": ok_count, "total": len(hosts_dict)},
+        })
+        if ok_count != len(hosts_dict):
+            raise typer.Exit(1)
+        return
     if ok_count == len(hosts_dict):
         success(_("status_all_ok", count=ok_count))
     else:
