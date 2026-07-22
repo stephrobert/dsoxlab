@@ -8,6 +8,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
+from pathlib import Path
 from typing import Any
 
 from ..models.lab import LabDefinition
@@ -433,16 +434,41 @@ def print_course_end(lab: "LabDefinition", manifest: "CourseManifest") -> None:
     )
 
 
+def _localised(base: Path, nom: str, lang: str) -> Path | None:
+    """``<nom>.<lang>.md`` s'il existe, sinon ``<nom>.md``, sinon rien."""
+    if lang != "en":
+        traduit = base / f"{nom}.{lang}.md"
+        if traduit.is_file():
+            return traduit
+    defaut = base / f"{nom}.md"
+    return defaut if defaut.is_file() else None
+
+
 def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
-    """Display the course content (scenario.md) for a lab — fallback when no course.yaml."""
+    """Affiche le cours du lab : le contexte, puis la partie qui enseigne.
+
+    Les deux fichiers sont complémentaires et étaient jusqu'ici traités comme
+    des concurrents : ``scenario`` pose la situation en quelques lignes,
+    ``README`` explique les commandes et déroule les exercices. Seul le premier
+    était affiché, si bien que la partie la plus riche n'était atteignable par
+    aucune commande (mesuré : 10 465 lignes de code dans les README d'un seul
+    dépôt, exposées par rien). L'apprenant en concluait qu'il n'y avait pas de
+    cours, et allait chercher la réponse dans l'énoncé du challenge.
+    """
     from rich.markdown import Markdown
     from rich.rule import Rule
 
-    localised = lab.path / f"scenario.{lang}.md"
-    course_file = localised if lang != "en" and localised.exists() else lab.path / "scenario.md"
     console.print(Rule(f"[bold cyan]{lab.id}[/bold cyan]"))
-    if course_file.exists():
-        console.print(Markdown(course_file.read_text()))
+    parties = [
+        f for f in (_localised(lab.path, "scenario", lang),
+                    _localised(lab.path, "README", lang))
+        if f is not None
+    ]
+    if parties:
+        for i, fichier in enumerate(parties):
+            if i:
+                console.print(Rule(style="dim"))
+            console.print(Markdown(fichier.read_text(encoding="utf-8")))
     else:
         msg = _("course_missing")
         console.print(f"[yellow]{msg}[/yellow]")
