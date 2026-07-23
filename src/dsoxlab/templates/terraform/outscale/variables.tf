@@ -35,7 +35,12 @@ variable "provider_config" {
     - vm_type_default        : type VM des labs (défaut tinav5.c2r4p1)
     - vm_type_bastion        : type VM du bastion (défaut tinav5.c1r1p1)
     - image_id_alma10        : OMI AlmaLinux 10 PINÉE (omi-xxxxxxxx)
+    - image_id_alma9         : OMI AlmaLinux 9 PINÉE
+    - image_id_ubuntu26      : OMI Ubuntu 26.04 PINÉE
     - image_id_ubuntu24      : OMI Ubuntu 24.04 PINÉE
+    - image_id_ubuntu22      : OMI Ubuntu 22.04 PINÉE
+    - image_id_debian13      : OMI Debian 13 PINÉE
+    - image_id_debian12      : OMI Debian 12 PINÉE
     - image_id_bastion       : OMI du bastion (par défaut = image_id_ubuntu24)
     - bastion_user           : utilisateur SSH du bastion (défaut "outscale")
     - ssh_pubkey             : clé SSH publique (injectée par dsoxlab depuis

@@ -29,9 +29,12 @@ Contrat invariant des providers (templates/terraform/README.md) :
 
 from __future__ import annotations
 
+import hashlib
+import ipaddress
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -318,6 +321,69 @@ def other_active_providers(repo_meta: RepoMetadata) -> list[str]:
     ]
 
 
+def _ensure_kvm_dhcp_leases(
+    repo_meta: RepoMetadata, target_hosts: list[str] | None = None
+) -> None:
+    """Pose à chaud les baux DHCP statiques manquants d'un réseau KVM existant.
+
+    Le provider ``dmacvicar/libvirt`` ne sait pas mettre à jour un réseau :
+    modifier ``ips[].dhcp.hosts`` (ajout/retrait d'un host) le pousse à recréer
+    le réseau (issue #468), ce qui échoue en « element N has vanished » et
+    couperait la connectivité des VMs déjà attachées. Le template pose donc
+    ``lifecycle { ignore_changes = [ips] }`` sur ``libvirt_network.lab`` :
+    Terraform crée le réseau une fois avec les baux de la liste initiale, puis
+    n'y touche plus. Cette fonction ajoute les baux des hosts déclarés ENSUITE,
+    à chaud, via ``virsh net-update … --live --config``, avant l'apply des
+    domaines.
+
+    No-op hors provider kvm, ou si le réseau n'existe pas encore (Terraform le
+    crée alors lui-même avec tous ses baux). Best-effort : une entrée déjà
+    présente ou un ``virsh`` qui échoue ne bloque pas le provision (Terraform
+    reste la source de vérité pour la création initiale).
+
+    Le calcul MAC/IP DOIT rester aligné sur le template kvm
+    (``main.tf`` : préfixe MAC ``52:54:<h0>:<h1>:00`` dérivé de
+    ``sha256(repo_id)``, dernier octet ``idx+16`` ; ``ip = cidrhost(cidr,
+    idx+11)``), idx étant la position dans ``infra.hosts``.
+    """
+    infra = repo_meta.infra
+    if infra is None or getattr(infra, "provider", None) != "kvm" or not infra.network:
+        return
+    dump = subprocess.run(
+        ["sudo", "virsh", "net-dumpxml", infra.network],
+        capture_output=True,
+        text=True,
+    )
+    if dump.returncode != 0:
+        return  # réseau pas encore créé : Terraform le posera avec ses baux
+    existing = {m.lower() for m in re.findall(r"mac='([^']+)'", dump.stdout)}
+    try:
+        network = ipaddress.ip_network(infra.cidr or "10.10.10.0/24", strict=False)
+    except ValueError:
+        return
+    # Même dérivation que le template kvm (locals.mac_prefix) : deux octets du
+    # hash du repo.id isolent les MAC entre dépôts. Doit rester synchronisé.
+    digest = hashlib.sha256(repo_meta.id.encode("utf-8")).hexdigest()
+    mac_prefix = f"52:54:{digest[0:2]}:{digest[2:4]}:00"
+    wanted = set(target_hosts) if target_hosts else None
+    for idx, host in enumerate(infra.hosts):
+        if wanted is not None and host.name not in wanted:
+            continue
+        mac = f"{mac_prefix}:{idx + 16:02x}"
+        if mac.lower() in existing:
+            continue
+        ip = str(network.network_address + idx + 11)
+        entry = f"<host mac='{mac}' name='{host.name}' ip='{ip}'/>"
+        res = subprocess.run(
+            ["sudo", "virsh", "net-update", infra.network,
+             "add-last", "ip-dhcp-host", entry, "--live", "--config"],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode == 0:
+            logger.info("bail DHCP ajouté à chaud: %s -> %s (%s)", host.name, ip, mac)
+
+
 def apply(
     repo_meta: RepoMetadata,
     *,
@@ -350,6 +416,12 @@ def apply(
 
     tf_dir = workdir(repo_meta)
     write_tfvars(repo_meta)
+
+    # Le réseau KVM est figé (lifecycle ignore_changes) : on pose ici les baux
+    # DHCP des hosts ajoutés après sa création, à chaud, sinon leur VM ne
+    # recevrait pas son IP statique. No-op au premier provision (réseau absent)
+    # et hors kvm. Voir _ensure_kvm_dhcp_leases.
+    _ensure_kvm_dhcp_leases(repo_meta, target_hosts)
 
     # Note : ``init`` n'est PAS appelé automatiquement ici. La CLI
     # ``dsoxlab provision`` l'appelle séparément (avec spinner) pour

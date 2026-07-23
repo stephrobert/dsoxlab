@@ -7,12 +7,21 @@
 # - Pas de bastion (réseau homelab direct depuis le poste de l'apprenant).
 
 locals {
-  # Convention dsoxlab : MAC déterministe par index pour permettre les
-  # baux DHCP statiques (51:54:00:cd:00:<XX>).
+  # MAC déterministe, unique par DÉPÔT et par index. Les deux octets du milieu
+  # sont dérivés d'un hash du repo.id : sans ça, deux catalogues KVM tournant en
+  # parallèle sur le même hôte donnaient la même MAC (52:54:00:cd:00:<idx>) à
+  # leurs VM de même index. Leurs baux se disputaient alors la table FDB du
+  # bridge et une des deux VM restait injoignable (« No route to host », sans
+  # erreur). C'est le pendant, en couche 2, de l'isolation par CIDR déjà en
+  # place. L'index reste dans le dernier octet pour garder les baux lisibles.
+  mac_prefix = format("52:54:%s:%s:00",
+    substr(sha256(var.repo_id), 0, 2),
+    substr(sha256(var.repo_id), 2, 2),
+  )
   hosts_with_idx = [
     for idx, h in var.hosts : merge(h, {
       idx = idx
-      mac = format("52:54:00:cd:00:%02x", idx + 16)
+      mac = format("%s:%02x", local.mac_prefix, idx + 16)
       ip  = cidrhost(var.network_cidr, idx + 11)
     })
   ]
@@ -25,8 +34,10 @@ locals {
   distro_to_template = {
     alma10   = "almalinux"
     alma9    = "almalinux"
+    ubuntu26 = "ubuntu"
     ubuntu24 = "ubuntu"
     ubuntu22 = "ubuntu"
+    debian13 = "debian"
     debian12 = "debian"
   }
 
@@ -35,9 +46,18 @@ locals {
   default_image_urls = {
     alma10   = "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2"
     alma9    = "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2"
+    ubuntu26 = "https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img"
     ubuntu24 = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
     ubuntu22 = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-    debian12 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+    # Variante « generic », PAS « genericcloud ». « genericcloud » utilise le
+    # kernel CLOUD de Debian, aux drivers réduits (ciblé EC2/Azure). Combiné au
+    # firmware OVMF/EFI que dsoxlab force ET au resize du disque au premier boot,
+    # il kernel-panique (« Attempted to kill init » ; bug connu documenté côté
+    # Proxmox et XCP-ng). « generic » embarque le kernel standard Debian et boot
+    # partout, EFI compris, pour ~90 Mo de plus. alma et ubuntu ne sont pas
+    # concernés (leur kernel n'est pas ce build cloud réduit).
+    debian13 = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2"
+    debian12 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
   }
 
   image_urls = {
@@ -107,6 +127,18 @@ resource "libvirt_network" "lab" {
       }
     }
   ]
+
+  # Le provider dmacvicar/libvirt ne sait PAS mettre à jour un réseau existant :
+  # modifier `ips[].dhcp.hosts` (ajout/retrait d'un host) le pousse à RECRÉER le
+  # réseau (issue #468), ce qui échoue en « element N has vanished /
+  # inconsistent result after apply » et couperait la connectivité de toutes les
+  # VMs attachées. On fige donc le réseau après création : Terraform le crée une
+  # fois avec les baux de la liste initiale, puis n'y touche plus. Les baux des
+  # hosts ajoutés ENSUITE sont posés à chaud par dsoxlab via `virsh net-update`
+  # (infra/terraform.py:_ensure_kvm_dhcp_leases), avant l'apply des domaines.
+  lifecycle {
+    ignore_changes = [ips]
+  }
 }
 
 # ── Images cloud (téléchargées une fois par distro) ────────────────────────

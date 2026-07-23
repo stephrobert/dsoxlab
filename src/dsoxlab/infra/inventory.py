@@ -351,6 +351,28 @@ class HostReadyTimeout(RuntimeError):
     """Levée quand un host ne devient pas joignable en SSH dans le délai imparti."""
 
 
+def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
+    """Envoie un ``virsh reset`` à un domaine KVM. Retourne True si tenté.
+
+    Débloque une VM coincée au premier boot. Cas connu : Debian cloud (generic
+    comme genericcloud) sous firmware OVMF/EFI avec resize du disque au premier
+    démarrage kernel-panique (« Attempted to kill init »), bug documenté côté
+    Proxmox et XCP-ng. Un simple reset passe le panic : la VM redémarre et boote
+    normalement. alma/ubuntu ne déclenchent pas ce cas, mais le reset répare
+    aussi n'importe quelle VM bloquée au boot. No-op hors provider kvm.
+    """
+    infra = repo_meta.infra
+    if infra is None or getattr(infra, "provider", None) != "kvm":
+        return False
+    res = subprocess.run(
+        ["sudo", "virsh", "reset", fqdn], capture_output=True, text=True
+    )
+    if res.returncode == 0:
+        logger.info("reset envoyé à %s (déblocage du premier boot)", fqdn)
+        return True
+    return False
+
+
 def wait_for_hosts_ready(
     repo_meta: RepoMetadata,
     hosts: list[str],
@@ -358,6 +380,7 @@ def wait_for_hosts_ready(
     timeout: float = 180.0,
     poll_interval: float = 3.0,
     connect_timeout: int = 8,
+    reset_after: float = 60.0,
     on_attempt: Callable[[str, int], None] | None = None,
 ) -> None:
     """Attend que chaque host soit réellement utilisable après ``terraform apply``.
@@ -405,7 +428,10 @@ def wait_for_hosts_ready(
     )
 
     for fqdn in hosts:
-        deadline = time.monotonic() + timeout
+        start = time.monotonic()
+        deadline = start + timeout
+        reset_deadline = start + reset_after
+        reset_done = False
         attempt = 0
         while True:
             attempt += 1
@@ -434,6 +460,14 @@ def wait_for_hosts_ready(
                     f"{fqdn} injoignable en SSH après {timeout:.0f}s "
                     "(cloud-init trop long, ou VM en échec de démarrage)."
                 )
+            # Un host dont sshd n'a JAMAIS répondu après `reset_after` est
+            # probablement coincé au boot (kernel panic Debian cloud + OVMF +
+            # resize, cf. _reset_kvm_domain). Un reset unique le débloque. Sans
+            # risque pour une VM saine : dès que sshd répond, la tentative se
+            # connecte et bloque sur `cloud-init status --wait`, donc ce seuil
+            # n'est plus évalué (le boot normal sshd est bien en deçà de 60 s).
+            if not reset_done and time.monotonic() >= reset_deadline:
+                reset_done = _reset_kvm_domain(repo_meta, fqdn) or True
             time.sleep(poll_interval)
 
 

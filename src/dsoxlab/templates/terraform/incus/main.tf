@@ -20,8 +20,10 @@ locals {
   default_images = {
     alma10   = "images:almalinux/10/cloud"
     alma9    = "images:almalinux/9/cloud"
+    ubuntu26 = "images:ubuntu/resolute/cloud"
     ubuntu24 = "images:ubuntu/noble/cloud"
     ubuntu22 = "images:ubuntu/jammy/cloud"
+    debian13 = "images:debian/13/cloud"
     debian12 = "images:debian/12/cloud"
   }
 
@@ -31,8 +33,10 @@ locals {
   distro_to_template = {
     alma10   = "almalinux"
     alma9    = "almalinux"
+    ubuntu26 = "ubuntu"
     ubuntu24 = "ubuntu"
     ubuntu22 = "ubuntu"
+    debian13 = "debian"
     debian12 = "debian"
   }
 

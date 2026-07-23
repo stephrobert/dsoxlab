@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.32] - 2026-07-23
+
+### Added
+
+- **Debian 12 (bookworm) support across the three providers.** The `debian12`
+  distro was already mapped to an image (qcow2 URL for kvm, `images:debian/12/cloud`
+  alias for incus) and to a `debian` cloud-init template, but that template did
+  not exist: any host declaring `distro: debian12` failed at provision time.
+  Added `templates/cloud-init/debian.yaml.tmpl` (same `student`/`ansible`
+  service accounts and hardening as the other distros). Debian 12 now
+  provisions on kvm, incus and outscale.
+- **Recent distros wired across all providers**: `debian13` (trixie) and
+  `ubuntu26` (26.04 LTS, Resolute Raccoon), alongside `alma9` and `ubuntu22`.
+  Each provider now exposes the same seven-distro set (kvm image URLs, incus
+  `images:` aliases, outscale pinned OMIs), verified by
+  `test_cloud_init_templates.py`. Image URLs confirmed live before wiring.
+- **Regression test for distro/cloud-init consistency**
+  (`tests/test_cloud_init_templates.py`): every distro a provider maps must have
+  its cloud-init template, all providers must expose the same distro set, and
+  `debian12` must be wired everywhere. This is the guard that the missing
+  `debian.yaml.tmpl` slipped past.
+
+### Fixed
+
+- **Outscale only mapped OMIs for `alma10` and `ubuntu24`** while
+  `distro_to_template` promised five distros. A host declaring `alma9`,
+  `ubuntu22` or `debian12` on outscale resolved to an empty OMI and an opaque
+  Terraform failure. `image_ids` now covers the full set (each still defaulting
+  to `""`, so a catalog only pins the OMIs it actually uses), with the matching
+  `image_id_alma9` / `image_id_ubuntu22` / `image_id_debian12` documented in
+  `variables.tf`.
+- **`element N has vanished` when adding a host to an existing KVM network.**
+  The `dmacvicar/libvirt` provider cannot update a network in place: changing
+  `ips[].dhcp.hosts` makes it recreate the network (issue #468), which fails and
+  would drop connectivity for every attached VM. The network is now frozen after
+  creation (`lifecycle { ignore_changes = [ips] }`); DHCP leases for hosts added
+  later are applied live via `virsh net-update`, in a new
+  `_ensure_kvm_dhcp_leases` step run before the domain apply.
+- **MAC collision between repos sharing a host (KVM).** MACs were
+  `52:54:00:cd:00:<idx>`, identical across repos, so two catalogs running in
+  parallel gave the same MAC to their same-index VMs and one became unreachable
+  (silent `No route to host`). The two middle octets are now derived from a hash
+  of `repo.id`, making MACs unique per repo: the layer-2 counterpart of the
+  existing per-repo CIDR isolation. Existing KVM VMs must be re-provisioned to
+  pick up the new MACs.
+
 ## [0.1.31] - 2026-07-23
 
 ### Fixed
