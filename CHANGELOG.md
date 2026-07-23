@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.29] - 2026-07-23
+
+### Fixed
+
+- **`check-release.py` concluded "All good" right after warning that CI was
+  still running.** Its first real use showed it: the closing message
+  contradicted the warning and invited tagging exactly when `RELEASING` says
+  to wait. A running CI is now a **wait** rather than a plain note: the script
+  exits 2 with "too early", distinct from failure (1), where something needs
+  fixing, and from the green light (0).
+
 ## [0.1.28] - 2026-07-23
 
 ### Added

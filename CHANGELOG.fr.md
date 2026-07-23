@@ -9,6 +9,18 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.29] - 2026-07-23
+
+### Corrigé
+
+- **`check-release.py` concluait « Tout est bon » alors qu'il venait de
+  signaler une CI en cours.** Son premier usage réel l'a montré : le message
+  final contredisait l'avertissement, et invitait à taguer précisément quand
+  `RELEASING` demande d'attendre. Une CI en cours est désormais une
+  **attente** et non une simple note : le script sort en 2 avec « il est trop
+  tôt », distinct de l'échec (1) où quelque chose est à corriger, et du feu
+  vert (0).
+
 ## [0.1.28] - 2026-07-23
 
 ### Ajouté
