@@ -9,7 +9,23 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.27] - 2026-07-23
+
+### Corrigé
+
+- **Le workflow de release publiait sous un tag qui ne correspondait pas à la
+  version empaquetée.** Le build lit `pyproject.toml`, le tag ne sert qu'aux
+  notes : rien ne vérifiait qu'ils concordent. Deux fois de suite, un tag posé
+  sur un commit dont la version avait déjà bougé a produit une publication
+  fausse. `v0.1.22` a republié 0.1.21, et `v0.1.25` a construit puis publié
+  0.1.26 sous le mauvais tag, si bien que PyPI n'a jamais reçu de 0.1.25. Le
+  workflow refuse désormais et dit quoi faire.
+
 ## [0.1.26] - 2026-07-23
+
+> Publiée sous le tag `v0.1.25`, posé sur un commit qui portait déjà le bump
+> 0.1.26 : PyPI n'a donc jamais reçu de 0.1.25, et tout ce que cette version
+> annonçait est présent ici.
 
 ### Corrigé
 

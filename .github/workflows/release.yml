@@ -52,6 +52,26 @@ jobs:
           version: "0.11.26"
           enable-cache: false   # no cache in the publishing path (cache-poisoning hardening)
 
+      # The tag must match the version inside pyproject.toml. Twice now, a tag
+      # was pushed at a commit whose version had already moved on: v0.1.22 built
+      # the previous version, and v0.1.25 built 0.1.26 and published it under
+      # the wrong tag, so PyPI never received a 0.1.25 at all. Nothing in the
+      # pipeline objected, because the build reads pyproject and the tag is only
+      # used for the release notes. Fail loudly instead.
+      - name: Tag must match the packaged version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          packaged=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "${TAG#v}" != "$packaged" ]; then
+            echo "::error::Tag $TAG does not match pyproject version $packaged." \
+                 "Tag the commit that carries the matching version bump," \
+                 "or bump pyproject to ${TAG#v} before tagging."
+            exit 1
+          fi
+          echo "Tag $TAG matches the packaged version $packaged."
+
       - name: Build sdist and wheel
         run: uv build
 

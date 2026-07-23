@@ -9,7 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.27] - 2026-07-23
+
+### Fixed
+
+- **The release workflow published under a tag that did not match the packaged
+  version.** The build reads `pyproject.toml`, the tag only feeds the release
+  notes, and nothing checked that they agree. Twice in a row, a tag pushed at a
+  commit whose version had already moved on produced a wrong publication:
+  `v0.1.22` republished 0.1.21, and `v0.1.25` built and published 0.1.26 under
+  the wrong tag, so PyPI never received a 0.1.25 at all. The workflow now fails
+  loudly and says what to do.
+
 ## [0.1.26] - 2026-07-23
+
+> Published under the `v0.1.25` tag, which was pushed at a commit already
+> carrying the 0.1.26 bump: PyPI never received a 0.1.25, and everything that
+> version announced is present here.
 
 ### Fixed
 
