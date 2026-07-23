@@ -1,0 +1,83 @@
+#cloud-config
+# Cloud-init Debian 12 (bookworm) pour les VMs de lab dsoxlab.
+# Variables Terraform substituées via templatefile() : hostname, ssh_pubkey.
+
+hostname: ${hostname}
+fqdn: ${hostname}.lab
+manage_etc_hosts: true
+preserve_hostname: false
+
+users:
+  - name: student
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    # lock_passwd: false + passwd: '*' : sshd 9+ (Debian 12 embarque
+    # OpenSSH 9.2) rejette les comptes « locked » (hash préfixé par « ! »)
+    # même en authentification par clé publique. Cloud-init applique
+    # lock_passwd: true par défaut, ce qui met ce « ! » : on force false.
+    lock_passwd: false
+    passwd: "*"
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+
+  # ansible : compte de SERVICE d'automatisation, distinct du compte humain
+  # student. C'est lui que dsoxlab et les playbooks des labs utilisent pour se
+  # connecter (ansible_user: ansible). Même durcissement : clé SSH uniquement,
+  # sans mot de passe. NOPASSWD:ALL volontaire (automatisation généraliste).
+  - name: ansible
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: "*"
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+
+disable_root: true
+ssh_pwauth: false
+
+# Outils minimum pour les labs LFCS Debian-like : diagnostic.
+package_update: true
+packages:
+  # openssh-server : NON préinstallé sur les images Incus cloud (Incus passe
+  # par incus exec via l'agent). On l'installe pour avoir un flow SSH unifié
+  # avec les autres providers (kvm, outscale). Sur les images cloud Debian
+  # pour KVM/Outscale il est déjà présent : cette ligne est idempotente.
+  - openssh-server
+  - vim
+  - tmux
+  - bash-completion
+  - tree
+  - lsof
+  - strace
+  - tcpdump
+  - dnsutils
+  - net-tools
+  - ufw
+  - apparmor
+  - apparmor-utils
+  # qemu-guest-agent : laisse libvirt récupérer l'IP via le canal virtio
+  # (« virsh domifaddr --source agent ») côté provider kvm.
+  - qemu-guest-agent
+
+runcmd:
+  # Garde-fou anti-locking : force le hash à '*' (cf. commentaire dans la
+  # section users). Idempotent.
+  - [ usermod, -p, "*", student ]
+  - [ usermod, -p, "*", ansible ]
+  - [ systemctl, enable, --now, ssh ]
+  # enable SANS --now : l'unité déclare
+  # BindsTo=dev-virtio\x2dports-org.qemu.guest_agent.0.device, or le provider
+  # KVM ne déclare aucun channel virtio (cf. la note dans
+  # templates/terraform/kvm/main.tf). Le device n'existe donc jamais, et --now
+  # attendait 90 s avant d'échouer : le script runcmd sortait en 1, cloud-init
+  # finissait en « status: error », et « dsoxlab provision » restait bloqué sur
+  # son attente alors que la VM était prête. L'activation est conservée : le
+  # jour où un channel est déclaré (ou sur un provider qui en fournit un), le
+  # service démarrera au boot.
+  - [ systemctl, enable, qemu-guest-agent ]
+
+# Sécurité par défaut : AppArmor reste activé. UFW est installé mais pas activé
+# par défaut : c'est aux labs LFCS de l'activer explicitement (pour ne pas
+# couper la SSH du provisioning).

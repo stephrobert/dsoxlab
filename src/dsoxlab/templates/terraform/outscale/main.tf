@@ -32,10 +32,18 @@ locals {
   bastion_user    = lookup(var.provider_config, "bastion_user", "student")
   ssh_pubkey      = lookup(var.provider_config, "ssh_pubkey", "")
 
-  # OMI par distro — l'utilisateur PIN les références dans meta.yml
+  # OMI par distro : l'utilisateur PIN les références dans meta.yml. Une entrée
+  # par distro de distro_to_template : une distro déclarée dans un lab mais
+  # absente ici donnerait une OMI vide et un échec Terraform opaque. Le défaut
+  # "" reste : chaque catalogue ne pin QUE les distros qu'il utilise.
   image_ids = {
     alma10   = lookup(var.provider_config, "image_id_alma10", "")
+    alma9    = lookup(var.provider_config, "image_id_alma9", "")
+    ubuntu26 = lookup(var.provider_config, "image_id_ubuntu26", "")
     ubuntu24 = lookup(var.provider_config, "image_id_ubuntu24", "")
+    ubuntu22 = lookup(var.provider_config, "image_id_ubuntu22", "")
+    debian13 = lookup(var.provider_config, "image_id_debian13", "")
+    debian12 = lookup(var.provider_config, "image_id_debian12", "")
   }
   image_id_bastion = coalesce(
     lookup(var.provider_config, "image_id_bastion", ""),
@@ -47,8 +55,10 @@ locals {
   distro_to_template = {
     alma10   = "almalinux"
     alma9    = "almalinux"
+    ubuntu26 = "ubuntu"
     ubuntu24 = "ubuntu"
     ubuntu22 = "ubuntu"
+    debian13 = "debian"
     debian12 = "debian"
   }
 

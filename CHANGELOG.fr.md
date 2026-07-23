@@ -9,6 +9,54 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.32] - 2026-07-23
+
+### Ajouté
+
+- **Support de Debian 12 (bookworm) sur les trois providers.** La distro
+  `debian12` était déjà associée à une image (URL qcow2 pour kvm, alias
+  `images:debian/12/cloud` pour incus) et à un template cloud-init `debian`,
+  mais ce template n'existait pas : tout host déclarant `distro: debian12`
+  échouait au provision. Ajout de `templates/cloud-init/debian.yaml.tmpl` (mêmes
+  comptes de service `student`/`ansible` et même durcissement que les autres
+  distros). Debian 12 se provisionne désormais sur kvm, incus et outscale.
+- **Distros récentes câblées sur tous les providers** : `debian13` (trixie) et
+  `ubuntu26` (26.04 LTS, Resolute Raccoon), en plus de `alma9` et `ubuntu22`.
+  Chaque provider expose désormais le même jeu de sept distros (URL d'images
+  kvm, alias `images:` incus, OMI pinées outscale), vérifié par
+  `test_cloud_init_templates.py`. URL d'images confirmées disponibles avant
+  câblage.
+- **Test de non-régression sur la cohérence distro/cloud-init**
+  (`tests/test_cloud_init_templates.py`) : toute distro mappée par un provider
+  doit avoir son template cloud-init, les trois providers doivent exposer le
+  même jeu de distros, et `debian12` doit être câblé partout. C'est le garde-fou
+  qui a manqué au `debian.yaml.tmpl` absent.
+
+### Corrigé
+
+- **Outscale ne mappait des OMI que pour `alma10` et `ubuntu24`** alors que
+  `distro_to_template` en promettait cinq. Un host déclarant `alma9`, `ubuntu22`
+  ou `debian12` sur outscale se résolvait en OMI vide et un échec Terraform
+  opaque. `image_ids` couvre désormais tout le jeu (chaque entrée gardant son
+  défaut `""`, un catalogue ne pin que les OMI qu'il utilise), avec les clés
+  correspondantes `image_id_alma9` / `image_id_ubuntu22` / `image_id_debian12`
+  documentées dans `variables.tf`.
+- **`element N has vanished` à l'ajout d'un host sur un réseau KVM existant.**
+  Le provider `dmacvicar/libvirt` ne sait pas mettre à jour un réseau en place :
+  modifier `ips[].dhcp.hosts` le pousse à recréer le réseau (issue #468), ce qui
+  échoue et couperait la connectivité de toutes les VM attachées. Le réseau est
+  désormais figé après création (`lifecycle { ignore_changes = [ips] }`) ; les
+  baux DHCP des hosts ajoutés ensuite sont posés à chaud via `virsh net-update`,
+  dans une nouvelle étape `_ensure_kvm_dhcp_leases` jouée avant l'apply des
+  domaines.
+- **Collision de MAC entre dépôts partageant un hôte (KVM).** Les MAC étaient
+  `52:54:00:cd:00:<idx>`, identiques d'un dépôt à l'autre : deux catalogues qui
+  tournent en parallèle donnaient la même MAC à leurs VM de même index, et l'une
+  devenait injoignable (`No route to host` silencieux). Les deux octets du
+  milieu sont maintenant dérivés d'un hash du `repo.id`, rendant les MAC uniques
+  par dépôt : le pendant en couche 2 de l'isolation par CIDR déjà en place. Les
+  VM KVM existantes doivent être re-provisionnées pour prendre les nouvelles MAC.
+
 ## [0.1.31] - 2026-07-23
 
 ### Corrigé
