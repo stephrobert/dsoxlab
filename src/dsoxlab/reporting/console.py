@@ -19,6 +19,9 @@ from ..i18n import _
 
 console = Console()
 err_console = Console(stderr=True, style="bold red")
+#: Avis de mise a jour : sur stderr comme les erreurs, pour ne jamais
+#: polluer un document JSON, mais sans le rouge qui ferait croire a un echec.
+update_console = Console(stderr=True, style="dim", highlight=False)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -563,6 +566,7 @@ def print_fullhelp() -> None:
         ("fullhelp_runtimes", None),
         ("fullhelp_language", None),
         ("fullhelp_scoring",  None),
+        ("fullhelp_update",   None),
     ]
 
     console.print()

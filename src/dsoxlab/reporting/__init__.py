@@ -3,6 +3,7 @@
 from .console import (
     console,
     err_console,
+    update_console,
     error,
     info,
     print_check_result,
@@ -28,6 +29,7 @@ from .console import (
 __all__ = [
     "console",
     "err_console",
+    "update_console",
     "error",
     "info",
     "print_check_result",

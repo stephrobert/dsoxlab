@@ -9,6 +9,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.25] - 2026-07-23
+
+### Ajouté
+
+- **dsoxlab signale qu'une version plus récente existe.** Un apprenant
+  installe la CLI une fois et ne revient jamais vérifier : il joue des labs
+  avec des défauts corrigés depuis longtemps, et remonte des problèmes déjà
+  résolus. La vérification a lieu une fois par jour et l'avis s'affiche en
+  dernier, pour être lu.
+
+  Il est construit pour ne jamais gêner. Le message part sur **stderr**, jamais
+  sur stdout : un document `--json` reste lisible quoi qu'il arrive. Il est tu
+  quand stderr n'est pas un terminal, ce qui laisse les journaux de CI propres.
+  Toute défaillance (hors ligne, PyPI en panne, proxy hostile, réponse
+  illisible) est avalée en silence : vérifier une version n'est jamais une
+  raison de casser un `check`. Le résultat est mis en cache un jour, pour
+  qu'une salle de formation ne martèle pas PyPI. Désactivation par
+  `DSOXLAB_NO_UPDATE_CHECK=1`.
+
 ## [0.1.24] - 2026-07-23
 
 ### Ajouté

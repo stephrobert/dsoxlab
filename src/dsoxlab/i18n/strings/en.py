@@ -101,6 +101,10 @@ STRINGS: dict[str, str] = {
     "confirm_destroy":
         "Destroy the whole {provider} infrastructure? "
         "All VM data will be lost",
+    "update_available":
+        "\n[dim]A newer version of dsoxlab is available: "
+        "{latest} (you have {current}).\n"
+        "Upgrade with: uv tool upgrade dsoxlab[/dim]",
     "destroy_host_not_isolated":
         "Warning: Terraform also destroys everything that depends on the target. "
         "Host targeting therefore does not isolate one VM from the others. To "
@@ -255,6 +259,16 @@ Lab titles and descriptions can be displayed in different languages.
 
   Set permanently:   [bold]dsoxlab use linux --lang fr[/bold]
   Set for one call:  [bold]DSOXLAB_LANG=fr dsoxlab list-labs[/bold]""",
+
+    "fullhelp_update": """\
+[bold]Updates[/bold]
+
+dsoxlab checks once a day whether a newer version exists on PyPI, and says so
+at the end of a command. The check never blocks anything: offline, it stays
+silent.
+
+  Upgrade:  [bold]uv tool upgrade dsoxlab[/bold]
+  Disable:  [bold]DSOXLAB_NO_UPDATE_CHECK=1[/bold]""",
 
     "fullhelp_scoring": """\
 [bold]Scoring[/bold]

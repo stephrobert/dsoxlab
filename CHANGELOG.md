@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-07-23
+
+### Added
+
+- **dsoxlab tells you when a newer version is available.** A learner installs
+  the CLI once and never comes back to check: they keep playing labs with
+  defects fixed long ago, and report problems already solved. The check now
+  runs once a day and the notice is printed last, so it is actually read.
+
+  It is built so it can never get in the way. The message goes to **stderr**,
+  never stdout, so a `--json` document stays parseable whatever happens. It is
+  skipped entirely when stderr is not a terminal, keeping CI logs clean. Any
+  failure (offline, PyPI down, hostile proxy, unreadable response) is swallowed
+  silently: checking a version is never a reason to break a `check`. The result
+  is cached for a day, so a classroom does not hammer PyPI. Opt out with
+  `DSOXLAB_NO_UPDATE_CHECK=1`.
+
 ## [0.1.24] - 2026-07-23
 
 ### Added
