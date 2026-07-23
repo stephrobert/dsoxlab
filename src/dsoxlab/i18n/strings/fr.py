@@ -98,6 +98,14 @@ STRINGS: dict[str, str] = {
     "provision_waiting_ssh": "Attente que les hôtes soient joignables (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Attente de {host} (SSH + cloud-init), tentative {attempt}…",
     "provision_ssh_timeout": "Délai d'attente dépassé : {error}\nLa VM démarre peut-être encore — relance `dsoxlab run` dans un instant.",
+    "confirm_destroy":
+        "Détruire toute l'infrastructure du provider {provider} ? "
+        "Les données des VM seront perdues",
+    "destroy_host_not_isolated":
+        "Attention : Terraform détruit aussi tout ce qui dépend de la cible. "
+        "Le ciblage par hôte n'isole donc pas une VM des autres. Pour "
+        "récupérer une machine inaccessible, préfère « dsoxlab destroy » "
+        "puis « dsoxlab provision » : le parc entier est reconstruit à neuf.",
     "destroy_starting":    "Destruction de l'infrastructure (provider : {provider})…",
     "ssh_fragment_failed":  "Fragment SSH non écrit : {error}. La connexion par nom de machine ne fonctionnera pas.",
     "ssh_fragment_written": "Connexion directe activée : [bold]ssh <machine>[/bold] fonctionne désormais (fragment {path}).",
