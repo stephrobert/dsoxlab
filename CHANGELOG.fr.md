@@ -9,6 +9,22 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.26] - 2026-07-23
+
+### Corrigé
+
+- **L'icône de runtime décalait l'affichage.** Les emoji de largeur double, et
+  leur sélecteur de variante, sont comptés pour une colonne par Rich mais rendus
+  sur deux par le terminal : la ligne glissait et la bordure du panneau se
+  brisait. L'icône est retirée de `show` et de `list-labs`. Elle affichait de
+  toute façon « ? » sur tous les labs `vm` : sa table connaissait `kvm` et
+  `incus`, les deux alias rétro-compat, mais pas `vm`, la valeur canonique du
+  contrat.
+- **La difficulté restait en anglais en français.** `show` affichait
+  « Difficulté : intermediate ». Les trois valeurs employées par les dépôts de
+  labs sont traduites ; le champ restant libre par contrat, toute autre valeur
+  s'affiche telle quelle plutôt que de disparaître.
+
 ## [0.1.25] - 2026-07-23
 
 ### Ajouté

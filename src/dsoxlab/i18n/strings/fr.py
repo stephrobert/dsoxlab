@@ -101,6 +101,9 @@ STRINGS: dict[str, str] = {
     "confirm_destroy":
         "Détruire toute l'infrastructure du provider {provider} ? "
         "Les données des VM seront perdues",
+    "difficulty_beginner":     "débutant",
+    "difficulty_intermediate": "intermédiaire",
+    "difficulty_advanced":     "avancé",
     "update_available":
         "\n[dim]Une version plus récente de dsoxlab est disponible : "
         "{latest} (vous avez {current}).\n"

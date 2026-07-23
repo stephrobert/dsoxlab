@@ -101,6 +101,9 @@ STRINGS: dict[str, str] = {
     "confirm_destroy":
         "Destroy the whole {provider} infrastructure? "
         "All VM data will be lost",
+    "difficulty_beginner":     "beginner",
+    "difficulty_intermediate": "intermediate",
+    "difficulty_advanced":     "advanced",
     "update_available":
         "\n[dim]A newer version of dsoxlab is available: "
         "{latest} (you have {current}).\n"

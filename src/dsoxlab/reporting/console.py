@@ -30,8 +30,16 @@ def _level_color(level: str) -> str:
     return {"l1": "green", "l2": "yellow", "lfcs": "cyan", "rhcsa": "magenta"}.get(level, "white")
 
 
-def _runtime_icon(runtime_type: str) -> str:
-    return {"shell": "🐚", "incus": "📦", "kvm": "🖥️"}.get(runtime_type, "?")
+def _difficulty_label(difficulty: str) -> str:
+    """Traduit les difficultés courantes, laisse passer le reste.
+
+    Le champ est libre par contrat : un dépôt de labs peut y mettre ce qu'il
+    veut. On ne traduit donc que les trois valeurs employées partout, et toute
+    autre valeur s'affiche telle quelle plutôt que de disparaître.
+    """
+    cle = f"difficulty_{difficulty.strip().lower()}"
+    traduit = _(cle)
+    return difficulty if traduit == cle else traduit
 
 
 def _section_color(section: str) -> str:
@@ -74,7 +82,7 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
     current_section = ""
     for lab in labs:
         level_text = Text(lab.level, style=_level_color(lab.level))
-        runtime_text = f"{_runtime_icon(lab.runtime.type.value)} {lab.runtime.type.value}"
+        runtime_text = lab.runtime.type.value
 
         # Une seule section affichée par groupe : les lignes suivantes du
         # même groupe laissent la cellule vide.
@@ -114,9 +122,9 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
         f"{_('field_type')}       {_type_badge(lab.lab_type)}"
         + (f"  —  bloc {lab.bloc}" if lab.bloc else ""),
         f"{_('field_level')}     [{_level_color(lab.level)}]{lab.level}[/{_level_color(lab.level)}]",
-        f"{_('field_runtime')}    {_runtime_icon(lab.runtime.type.value)} {lab.runtime.type.value} / {lab.runtime.topology}",
+        f"{_('field_runtime')}    {lab.runtime.type.value} / {lab.runtime.topology}",
         f"{_('field_duration')}      {lab.estimated_time}",
-        f"{_('field_difficulty')} {lab.difficulty}",
+        f"{_('field_difficulty')} {_difficulty_label(lab.difficulty)}",
         f"{_('field_distros')}    {', '.join(lab.distros)}",
         f"{_('field_skills')}     {', '.join(lab.skills)}",
         f"{_('field_doc')}        [link={lab.doc_url}]{lab.doc_url}[/link]",

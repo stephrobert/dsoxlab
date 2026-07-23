@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-07-23
+
+### Fixed
+
+- **The runtime icon shifted the layout.** Double-width emoji, and their
+  variation selector, count as one column for Rich but render as two in the
+  terminal: the line drifted and the panel border broke. The icon is dropped
+  from `show` and `list-labs`. It showed "?" on every `vm` lab anyway: its table
+  knew about `kvm` and `incus`, the two backward-compatible aliases, but not
+  `vm`, the contract's canonical value.
+- **Difficulty stayed in English under a French UI.** `show` printed
+  "Difficulté : intermediate". The three values used by lab repositories are now
+  translated; since the field is free-form by contract, any other value is
+  printed as-is rather than vanishing.
+
 ## [0.1.25] - 2026-07-23
 
 ### Added
