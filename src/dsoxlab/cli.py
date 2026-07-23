@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import atexit
 import os
 import webbrowser
 import shutil
@@ -64,6 +65,7 @@ from .reporting import (
     print_lab_course,
     print_lab_welcome,
     success,
+    update_console,
     warn,
 )
 from .models import (
@@ -260,6 +262,34 @@ def _bootstrap(
         set_lang(lang)
     except Exception:  # noqa: S110 — silence volontaire : pas de contexte lab, on continue en langue par défaut
         pass  # silencieux si LAB_HOME introuvable
+
+    # L'avis de mise à jour est posé ici, mais affiché à la toute fin par
+    # atexit : c'est le seul moyen qu'il soit le dernier message, y compris
+    # quand la commande sort en erreur ou lève typer.Exit.
+    atexit.register(_notify_update_available)
+
+
+def _notify_update_available() -> None:
+    """Affiche l'avis de mise à jour, en dernier, sur stderr.
+
+    Sur stderr et pas stdout : une commande en `--json` doit rendre un
+    document lisible par un programme, quoi qu'il arrive. Et seulement si
+    stderr est un terminal, pour ne pas polluer les journaux d'une CI ni la
+    sortie capturée par un script.
+    """
+    if not sys.stderr.isatty():
+        return
+    try:
+        from .services.update_check import available_update
+
+        latest = available_update(__version__)
+        if latest is None:
+            return
+        update_console.print(
+            _("update_available", latest=latest, current=__version__)
+        )
+    except Exception:  # noqa: S110 — un avis ne casse jamais une commande
+        return
 
 
 # ── install ─────────────────────────────────────────────────────────────────
