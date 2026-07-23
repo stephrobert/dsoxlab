@@ -41,6 +41,7 @@ class Rapport:
 
     def __init__(self) -> None:
         self.echecs: list[str] = []
+        self.attentes: list[str] = []
 
     def ok(self, titre: str, detail: str = "") -> None:
         suffixe = f" {detail}" if detail else ""
@@ -52,8 +53,20 @@ class Rapport:
         self.echecs.append(titre)
 
     def note(self, titre: str, detail: str) -> None:
+        """Information : n'empêche pas de taguer."""
         print(f"  {JAUNE}!{RAZ} {titre}")
         print(f"      {detail}")
+
+    def attendre(self, titre: str, detail: str) -> None:
+        """Rien n'est faux, mais il est trop tôt pour taguer.
+
+        Distinct d'un échec : il n'y a rien à corriger, seulement à
+        attendre. Distinct d'une note : conclure « tout est bon » ici
+        reviendrait à encourager ce que RELEASING interdit.
+        """
+        print(f"  {JAUNE}⏳{RAZ} {titre}")
+        print(f"      {detail}")
+        self.attentes.append(titre)
 
 
 def git(*args: str) -> str:
@@ -207,9 +220,9 @@ def _verifier_ci(r: Rapport) -> None:
             "Corrige avant de taguer : le tag publie ce commit tel quel.",
         )
     elif en_cours:
-        r.note(
+        r.attendre(
             f"CI encore en cours : {', '.join(sorted(set(en_cours)))}",
-            "Attends la fin. PyPI est définitif.",
+            "Attends la fin, puis relance ce contrôle. PyPI est définitif.",
         )
     else:
         r.ok("CI verte sur ce commit")
@@ -237,6 +250,10 @@ def main() -> int:
         print(f"{ROUGE}{GRAS}{len(r.echecs)} contrôle(s) en échec.{RAZ} "
               "Ne pose pas le tag.\n")
         return 1
+    if r.attentes:
+        print(f"{JAUNE}{GRAS}Rien n'est faux, mais il est trop tôt.{RAZ} "
+              "Attends puis relance ce contrôle.\n")
+        return 2
     print(f"{VERT}{GRAS}Tout est bon.{RAZ} Pose le tag :\n")
     print(f'    git tag -a {tag} -m "{tag}" && git push origin {tag}\n')
     return 0
