@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-07-23
+
+### Added
+
+- **A local check to run before pushing a tag**:
+  `python3 scripts/check-release.py`. The guard added in 0.1.27 lives in the
+  workflow, so it only speaks once the tag is pushed, and the tag then has to
+  be deleted locally and on the remote. This script replays the same checks
+  offline, plus the ones `RELEASING` left to human vigilance: clean tree,
+  `main` up to date, tag consistent with `pyproject.toml`, CHANGELOG section
+  present **in both languages**, `uv.lock` aligned, version still free on
+  PyPI, CI green on the commit. It prints every verdict in one pass, then the
+  exact command to run.
+
 ## [0.1.27] - 2026-07-23
 
 ### Fixed
