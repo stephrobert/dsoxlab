@@ -419,6 +419,19 @@ def use(
         error(_("provider_not_a_section", name=context))
         raise typer.Exit(1)
 
+    # Même piège, cas général : une section inconnue était acceptée sans un
+    # mot, puis « list-labs » répondait « Aucun lab trouvé ». L'apprenant
+    # croyait le catalogue vide alors qu'il venait de poser un filtre qui ne
+    # correspond à rien. On refuse, et on montre ce qui existe.
+    # Un meta.yml sans bloc « sections » ne déclare rien : on ne filtre pas.
+    if context is not None and declared_sections:
+        demandee = context.strip().split("/", 1)[0]
+        if demandee and demandee not in declared_sections:
+            error(_("section_unknown",
+                    name=demandee,
+                    sections=", ".join(declared_sections)))
+            raise typer.Exit(1)
+
     # --provider <name> : valider contre les providers candidats du
     # meta.yml avant de l'enregistrer dans le contexte session.
     if provider is not None:

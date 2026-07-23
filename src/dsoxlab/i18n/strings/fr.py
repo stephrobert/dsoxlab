@@ -86,6 +86,10 @@ STRINGS: dict[str, str] = {
     # ── résolution du provider ────────────────────────────────────────────────
     "provider_required":      "Cette commande a besoin d'un provider d'infrastructure, et ce dépôt en déclare plusieurs ({candidates}) sans qu'aucun ne soit actif.\nChoisis-en un :\n  dsoxlab use --provider {first}   (persisté)\n  DSOXLAB_PROVIDER={first} dsoxlab <commande>   (one-shot)",
     "provider_none_declared": "Aucun provider d'infrastructure déclaré dans meta.yml (infra.provider). Cette commande en exige un.",
+    "section_unknown":
+        "Section inconnue : « {name} ». Le catalogue serait vide.\n"
+        "Sections déclarées dans meta.yml : {sections}.\n"
+        "Pour tout voir : dsoxlab use --reset",
     "provider_not_a_section": "'{name}' est un provider d'infrastructure, pas une section du catalogue.\nPour l'activer :\n  dsoxlab use --provider {name}",
     "provider_unknown":       "Provider '{name}' inconnu pour ce dépôt. Candidats : {candidates}",
 

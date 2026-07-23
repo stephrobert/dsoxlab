@@ -20,6 +20,11 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   toute façon « ? » sur tous les labs `vm` : sa table connaissait `kvm` et
   `incus`, les deux alias rétro-compat, mais pas `vm`, la valeur canonique du
   contrat.
+- **Une section inconnue passée à `use` était acceptée sans un mot.**
+  `dsoxlab use l2` posait le filtre, puis `list-labs` répondait « Aucun lab
+  trouvé » : l'apprenant croyait le catalogue vide alors qu'il venait de poser
+  un filtre ne correspondant à rien. La commande refuse maintenant et liste les
+  sections déclarées dans le `meta.yml`.
 - **La difficulté restait en anglais en français.** `show` affichait
   « Difficulté : intermediate ». Les trois valeurs employées par les dépôts de
   labs sont traduites ; le champ restant libre par contrat, toute autre valeur

@@ -85,6 +85,10 @@ STRINGS: dict[str, str] = {
     # ── provider resolution ───────────────────────────────────────────────────
     "provider_required":      "This command needs an infrastructure provider, and this repository declares several ({candidates}) with none active.\nPick one:\n  dsoxlab use --provider {first}   (persisted)\n  DSOXLAB_PROVIDER={first} dsoxlab <command>   (one-shot)",
     "provider_none_declared": "No infrastructure provider declared in meta.yml (infra.provider). This command needs one.",
+    "section_unknown":
+        "Unknown section: \"{name}\". The catalog would come out empty.\n"
+        "Sections declared in meta.yml: {sections}.\n"
+        "To see everything: dsoxlab use --reset",
     "provider_not_a_section": "'{name}' is an infrastructure provider, not a catalog section.\nTo activate it:\n  dsoxlab use --provider {name}",
     "provider_unknown":       "Unknown provider '{name}' for this repository. Candidates: {candidates}",
 

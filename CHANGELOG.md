@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from `show` and `list-labs`. It showed "?" on every `vm` lab anyway: its table
   knew about `kvm` and `incus`, the two backward-compatible aliases, but not
   `vm`, the contract's canonical value.
+- **An unknown section passed to `use` was accepted silently.**
+  `dsoxlab use l2` set the filter, then `list-labs` answered "No lab found":
+  the learner believed the catalog was empty when they had just set a filter
+  matching nothing. The command now refuses and lists the sections declared in
+  `meta.yml`.
 - **Difficulty stayed in English under a French UI.** `show` printed
   "Difficulté : intermediate". The three values used by lab repositories are now
   translated; since the field is free-form by contract, any other value is
