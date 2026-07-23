@@ -1171,10 +1171,14 @@ def validate_structure_cmd(
     )] = False,
 ) -> None:
     from .discovery.scanner import discover_labs
+    from .discovery.repo import read_repo_metadata
     from .validators.content import (
         check_doc_url,
         validate_internal_links,
+        validate_language_parity,
+        validate_scoring,
         validate_solutions_encrypted,
+        validate_targets,
     )
 
     root = _root(lab_home)
@@ -1187,9 +1191,22 @@ def validate_structure_cmd(
     # Un lien mort ou une solution en clair ne casse aucun test fonctionnel,
     # c'est bien pourquoi rien ne les attrapait.
     labs = discover_labs(root)
+    # Les cibles vm se valident contre infra.hosts : un FQDN inconnu ne se
+    # voyait qu'au run, sur la machine de l'apprenant, après provisionnement.
+    try:
+        repo_meta = read_repo_metadata(root)
+        host_names = {h.name for h in repo_meta.infra.hosts} if repo_meta else set()
+    except Exception:  # noqa: BLE001 - meta.yml illisible : les autres contrôles restent utiles
+        host_names = set()
+
     content_issues: list[tuple[str, Path, str]] = []
     for lab in labs:
-        rapports = [validate_internal_links(lab)]
+        rapports = [
+            validate_internal_links(lab),
+            validate_scoring(lab),
+            validate_language_parity(lab),
+            validate_targets(lab, host_names),
+        ]
         # « solution/<chemin du lab depuis labs/> » : convention respectée par
         # les dépôts qui tiennent leurs corrigés hors des labs. Absent = pas
         # de contrôle, ce n'est pas une faute.

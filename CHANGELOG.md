@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Three more structural checks.** **Scoring** first: dsoxlab scores **per
+  test**, so a lab announcing five tasks at 20 points while shipping six
+  tests really awards 16.7 per task, and the printed scale lies with no way
+  for anyone to notice. It only fires when the statement announces per-task
+  points: a mock exam checking several things per task is making another,
+  equally valid choice. **Language parity** next, since a `.fr.md` with no
+  counterpart leaves the other half of learners on missing or stale content.
+  **VM targets** last, whose FQDN was only verified when playing the lab, on
+  the learner's machine and after provisioning, though it is readable
+  straight from the contract.
 - **`validate-structure` now checks content, not just file presence.** Three
   silent drifts that no functional test catches, because they do not break a
   lab's execution: a **dead relative link** in a Markdown file (the Ansible

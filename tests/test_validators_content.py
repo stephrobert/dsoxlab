@@ -158,3 +158,96 @@ def _reponse(status: int):  # noqa: ANN202 - fabrique de doublure
         return _Reponse(status)
 
     return _ouvrir
+
+
+class TestBareme:
+    """Le score se calcule par test : un test de plus décale tout le barème."""
+
+    def _lab_note(self, tmp_path: Path, taches: int, tests: int) -> LabDefinition:
+        ch = tmp_path / "challenge"
+        (ch / "tests").mkdir(parents=True)
+        points = 100 // taches
+        corps = f"**Format** : {taches} tâches, {points * taches} points.\n\n"
+        corps += "".join(
+            f"### Tâche {i} — quelque chose ({points} pts)\n\n" for i in range(1, taches + 1)
+        )
+        (ch / "README.fr.md").write_text(corps, encoding="utf-8")
+        (ch / "tests" / "test_functional.py").write_text(
+            "".join(f"def test_{i}(host):\n    assert True\n\n" for i in range(tests)),
+            encoding="utf-8",
+        )
+        return _lab(tmp_path)
+
+    def test_un_test_de_plus_est_signale(self, tmp_path: Path) -> None:
+        rapport = content.validate_scoring(self._lab_note(tmp_path, taches=5, tests=6))
+        assert not rapport.ok
+        assert "5 tâche(s) notée(s) pour 6 test(s)" in rapport.issues[0].message
+
+    def test_un_pour_un_passe(self, tmp_path: Path) -> None:
+        assert content.validate_scoring(self._lab_note(tmp_path, taches=5, tests=5)).ok
+
+    def test_sans_bareme_par_tache_le_controle_se_tait(self, tmp_path: Path) -> None:
+        """Un examen blanc peut vérifier plusieurs points par tâche."""
+        ch = tmp_path / "challenge"
+        (ch / "tests").mkdir(parents=True)
+        (ch / "README.fr.md").write_text(
+            "### Tâche 1 — sans points annoncés\n", encoding="utf-8"
+        )
+        (ch / "tests" / "test_functional.py").write_text(
+            "def test_a(h): ...\ndef test_b(h): ...\n", encoding="utf-8"
+        )
+        assert content.validate_scoring(_lab(tmp_path)).ok
+
+    def test_les_sections_ne_sont_pas_comptees_comme_taches(self, tmp_path: Path) -> None:
+        """`## Section A (20 pts)` totalise ses `###` : la compter doublerait."""
+        ch = tmp_path / "challenge"
+        (ch / "tests").mkdir(parents=True)
+        (ch / "README.fr.md").write_text(
+            "**Format** : 2 tâches, 20 points.\n\n"
+            "## Section A — bloc (20 pts)\n\n"
+            "### Tâche 1 — a (10 pts)\n\n### Tâche 2 — b (10 pts)\n",
+            encoding="utf-8",
+        )
+        (ch / "tests" / "test_functional.py").write_text(
+            "def test_a(h): ...\ndef test_b(h): ...\n", encoding="utf-8"
+        )
+        assert content.validate_scoring(_lab(tmp_path)).ok
+
+
+class TestPariteLangues:
+    def test_traduction_manquante(self, tmp_path: Path) -> None:
+        (tmp_path / "README.fr.md").write_text("cours", encoding="utf-8")
+        rapport = content.validate_language_parity(_lab(tmp_path))
+        assert not rapport.ok
+        assert "README.md" in rapport.issues[0].message
+
+    def test_les_deux_langues_presentes(self, tmp_path: Path) -> None:
+        (tmp_path / "README.fr.md").write_text("cours", encoding="utf-8")
+        (tmp_path / "README.md").write_text("course", encoding="utf-8")
+        assert content.validate_language_parity(_lab(tmp_path)).ok
+
+
+class TestCibles:
+    def _lab_vm(self, tmp_path: Path, host: str) -> LabDefinition:
+        from dsoxlab.models.runtime import Target
+
+        lab = _lab(tmp_path)
+        lab.runtime.type = RuntimeType.VM
+        lab.runtime.targets = [Target(name="rhel", host=host)]
+        return lab
+
+    def test_hote_inconnu(self, tmp_path: Path) -> None:
+        rapport = content.validate_targets(
+            self._lab_vm(tmp_path, "absent.lab"), {"present.lab"}
+        )
+        assert not rapport.ok
+        assert "absent.lab" in rapport.issues[0].message
+
+    def test_hote_connu(self, tmp_path: Path) -> None:
+        assert content.validate_targets(
+            self._lab_vm(tmp_path, "present.lab"), {"present.lab"}
+        ).ok
+
+    def test_sans_infra_declaree_le_controle_se_tait(self, tmp_path: Path) -> None:
+        """Un dépôt 100 % shell n'a pas d'`infra.hosts` : ce n'est pas une faute."""
+        assert content.validate_targets(self._lab_vm(tmp_path, "x.lab"), set()).ok

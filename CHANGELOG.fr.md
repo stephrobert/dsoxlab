@@ -13,6 +13,17 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Trois contrôles de structure supplémentaires.** Le **barème** d'abord :
+  dsoxlab note **par test**, donc un lab qui annonce cinq tâches à 20 points
+  mais compte six tests attribue en réalité 16,7 points par tâche, et le
+  barème affiché ment sans que personne puisse le deviner. Il ne se déclenche
+  que si l'énoncé annonce des points par tâche : un examen blanc qui vérifie
+  plusieurs points par tâche fait un autre choix, tout aussi valable. La
+  **parité des langues** ensuite, un `.fr.md` sans équivalent laissant
+  l'autre moitié des apprenants sur un contenu absent ou périmé. Les
+  **cibles vm** enfin, dont le FQDN ne se vérifiait qu'au moment de jouer le
+  lab, sur la machine de l'apprenant et après provisionnement, alors qu'il
+  est lisible dans le contrat.
 - **`validate-structure` contrôle désormais le contenu, pas seulement la
   présence des fichiers.** Trois dérives silencieuses, qu'aucun test
   fonctionnel n'attrape parce qu'elles ne cassent pas l'exécution d'un lab :
