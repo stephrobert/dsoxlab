@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-07-23
+
+### Added
+
+- **`destroy` now asks for confirmation.** The command wiped a whole park
+  without a word: typed in the wrong repository, it destroyed the VMs and their
+  data with no way back. It now prompts, and `--yes` / `-y` keeps scripted use
+  (CI, the documented recovery procedure) working.
+
+### Fixed
+
+- **`check` no longer crashes on a repository that declares several providers
+  with none active.** Reading the Terraform outputs raises `ProviderUnresolved`;
+  the traceback surfaced raw from `inventory.py`. The learner now gets the same
+  actionable message as the infra commands: pick a provider with
+  `dsoxlab use --provider <name>` or `DSOXLAB_PROVIDER=<name>`. Shell labs,
+  which need no infrastructure at all, are unaffected either way.
+
+### Changed
+
+- **`destroy --host` no longer claims to isolate a VM.** Measured on a
+  three-host park: `terraform destroy -target` also destroys everything that
+  depends on the target, so asking for one host planned **7** resources for
+  destruction, not 4. The option help said "destroys a single VM", which is
+  false and dangerous. It now states the real behaviour and points to
+  `destroy` + `provision` as the reliable way to recover an unreachable
+  machine, and a warning is printed at run time.
+
 ## [0.1.23] - 2026-07-22
 
 > The `v0.1.22` tag was created on the wrong commit, before its pull request was

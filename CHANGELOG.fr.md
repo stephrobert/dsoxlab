@@ -9,6 +9,36 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.24] - 2026-07-23
+
+### Ajouté
+
+- **`destroy` demande désormais confirmation.** La commande effaçait un parc
+  entier sans un mot : tapée dans le mauvais dépôt, elle détruisait les VM et
+  leurs données sans retour possible. Elle demande maintenant confirmation, et
+  `--yes` / `-y` préserve l'usage scripté (CI, procédure de récupération
+  documentée).
+
+### Corrigé
+
+- **`check` ne plante plus sur un dépôt qui déclare plusieurs providers sans
+  qu'aucun soit actif.** La lecture des outputs Terraform lève
+  `ProviderUnresolved` et la traceback remontait telle quelle depuis
+  `inventory.py`. L'apprenant reçoit maintenant le même message actionnable que
+  pour les commandes d'infra : choisir un provider avec
+  `dsoxlab use --provider <nom>` ou `DSOXLAB_PROVIDER=<nom>`. Les labs shell,
+  qui n'ont besoin d'aucune infrastructure, ne sont concernés dans aucun cas.
+
+### Modifié
+
+- **`destroy --host` ne prétend plus isoler une VM.** Mesuré sur un parc de
+  trois hôtes : `terraform destroy -target` détruit aussi tout ce qui dépend de
+  la cible, si bien que demander un seul hôte planifiait **7** ressources à
+  détruire, et non 4. L'aide de l'option annonçait « détruit une seule VM », ce
+  qui est faux et dangereux. Elle décrit maintenant le comportement réel et
+  renvoie vers `destroy` + `provision`, seule façon fiable de récupérer une
+  machine inaccessible ; un avertissement est affiché à l'exécution.
+
 ## [0.1.23] - 2026-07-22
 
 > Le tag `v0.1.22` a été posé sur le mauvais commit, avant la fusion de sa pull

@@ -98,6 +98,14 @@ STRINGS: dict[str, str] = {
     "provision_waiting_ssh": "Waiting for hosts to become reachable (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Waiting for {host} (SSH + cloud-init), attempt {attempt}…",
     "provision_ssh_timeout": "Host readiness timed out: {error}\nThe VM may still be booting — retry `dsoxlab run` in a moment.",
+    "confirm_destroy":
+        "Destroy the whole {provider} infrastructure? "
+        "All VM data will be lost",
+    "destroy_host_not_isolated":
+        "Warning: Terraform also destroys everything that depends on the target. "
+        "Host targeting therefore does not isolate one VM from the others. To "
+        "recover an unreachable machine, prefer \"dsoxlab destroy\" then "
+        "\"dsoxlab provision\": the whole park is rebuilt from scratch.",
     "destroy_starting":    "Destroying infrastructure (provider: {provider})…",
     "ssh_fragment_failed":  "SSH fragment not written: {error}. Connecting by machine name will not work.",
     "ssh_fragment_written": "Direct connection enabled: [bold]ssh <machine>[/bold] now works (fragment {path}).",

@@ -832,6 +832,18 @@ def _run_check(
             except InfraNotProvisioned:
                 error(_("infra_not_provisioned"))
                 raise typer.Exit(2) from None
+            except ProviderUnresolved as exc:
+                # Un dépôt qui déclare plusieurs providers sans qu'aucun ne
+                # soit actif : lire les outputs Terraform est impossible, mais
+                # ce n'est pas une faute de l'apprenant. Sans ce garde-fou, la
+                # traceback remontait telle quelle depuis inventory.py.
+                if not exc.candidates:
+                    error(_("provider_none_declared"))
+                else:
+                    error(_("provider_required",
+                            candidates=", ".join(exc.candidates),
+                            first=exc.candidates[0]))
+                raise typer.Exit(2) from None
 
     # Un --target explicite et inconnu est une ERREUR : on sort avant de
     # lancer quoi que ce soit, sinon une faute de frappe enregistrerait un
@@ -1465,10 +1477,15 @@ def provision(
 def destroy(
     host: Annotated[Optional[list[str]], typer.Option(
         "--host",
-        help="Détruit une seule VM (fqdn meta.yml). Répétable. Le réseau "
-             "et les images de base partagées sont conservés. Sans option : "
-             "détruit toute l'infrastructure.",
+        help="Restreint la cible Terraform à un fqdn du meta.yml. Répétable. "
+             "ATTENTION : Terraform détruit aussi tout ce qui dépend de la "
+             "cible, donc cette option n'isole PAS une VM des autres. Pour "
+             "récupérer une machine, préférer destroy complet + provision.",
     )] = None,
+    yes: Annotated[bool, typer.Option(
+        "--yes", "-y",
+        help="Ne pas demander confirmation (usage non interactif).",
+    )] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     """Lance terraform destroy sur le provider courant avec progress bar."""
@@ -1496,6 +1513,17 @@ def destroy(
                 error(str(exc))
                 raise typer.Exit(2)
         info(f"Cible Terraform : {', '.join(host)} ({len(targets)} ressources)")
+        # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
+        # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
+        # cibler un seul hôte emporte les autres (7 ressources détruites pour
+        # 1 demandée). On prévient plutôt que de laisser croire à un ciblage fin.
+        warn(_("destroy_host_not_isolated"))
+
+    # destroy est irréversible et ne prévenait pas : un « dsoxlab destroy »
+    # tapé dans le mauvais dépôt effaçait le parc sans un mot. --yes garde
+    # l'usage scripté (CI, procédure de récupération documentée).
+    if not yes:
+        typer.confirm(_("confirm_destroy", provider=provider), abort=True)
 
     info(_("destroy_starting", provider=provider))
     try:
