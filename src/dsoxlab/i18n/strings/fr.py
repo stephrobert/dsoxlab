@@ -359,6 +359,14 @@ hors ligne, elle se tait.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "Tous les labs sont valides.",
     "labs_have_issues":       "Des labs ont des problèmes de structure ou de métadonnées.",
+    "opt_check_urls":
+        "Vérifier aussi que chaque doc_url répond (sort sur le réseau).",
+    "content_issues_header":
+        "\n[bold]Contenu :[/bold]",
+    "doc_url_issues_header":
+        "\n[bold]Guides injoignables :[/bold]",
+    "checking_doc_urls":
+        "Vérification des doc_url de {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Problèmes de métadonnées :[/bold red]",
 
     # ── doctor — libellés composants ─────────────────────────────────────────

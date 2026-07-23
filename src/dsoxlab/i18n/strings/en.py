@@ -361,6 +361,14 @@ silent.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "All labs are valid.",
     "labs_have_issues":       "Some labs have structure or metadata issues.",
+    "opt_check_urls":
+        "Also check that every doc_url answers (hits the network).",
+    "content_issues_header":
+        "\n[bold]Content:[/bold]",
+    "doc_url_issues_header":
+        "\n[bold]Unreachable guides:[/bold]",
+    "checking_doc_urls":
+        "Checking doc_url for {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Metadata issues:[/bold red]",
 
     # ── doctor — component labels ─────────────────────────────────────────────
