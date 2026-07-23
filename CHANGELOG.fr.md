@@ -9,6 +9,22 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.30] - 2026-07-23
+
+### Ajouté
+
+- **`validate-structure` contrôle désormais le contenu, pas seulement la
+  présence des fichiers.** Trois dérives silencieuses, qu'aucun test
+  fonctionnel n'attrape parce qu'elles ne cassent pas l'exécution d'un lab :
+  un **lien relatif mort** dans un Markdown (le dépôt Ansible en comptait 150
+  le jour où le contrôle y a été écrit), une **solution laissée en clair**
+  (irrattrapable : git la garde pour toujours), et un **`doc_url` qui ne
+  répond plus**, via l'option `--check-urls` puisqu'elle sort sur le réseau.
+  Ces contrôles étaient recopiés à la main dans chaque dépôt de labs ; ils
+  profitent maintenant à tous. Le contrôle des solutions ne s'applique qu'aux
+  dépôts qui tiennent un répertoire `solution/` : son absence n'est pas une
+  faute, c'est un autre choix.
+
 ## [0.1.29] - 2026-07-23
 
 ### Corrigé

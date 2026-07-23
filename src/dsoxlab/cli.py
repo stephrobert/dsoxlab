@@ -1166,12 +1166,65 @@ def clean(
 @app.command("validate-structure", help=_("cmd_validate_help"))
 def validate_structure_cmd(
     lab_home: LabHomeOption = None,
+    check_urls: Annotated[bool, typer.Option(
+        "--check-urls", help=_("opt_check_urls"),
+    )] = False,
 ) -> None:
+    from .discovery.scanner import discover_labs
+    from .validators.content import (
+        check_doc_url,
+        validate_internal_links,
+        validate_solutions_encrypted,
+    )
+
     root = _root(lab_home)
     structure_reports = validate_all_structure(root)
     metadata_reports = validate_all_metadata(root)
 
     print_structure_reports(structure_reports)
+
+    # Contrôles de contenu : locaux, donc jouables hors ligne et par défaut.
+    # Un lien mort ou une solution en clair ne casse aucun test fonctionnel,
+    # c'est bien pourquoi rien ne les attrapait.
+    labs = discover_labs(root)
+    content_issues: list[tuple[str, Path, str]] = []
+    for lab in labs:
+        rapports = [validate_internal_links(lab)]
+        # « solution/<chemin du lab depuis labs/> » : convention respectée par
+        # les dépôts qui tiennent leurs corrigés hors des labs. Absent = pas
+        # de contrôle, ce n'est pas une faute.
+        try:
+            relatif = lab.path.relative_to(root / "labs")
+        except ValueError:
+            relatif = None
+        if relatif is not None:
+            rapports.append(
+                validate_solutions_encrypted(lab, root / "solution" / relatif)
+            )
+        for rapport in rapports:
+            for souci in rapport.issues:
+                content_issues.append((lab.id, souci.path, souci.message))
+
+    if content_issues:
+        console.print(_("content_issues_header"))
+        for lab_id, chemin, message in content_issues:
+            try:
+                affiche = chemin.relative_to(root)
+            except ValueError:
+                affiche = chemin
+            console.print(f"  [red]✘[/red] {lab_id} — {affiche}: {message}")
+
+    url_issues: list[tuple[str, str]] = []
+    if check_urls:
+        info(_("checking_doc_urls", count=len(labs)))
+        for lab in labs:
+            motif = check_doc_url(lab)
+            if motif is not None:
+                url_issues.append((lab.id, f"{lab.doc_url} — {motif}"))
+        if url_issues:
+            console.print(_("doc_url_issues_header"))
+            for lab_id, detail in url_issues:
+                console.print(f"  [red]✘[/red] {lab_id} — {detail}")
 
     issues = [r for r in metadata_reports if not r.ok]
     if issues:
@@ -1180,7 +1233,12 @@ def validate_structure_cmd(
             for issue in report.issues:
                 console.print(f"  [red]✘[/red] {report.lab_id} — {issue.field}: {issue.message}")
 
-    all_ok = all(r.ok for r in structure_reports) and not issues
+    all_ok = (
+        all(r.ok for r in structure_reports)
+        and not issues
+        and not content_issues
+        and not url_issues
+    )
     if all_ok:
         success(_("all_labs_valid"))
     else:

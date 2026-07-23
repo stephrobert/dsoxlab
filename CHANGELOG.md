@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.30] - 2026-07-23
+
+### Added
+
+- **`validate-structure` now checks content, not just file presence.** Three
+  silent drifts that no functional test catches, because they do not break a
+  lab's execution: a **dead relative link** in a Markdown file (the Ansible
+  repo had 150 the day the check was written there), a **solution left in
+  plain text** (unrecoverable: git keeps it forever), and a **`doc_url` that
+  no longer answers**, behind the `--check-urls` flag since it hits the
+  network. These checks were hand-copied into each lab repository; they now
+  benefit all of them. The solution check only applies to repositories that
+  keep a `solution/` directory: its absence is not a fault, just another
+  choice.
+
 ## [0.1.29] - 2026-07-23
 
 ### Fixed
