@@ -96,6 +96,15 @@ def _assign_section(
             if rel in section.labs:
                 lab.bloc = lab.bloc or idx
                 lab.bloc_name = section.title or section.id
+                # Position dans la section, d'où « dsoxlab next » tire l'ordre
+                # pédagogique. Sans elle, le tri retombait sur l'id, donc sur
+                # l'alphabet : « ansible-vault » était proposé avant
+                # « premier-playbook », et « bash-script » avant
+                # « discover-linux-map ». Le meta.yml est censé piloter cet
+                # ordre ; il le pilote désormais vraiment, sans qu'aucun
+                # lab.yaml n'ait à recopier l'information.
+                # Un bloc_order explicite dans le lab.yaml reste prioritaire.
+                lab.bloc_order = lab.bloc_order or (section.labs.index(rel) + 1)
                 break
         return
 
