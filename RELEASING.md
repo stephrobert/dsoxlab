@@ -33,7 +33,20 @@ ever stored in the repository.
 3. Commit through a pull request and merge to `main`.
 4. **Wait for CI to be green on `main`.** The tag builds from that commit, and
    PyPI is final: a version number can never be republished.
-5. Tag the release and push the tag:
+5. **Run the local check** before tagging:
+
+   ```bash
+   python3 scripts/check-release.py
+   ```
+
+   It replays the steps above offline: clean tree, `main` up to date, tag
+   consistent with `pyproject.toml`, CHANGELOG section present in both
+   languages, `uv.lock` aligned, version still free on PyPI, CI green. It
+   prints the exact command to run once everything passes. The workflow
+   guard only speaks after the tag is pushed, and it then has to be deleted
+   on both sides.
+
+6. Tag the release and push the tag:
 
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z"

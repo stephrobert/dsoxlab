@@ -36,7 +36,20 @@ OIDC) : aucun token d'API n'est jamais stocké dans le dépôt.
 4. **Attendez que la CI soit verte sur `main`.** Le tag construit depuis ce
    commit, et PyPI est définitif : un numéro de version ne peut jamais être
    republié.
-5. Taguez la version et poussez le tag :
+5. **Lancez le contrôle local** avant de taguer :
+
+   ```bash
+   python3 scripts/check-release.py
+   ```
+
+   Il rejoue à froid les étapes ci-dessus : arbre propre, `main` à jour, tag
+   cohérent avec `pyproject.toml`, section de CHANGELOG présente dans les deux
+   langues, `uv.lock` aligné, version encore libre sur PyPI, CI verte. Il
+   affiche la commande exacte à lancer quand tout est bon. Le garde-fou du
+   workflow, lui, ne parle qu'une fois le tag poussé : il faut alors le
+   supprimer des deux côtés.
+
+6. Taguez la version et poussez le tag :
 
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z"

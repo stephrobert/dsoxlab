@@ -9,6 +9,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.28] - 2026-07-23
+
+### Ajouté
+
+- **Un contrôle local à lancer avant de poser un tag** :
+  `python3 scripts/check-release.py`. Le garde-fou ajouté en 0.1.27 vit dans
+  le workflow, donc il ne parle qu'une fois le tag poussé : il faut alors le
+  supprimer en local et sur le dépôt distant. Ce script rejoue les mêmes
+  vérifications à froid, plus celles que `RELEASING` confiait à la vigilance
+  humaine : arbre propre, `main` à jour, tag cohérent avec `pyproject.toml`,
+  section de CHANGELOG présente **dans les deux langues**, `uv.lock` aligné,
+  version encore libre sur PyPI, CI verte sur le commit. Il affiche tous les
+  verdicts d'une traite, puis la commande exacte à lancer.
+
 ## [0.1.27] - 2026-07-23
 
 ### Corrigé
