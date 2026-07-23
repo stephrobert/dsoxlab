@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.31] - 2026-07-23
+
+### Fixed
+
+- **`dsoxlab next` suggested labs in alphabetical order.** The pedagogical
+  sort relies on `bloc_order`, which the scanner never set: it stayed at 0
+  unless a `lab.yaml` spelled it out, and the sort fell back to the `id`. A
+  beginner was pointed at `ansible-vault` before their first playbook, or at
+  writing a Bash script before ever opening a terminal. Measured: **19 of 22
+  sections** in the Ansible repository.
+  The `meta.yml` is documented as driving that order; it now actually does.
+  The scanner derives the position from `sections[].labs[]`, so no repository
+  has to copy it into its `lab.yaml` files: 197 files no longer need
+  touching. An explicit `bloc_order` still wins.
+
 ## [0.1.30] - 2026-07-23
 
 ### Added

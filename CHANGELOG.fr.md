@@ -9,6 +9,22 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.31] - 2026-07-23
+
+### Corrigé
+
+- **`dsoxlab next` proposait les labs dans l'ordre alphabétique.** Le tri
+  pédagogique s'appuie sur `bloc_order`, que le scanner ne posait jamais : il
+  restait à 0 sauf mention explicite dans un `lab.yaml`, et le tri retombait
+  sur l'`id`. Un débutant se voyait proposer `ansible-vault` avant son premier
+  playbook, ou l'écriture d'un script Bash avant d'avoir ouvert un terminal.
+  Mesuré : **19 sections sur 22** dans le dépôt Ansible.
+  Le `meta.yml` est documenté comme pilotant cet ordre ; il le pilote
+  désormais vraiment. Le scanner dérive la position depuis
+  `sections[].labs[]`, donc aucun dépôt n'a à recopier l'information dans ses
+  `lab.yaml` : 197 fichiers n'ont plus besoin d'être touchés. Un `bloc_order`
+  explicite reste prioritaire.
+
 ## [0.1.30] - 2026-07-23
 
 ### Ajouté
