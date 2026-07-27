@@ -9,7 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.35] - 2026-07-27
+## [0.1.36] - 2026-07-27
+
+### Added
+
+- **Containerised services a lab needs, started automatically.** Some `shell`
+  labs target an API the workstation does not host (a cloud emulator, a
+  database, a registry). Instead of a manual `docker run` in every scenario, a
+  lab now declares its service in `runtime.services`, and dsoxlab starts the
+  container before `run`/`check` and stops it at `clean`. The engine stays
+  **domain-agnostic**: it launches the **image the lab declares**, on the ports
+  the lab declares, and knows nothing about the emulated product. Each container
+  is namespaced `dsoxlab-<repo_id>-<service>`, and `ready_tcp` waits for the port
+  to accept a connection before proceeding. Docker is the engine; if it is
+  unreachable, `run`/`check` fail with a clear message rather than a Docker
+  traceback. Verified live against the repository's cloud emulator: the service
+  comes up on its port and is removed on `clean`.
 
 Both fixes come from running a full validation campaign over an 84-lab
 catalog: one incident, one leak that the campaign made visible.

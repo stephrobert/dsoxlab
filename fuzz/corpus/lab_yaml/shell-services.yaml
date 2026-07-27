@@ -1,0 +1,17 @@
+id: l2-cloud-emulator
+title: Query a local cloud emulator
+level: intermediate
+skills: [terraform]
+distros: [any]
+doc_url: https://blog.stephane-robert.info/docs/terraform/aws/
+runtime:
+  type: shell
+  workdir: challenge/work
+  services:
+    - name: cloud
+      image: some/emulator:1.2.3
+      ports: ["4566:4566"]
+      run_args: ["-u", "root"]
+      env: { DEBUG: "1" }
+      ready_tcp: 4566
+      ready_timeout: 90

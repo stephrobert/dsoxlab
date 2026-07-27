@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 
 from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
-from .runtime import RuntimeConfig, RuntimeType, Target
+from .runtime import RuntimeConfig, RuntimeType, Service, Target
 
 
 @dataclass
@@ -104,6 +104,27 @@ class LabDefinition:
                 roles={str(k): str(v) for k, v in roles_raw.items()},
             ))
 
+        services_raw = as_mapping_list(runtime_data.get("services"), "runtime.services", lab_yaml)
+        services: list[Service] = []
+        for idx, s in enumerate(services_raw):
+            if "name" not in s or "image" not in s:
+                raise ValueError(
+                    f"{lab_yaml}: runtime.services[{idx}] doit contenir "
+                    f"'name' et 'image'."
+                )
+            env_raw = as_mapping(
+                s.get("env"), f"runtime.services[{idx}].env", lab_yaml
+            )
+            services.append(Service(
+                name=str(s["name"]),
+                image=str(s["image"]),
+                ports=as_str_list(s.get("ports"), f"runtime.services[{idx}].ports", lab_yaml),
+                run_args=as_str_list(s.get("run_args"), f"runtime.services[{idx}].run_args", lab_yaml),
+                env={str(k): str(v) for k, v in env_raw.items()},
+                ready_tcp=as_int(s.get("ready_tcp"), 0, f"runtime.services[{idx}].ready_tcp", lab_yaml),
+                ready_timeout=as_int(s.get("ready_timeout"), 90, f"runtime.services[{idx}].ready_timeout", lab_yaml),
+            ))
+
         runtime = RuntimeConfig(
             type=RuntimeType(runtime_data.get("type", "shell")),
             targets=targets,
@@ -113,6 +134,7 @@ class LabDefinition:
             workdir=runtime_data.get("workdir", "challenge/work"),
             fixtures=as_str_list(runtime_data.get("fixtures"), "runtime.fixtures", lab_yaml),
             topology=runtime_data.get("topology", "local"),
+            services=services,
         )
 
         validation_data = as_mapping(data.get("validation"), "validation", lab_yaml)

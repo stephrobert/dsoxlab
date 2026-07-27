@@ -342,6 +342,11 @@ hors ligne, elle se tait.
     "runtime_unavailable": "runtime indisponible",
 
     # ── run ───────────────────────────────────────────────────────────────────
+    "services_docker_absent": "Ce lab a besoin d'un service conteneurisé, mais Docker est injoignable. Démarrez Docker, puis relancez la commande.",
+    "service_starting":   "Démarrage du service [bold]{name}[/bold] ({image})…",
+    "service_ready":      "Service [bold]{name}[/bold] prêt.",
+    "service_failed":     "Le service [bold]{name}[/bold] n'a pas pu démarrer : {detail}",
+    "service_stopped":    "Service [bold]{name}[/bold] arrêté.",
     "lab_starting":       "Démarrage du lab [bold]{lab_id}[/bold] (runtime: {runtime})…",
     "lab_ready":          "Lab {lab_id} prêt. Vous êtes dans [bold]{workdir}/[/bold], votre répertoire de travail isolé.",
     "lab_ready_local":    "Lab {lab_id} prêt. Vous êtes sur [bold]votre poste[/bold], à la racine du dépôt.",

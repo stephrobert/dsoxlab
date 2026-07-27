@@ -191,6 +191,56 @@ def _require_provider(repo_meta: RepoMetadata) -> str:
         raise typer.Exit(1)
 
 
+def _services_repo_id(root: Path) -> str:
+    """Slug du dépôt, pour namespacer les conteneurs de services.
+
+    Le ``meta.yml`` fournit ``repo.id`` ; à défaut, le nom du répertoire racine.
+    """
+    from .discovery.repo import read_repo_metadata
+    try:
+        meta = read_repo_metadata(root)
+    except ValueError:
+        meta = None
+    return meta.id if meta else root.name
+
+
+def _ensure_services(lab: LabDefinition, root: Path) -> None:
+    """Démarre les services conteneurisés déclarés par le lab, avant run/check.
+
+    Sans service déclaré, ne fait rien. Si Docker est injoignable ou qu'un
+    service ne démarre pas, sort proprement : un lab qui déclare un service ne
+    peut pas fonctionner sans lui.
+    """
+    if not lab.runtime.services:
+        return
+    from .runtimes import services as svc
+    if not svc.docker_available():
+        error(_("services_docker_absent"))
+        raise typer.Exit(2)
+    repo_id = _services_repo_id(root)
+    for service in lab.runtime.services:
+        info(_("service_starting", name=service.name, image=service.image))
+        try:
+            svc.start(service, repo_id)
+        except svc.ServiceError as exc:
+            error(_("service_failed", name=service.name, detail=str(exc)))
+            raise typer.Exit(2) from None
+        success(_("service_ready", name=service.name))
+
+
+def _stop_services(lab: LabDefinition, root: Path) -> None:
+    """Arrête les services conteneurisés du lab, à destroy/clean. Best-effort."""
+    if not lab.runtime.services:
+        return
+    from .runtimes import services as svc
+    if not svc.docker_available():
+        return
+    repo_id = _services_repo_id(root)
+    for service in lab.runtime.services:
+        if svc.stop(service, repo_id):
+            info(_("service_stopped", name=service.name))
+
+
 def _lang(root: Path) -> str:
     """Langue effective : contexte > DSOXLAB_LANG > LANG système > en."""
     ctx = read_context(root)
@@ -526,6 +576,7 @@ def run(
         raise typer.Exit(1)
 
     info(_("lab_starting", lab_id=lab.id, runtime=lab.runtime.type.value))
+    _ensure_services(lab, root)
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
             _run_ansible_with_progress(
@@ -901,6 +952,10 @@ def _run_check(
         if session_target and lab.runtime.target(session_target) is not None:
             target = session_target
 
+    # Les services conteneurisés (émulateur cloud, base…) doivent être debout
+    # avant que pytest ne s'exécute : les tests pilotent l'API qu'ils exposent.
+    _ensure_services(lab, root)
+
     if not quiet:
         info(_("validating", lab_id=lab.id))
     result = _run_check_with_progress(lab, target, quiet=quiet)
@@ -1152,6 +1207,7 @@ def clean(
             )
         else:
             clean_lab(lab, target_name=target)
+        _stop_services(lab, root)
         success(_("clean_done"))
     except RuntimeError as exc:
         error(str(exc))

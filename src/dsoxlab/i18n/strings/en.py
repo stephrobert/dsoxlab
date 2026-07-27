@@ -344,6 +344,11 @@ silent.
     "runtime_unavailable": "runtime unavailable",
 
     # ── run ───────────────────────────────────────────────────────────────────
+    "services_docker_absent": "This lab needs a containerised service, but Docker is not reachable. Start Docker, then run the command again.",
+    "service_starting":   "Starting service [bold]{name}[/bold] ({image})…",
+    "service_ready":      "Service [bold]{name}[/bold] is ready.",
+    "service_failed":     "Service [bold]{name}[/bold] could not start: {detail}",
+    "service_stopped":    "Service [bold]{name}[/bold] stopped.",
     "lab_starting":       "Starting lab [bold]{lab_id}[/bold] (runtime: {runtime})…",
     "lab_ready":          "Lab {lab_id} ready. You are now in [bold]{workdir}/[/bold] — your isolated working directory.",
     "lab_ready_local":    "Lab {lab_id} ready. You are on [bold]your own machine[/bold], at the repository root.",
