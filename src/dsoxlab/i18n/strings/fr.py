@@ -15,6 +15,18 @@ STRINGS: dict[str, str] = {
     "opt_top":        "Nombre de résultats affichés",
     "opt_fix":        "Tenter la remédiation automatique des composants manquants.",
     "opt_no_pager":   "Tout afficher d'un bloc au lieu de paginer ce qui dépasse l'écran.",
+    "opt_use_provider":
+        "Provider d'infra à activer (ex. kvm, outscale, incus). "
+        "Surchargé par DSOXLAB_PROVIDER. Persisté entre commandes.",
+    "opt_provision_host":
+        "Cible une seule VM (fqdn du meta.yml). Répétable. Si absent, applique "
+        "tout le plan. Les ressources partagées (réseau, images de base) sont "
+        "gérées par Terraform en cascade.",
+    "opt_destroy_host":
+        "Restreint la cible Terraform à un fqdn du meta.yml. Répétable. "
+        "ATTENTION : Terraform détruit aussi tout ce qui dépend de la cible, "
+        "donc cette option n'isole PAS une VM des autres. Pour récupérer une "
+        "machine, préférer destroy complet + provision.",
     "opt_yes":        "Confirme sans demander",
     "opt_filter_lab": "Filtre par lab",
 
@@ -95,6 +107,17 @@ STRINGS: dict[str, str] = {
     "provider_unknown":       "Provider '{name}' inconnu pour ce dépôt. Candidats : {candidates}",
 
     "provision_no_meta":   "Pas de meta.yml trouvé dans {root}. Es-tu dans un dépôt dsoxlab ?",
+    "host_unknown":        "Host inconnu : '{fqdn}'. Connus : {known}.",
+    "terraform_target":    "Cible Terraform : {hosts} ({count} ressources)",
+
+    # ── barres de progression ────────────────────────────────────────────────
+    "progress_tests_running":  "Tests : {lab_id}",
+    "progress_tests_done":     "Tests {lab_id} terminés",
+    "progress_ansible_task":   "Tâche : {task}",
+    "progress_playbook_done":  "{playbook} terminé",
+    "progress_tf_init_done":   "terraform init terminé",
+    "progress_action_done":    "{action} terminé",
+    "progress_nothing_to_do":  "Rien à faire",
     "provision_starting":  "Provisionnement de l'infrastructure (provider : {provider})…",
     "provision_no_ssh_key": "Clé SSH du lab manquante : {path}\nSans elle, le keypair cloud serait vide et les VMs inaccessibles.\nLance d'abord : dsoxlab instructor bootstrap",
     "provision_done":      "Provisionnement terminé — {count} hôte(s) prêt(s).",
@@ -304,6 +327,8 @@ hors ligne, elle se tait.
     "context_set_info": "Les commandes list-labs et validate-structure utilisent maintenant ce filtre par défaut.",
     "context_lang_set": "Langue définie : [bold]{lang}[/bold] — les titres et descriptions des labs seront affichés dans cette langue.",
     "context_target_set": "Cible par défaut : [bold]{target}[/bold] — 'dsoxlab run' l'utilisera sauf si --target est spécifié.",
+    "context_provider_set": "Provider actif : [bold]{provider}[/bold]",
+    "meta_read_failed": "Lecture du meta.yml impossible : {error}",
     "context_cleared":  "Contexte réinitialisé — tous les labs sont maintenant visibles.",
     "context_active":   "Contexte actif : [bold]{label}[/bold] — utilisez [bold]dsoxlab use --reset[/bold] pour tout voir.",
 
@@ -419,6 +444,15 @@ hors ligne, elle se tait.
     # ── doctor — remédiation ──────────────────────────────────────────────────
     "fix_nothing": "Aucune remédiation nécessaire.",
     "fix_count":   "{count} composant(s) à corriger…",
+    "fix_needs_tty":
+        "Au moins une remédiation exige sudo, mais ce shell n'est pas "
+        "interactif (pas de TTY). Lancez dsoxlab depuis un terminal, ou "
+        "appliquez les commandes à la main.",
+    "fix_no_sudo": "sudo introuvable dans le PATH : remédiation impossible.",
+    "fix_sudo_preauth":
+        "[bold]{count}[/bold] commande(s) nécessitent sudo. "
+        "Pré-authentification ci-dessous (un seul prompt pour toute la cascade) :",
+    "fix_sudo_failed": "Pré-authentification sudo échouée : remédiations abandonnées.",
     "fix_success": "{label} : remédiation réussie.",
     "fix_failure": "{label} : échec de la remédiation (code {code}).",
     "fix_rerun":   "Relancez [bold]dsoxlab doctor[/bold] pour vérifier.",
