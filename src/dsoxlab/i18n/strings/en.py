@@ -14,6 +14,7 @@ STRINGS: dict[str, str] = {
     "opt_bloc":     "Filter by bloc number (1-8)",
     "opt_top":      "Number of displayed results",
     "opt_fix":      "Attempt automatic remediation of missing components.",
+    "opt_no_pager": "Print everything at once instead of paging output longer than the screen.",
     "opt_yes":      "Confirm without asking",
     "opt_filter_lab": "Filter by lab",
 
@@ -199,7 +200,11 @@ Each lab exposes:
 
   [cyan]run <id>[/cyan]             Start the lab environment (shell, incus or KVM).
 
-  [cyan]course[/cyan] [dim][<id>][/dim]        Re-display the guided exercises (scenario.md).
+  [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
+                       declares them (course.yaml), otherwise scenario + README.
+    [dim]--section / -s[/dim]       Section to display: number or id.
+    [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
+    [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]guide[/cyan] [dim][<id>][/dim]         Open the lab's online guide in your web browser.
@@ -210,6 +215,7 @@ Each lab exposes:
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md).
+    [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]hint[/cyan] [dim][<id>][/dim]          Display the next hint.
@@ -240,8 +246,11 @@ Each lab exposes:
 
   [cyan]validate-structure[/cyan]   Check all lab.yaml files and directory layout.
 
-  [cyan]doctor[/cyan]               Check required tools (Python, pytest, virsh, incus …).
-    [dim]--fix[/dim]                Auto-install missing components.
+  [cyan]doctor[/cyan]               Diagnose the environment. The [bold]Required[/bold] table lists what
+                       blocks this very repo; a hypervisor useless here stays
+                       [bold]Informational[/bold] and never shows up as an error.
+    [dim]--fix[/dim]                Remediate the missing required components.
+                       Informational components are left alone.
 
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.
@@ -377,15 +386,35 @@ silent.
     "check_shell":    "ShellRuntime",
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
+    "check_provider": "Infra provider",
     "check_labs":     "Labs detected",
     "check_lab_home": "LAB_HOME",
 
     "detail_shell_always":   "always available",
-    "detail_incus_missing":  "not found (optional)",
+    "detail_incus_missing":  "not found",
+    "detail_incus_ok":       "client {version}, daemon ok",
+    "detail_incus_daemon_down": "client {version}, daemon inactive",
+    "detail_incus_no_group": "client {version}, user not in the incus group (re-login required)",
+    "detail_incus_no_init":  "client {version}, daemon ok but not initialised",
     "detail_kvm_daemon_err": "virsh present but error (daemon stopped?)",
-    "detail_kvm_missing":    "not found (required for l2+ labs)",
+    "detail_kvm_missing":    "not found",
     "detail_pytest_missing": "not found",
+    "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
+    "detail_pytest_via":     "via {cmd}",
+    "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
+    "detail_unknown_error":  "unknown error",
     "detail_labs_count":     "{count} lab(s) in {root}",
+
+    # ── doctor — why a component is informational here ───────────────────────
+    "doctor_note_no_vm":
+        "No lab in this repo uses a VM: the hypervisors above are informational.",
+    "doctor_note_other_providers":
+        "Active provider: {provider}. The other hypervisors are informational.",
+    "doctor_note_remote_provider":
+        "Provider {provider} runs in the cloud: no local hypervisor needed.",
+    "doctor_note_provider_unresolved":
+        "This repo declares several providers. Pick one with "
+        "[bold]dsoxlab use --provider <name>[/bold] before provisioning.",
 
     # ── doctor — fix ──────────────────────────────────────────────────────────
     "fix_nothing": "No remediation needed.",
@@ -448,14 +477,24 @@ silent.
     "tree_structure_title": "[bold]Structure validation[/bold]",
 
     # ── console — doctor ──────────────────────────────────────────────────────
-    "doctor_table_title": "dsoxlab doctor diagnostic",
+    "doctor_table_title":    "Required for this repo",
+    "doctor_optional_title": "Informational — not required here",
+    "doctor_optional_hint":
+        "These components block nothing in this repo: [bold]--fix[/bold] "
+        "leaves them alone. Install them only if you want that provider.",
     "col_component":      "Component",
     "col_status":         "Status",
     "col_detail":         "Detail",
     "col_remediation":    "Remediation",
     "status_ok":          "[green]✔ OK[/green]",
     "status_ko":          "[red]✘ KO[/red]",
+    "status_present":     "[green]installed[/green]",
+    "status_absent":      "[dim]— absent[/dim]",
+    "status_choose":      "[yellow]to be chosen[/yellow]",
     "doctor_fix_hint":    "ℹ Use [bold]dsoxlab doctor --fix[/bold] to attempt automatic remediation.",
+    "doctor_manual_hint":
+        "ℹ [bold]--fix[/bold] cannot repair what is missing: apply the "
+        "remediation shown above by hand.",
 
     # ── console — check result ────────────────────────────────────────────────
     "check_result_title":       "Result — {lab_id}",

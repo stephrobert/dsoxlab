@@ -110,6 +110,19 @@ DSOXLAB_LANG=fr dsoxlab fullhelp
 DSOXLAB_LANG=en dsoxlab fullhelp
 ```
 
+### Reading long courses
+
+`course` and `challenge` go through the pager as soon as their output is
+taller than the terminal, so a course of several hundred lines stays readable
+without depending on the terminal's scrollback. Pipes and redirections are
+never paged: they always receive the full text.
+
+```bash
+DSOXLAB_PAGER='bat --plain' dsoxlab course   # pick your pager (default: less -R)
+dsoxlab course --no-pager                    # dump everything at once
+dsoxlab course > course.txt                  # never paged: plain text
+```
+
 ---
 
 ## The declarative contract

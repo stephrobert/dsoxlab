@@ -13,11 +13,13 @@ from .lab_service import (
     lab_status,
     open_lab_session,
     reset_lab,
+    resolve_pytest_cmd,
     run_lab,
     stop_lab,
     validate_all_metadata,
     validate_all_structure,
 )
+from .doctor import Check, DoctorReport, collect_checks, uses_vm
 from .guide_service import guide_url
 from .progress_service import (
     BlocProgress,
@@ -28,11 +30,14 @@ from .progress_service import (
 
 __all__ = [
     "BlocProgress",
+    "Check",
     "CheckResult",
+    "DoctorReport",
     "ScoreResult",
     "build_progress",
     "check_lab",
     "clean_lab",
+    "collect_checks",
     "compute_score",
     "evaluate_lab",
     "get_all_labs",
@@ -44,8 +49,10 @@ __all__ = [
     "open_lab_session",
     "pedagogical_sort_key",
     "reset_lab",
+    "resolve_pytest_cmd",
     "run_lab",
     "stop_lab",
+    "uses_vm",
     "validate_all_metadata",
     "validate_all_structure",
 ]
