@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.35] - 2026-07-27
+
+Both fixes come from running a full validation campaign over an 84-lab
+catalog: one incident, one leak that the campaign made visible.
+
+### Fixed
+
+- **`instructor bootstrap` could write an SSH key outside any lab repository.**
+  It created `<root>/ssh/id_ed25519` from whatever `get_lab_home()` returned,
+  and that function falls back to the **current directory** when it finds no
+  `meta.yml`. Run from the tool's own repository, the command therefore dropped
+  a passphrase-less private key into a public repo, where no `.gitignore`
+  covered it. The `detect-private-key` hook would have refused the commit
+  (verified: it exits 1 with "Private key found"), so nothing leaked, but a
+  hook is bypassable with `--no-verify` and a lab key has no business being
+  there. The command now refuses when the target has no `meta.yml`, and names
+  the fix (`--lab-home`). Defence in depth: `ssh/`, `*.pem`, `id_ed25519` and
+  `id_rsa` are now gitignored here.
+- **A file descriptor leaked on every playbook run.** `_read_stdout()` read
+  `ansible-runner`'s artifact file and never closed it. Harmless on one lab,
+  measurable across a campaign that chains 84. The `ResourceWarning` that
+  reported it was drowned in the library's own `DeprecationWarning` noise:
+  once that noise was filtered, a `vm` lab went from 26 warnings to zero.
+
 ## [0.1.34] - 2026-07-27
 
 ### Fixed

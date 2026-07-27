@@ -2035,6 +2035,18 @@ def instructor_bootstrap(
     Vérifie la présence de ``terraform`` et ``ansible-runner``.
     """
     root = _root(lab_home)
+
+    # Une clé privée ne se crée pas n'importe où. Sans `meta.yml`, `root` n'est
+    # pas un dépôt de labs : `get_lab_home()` a simplement retenu le répertoire
+    # courant en dernier recours. Le cas est vécu : lancée depuis le dépôt de
+    # l'outil, la commande y a déposé une paire de clés hors de tout .gitignore.
+    # Le hook `detect-private-key` l'aurait arrêtée au commit, mais un hook se
+    # contourne (`--no-verify`) et ne protège que ce dépôt-ci. La clé n'avait
+    # de toute façon rien à faire là : on refuse plutôt que de deviner.
+    if not (root / "meta.yml").is_file():
+        error(_("bootstrap_not_a_lab_repo", root=root))
+        raise typer.Exit(1)
+
     ssh_dir = root / "ssh"
     private_key = ssh_dir / "id_ed25519"
     public_key = ssh_dir / "id_ed25519.pub"

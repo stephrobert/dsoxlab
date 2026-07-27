@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.35] - 2026-07-27
+
+Les deux corrections viennent d'une campagne de validation complète sur un
+catalogue de 84 labs : un incident, et une fuite que la campagne a rendue
+visible.
+
+### Corrigé
+
+- **`instructor bootstrap` pouvait écrire une clé SSH hors de tout dépôt de
+  labs.** Elle créait `<root>/ssh/id_ed25519` d'après ce que rendait
+  `get_lab_home()`, or cette fonction retombe sur le **répertoire courant**
+  quand elle ne trouve aucun `meta.yml`. Lancée depuis le dépôt de l'outil, la
+  commande y a donc déposé une clé privée sans passphrase, dans un dépôt public
+  qu'aucun `.gitignore` ne couvrait. Le hook `detect-private-key` aurait refusé
+  le commit (vérifié : il sort en 1 avec « Private key found »), donc rien n'a
+  fui, mais un hook se contourne avec `--no-verify` et une clé de lab n'a rien
+  à faire là. La commande refuse désormais quand la cible n'a pas de `meta.yml`,
+  et nomme la solution (`--lab-home`). Défense en profondeur : `ssh/`, `*.pem`,
+  `id_ed25519` et `id_rsa` sont maintenant gitignorés ici.
+- **Un descripteur de fichier fuyait à chaque playbook joué.** `_read_stdout()`
+  lisait le fichier d'artefact d'`ansible-runner` sans jamais le refermer.
+  Anodin sur un lab, mesurable sur une campagne qui en enchaîne 84. Le
+  `ResourceWarning` qui le signalait se noyait dans le bruit des
+  `DeprecationWarning` de la bibliothèque elle-même : une fois ce bruit filtré,
+  un lab `vm` est passé de 26 warnings à zéro.
+
 ## [0.1.34] - 2026-07-27
 
 ### Corrigé

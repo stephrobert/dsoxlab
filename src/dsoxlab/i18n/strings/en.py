@@ -162,6 +162,12 @@ STRINGS: dict[str, str] = {
     "cmd_instructor_help":            "Instructor commands (lab key generation, vault, hosts, ssh-config). Not for learners.",
     "cmd_instructor_bootstrap_help":  "Generate the lab SSH key (if missing) and check that terraform/ansible-runner are installed.",
     "bootstrap_key_exists":           "SSH key already present: {path}",
+    "bootstrap_not_a_lab_repo":
+        "{root} is not a lab repository: no meta.yml at its root.\n"
+        "No key was generated: it would land in an arbitrary directory, "
+        "outside of any .gitignore.\n"
+        "Move into the lab repository, or point at it:\n"
+        "  dsoxlab instructor bootstrap --lab-home /path/to/the-repo",
     "bootstrap_generating_key":       "Generating SSH ed25519 key: {path} (no passphrase)…",
     "bootstrap_key_created":          "SSH key created: {path}",
     "bootstrap_keygen_failed":        "ssh-keygen failed: {stderr}",

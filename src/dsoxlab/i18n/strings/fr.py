@@ -162,6 +162,12 @@ STRINGS: dict[str, str] = {
     "cmd_instructor_help":            "Commandes formateur (clé SSH, vault, hosts, ssh-config). Pas pour les apprenants.",
     "cmd_instructor_bootstrap_help":  "Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés.",
     "bootstrap_key_exists":           "Clé SSH déjà présente : {path}",
+    "bootstrap_not_a_lab_repo":
+        "{root} n'est pas un dépôt de labs : aucun meta.yml à sa racine.\n"
+        "Aucune clé n'a été générée : elle atterrirait dans un répertoire "
+        "quelconque, hors de tout .gitignore.\n"
+        "Place-toi dans le dépôt de labs, ou indique-le :\n"
+        "  dsoxlab instructor bootstrap --lab-home /chemin/vers/le-depot",
     "bootstrap_generating_key":       "Génération clé SSH ed25519 : {path} (sans passphrase)…",
     "bootstrap_key_created":          "Clé SSH créée : {path}",
     "bootstrap_keygen_failed":        "ssh-keygen a échoué : {stderr}",
