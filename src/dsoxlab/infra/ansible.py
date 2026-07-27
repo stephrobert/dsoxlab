@@ -20,6 +20,7 @@ import logging
 import os
 import tempfile
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -213,4 +214,14 @@ def _read_stdout(runner: Any) -> str:
             return str(stdout_attr.read())
         except Exception:  # noqa: BLE001 — best-effort logging
             return ""
+        finally:
+            # ansible-runner ouvre ce fichier d'artefact et ne le referme pas.
+            # Sans ce close, chaque playbook joué fuit un descripteur : anodin
+            # sur un lab, visible sur une campagne qui en enchaîne 84, et le
+            # ResourceWarning se noyait dans le bruit des DeprecationWarning
+            # de la bibliothèque elle-même.
+            close = getattr(stdout_attr, "close", None)
+            if callable(close):
+                with suppress(Exception):
+                    close()
     return str(stdout_attr)

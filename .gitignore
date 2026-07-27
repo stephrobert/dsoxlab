@@ -80,3 +80,13 @@ src/dsoxlab/templates/terraform/*/.terraform.lock.hcl
 crash-*
 leak-*
 timeout-*
+
+# Clés SSH : ce dépôt est celui de l'outil, il n'a aucune raison d'en porter.
+# `dsoxlab instructor bootstrap` refuse désormais d'en générer hors d'un dépôt
+# de labs, et le hook `detect-private-key` refuse de les committer. Cette
+# troisième ligne couvre ce que les deux autres laissent passer : un fichier
+# déposé par un autre chemin, ou un commit forcé en `--no-verify`.
+ssh/
+*.pem
+id_ed25519
+id_rsa
