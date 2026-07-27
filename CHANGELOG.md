@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.34] - 2026-07-27
+
+### Fixed
+
+- **21 user-facing strings ignored `DSOXLAB_LANG`.** The i18n rule ("every
+  displayed text goes through `_()`") was stated in prose only, and prose does
+  not hold: option helps and messages had drifted back into literals. Some were
+  French, so an English run printed French (`dsoxlab use --provider`,
+  `provision --host` and `destroy --host` helps, `Host inconnu`,
+  `Cible Terraform`, the whole `doctor --fix` sudo pre-flight); others were
+  English, so a French run printed English (every progress-bar label: Ansible
+  task names, `Terraform init complete`, `Nothing to do`, test progress). All
+  of them now live in the EN and FR catalogs, which reach 315 paired keys.
+- **`destroy --host` lost its sharpest warning** while being extracted, and it
+  is restored: Terraform destroys everything depending on the target, so the
+  option does **not** isolate one VM from the others.
+
+### Added
+
+- **A guard that keeps the rule true** (`tests/test_i18n_coverage.py`): it
+  parses `cli.py` and rejects any `help=`/`description=` that is not an `_()`
+  call, and any literal sentence handed to `error/info/warn/success`. Pure
+  layout around translated values (`f"  ✔ {fqdn} ({ip})"`) still passes. The
+  guard was run against the previous commit, where it reports all 21
+  violations, so it is known to fail when it should.
+
 ## [0.1.33] - 2026-07-27
 
 Both changes come from a learner's report on their first session with the

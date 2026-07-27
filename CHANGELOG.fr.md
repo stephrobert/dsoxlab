@@ -9,6 +9,35 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.34] - 2026-07-27
+
+### Corrigé
+
+- **21 textes affichés ignoraient `DSOXLAB_LANG`.** La règle i18n (« tout
+  texte affiché passe par `_()` ») n'existait qu'en prose, et la prose ne
+  tient pas : des libellés étaient revenus en dur. Les uns en français, donc
+  affichés en français sous `DSOXLAB_LANG=en` (aides de
+  `dsoxlab use --provider`, `provision --host`, `destroy --host`,
+  `Host inconnu`, `Cible Terraform`, tout le pré-vol sudo de `doctor --fix`) ;
+  les autres en anglais, donc affichés en anglais sous `DSOXLAB_LANG=fr`
+  (tous les libellés de barres de progression : tâches Ansible,
+  `Terraform init complete`, `Nothing to do`, progression des tests). Ils
+  vivent désormais dans les catalogues EN et FR, qui atteignent 315 clés
+  appariées.
+- **`destroy --host` avait perdu son avertissement le plus utile** pendant
+  l'extraction, il est rétabli : Terraform détruit aussi tout ce qui dépend de
+  la cible, donc l'option n'isole **pas** une VM des autres.
+
+### Ajouté
+
+- **Un garde-fou qui maintient la règle vraie**
+  (`tests/test_i18n_coverage.py`) : il analyse `cli.py` et rejette tout
+  `help=`/`description=` qui n'est pas un appel `_()`, ainsi que toute phrase
+  en dur passée à `error/info/warn/success`. La mise en forme pure autour de
+  valeurs déjà traduites (`f"  ✔ {fqdn} ({ip})"`) reste acceptée. Le garde-fou
+  a été passé sur le commit précédent, où il signale les 21 violations : on
+  sait donc qu'il échoue quand il le doit.
+
 ## [0.1.33] - 2026-07-27
 
 Les deux changements viennent du retour d'un apprenant sur sa première

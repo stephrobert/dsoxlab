@@ -348,8 +348,7 @@ def use(
     target: Annotated[Optional[str], typer.Option("--target", "-t",
         help=_("opt_target"))] = None,
     provider: Annotated[Optional[str], typer.Option("--provider", "-p",
-        help="Provider d'infra à activer (ex. kvm, outscale, incus). "
-             "Override par DSOXLAB_PROVIDER. Persisté entre commandes.")] = None,
+        help=_("opt_use_provider"))] = None,
     reset: Annotated[bool, typer.Option("--reset", "-r", help=_("opt_use_reset"))] = False,
 ) -> None:
     root = _root(lab_home)
@@ -377,7 +376,7 @@ def use(
         try:
             raw = _yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
         except _yaml.YAMLError as exc:
-            error(f"Lecture meta.yml impossible : {exc}")
+            error(_("meta_read_failed", error=exc))
             raise typer.Exit(1)
         declared = (raw.get("infra") or {}).get("provider")
         if isinstance(declared, list):
@@ -422,7 +421,7 @@ def use(
                     candidates=", ".join(declared_providers)))
             raise typer.Exit(1)
         set_active_provider(root, provider)
-        success(f"Provider actif : [bold]{provider}[/bold]")
+        success(_("context_provider_set", provider=provider))
 
     section: str | None = None
     level: str | None = None
@@ -819,7 +818,7 @@ def _run_check_with_progress(
                 total = event.get("total", 0) or None
                 progress.update(
                     task,
-                    description=f"Tests : {lab.id}",
+                    description=_("progress_tests_running", lab_id=lab.id),
                     total=total,
                 )
             elif etype == "verdict":
@@ -841,7 +840,7 @@ def _run_check_with_progress(
             # result.output et imprimées seulement si le check échoue.
 
         result = check_lab(lab, target=target, on_event=on_event)
-        progress.update(task, description=f"Tests {lab.id} terminés")
+        progress.update(task, description=_("progress_tests_done", lab_id=lab.id))
 
     return result
 
@@ -1298,28 +1297,20 @@ def doctor(
         sudo_fixes = [c for _, c in failing if c.strip().startswith("sudo ")]
         if sudo_fixes:
             if not sys.stdin.isatty():
-                error(
-                    "Au moins un fix exige sudo, mais ce shell n'est pas "
-                    "interactif (pas de TTY). Lance dsoxlab depuis un "
-                    "terminal ou applique les commandes manuellement."
-                )
+                error(_("fix_needs_tty"))
                 raise typer.Exit(1)
             if shutil.which("sudo") is None:
-                error("sudo introuvable dans le PATH \u2014 fix impossible.")
+                error(_("fix_no_sudo"))
                 raise typer.Exit(1)
 
             # Pr\u00e9-cache les credentials sudo : un seul prompt password
             # pour toute la cascade. Sans ce sudo -v, l'apprenant
             # pourrait avoir \u00e0 retaper son password \u00e0 chaque commande
             # (si sudo timestamp_timeout=0 ou si la cascade d\u00e9passe 5min).
-            info(
-                f"[bold]{len(sudo_fixes)}[/bold] commande(s) n\u00e9cessitent "
-                "sudo. Pr\u00e9-authentification ci-dessous (un seul prompt "
-                "pour toute la cascade) :"
-            )
+            info(_("fix_sudo_preauth", count=len(sudo_fixes)))
             preauth = subprocess.run(["sudo", "-v"])  # noqa: S603,S607
             if preauth.returncode != 0:
-                error("Pr\u00e9-authentification sudo \u00e9chou\u00e9e \u2014 abandon des fixes.")
+                error(_("fix_sudo_failed"))
                 raise typer.Exit(1)
 
         info(_("fix_count", count=len(failing)))
@@ -1340,9 +1331,7 @@ def doctor(
 def provision(
     host: Annotated[Optional[list[str]], typer.Option(
         "--host",
-        help="Cible une seule VM (fqdn meta.yml). Répétable. Si absent, "
-             "applique tout le plan. Les ressources partagées (réseau, "
-             "images de base) sont gérées par Terraform en cascade.",
+        help=_("opt_provision_host"),
     )] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -1389,14 +1378,14 @@ def provision(
         known = {h.name for h in repo_meta.infra.hosts}
         for fqdn in host:
             if fqdn not in known:
-                error(f"Host inconnu : '{fqdn}'. Connus : {sorted(known)}")
+                error(_("host_unknown", fqdn=fqdn, known=", ".join(sorted(known))))
                 raise typer.Exit(1)
             try:
                 targets.extend(host_targets(provider, fqdn))
             except NotImplementedError as exc:
                 error(str(exc))
                 raise typer.Exit(2)
-        info(f"Cible Terraform : {', '.join(host)} ({len(targets)} ressources)")
+        info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
 
     try:
         # Étape 1 : terraform init (peut télécharger ~50 MB de provider
@@ -1502,14 +1491,11 @@ def provision(
 def destroy(
     host: Annotated[Optional[list[str]], typer.Option(
         "--host",
-        help="Restreint la cible Terraform à un fqdn du meta.yml. Répétable. "
-             "ATTENTION : Terraform détruit aussi tout ce qui dépend de la "
-             "cible, donc cette option n'isole PAS une VM des autres. Pour "
-             "récupérer une machine, préférer destroy complet + provision.",
+        help=_("opt_destroy_host"),
     )] = None,
     yes: Annotated[bool, typer.Option(
         "--yes", "-y",
-        help="Ne pas demander confirmation (usage non interactif).",
+        help=_("opt_yes"),
     )] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -1530,14 +1516,14 @@ def destroy(
         known = {h.name for h in repo_meta.infra.hosts}
         for fqdn in host:
             if fqdn not in known:
-                error(f"Host inconnu : '{fqdn}'. Connus : {sorted(known)}")
+                error(_("host_unknown", fqdn=fqdn, known=", ".join(sorted(known))))
                 raise typer.Exit(1)
             try:
                 targets.extend(host_targets(provider, fqdn))
             except NotImplementedError as exc:
                 error(str(exc))
                 raise typer.Exit(2)
-        info(f"Cible Terraform : {', '.join(host)} ({len(targets)} ressources)")
+        info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
         # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
         # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
         # cibler un seul hôte emporte les autres (7 ressources détruites pour
@@ -1630,7 +1616,7 @@ def _run_ansible_with_progress(
             if etype == "playbook_on_task_start":
                 task_name = data.get("name") or data.get("task", "")
                 state["current_task"] = task_name
-                progress.update(task, description=f"Task: {task_name}")
+                progress.update(task, description=_("progress_ansible_task", task=task_name))
             elif etype == "runner_on_ok":
                 host = data.get("host", "?")
                 task_name = data.get("task", state["current_task"])
@@ -1667,7 +1653,10 @@ def _run_ansible_with_progress(
                 )
 
         runner(on_event)
-        progress.update(task, description=f"{playbook_path.name} complete")
+        progress.update(
+            task,
+            description=_("progress_playbook_done", playbook=playbook_path.name),
+        )
 
 
 def _run_terraform_init_with_spinner(runner: Callable[[EventCallback], Any]) -> None:
@@ -1699,7 +1688,7 @@ def _run_terraform_init_with_spinner(runner: Callable[[EventCallback], Any]) -> 
                     progress.update(task, description=msg.strip())
 
         runner(on_event)
-        progress.update(task, description="Terraform init complete")
+        progress.update(task, description=_("progress_tf_init_done"))
 
 
 def _run_terraform_with_progress(
@@ -1817,11 +1806,16 @@ def _run_terraform_with_progress(
         if state["total"] > 0:
             progress.update(
                 task,
-                description=f"{label_action} complete",
+                description=_("progress_action_done", action=label_action),
                 completed=state["total"],
             )
         else:
-            progress.update(task, description="Nothing to do", total=1, completed=1)
+            progress.update(
+                task,
+                description=_("progress_nothing_to_do"),
+                total=1,
+                completed=1,
+            )
 
     return state["result"]
 
