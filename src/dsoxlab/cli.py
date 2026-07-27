@@ -49,6 +49,7 @@ from .reporting import (
     console,
     error,
     info,
+    paged,
     print_check_result,
     print_course_end,
     print_doctor,
@@ -80,6 +81,7 @@ from .services import (
     CheckResult,
     check_lab,
     clean_lab,
+    collect_checks,
     evaluate_lab,
     get_all_labs,
     get_lab,
@@ -142,6 +144,15 @@ LabHomeOption = Annotated[
 ]
 
 
+#: Les affichages longs (cours, mission de challenge) passent par le pager
+#: dès qu'ils dépassent l'écran. L'option permet de retrouver le déversement
+#: brut, par exemple pour copier tout un README d'un seul tenant.
+NoPagerOption = Annotated[
+    bool,
+    typer.Option("--no-pager", help=_("opt_no_pager")),
+]
+
+
 def _root(lab_home: Optional[Path]) -> Path:
     return lab_home.resolve() if lab_home else get_lab_home()
 
@@ -201,36 +212,6 @@ def _complete_lab_id(
         ]
     except Exception:
         return []
-
-
-def _detect_pytest(root: Path) -> tuple[bool, str, str | None]:
-    """Détecte pytest dans le PATH, dans le venv du projet ou via uv."""
-    pytest_path = shutil.which("pytest")
-    if pytest_path:
-        return True, pytest_path, None
-
-    venv_candidates = [
-        root / ".venv" / "bin" / "pytest",
-        root / ".venv" / "Scripts" / "pytest.exe",
-    ]
-    for candidate in venv_candidates:
-        if candidate.is_file():
-            return True, f"{candidate} (project .venv)", None
-
-    uv_path = shutil.which("uv")
-    if uv_path:
-        result = subprocess.run(
-            [uv_path, "run", "pytest", "--version"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode == 0:
-            detail = result.stdout.strip() or result.stderr.strip() or "available via uv run"
-            return True, detail, None
-
-    return False, _("detail_pytest_missing"), "uv add --dev pytest pytest-testinfra"
 
 
 def _version_callback(value: bool) -> None:
@@ -609,6 +590,7 @@ def course(
     section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("cmd_course_opt_section"))] = None,
     next_section: Annotated[bool, typer.Option("--next", "-n", help=_("cmd_course_opt_next"))] = False,
     prev_section: Annotated[bool, typer.Option("--prev", "-p", help=_("cmd_course_opt_prev"))] = False,
+    no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
@@ -619,8 +601,11 @@ def course(
     manifest = CourseManifest.load(lab.path, lang=lang)
 
     if manifest is None:
-        # Pas de course.yaml : fallback sur scenario.md
-        print_lab_course(lab, lang=lang)
+        # Pas de course.yaml : fallback sur scenario.md + README.md, soit
+        # plusieurs centaines de lignes d'un bloc. C'est le cas qui rend le
+        # pager indispensable.
+        with paged(enabled=not no_pager):
+            print_lab_course(lab, lang=lang)
         return
 
     total = len(manifest.sections)
@@ -650,9 +635,12 @@ def course(
             print_course_end(lab, manifest)
             return
         else:
-            # Jamais commencé → sommaire + section 1
-            print_course_toc(lab, manifest)
-            target_pos = 1
+            # Jamais commencé → sommaire + section 1, paginés ensemble : les
+            # séparer ferait défiler le sommaire hors de l'écran.
+            with paged(enabled=not no_pager):
+                print_course_toc(lab, manifest)
+                _show_course_section(root, lab, manifest, 1)
+            return
 
     # ── Fin de cours ─────────────────────────────────────────────────────────
     if target_pos > total:
@@ -661,9 +649,17 @@ def course(
         return
 
     # ── Affichage de la section ───────────────────────────────────────────────
-    sec = manifest.sections[target_pos - 1]
-    set_course_pos(root, target_pos)
-    print_course_section(lab, sec, pos=target_pos, total=total)
+    with paged(enabled=not no_pager):
+        _show_course_section(root, lab, manifest, target_pos)
+
+
+def _show_course_section(
+    root: Path, lab: LabDefinition, manifest: CourseManifest, pos: int
+) -> None:
+    """Mémorise la position atteinte puis affiche la section correspondante."""
+    total = len(manifest.sections)
+    set_course_pos(root, pos)
+    print_course_section(lab, manifest.sections[pos - 1], pos=pos, total=total)
 
 
 # ── challenge ─────────────────────────────────────────────────────────────────
@@ -671,11 +667,13 @@ def course(
 @app.command("challenge", help=_("cmd_challenge_help"))
 def challenge_cmd(
     lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_challenge_arg"), shell_complete=_complete_lab_id)] = None,
+    no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    print_lab_challenge(lab, lang=_lang(root))
+    with paged(enabled=not no_pager):
+        print_lab_challenge(lab, lang=_lang(root))
 
 
 # ── hint ──────────────────────────────────────────────────────────────────────
@@ -1271,115 +1269,24 @@ def doctor(
     fix: Annotated[bool, typer.Option("--fix", help=_("opt_fix"))] = False,
 ) -> None:
     root = _root(lab_home)
-    checks: list[tuple[str, bool, str, str | None]] = []
 
-    # Python
-    checks.append((_( "check_python"), True, sys.version.split()[0], None))
+    # Le meta.yml décide de ce qui est bloquant ici : un dépôt sans lab `vm`
+    # n'a besoin d'aucun hyperviseur, et un dépôt qui a choisi son provider
+    # n'a pas besoin des autres. Son absence n'est pas une erreur : on
+    # diagnostique alors le strict socle commun.
+    try:
+        repo_meta = _read_repo(root)
+    except typer.Exit:
+        # Un meta.yml illisible est justement ce qu'un diagnostic doit
+        # pouvoir rapporter : l'erreur est déjà affichée, on poursuit sur
+        # le socle commun plutôt que de sortir sans rien dire d'autre.
+        repo_meta = None
+    report = collect_checks(root, repo_meta)
 
-    # pytest
-    pytest_ok, pytest_detail, pytest_fix = _detect_pytest(root)
-    checks.append((_("check_pytest"), pytest_ok, pytest_detail, pytest_fix))
-
-    # Shell runtime
-    checks.append((_("check_shell"), True, _("detail_shell_always"), None))
-
-
-    # Incus : binaire + daemon + permissions user + init storage/network.
-    # Le simple ``which incus`` ne suffit pas : sans daemon actif ni
-    # appartenance au groupe ``incus``, le client ne peut rien faire
-    # (erreur "permissions to talk to the incus daemon").
-    incus_path = shutil.which("incus")
-    if not incus_path:
-        checks.append((
-            _("check_incus"), False, _("detail_incus_missing"),
-            "sudo apt install incus",
-        ))
-    else:
-        # Test daemon actif via socket : on lance ``incus list`` qui
-        # échoue distinctement selon la cause (daemon down, perm,
-        # init manquant).
-        ver = subprocess.run(
-            ["incus", "--version"], capture_output=True, text=True, timeout=5,
-        )
-        version = ver.stdout.strip() or "?"
-
-        probe = subprocess.run(
-            ["incus", "list"], capture_output=True, text=True, timeout=5,
-        )
-        if probe.returncode == 0:
-            checks.append((
-                _("check_incus"), True,
-                f"client {version}, daemon ok",
-                None,
-            ))
-        else:
-            err = (probe.stderr or "").lower()
-            if "permission" in err or "socket" in err:
-                # Soit daemon inactif, soit user pas dans le groupe.
-                daemon_active = subprocess.run(
-                    ["systemctl", "is-active", "--quiet", "incus.service"],
-                ).returncode == 0
-                if not daemon_active:
-                    checks.append((
-                        _("check_incus"), False,
-                        f"client {version}, daemon inactif",
-                        "sudo systemctl enable --now incus.service",
-                    ))
-                else:
-                    checks.append((
-                        _("check_incus"), False,
-                        f"client {version}, user hors groupe incus (re-login requis)",
-                        f"sudo usermod -aG incus,incus-admin {os.environ.get('USER', '$USER')}",
-                    ))
-            elif "no storage pools" in err or "init" in err:
-                checks.append((
-                    _("check_incus"), False,
-                    f"client {version}, daemon ok mais non initialisé",
-                    "sudo incus admin init --auto",
-                ))
-            else:
-                tail = (probe.stderr or probe.stdout).strip().splitlines()
-                msg = tail[-1] if tail else "erreur inconnue"
-                checks.append((_("check_incus"), False, msg, None))
-
-    # KVM
-    virsh_path = shutil.which("virsh")
-    if virsh_path:
-        result = subprocess.run(
-            ["virsh", "version"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            first_line = result.stdout.splitlines()[0] if result.stdout else "ok"
-            checks.append((_("check_kvm"), True, first_line, None))
-        else:
-            checks.append((
-                _("check_kvm"),
-                False,
-                _("detail_kvm_daemon_err"),
-                "sudo systemctl start libvirtd",
-            ))
-    else:
-        checks.append((
-            _("check_kvm"),
-            False,
-            _("detail_kvm_missing"),
-            "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
-        ))
-
-    # Labs détectés
-    labs = get_all_labs(root)
-    checks.append((_("check_labs"), len(labs) > 0, _("detail_labs_count", count=len(labs), root=root), None))
-
-    # LAB_HOME
-    checks.append((_("check_lab_home"), True, str(root), None))
-
-    print_doctor(checks)
+    print_doctor(report)
 
     if fix:
-        failing = [(label, fix_cmd) for label, ok, _detail, fix_cmd in checks if not ok and fix_cmd]
+        failing = [(c.label, c.fix) for c in report.fixable() if c.fix]
         if not failing:
             info(_("fix_nothing"))
             return

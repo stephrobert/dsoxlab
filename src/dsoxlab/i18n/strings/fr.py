@@ -14,6 +14,7 @@ STRINGS: dict[str, str] = {
     "opt_bloc":       "Filtre par numéro de bloc (1-8)",
     "opt_top":        "Nombre de résultats affichés",
     "opt_fix":        "Tenter la remédiation automatique des composants manquants.",
+    "opt_no_pager":   "Tout afficher d'un bloc au lieu de paginer ce qui dépasse l'écran.",
     "opt_yes":        "Confirme sans demander",
     "opt_filter_lab": "Filtre par lab",
 
@@ -199,7 +200,11 @@ Chaque lab expose :
 
   [cyan]run <id>[/cyan]             Démarre l'environnement du lab (shell, incus ou KVM).
 
-  [cyan]course[/cyan] [dim][<id>][/dim]        Réaffiche les exercices guidés (scenario.md).
+  [cyan]course[/cyan] [dim][<id>][/dim]        Affiche le cours : une section à la fois si le lab en
+                       déclare (course.yaml), sinon le scenario et le README.
+    [dim]--section / -s[/dim]       Section à afficher : numéro ou identifiant.
+    [dim]--next    / -n[/dim]       Section suivante.  [dim]--prev / -p[/dim] : précédente.
+    [dim]--no-pager[/dim]           Tout afficher d'un bloc, sans pagination.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]guide[/cyan] [dim][<id>][/dim]         Ouvre le guide en ligne du lab dans le navigateur.
@@ -210,6 +215,7 @@ Chaque lab expose :
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]challenge[/cyan] [dim][<id>][/dim]     Affiche la mission du challenge (challenge/README.md).
+    [dim]--no-pager[/dim]           Tout afficher d'un bloc, sans pagination.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]hint[/cyan] [dim][<id>][/dim]          Affiche le prochain indice.
@@ -238,8 +244,11 @@ Chaque lab expose :
 
   [cyan]validate-structure[/cyan]   Vérifie tous les fichiers lab.yaml et l'arborescence.
 
-  [cyan]doctor[/cyan]               Vérifie les outils requis (Python, pytest, virsh, incus…).
-    [dim]--fix[/dim]                Installe automatiquement les composants manquants.
+  [cyan]doctor[/cyan]               Diagnostique l'environnement. Le tableau [bold]Requis[/bold] liste ce qui
+                       bloque ce dépôt-ci ; un hyperviseur inutile ici reste
+                       [bold]Informatif[/bold] et ne s'affiche jamais en erreur.
+    [dim]--fix[/dim]                Applique la remédiation des composants requis manquants.
+                       Les composants informatifs ne sont pas touchés.
 
   [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
                        Supporte bash et zsh. Rechargez le shell après exécution.
@@ -375,15 +384,37 @@ hors ligne, elle se tait.
     "check_shell":    "ShellRuntime",
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
+    "check_provider": "Provider d'infra",
     "check_labs":     "Labs détectés",
     "check_lab_home": "LAB_HOME",
 
     "detail_shell_always":   "toujours disponible",
-    "detail_incus_missing":  "introuvable (optionnel)",
+    "detail_incus_missing":  "introuvable",
+    "detail_incus_ok":       "client {version}, daemon ok",
+    "detail_incus_daemon_down": "client {version}, daemon inactif",
+    "detail_incus_no_group": "client {version}, user hors groupe incus (re-login requis)",
+    "detail_incus_no_init":  "client {version}, daemon ok mais non initialisé",
     "detail_kvm_daemon_err": "virsh présent mais erreur (daemon arrêté ?)",
-    "detail_kvm_missing":    "introuvable (requis pour labs l2+)",
+    "detail_kvm_missing":    "introuvable",
     "detail_pytest_missing": "introuvable",
+    "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",
+    "detail_pytest_via":     "via {cmd}",
+    "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
+    "detail_unknown_error":  "erreur inconnue",
     "detail_labs_count":     "{count} lab(s) dans {root}",
+
+    # ── doctor — pourquoi un composant est informatif ici ────────────────────
+    "doctor_note_no_vm":
+        "Aucun lab de ce dépôt n'utilise de VM : les hyperviseurs ci-dessus "
+        "sont informatifs.",
+    "doctor_note_other_providers":
+        "Provider actif : {provider}. Les autres hyperviseurs sont informatifs.",
+    "doctor_note_remote_provider":
+        "Le provider {provider} tourne dans le cloud : aucun hyperviseur "
+        "local n'est nécessaire.",
+    "doctor_note_provider_unresolved":
+        "Ce dépôt déclare plusieurs providers. Choisissez-en un avec "
+        "[bold]dsoxlab use --provider <nom>[/bold] avant de provisionner.",
 
     # ── doctor — remédiation ──────────────────────────────────────────────────
     "fix_nothing": "Aucune remédiation nécessaire.",
@@ -445,14 +476,24 @@ hors ligne, elle se tait.
     "tree_structure_title": "[bold]Validation de structure[/bold]",
 
     # ── console — doctor ──────────────────────────────────────────────────────
-    "doctor_table_title": "Diagnostic dsoxlab doctor",
+    "doctor_table_title":    "Requis pour ce dépôt",
+    "doctor_optional_title": "Informatif — non requis ici",
+    "doctor_optional_hint":
+        "Ces composants ne bloquent rien dans ce dépôt : [bold]--fix[/bold] "
+        "ne les traite pas. Installez-les seulement si vous voulez ce provider.",
     "col_component":      "Composant",
     "col_status":         "Statut",
     "col_detail":         "Détail",
     "col_remediation":    "Remédiation",
     "status_ok":          "[green]✔ OK[/green]",
     "status_ko":          "[red]✘ KO[/red]",
+    "status_present":     "[green]installé[/green]",
+    "status_absent":      "[dim]— absent[/dim]",
+    "status_choose":      "[yellow]à choisir[/yellow]",
     "doctor_fix_hint":    "ℹ Utilisez [bold]dsoxlab doctor --fix[/bold] pour tenter la remédiation automatique.",
+    "doctor_manual_hint":
+        "ℹ [bold]--fix[/bold] ne sait pas corriger ce qui manque : appliquez "
+        "la remédiation indiquée à la main.",
 
     # ── console — résultat check ──────────────────────────────────────────────
     "check_result_title":       "Résultat — {lab_id}",

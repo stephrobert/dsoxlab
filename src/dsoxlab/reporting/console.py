@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import os
+import shlex
+import shutil
+import subprocess
+from contextlib import contextmanager
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 from ..models.lab import LabDefinition
 from ..models.course import CourseManifest, CourseSection
+from ..services.doctor import Check, DoctorReport
 from ..services.progress_service import build_progress
 from ..validators.structure import StructureReport
 from ..i18n import _
@@ -22,6 +30,85 @@ err_console = Console(stderr=True, style="bold red")
 #: Avis de mise a jour : sur stderr comme les erreurs, pour ne jamais
 #: polluer un document JSON, mais sans le rouge qui ferait croire a un echec.
 update_console = Console(stderr=True, style="dim", highlight=False)
+
+
+# ── Pager ────────────────────────────────────────────────────────────────────
+
+def _pager_command() -> list[str]:
+    """La commande de pagination, dans l'ordre des préférences déclarées.
+
+    ``DSOXLAB_PAGER`` prime sur ``PAGER`` pour qu'un apprenant puisse régler
+    la lecture des cours sans toucher au pager de tout son système. Faute
+    des deux, ``less -R`` : sans ``-R``, les couleurs de Rich s'affichent en
+    séquences d'échappement brutes et le cours devient illisible.
+    """
+    raw = os.environ.get("DSOXLAB_PAGER") or os.environ.get("PAGER") or ""
+    parts = shlex.split(raw) if raw.strip() else ["less"]
+    if Path(parts[0]).name == "less" and not any(
+        arg in ("-R", "-r", "--RAW-CONTROL-CHARS", "--raw-control-chars")
+        for arg in parts[1:]
+    ):
+        parts.append("-R")
+    return parts
+
+
+def _write_through(text: str) -> None:
+    """Écrit un rendu déjà produit par Rich, sans le repasser dans Rich."""
+    console.file.write(text)
+    console.file.flush()
+
+
+def _page(text: str) -> None:
+    """Affiche ``text`` directement s'il tient à l'écran, sinon le pagine."""
+    if not text:
+        return
+    # -1 : la ligne que le shell reprendra pour son prompt.
+    if text.count("\n") <= console.size.height - 1:
+        _write_through(text)
+        return
+
+    cmd = _pager_command()
+    if shutil.which(cmd[0]) is None:
+        _write_through(text)
+        return
+    try:
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, text=True)  # noqa: S603
+    except OSError:
+        # Pas de pager utilisable : mieux vaut une sortie trop longue
+        # qu'une commande qui échoue sur son affichage.
+        _write_through(text)
+        return
+    try:
+        proc.communicate(text)
+    except KeyboardInterrupt:
+        proc.wait()
+
+
+@contextmanager
+def paged(*, enabled: bool = True) -> Iterator[None]:
+    """Envoie au pager ce que le bloc affiche, s'il dépasse la hauteur du terminal.
+
+    ``course`` déverse un README entier, jusqu'à un millier de lignes dans
+    les catalogues existants. Sans client SSH ni tmux, le scrollback d'un
+    terminal local ne suffit pas et le début du cours est perdu.
+
+    Deux garde-fous : on ne pagine jamais hors d'un terminal, pour qu'un
+    pipe ou une redirection reçoive toujours du texte exploitable, et on ne
+    pagine pas ce qui tient déjà à l'écran, pour ne pas ouvrir un pager sur
+    trois lignes. Le rendu capturé est réémis même si le bloc lève, sans
+    quoi une erreur en fin d'affichage avalerait tout ce qui la précède.
+    """
+    if not enabled or not console.is_terminal:
+        yield
+        return
+
+    capture = None
+    try:
+        with console.capture() as capture:
+            yield
+    finally:
+        if capture is not None:
+            _page(capture.get())
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -165,25 +252,50 @@ def print_structure_reports(reports: list[StructureReport]) -> None:
 
 # ── doctor ────────────────────────────────────────────────────────────────────
 
-def print_doctor(checks: list[tuple[str, bool, str, str | None]]) -> None:
-    """checks : liste de (label, ok, détail, fix_cmd|None)."""
-    table = Table(title=_('doctor_table_title'), show_header=True)
+def _doctor_table(title: str, checks: list[Check], *, blocking: bool) -> Table:
+    """Un tableau de checks.
+
+    ``blocking=False`` change le vocabulaire du statut : un composant
+    informatif absent n'est pas un échec, et l'afficher en rouge est
+    précisément ce qui décourageait au premier lancement.
+    """
+    table = Table(title=title, show_header=True)
     table.add_column(_('col_component'))
     table.add_column(_('col_status'), justify="center")
     table.add_column(_('col_detail'))
     table.add_column(_('col_remediation'))
 
-    has_failures = False
-    for label, ok, detail, fix_cmd in checks:
-        status = _('status_ok') if ok else _('status_ko')
-        fix_cell = "" if ok or not fix_cmd else f"[dim]{fix_cmd}[/dim]"
-        if not ok:
-            has_failures = True
-        table.add_row(label, status, detail, fix_cell)
+    for check in checks:
+        if check.status_key:
+            status = _(check.status_key)
+        elif blocking:
+            status = _('status_ok') if check.ok else _('status_ko')
+        else:
+            status = _('status_present') if check.ok else _('status_absent')
+        remediation = "" if check.ok else f"[dim]{check.remediation}[/dim]"
+        table.add_row(check.label, status, check.detail, remediation)
+    return table
 
-    console.print(table)
-    if has_failures:
+
+def print_doctor(report: DoctorReport) -> None:
+    """Affiche le diagnostic : ce qui bloque, puis ce qui informe."""
+    console.print(_doctor_table(
+        _('doctor_table_title'), report.required, blocking=True,
+    ))
+
+    if report.optional:
+        console.print(_doctor_table(
+            _('doctor_optional_title'), report.optional, blocking=False,
+        ))
+        console.print(f"[dim]{_('doctor_optional_hint')}[/dim]")
+
+    for note in report.notes:
+        console.print(f"[cyan]ℹ[/cyan] {note}")
+
+    if report.fixable():
         console.print(f"[yellow]{_('doctor_fix_hint')}[/yellow]")
+    elif report.failing():
+        console.print(f"[yellow]{_('doctor_manual_hint')}[/yellow]")
 
 
 # ── messages simples ──────────────────────────────────────────────────────────

@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.33] - 2026-07-27
+
+Both changes come from a learner's report on their first session with the
+tool: the first command they ran showed three failures, and the first
+course they read scrolled off the screen.
+
+### Fixed
+
+- **`doctor` reported `pytest` as missing while `check` ran it fine.** The
+  diagnostic looked for a `pytest` binary in `PATH`, whereas `check` resolves
+  it through `resolve_pytest_cmd()`, which starts with `sys.executable -m
+  pytest` — the tool's own environment, where pytest and pytest-testinfra are
+  declared dependencies. So the table said red on a component that worked,
+  and the remediation it offered (`uv add --dev pytest pytest-testinfra`)
+  had the learner install what they already had. Both paths now share the
+  same resolution, and an unresolvable pytest points at reinstalling the
+  tool.
+
+### Changed
+
+- **`doctor` now separates what blocks this repo from what merely informs.**
+  A repo whose labs are all `shell` needs no hypervisor at all; a repo that
+  has picked `kvm` does not need incus. Those checks moved to an
+  *Informational* table that never shows red and that `--fix` leaves alone,
+  with a line saying why they are not required here. On a catalog like
+  `terraform-training` (no `infra:` block, every lab `shell`), the diagnostic
+  is now entirely green.
+- **An unresolved provider is reported as a decision, not a failure.** When
+  the `meta.yml` declares several candidates and none is active, the check is
+  blocking — `provision` cannot run — but carries a *to be chosen* status and
+  names the command to run. It stays a hint, never an auto-applied fix:
+  picking a provider silently would decide how the learner's labs run.
+- **`--fix` states its limits.** It only ever touched the components it has a
+  command for; now the output says so, and points at manual remediation when
+  nothing can be automated.
+
+### Added
+
+- **Long output goes through the pager.** `course` prints a whole README when
+  the lab declares no `course.yaml` — up to a thousand lines in existing
+  catalogs — which a plain local terminal cannot scroll back through. `course`
+  and `challenge` now page their output when it is taller than the screen.
+  Never in a pipe or a redirection, so scripted output stays plain text, and
+  never for output that already fits. `$DSOXLAB_PAGER` (then `$PAGER`)
+  chooses the pager, defaulting to `less -R`; `--no-pager` restores the raw
+  dump.
+
 ## [0.1.32] - 2026-07-23
 
 ### Added

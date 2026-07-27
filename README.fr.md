@@ -111,6 +111,19 @@ DSOXLAB_LANG=fr dsoxlab fullhelp
 DSOXLAB_LANG=en dsoxlab fullhelp
 ```
 
+### Lecture des cours longs
+
+`course` et `challenge` passent par le pager dès que leur sortie dépasse la
+hauteur du terminal : un cours de plusieurs centaines de lignes reste lisible
+sans dépendre du scrollback du terminal. La pagination ne s'applique jamais à
+un tube ni à une redirection, qui reçoivent toujours le texte complet.
+
+```bash
+DSOXLAB_PAGER='bat --plain' dsoxlab course   # choisir son pager (défaut : less -R)
+dsoxlab course --no-pager                    # tout déverser d'un bloc
+dsoxlab course > cours.txt                   # jamais paginé : texte brut
+```
+
 ---
 
 ## Le contrat déclaratif

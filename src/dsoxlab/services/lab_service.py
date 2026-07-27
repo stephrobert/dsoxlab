@@ -212,8 +212,13 @@ def lab_status(lab: LabDefinition, target_name: str | None = None) -> str:
     return runtime.status(lab, target_name)
 
 
-def _resolve_pytest_cmd(repo_root: Path) -> list[str] | None:
+def resolve_pytest_cmd(repo_root: Path) -> list[str] | None:
     """Trouve la bonne façon de lancer pytest avec testinfra disponible.
+
+    Publique parce que ``doctor`` doit diagnostiquer **exactement** ce que
+    ``check`` exécutera. Tant que le diagnostic cherchait un binaire dans le
+    PATH de son côté, il annonçait un pytest introuvable là où ``check``
+    tournait très bien via l'environnement de l'outil.
 
     Ordre de résolution :
 
@@ -322,7 +327,7 @@ def check_lab(
 
     meta_path = find_meta_yml(lab.path)
     repo_root = meta_path.parent if meta_path else lab.path.parent
-    pytest_cmd = _resolve_pytest_cmd(repo_root)
+    pytest_cmd = resolve_pytest_cmd(repo_root)
     if pytest_cmd is None:
         return CheckResult(
             ok=False,

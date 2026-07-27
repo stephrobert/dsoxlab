@@ -9,6 +9,56 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.33] - 2026-07-27
+
+Les deux changements viennent du retour d'un apprenant sur sa première
+session : la première commande lancée affichait trois erreurs, et le premier
+cours lu défilait hors de l'écran.
+
+### Corrigé
+
+- **`doctor` annonçait `pytest` introuvable alors que `check` le lançait très
+  bien.** Le diagnostic cherchait un binaire `pytest` dans le `PATH`, quand
+  `check` passe par `resolve_pytest_cmd()`, qui commence par
+  `sys.executable -m pytest`, c'est-à-dire l'environnement de l'outil, où
+  pytest et pytest-testinfra sont des dépendances déclarées. Le tableau
+  affichait donc du rouge sur un composant qui fonctionnait, et la
+  remédiation proposée (`uv add --dev pytest pytest-testinfra`) faisait
+  installer à l'apprenant ce qu'il possédait déjà. Les deux chemins partagent
+  désormais la même résolution, et un pytest introuvable renvoie à la
+  réinstallation de l'outil.
+
+### Modifié
+
+- **`doctor` sépare ce qui bloque ce dépôt de ce qui l'informe.** Un dépôt
+  dont tous les labs sont `shell` n'a besoin d'aucun hyperviseur ; un dépôt
+  qui a choisi `kvm` n'a pas besoin d'incus. Ces contrôles passent dans un
+  tableau *Informatif* qui n'affiche jamais de rouge et que `--fix` ne touche
+  pas, avec une ligne qui dit pourquoi ils ne sont pas requis ici. Sur un
+  catalogue comme `terraform-training` (aucun bloc `infra:`, tous les labs
+  `shell`), le diagnostic est désormais entièrement vert.
+- **Un provider non résolu est présenté comme une décision, pas comme une
+  panne.** Quand le `meta.yml` déclare plusieurs candidats et qu'aucun n'est
+  actif, le contrôle reste bloquant — `provision` ne peut pas tourner — mais
+  porte un statut *à choisir* et nomme la commande à taper. Il reste un
+  conseil, jamais un correctif automatique : choisir le provider à la place
+  de l'apprenant déciderait en silence de la façon dont ses labs tournent.
+- **`--fix` annonce ses limites.** Il n'a jamais traité que les composants
+  pour lesquels il détient une commande ; la sortie le dit maintenant, et
+  renvoie à la remédiation manuelle quand rien n'est automatisable.
+
+### Ajouté
+
+- **Les affichages longs passent par le pager.** `course` déverse un README
+  entier quand le lab ne déclare pas de `course.yaml`, soit jusqu'à un
+  millier de lignes dans les catalogues existants, que le scrollback d'un
+  terminal local ne permet pas de remonter. `course` et `challenge` paginent
+  désormais leur sortie dès qu'elle dépasse la hauteur de l'écran. Jamais
+  dans un tube ni une redirection, pour qu'une sortie scriptée reste du texte
+  brut, et jamais pour ce qui tient déjà à l'écran. `$DSOXLAB_PAGER` (puis
+  `$PAGER`) choisit le pager, `less -R` par défaut ; `--no-pager` rétablit le
+  déversement brut.
+
 ## [0.1.32] - 2026-07-23
 
 ### Ajouté
