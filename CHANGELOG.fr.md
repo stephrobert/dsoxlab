@@ -9,7 +9,23 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-## [0.1.35] - 2026-07-27
+## [0.1.36] - 2026-07-27
+
+### Ajouté
+
+- **Les services conteneurisés dont un lab a besoin, démarrés automatiquement.**
+  Certains labs `shell` ciblent une API que le poste n'héberge pas (un émulateur
+  de cloud, une base de données, un registre). Plutôt qu'un `docker run` manuel
+  dans chaque scénario, un lab déclare désormais son service dans
+  `runtime.services`, et dsoxlab démarre le conteneur avant `run`/`check` et
+  l'arrête à `clean`. Le moteur reste **agnostique du domaine** : il lance
+  **l'image que le lab déclare**, sur les ports que le lab déclare, et ne connaît
+  rien du produit émulé. Chaque conteneur est nommé `dsoxlab-<repo_id>-<service>`,
+  et `ready_tcp` attend que le port accepte une connexion avant de continuer. Le
+  moteur est Docker ; s'il est injoignable, `run`/`check` échouent avec un
+  message clair plutôt qu'une traceback Docker. Vérifié en live contre
+  l'émulateur cloud du dépôt : le service monte sur son port et est retiré au
+  `clean`.
 
 Les deux corrections viennent d'une campagne de validation complète sur un
 catalogue de 84 labs : un incident, et une fuite que la campagne a rendue

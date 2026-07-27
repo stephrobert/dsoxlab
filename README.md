@@ -182,6 +182,32 @@ validation:
 An optional `lab.fr.yaml` may override `title` and `description` for French
 only.
 
+#### Optional `runtime.services`: containerized sidecars
+
+A lab can declare containers that must be up while it runs. dsoxlab starts them
+on `run`/`check`/`submit` and stops them on `clean`. The mechanism is
+domain-agnostic: it launches exactly the image you declare and knows nothing
+about what runs inside. A cloud-API emulator for a Terraform lab is one use;
+a database for an app lab is another.
+
+```yaml
+runtime:
+  type: shell
+  workdir: challenge/work
+  services:
+    - name: cloud                 # required, unique within the lab
+      image: some/emulator:1.2.3  # required, the exact image to run
+      ports: ["4566:4566"]        # optional, docker -p mappings
+      run_args: ["-u", "root"]    # optional, extra docker run flags
+      env: { DEBUG: "1" }         # optional, -e VAR=value
+      ready_tcp: 4566             # optional, wait until this TCP port accepts
+      ready_timeout: 90           # optional, seconds before giving up (default 90)
+```
+
+Containers are named `dsoxlab-<repo-id>-<service>` so they never collide
+across repos. Docker must be reachable; if it is not, the lab fails fast rather
+than running against a missing service.
+
 `dsoxlab validate-structure` checks that the whole contract holds: the root
 `meta.yml` is well-formed, every referenced lab exists with a valid
 `lab.yaml`, each `runtime.host` maps to a declared host, and all referenced

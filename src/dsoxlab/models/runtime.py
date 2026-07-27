@@ -76,6 +76,51 @@ class Target:
 
 
 @dataclass
+class Service:
+    """Un service conteneurisé dont un lab a besoin le temps de l'exercice.
+
+    Certains labs ``shell`` ciblent une API que le poste n'héberge pas (un
+    émulateur de cloud, une base de données, un registre). Plutôt que d'imposer
+    à l'apprenant un ``docker run`` manuel dans le scénario, le lab déclare ici
+    le conteneur à lancer, et dsoxlab le démarre avant ``run``/``check`` et
+    l'arrête à ``destroy``/``clean``.
+
+    **dsoxlab reste agnostique du domaine.** Il lance **l'image que le lab
+    déclare**, sur les ports que le lab déclare : il ne connaît ni le cloud, ni
+    le produit émulé. Toute la spécificité vit dans le ``lab.yaml`` du dépôt
+    fournisseur, jamais dans ce code.
+    """
+
+    name: str
+    """Nom court du service, unique dans le lab (ex. ``db``, ``cloud``).
+
+    Le conteneur est nommé ``dsoxlab-<repo_id>-<name>`` pour éviter toute
+    collision entre dépôts de labs."""
+
+    image: str
+    """Image du conteneur, tag compris (ex. ``postgres:16``). REQUIS."""
+
+    ports: list[str] = field(default_factory=list)
+    """Publications de ports au format Docker ``hôte:conteneur`` (ex.
+    ``["4566:4566"]``). Passées telles quelles en ``-p``."""
+
+    run_args: list[str] = field(default_factory=list)
+    """Arguments bruts ajoutés au ``docker run`` (ex.
+    ``["-v", "/var/run/docker.sock:/var/run/docker.sock"]``). Le lab en assume
+    le sens ; dsoxlab ne les interprète pas."""
+
+    env: dict[str, str] = field(default_factory=dict)
+    """Variables d'environnement du conteneur, passées en ``-e NOM=valeur``."""
+
+    ready_tcp: int = 0
+    """Port TCP (dans le conteneur, côté hôte) à sonder jusqu'à ce qu'il
+    accepte une connexion. 0 = pas d'attente TCP."""
+
+    ready_timeout: int = 90
+    """Délai maximum, en secondes, pour que le service devienne disponible."""
+
+
+@dataclass
 class RuntimeConfig:
     """Configuration runtime d'un lab — déclarée dans ``lab.yaml``."""
 
@@ -125,6 +170,12 @@ class RuntimeConfig:
 
     Chemins relatifs depuis ``<lab>/fixtures/``. Ignoré pour ``vm``.
     """
+
+    services: list["Service"] = field(default_factory=list)
+    """Services conteneurisés dont le lab a besoin le temps de l'exercice.
+
+    Démarrés par ``run``/``check``, arrêtés par ``destroy``/``clean``, affichés
+    par ``status``. Vide = aucun service (défaut). Voir :class:`Service`."""
 
     # ── Rétro-compat ──────────────────────────────────────────────────
     topology: str = "local"
