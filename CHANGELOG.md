@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.37] - 2026-07-28
+
+### Fixed
+
+- **A `shell` lab can finally ship a local module.** `ShellRuntime` copied every
+  fixture on its **base name**, so `modules/stockage/main.tf` landed on
+  `main.tf` and **silently overwrote** the root `main.tf`. Any lab teaching
+  Terraform modules was therefore impossible to build, and the failure was
+  invisible: the workdir looked plausible, only its content was wrong. The
+  module docstring already promised `<lab>/fixtures/<file>` →
+  `<lab>/<workdir>/<file>` with nested examples, so the code contradicted its
+  own contract. The declared path is now **preserved** and intermediate
+  directories are created. A path that is absolute or contains `..` is refused
+  with a warning instead of being followed, so a fixture never writes outside
+  the workdir. Strictly additive: none of the **136** fixtures declared across
+  the three lab repositories uses a `/`, so no existing lab changes behaviour.
+
 ## [0.1.36] - 2026-07-27
 
 ### Added

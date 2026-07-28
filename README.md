@@ -182,6 +182,28 @@ validation:
 An optional `lab.fr.yaml` may override `title` and `description` for French
 only.
 
+#### Optional `runtime.fixtures`: the starting files of a `shell` lab
+
+A `shell` lab lists the files it hands to the learner. Each entry is a path
+**relative to `<lab>/fixtures/`**, and that path is **preserved** under the
+workdir: intermediate directories are created for you, so a lab can ship a local
+Terraform module without its `main.tf` colliding with the root one.
+
+```yaml
+runtime:
+  type: shell
+  workdir: challenge/work
+  fixtures:
+    - versions.tf
+    - main.tf
+    - modules/stockage/main.tf   # lands in <workdir>/modules/stockage/main.tf
+```
+
+Two things to know. A file **not listed here is not copied**, even if it sits in
+`fixtures/` — the runtime iterates over this list, not over the directory. And a
+path that is absolute or contains `..` is refused with a warning, so a fixture
+never writes outside the workdir.
+
 #### Optional `runtime.services`: containerized sidecars
 
 A lab can declare containers that must be up while it runs. dsoxlab starts them
