@@ -7,7 +7,14 @@ from pathlib import Path
 
 import yaml
 
-from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
+from ._contract import (
+    as_argv,
+    as_argv_list,
+    as_int,
+    as_mapping,
+    as_mapping_list,
+    as_str_list,
+)
 from .runtime import RuntimeConfig, RuntimeType, Service, Target
 
 
@@ -122,7 +129,13 @@ class LabDefinition:
                 run_args=as_str_list(s.get("run_args"), f"runtime.services[{idx}].run_args", lab_yaml),
                 env={str(k): str(v) for k, v in env_raw.items()},
                 ready_tcp=as_int(s.get("ready_tcp"), 0, f"runtime.services[{idx}].ready_tcp", lab_yaml),
+                ready_exec=as_argv(
+                    s.get("ready_exec"), f"runtime.services[{idx}].ready_exec", lab_yaml
+                ),
                 ready_timeout=as_int(s.get("ready_timeout"), 90, f"runtime.services[{idx}].ready_timeout", lab_yaml),
+                post_start=as_argv_list(
+                    s.get("post_start"), f"runtime.services[{idx}].post_start", lab_yaml
+                ),
             ))
 
         runtime = RuntimeConfig(

@@ -17,6 +17,7 @@ harnais de ``fuzz/``.
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,65 @@ def as_mapping(value: object, field_name: str, source: Path, *, default_empty: b
             f"(reçu : {type(value).__name__})."
         )
     return value
+
+
+def as_argv(value: object, field_name: str, source: Path) -> list[str]:
+    """Valide UNE commande et la normalise en ``argv``.
+
+    Mêmes écritures que :func:`as_argv_list`, au singulier : une chaîne
+    découpée façon shell, ou une liste d'arguments.
+    """
+    if value is None:
+        return []
+    commandes = as_argv_list([value], field_name, source)
+    return commandes[0] if commandes else []
+
+
+def as_argv_list(value: object, field_name: str, source: Path) -> list[list[str]]:
+    """Valide une liste de commandes et la normalise en liste d'``argv``.
+
+    Deux écritures sont acceptées pour la même commande, parce que les deux se
+    défendent dans un ``lab.yaml`` :
+
+    - ``- vault kv put secret/x k=v`` — lisible, découpée à la manière du shell
+      (``shlex``), donc les guillemets d'un argument à espaces sont respectés ;
+    - ``- ["vault", "kv", "put", "secret/x", "k=v"]`` — explicite, sans découpage.
+
+    Le résultat est toujours un ``argv``, exécuté sans shell : ni pipe, ni
+    redirection, ni expansion. Une chaîne vide (ou qui ne contient que des
+    espaces) est refusée plutôt qu'ignorée : ``docker exec`` sans commande
+    échouerait plus loin, avec un message qui ne désignerait pas le lab fautif.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+        raise ValueError(
+            f"{source}: '{field_name}' doit être une liste de commandes "
+            f"(reçu : {type(value).__name__})."
+        )
+    commandes: list[list[str]] = []
+    for idx, item in enumerate(value):
+        if isinstance(item, str):
+            try:
+                argv = shlex.split(item)
+            except ValueError as exc:  # guillemet non fermé
+                raise ValueError(
+                    f"{source}: '{field_name}[{idx}]' n'est pas une commande "
+                    f"analysable ({exc})."
+                ) from None
+        elif isinstance(item, (list, tuple)):
+            argv = [str(mot) for mot in item]
+        else:
+            raise ValueError(
+                f"{source}: '{field_name}[{idx}]' doit être une chaîne ou une "
+                f"liste d'arguments (reçu : {type(item).__name__})."
+            )
+        if not argv:
+            raise ValueError(
+                f"{source}: '{field_name}[{idx}]' est une commande vide."
+            )
+        commandes.append(argv)
+    return commandes
 
 
 def as_mapping_list(value: object, field_name: str, source: Path) -> list[dict[str, Any]]:
