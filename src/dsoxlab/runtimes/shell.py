@@ -14,7 +14,12 @@ le poste de l'apprenant), la préparation se déclare directement dans
 `dsoxlab run` :
 
 1. crée ``<lab>/<workdir>/`` (idempotent)
-2. copie chaque ``<lab>/fixtures/<file>`` vers ``<lab>/<workdir>/<file>``
+2. copie chaque ``<lab>/fixtures/<file>`` vers ``<lab>/<workdir>/<file>``, en
+   **préservant le chemin déclaré** : ``modules/stockage/main.tf`` arrive en
+   ``<workdir>/modules/stockage/main.tf``, et les répertoires intermédiaires
+   sont créés. Un lab Terraform peut donc livrer un module local sans que son
+   ``main.tf`` écrase celui de la racine. Un chemin absolu ou contenant ``..``
+   est refusé : une fixture ne sort jamais du workdir.
 
 `dsoxlab clean` supprime ``<workdir>/``. Aucun script bash n'est invoqué
 (décision 11.3 du REFACTORING-PLAN — zéro exception au déclaratif).
@@ -64,7 +69,15 @@ class ShellRuntime(BaseRuntime):
 
         fixtures_root = lab.path / "fixtures"
         for rel in lab.runtime.fixtures:
-            src = fixtures_root / rel
+            chemin = Path(rel)
+            if chemin.is_absolute() or ".." in chemin.parts:
+                logger.warning(
+                    "Fixture ignorée : %s sort du workdir. Un chemin de fixture "
+                    "est toujours relatif à fixtures/, sans « .. ».",
+                    rel,
+                )
+                continue
+            src = fixtures_root / chemin
             if not src.is_file():
                 logger.warning(
                     "Fixture déclarée mais introuvable : %s "
@@ -72,7 +85,11 @@ class ShellRuntime(BaseRuntime):
                     src,
                 )
                 continue
-            dst = workdir / Path(rel).name
+            # Le chemin déclaré est PRÉSERVÉ : `modules/stockage/main.tf` arrive
+            # en `<workdir>/modules/stockage/main.tf`. Aplatir sur le nom de
+            # base rendait impossible tout lab à modules (deux `main.tf` dans
+            # l'arborescence s'écrasaient l'un l'autre).
+            dst = workdir / chemin
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
             logger.info("fixture %s → %s", rel, dst)

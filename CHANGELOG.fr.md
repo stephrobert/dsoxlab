@@ -9,6 +9,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.37] - 2026-07-28
+
+### Corrigé
+
+- **Un lab `shell` peut enfin livrer un module local.** `ShellRuntime` copiait
+  chaque fixture sur son **nom de base** : `modules/stockage/main.tf` atterrissait
+  donc en `main.tf` et **écrasait silencieusement** le `main.tf` de la racine.
+  Tout lab qui enseigne les modules Terraform était de ce fait impossible à
+  construire, et la panne était invisible : le workdir avait l'air correct, seul
+  son contenu était faux. Le docstring du module promettait déjà
+  `<lab>/fixtures/<fichier>` → `<lab>/<workdir>/<fichier>`, exemples en
+  sous-répertoire compris : le code contredisait son propre contrat. Le chemin
+  déclaré est désormais **préservé**, et les répertoires intermédiaires sont
+  créés. Un chemin absolu ou contenant `..` est refusé avec un avertissement au
+  lieu d'être suivi, de sorte qu'une fixture n'écrit jamais hors du workdir.
+  Strictement additif : aucune des **136** fixtures déclarées dans les trois
+  dépôts de labs ne comporte de `/`, donc aucun lab existant ne change de
+  comportement.
+
 ## [0.1.36] - 2026-07-27
 
 ### Ajouté
