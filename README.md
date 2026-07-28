@@ -206,6 +206,11 @@ never writes outside the workdir.
 
 #### Optional `runtime.services`: containerized sidecars
 
+Services of a repository share a Docker network, each reachable by its declared
+`name`: a lab with an application and its database writes `DB_HOST: db`. On
+Docker's default bridge there is no name resolution between containers, so such
+a lab could not be declared at all.
+
 A lab can declare containers that must be up while it runs. dsoxlab starts them
 on `run`/`check`/`submit` and stops them on `clean`. The mechanism is
 domain-agnostic: it launches exactly the image you declare and knows nothing
@@ -222,7 +227,16 @@ runtime:
       ports: ["4566:4566"]        # optional, docker -p mappings
       run_args: ["-u", "root"]    # optional, extra docker run flags
       env: { DEBUG: "1" }         # optional, -e VAR=value
-      ready_tcp: 4566             # optional, wait until this TCP port accepts
+      ready_tcp: 4566             # optional, HOST port to wait on. Beware: on a
+                                  # published port Docker's proxy accepts before
+                                  # the service listens, so this alone lies.
+      ready_exec: check-health    # optional but recommended: probe run INSIDE the
+                                  # container, retried until it succeeds. This is
+                                  # the only trustworthy readiness signal.
+      post_start:                 # optional: initialise the service once ready
+        - seed --from fixtures    # (schema, secrets, repository…). Run through
+                                  # `docker exec`, no shell. Replayed on every
+                                  # start, so it must be idempotent.
       ready_timeout: 90           # optional, seconds before giving up (default 90)
 ```
 
