@@ -1,0 +1,23 @@
+id: l2-cloud-emulator-init
+title: Seed a local service before the exercise
+level: intermediate
+skills: [terraform]
+distros: [any]
+doc_url: https://blog.stephane-robert.info/docs/terraform/aws/
+runtime:
+  type: shell
+  workdir: challenge/work
+  services:
+    - name: db
+      image: some/database:16
+      ready_exec: ["pg_isready", "-q"]
+      ready_timeout: 60
+    - name: app
+      image: some/app:1.0
+      ports: ["8443:443"]
+      env: { DB_HOST: db }
+      ready_tcp: 8443
+      ready_exec: check-health
+      post_start:
+        - seed --from fixtures
+        - ["seed", "--extra", "arg with spaces"]
