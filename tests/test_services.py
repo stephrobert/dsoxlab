@@ -284,9 +284,10 @@ def test_post_start_joue_apres_le_demarrage(monkeypatch: pytest.MonkeyPatch) -> 
         ["docker", "exec", "dsoxlab-ansible-training-vault", "vault", "status"],
     ]
     # …et après le `docker run`, jamais avant : un service pas encore prêt
-    # ferait échouer l'initialisation par intermittence.
-    assert appels.index(["docker", "run", "-d", "--name", "dsoxlab-ansible-training-vault",
-                         "some/vault:1.0"]) < appels.index(execs[0])
+    # ferait échouer l'initialisation par intermittence. On repère le run par
+    # son préfixe, pas mot pour mot : les options (réseau, ports, env) varient.
+    index_run = next(i for i, c in enumerate(appels) if c[:2] == ["docker", "run"])
+    assert index_run < appels.index(execs[0])
 
 
 def test_ready_tcp_sonde_le_port_hote_pas_celui_du_conteneur(
@@ -370,6 +371,56 @@ def test_container_name_sanitize(tmp_path: Path) -> None:
     assert svc.container_name("repo/id", s) == "dsoxlab-repo-id-my-cloud-"
 
 
+# ── Réseau partagé entre les services d'un dépôt ────────────────────────────
+
+def test_network_name_namespace_par_repo() -> None:
+    assert svc.network_name("ansible-training") == "dsoxlab-ansible-training"
+    assert svc.network_name("repo/id") == "dsoxlab-repo-id"
+
+
+def test_run_attache_le_conteneur_au_reseau_avec_son_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sans alias, un service ne peut pas en joindre un autre par son nom."""
+    appels: list[list[str]] = []
+
+    class _Res:
+        ok = True
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: False)
+    monkeypatch.setattr(svc, "_exists", lambda name: False)
+    monkeypatch.setattr(svc, "run_command",
+                        lambda cmd, **kw: (appels.append(list(cmd)), _Res())[1])
+
+    svc.start(Service(name="db", image="postgres:16"), "ansible-training")
+
+    run = next(c for c in appels if c[:2] == ["docker", "run"])
+    assert "--network" in run and run[run.index("--network") + 1] == "dsoxlab-ansible-training"
+    assert "--network-alias" in run and run[run.index("--network-alias") + 1] == "db"
+
+
+def test_reseau_cree_seulement_s_il_manque(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Réseau déjà là : on ne le recrée pas (l'inspect suffit)."""
+    appels: list[list[str]] = []
+
+    class _Res:
+        ok = True
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: False)
+    monkeypatch.setattr(svc, "_exists", lambda name: False)
+    monkeypatch.setattr(svc, "run_command",
+                        lambda cmd, **kw: (appels.append(list(cmd)), _Res())[1])
+
+    svc.start(Service(name="db", image="postgres:16"), "repo")
+
+    assert ["docker", "network", "inspect", "dsoxlab-repo"] in appels
+    assert not [c for c in appels if c[:3] == ["docker", "network", "create"]]
+
+
 # ── Intégration Docker (sautée si Docker injoignable) ───────────────────────
 
 @pytest.mark.skipif(not svc.docker_available(), reason="Docker injoignable")
@@ -417,6 +468,33 @@ def test_post_start_execute_vraiment_dans_le_conteneur() -> None:
         assert lu.stdout.strip() == "initialise"
     finally:
         svc.stop(s, repo)
+
+
+@pytest.mark.skipif(not svc.docker_available(), reason="Docker injoignable")
+def test_deux_services_se_joignent_par_leur_nom() -> None:
+    """Le cas qui motive le réseau : une application qui joint sa base.
+
+    On ne vérifie pas la présence des options `--network` (les tests mockés le
+    font déjà) mais l'effet : depuis un conteneur, le nom de l'autre service se
+    résout. Sur le bridge par défaut de Docker, cette résolution n'existe pas.
+    """
+    db = Service(name="pytest-db", image="nginx:alpine")
+    app = Service(name="pytest-app", image="nginx:alpine")
+    repo = "dsoxlab-test-net"
+    try:
+        svc.start(db, repo)
+        nom_app = svc.start(app, repo)
+        resolu = run_command(
+            ["docker", "exec", nom_app, "getent", "hosts", "pytest-db"],
+            check=False, timeout=30,
+        )
+        assert resolu.ok, "le nom du service voisin ne se résout pas"
+        assert "pytest-db" in resolu.stdout
+    finally:
+        svc.stop(app, repo)
+        svc.stop(db, repo)
+        run_command(["docker", "network", "rm", svc.network_name(repo)],
+                    check=False, timeout=30)
 
 
 @pytest.mark.skipif(not svc.docker_available(), reason="Docker injoignable")

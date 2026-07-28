@@ -9,6 +9,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.39] - 2026-07-28
+
+### Ajouté
+
+- **Les services d'un dépôt partagent un réseau Docker et se joignent par leur
+  nom.** Un lab a souvent besoin de plusieurs conteneurs — une application et sa
+  base. Sur le bridge par défaut de Docker, aucune résolution par nom n'existe :
+  l'application ne peut joindre sa base que par une IP que personne ne connaît
+  d'avance, si bien qu'un tel lab ne pouvait tout simplement pas se déclarer.
+  Chaque service rejoint désormais un réseau *user-defined* `dsoxlab-<repo_id>`
+  avec son `name` déclaré pour alias, ce qui rend `DATASOURCES_DEFAULT_HOST: db`
+  écrivable dans un `lab.yaml`. Le réseau est créé à la demande et survit à une
+  création concurrente.
+
 ## [0.1.38] - 2026-07-28
 
 ### Ajouté

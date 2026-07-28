@@ -53,6 +53,35 @@ def container_name(repo_id: str, service: Service) -> str:
     return f"dsoxlab-{slug}"
 
 
+def network_name(repo_id: str) -> str:
+    """Réseau partagé par les services d'un même dépôt."""
+    return f"dsoxlab-{_NAME_SAFE.sub('-', repo_id)}"
+
+
+def _ensure_network(name: str) -> None:
+    """Crée le réseau s'il n'existe pas. Idempotent.
+
+    Un lab a souvent besoin de plusieurs conteneurs qui se parlent — une
+    application et sa base. Sur le bridge par défaut de Docker, ils n'ont
+    aucune résolution par nom : l'application ne peut joindre sa base que par
+    une IP qu'on ne connaît pas d'avance. Un réseau *user-defined* apporte le
+    DNS interne, et c'est la seule façon d'écrire `DB_HOST: db` dans un lab.
+    """
+    if run_command(["docker", "network", "inspect", name],
+                   check=False, timeout=15).ok:
+        return
+    res = run_command(["docker", "network", "create", name], check=False, timeout=30)
+    if res.ok:
+        return
+    # Deux labs démarrés en parallèle peuvent le créer en même temps : ce n'est
+    # un échec que si le réseau n'existe toujours pas après coup.
+    if not run_command(["docker", "network", "inspect", name],
+                       check=False, timeout=15).ok:
+        raise ServiceError(
+            f"Impossible de créer le réseau '{name}' :\n{res.stderr.strip()}"
+        )
+
+
 def docker_available() -> bool:
     """True si le CLI ``docker`` répond (moteur joignable)."""
     try:
@@ -163,7 +192,15 @@ def start(service: Service, repo_id: str) -> str:
     if _exists(name):
         run_command(["docker", "rm", "-f", name], check=False, timeout=30)
 
-    cmd = ["docker", "run", "-d", "--name", name]
+    # Réseau partagé + alias : depuis un autre service du même dépôt, celui-ci
+    # se joint par son `name` déclaré (`db`, `vault`…), pas par le nom complet
+    # du conteneur. C'est ce qui rend `DATASOURCES_DEFAULT_HOST: db` écrivable
+    # dans un lab.yaml.
+    reseau = network_name(repo_id)
+    _ensure_network(reseau)
+
+    cmd = ["docker", "run", "-d", "--name", name,
+           "--network", reseau, "--network-alias", service.name]
     for mapping in service.ports:
         cmd += ["-p", mapping]
     for key, value in service.env.items():

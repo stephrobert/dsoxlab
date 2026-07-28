@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.39] - 2026-07-28
+
+### Added
+
+- **Services of a repository share a Docker network, and reach each other by
+  name.** A lab often needs more than one container — an application and its
+  database. On Docker's default bridge there is no name resolution: the
+  application can only reach the database through an IP nobody knows in advance,
+  so such a lab could not be declared at all. Each service now joins a
+  *user-defined* network `dsoxlab-<repo_id>` with its declared `name` as alias,
+  which is what makes `DATASOURCES_DEFAULT_HOST: db` writable in a `lab.yaml`.
+  The network is created on demand and survives a concurrent creation.
+
 ## [0.1.38] - 2026-07-28
 
 ### Added

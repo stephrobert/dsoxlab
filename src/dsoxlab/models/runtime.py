@@ -95,7 +95,12 @@ class Service:
     """Nom court du service, unique dans le lab (ex. ``db``, ``cloud``).
 
     Le conteneur est nommé ``dsoxlab-<repo_id>-<name>`` pour éviter toute
-    collision entre dépôts de labs."""
+    collision entre dépôts de labs.
+
+    C'est aussi le **nom d'hôte** sous lequel les autres services du dépôt le
+    joignent : tous partagent un réseau Docker *user-defined*, où ce nom est
+    résolu par le DNS interne. Un lab à deux conteneurs écrit donc
+    ``DB_HOST: db`` et non une IP, qu'il ne pourrait pas connaître d'avance."""
 
     image: str
     """Image du conteneur, tag compris (ex. ``postgres:16``). REQUIS."""
