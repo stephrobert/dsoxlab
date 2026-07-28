@@ -5,6 +5,11 @@ de cloud, une base de données, un registre). Le lab la déclare dans
 ``runtime.services`` (voir :class:`dsoxlab.models.runtime.Service`), et ce module
 démarre le conteneur avant ``run``/``check`` et l'arrête à ``destroy``/``clean``.
 
+Un conteneur debout n'est pas toujours un service utilisable : une base veut son
+schéma, un coffre ses secrets. ``post_start`` joue ces commandes dans le
+conteneur une fois le service prêt, ce qui évite au lab de fournir un script
+bash d'initialisation que l'apprenant devrait penser à lancer.
+
 **dsoxlab reste agnostique.** Ce module lance **l'image que le lab déclare**, sur
 les ports que le lab déclare, et ne connaît ni le cloud, ni le produit émulé.
 Aucune chaîne « aws », « floci » ou autre n'apparaît ici : toute la spécificité
@@ -81,23 +86,78 @@ def _wait_tcp(port: int, timeout: int) -> bool:
     return False
 
 
+def _wait_exec(name: str, argv: list[str], timeout: int) -> bool:
+    """Rejoue une sonde DANS le conteneur jusqu'à ce qu'elle réussisse.
+
+    C'est le seul signal fiable de disponibilité quand le port est publié :
+    ``_wait_tcp`` interroge alors le proxy de Docker, qui accepte les connexions
+    dès le ``run``, avant que le service écoute.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        if run_command(["docker", "exec", name, *argv], check=False, timeout=30).ok:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(1)
+
+
+def _wait_ready(service: Service, name: str) -> None:
+    """Attend que le service réponde vraiment, puis rend la main.
+
+    Deux étages complémentaires : ``ready_tcp`` élimine le conteneur mort-né
+    sans rien exiger de l'image, ``ready_exec`` prouve que le service répond.
+    """
+    if service.ready_tcp and not _wait_tcp(service.ready_tcp, service.ready_timeout):
+        raise ServiceError(
+            f"Le service '{service.name}' n'a pas ouvert le port "
+            f"{service.ready_tcp} en {service.ready_timeout}s."
+        )
+    if service.ready_exec and not _wait_exec(name, service.ready_exec, service.ready_timeout):
+        raise ServiceError(
+            f"Le service '{service.name}' n'a jamais répondu à « "
+            f"{' '.join(service.ready_exec)} » en {service.ready_timeout}s."
+        )
+
+
+def _run_post_start(service: Service, name: str) -> None:
+    """Joue les commandes d'initialisation DANS le conteneur, une fois prêt.
+
+    Après ``ready_tcp``, jamais avant : un port qui accepte une connexion ne
+    garantit pas un service qui répond, et une initialisation jouée trop tôt
+    échoue de façon intermittente — le pire des symptômes à diagnostiquer.
+
+    Sans shell (``docker exec`` reçoit l'argv tel quel), donc pas d'expansion ni
+    de redirection : ce que le lab déclare est ce qui s'exécute.
+    """
+    for argv in service.post_start:
+        res = run_command(["docker", "exec", name, *argv], check=False, timeout=120)
+        if not res.ok:
+            raise ServiceError(
+                f"L'initialisation du service '{service.name}' a échoué sur "
+                f"« {' '.join(argv)} » :\n{(res.stderr or res.stdout).strip()}"
+            )
+
+
 def start(service: Service, repo_id: str) -> str:
     """Démarre (ou réutilise) le conteneur d'un service et attend sa disponibilité.
 
     Idempotent : si le conteneur tourne déjà, on ne le recrée pas. S'il existe
     mais est arrêté, on le retire d'abord. Retourne le nom du conteneur.
 
+    ``post_start`` est rejoué dans les deux cas, y compris sur un conteneur
+    réutilisé : c'est ce qui rend l'état de départ identique d'un lab à l'autre,
+    quel que soit ce que l'exercice précédent a laissé derrière lui.
+
     Raises:
-        ServiceError: Docker indisponible, échec du ``run``, ou service jamais prêt.
+        ServiceError: Docker indisponible, échec du ``run``, service jamais
+            prêt, ou commande ``post_start`` en échec.
     """
     name = container_name(repo_id, service)
 
     if _is_running(name):
-        if service.ready_tcp and not _wait_tcp(service.ready_tcp, service.ready_timeout):
-            raise ServiceError(
-                f"Le service '{service.name}' tourne mais son port "
-                f"{service.ready_tcp} ne répond pas."
-            )
+        _wait_ready(service, name)
+        _run_post_start(service, name)
         return name
 
     if _exists(name):
@@ -117,11 +177,8 @@ def start(service: Service, repo_id: str) -> str:
             f"Le démarrage du service '{service.name}' a échoué :\n{res.stderr.strip()}"
         )
 
-    if service.ready_tcp and not _wait_tcp(service.ready_tcp, service.ready_timeout):
-        raise ServiceError(
-            f"Le service '{service.name}' n'a pas ouvert le port "
-            f"{service.ready_tcp} en {service.ready_timeout}s."
-        )
+    _wait_ready(service, name)
+    _run_post_start(service, name)
     return name
 
 

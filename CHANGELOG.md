@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.38] - 2026-07-28
+
+### Added
+
+- **`runtime.services[].post_start`: a service can be initialised, not just
+  started.** A container that boots is rarely a usable service — a database
+  wants its schema, a vault its secrets, a registry its repository. Until now
+  that step fell back to a bash script at the lab root, which the learner had to
+  remember to run: labs that skipped when the service was missing, or failed
+  when it was there but empty. The declared commands run inside the container
+  once it is ready, through `docker exec` with **no shell** (no expansion, no
+  pipe, no redirection). Each entry may be written as a readable string
+  (`vault kv put secret/lab k=v`, split the way a shell would, quotes honoured)
+  or as an explicit argv (`["vault", "kv", "put", …]`).
+
+  They are **replayed on every start**, including on a container that was
+  already up: that is what makes the starting state identical from one lab to
+  the next, whatever the previous exercise left behind — so they must be
+  idempotent, exactly like a `setup.yaml`. A failing command raises
+  `ServiceError` and stops the lab, naming the offending command and the
+  service output, rather than letting the tests record a silent zero.
+
+  dsoxlab stays domain-agnostic: it runs what the lab declares and knows nothing
+  of secrets or schemas.
+
+- **`runtime.services[].ready_exec`: the only trustworthy readiness signal.**
+  `ready_tcp` alone is a **false positive whenever the port is published**:
+  Docker installs its proxy on the host port at `run` time, and that proxy
+  accepts connections before the service listens. Measured, not assumed — a
+  connection succeeds on a `-p 8299:1234` whose container listens nowhere. The
+  probe declared here runs *inside* the container (`vault status`,
+  `pg_isready`, `redis-cli ping`…) and is retried until it succeeds or
+  `ready_timeout` expires. It must be side-effect free; initialisation belongs
+  in `post_start`, which now waits for the probe.
+
+### Fixed
+
+- **`ready_tcp` documented as what it is: a HOST port.** The docstring said
+  "in the container, host side", which reads either way. It matters as soon as
+  a lab remaps to cohabit: with `ports: ["8201:8200"]`, a `ready_tcp: 8200`
+  probes the host's 8200 — somebody else's service — and declares it ready.
+
 ## [0.1.37] - 2026-07-28
 
 ### Fixed

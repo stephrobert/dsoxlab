@@ -9,6 +9,50 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.38] - 2026-07-28
+
+### Ajouté
+
+- **`runtime.services[].post_start` : un service peut être initialisé, pas
+  seulement démarré.** Un conteneur qui boote est rarement un service
+  utilisable : une base veut son schéma, un coffre ses secrets, un registre son
+  dépôt. Jusqu'ici cette étape retombait sur un script bash à la racine du lab,
+  que l'apprenant devait penser à lancer — d'où des labs qui se skippent quand
+  le service manque, ou qui échouent quand il est là mais vide. Les commandes
+  déclarées sont jouées dans le conteneur une fois le service prêt, par
+  `docker exec` et **sans shell** (ni expansion, ni pipe, ni redirection).
+  Chaque entrée s'écrit au choix en chaîne lisible
+  (`vault kv put secret/lab k=v`, découpée à la manière du shell, guillemets
+  respectés) ou en argv explicite (`["vault", "kv", "put", …]`).
+
+  Elles sont **rejouées à chaque démarrage**, y compris sur un conteneur déjà
+  debout : c'est ce qui rend l'état de départ identique d'un lab à l'autre,
+  quoi qu'ait laissé l'exercice précédent — elles doivent donc être
+  idempotentes, au même titre qu'un `setup.yaml`. Une commande en échec lève
+  `ServiceError` et arrête le lab en nommant la commande fautive et la sortie du
+  service, plutôt que de laisser les tests enregistrer un 0 silencieux.
+
+  dsoxlab reste agnostique du domaine : il exécute ce que le lab déclare, et ne
+  sait ni ce qu'est un secret ni ce qu'est un schéma.
+
+- **`runtime.services[].ready_exec` : le seul signal fiable de disponibilité.**
+  `ready_tcp` seul est un **faux positif dès que le port est publié** : Docker
+  installe son proxy sur le port de l'hôte **au moment du `run`**, et ce proxy
+  accepte les connexions avant que le service écoute. Mesuré, pas supposé — une
+  connexion réussit sur un `-p 8299:1234` dont le conteneur n'écoute nulle part.
+  La sonde déclarée ici s'exécute **dans** le conteneur (`vault status`,
+  `pg_isready`, `redis-cli ping`…) et est réessayée jusqu'à son succès ou
+  l'expiration de `ready_timeout`. Elle doit être sans effet : l'initialisation,
+  c'est `post_start`, qui attend désormais que la sonde soit satisfaite.
+
+### Corrigé
+
+- **`ready_tcp` documenté pour ce qu'il est : un port de l'HÔTE.** La docstring
+  disait « dans le conteneur, côté hôte », ce qui se lit dans les deux sens. La
+  nuance devient un piège dès qu'un lab remappe pour cohabiter : avec
+  `ports: ["8201:8200"]`, un `ready_tcp: 8200` sonde le 8200 de l'hôte, donc le
+  service de quelqu'un d'autre, et le déclare prêt.
+
 ## [0.1.37] - 2026-07-28
 
 ### Corrigé

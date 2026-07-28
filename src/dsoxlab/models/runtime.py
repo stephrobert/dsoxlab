@@ -113,11 +113,57 @@ class Service:
     """Variables d'environnement du conteneur, passées en ``-e NOM=valeur``."""
 
     ready_tcp: int = 0
-    """Port TCP (dans le conteneur, côté hôte) à sonder jusqu'à ce qu'il
-    accepte une connexion. 0 = pas d'attente TCP."""
+    """Port **de l'hôte** à sonder jusqu'à ce qu'il accepte une connexion.
+    0 = pas d'attente TCP.
+
+    C'est bien le port publié, celui de gauche dans ``ports``, pas celui du
+    conteneur : la sonde ouvre une connexion sur ``127.0.0.1``. La distinction
+    n'a l'air de rien tant que les deux coïncident, et devient un piège dès
+    qu'on remappe pour cohabiter — avec ``ports: ["8201:8200"]``, un
+    ``ready_tcp: 8200`` sonderait le 8200 de l'hôte, donc **le service de
+    quelqu'un d'autre**, et le déclarerait prêt. Écrire ``ready_tcp: 8201``."""
+
+    ready_exec: list[str] = field(default_factory=list)
+    """Commande de SONDE jouée dans le conteneur jusqu'à ce qu'elle réussisse.
+
+    ``ready_tcp`` ne suffit pas dès que le port est publié : Docker installe un
+    proxy sur le port de l'hôte **au moment du ``run``**, et ce proxy accepte
+    les connexions avant que le service écoute — vérifié, une connexion réussit
+    sur un ``-p 8299:1234`` dont le conteneur n'écoute nulle part. La sonde TCP
+    répond donc « prêt » quasi immédiatement, et ce qui suit part trop tôt.
+
+    Cette commande, elle, s'exécute **dans** le conteneur et interroge le
+    service lui-même (``vault status``, ``pg_isready``, ``redis-cli ping``…).
+    Elle est réessayée jusqu'à ``ready_timeout``. Elle doit être **sans effet** :
+    c'est une question posée au service, pas une initialisation — celle-ci vit
+    dans ``post_start``, qui ne tourne qu'une fois la sonde satisfaite."""
 
     ready_timeout: int = 90
-    """Délai maximum, en secondes, pour que le service devienne disponible."""
+    """Délai maximum, en secondes, pour que le service devienne disponible.
+
+    Vaut pour ``ready_tcp`` et ``ready_exec``."""
+
+    post_start: list[list[str]] = field(default_factory=list)
+    """Commandes à jouer DANS le conteneur une fois le service prêt.
+
+    Un conteneur qui démarre est rarement un service utilisable : une base veut
+    son schéma, un coffre veut ses secrets, un registre veut son dépôt. Sans ce
+    crochet, cette initialisation retombait sur un script bash à la racine du
+    lab, que l'apprenant devait penser à lancer — donc un lab qui se skippe ou
+    qui échoue selon l'humeur du poste.
+
+    Chaque entrée est un **argv** exécuté par ``docker exec``, sans shell : pas
+    d'expansion, pas de pipe, pas de redirection. Le ``lab.yaml`` peut l'écrire
+    en liste (``["vault", "kv", "put", "secret/x", "k=v"]``) ou en chaîne
+    (``vault kv put secret/x k=v``), découpée à la manière du shell.
+
+    **Ces commandes sont rejouées à chaque démarrage**, y compris quand le
+    conteneur tournait déjà : c'est ce qui garantit un état de départ identique
+    d'un lab à l'autre. Elles doivent donc être idempotentes, au même titre
+    qu'un ``setup.yaml``.
+
+    dsoxlab ne les interprète pas : il ne sait pas ce qu'est un secret ni un
+    schéma, il exécute ce que le lab déclare."""
 
 
 @dataclass
