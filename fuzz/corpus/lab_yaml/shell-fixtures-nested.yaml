@@ -1,0 +1,14 @@
+id: l2-module-local
+title: Ship a local module as a fixture
+level: intermediate
+skills: [terraform, modules]
+distros: [any]
+doc_url: https://blog.stephane-robert.info/docs/infra-as-code/provisionnement/terraform/
+runtime:
+  type: shell
+  workdir: challenge/work
+  fixtures:
+    - versions.tf
+    - main.tf
+    - modules/stockage/main.tf
+    - reference/etat-initial.tfstate
