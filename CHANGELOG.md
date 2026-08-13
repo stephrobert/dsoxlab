@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.40] - 2026-08-13
+
+### Fixed
+
+- **A running container is reused only if it matches the declaration.** Reuse
+  was decided on the container name alone. Two labs of the same repository
+  declaring a service under the same `name` but with different `ports`, `env`,
+  `image` or `run_args` therefore shared whichever container came first: the
+  second lab started against a service that had neither its ports nor its
+  launch arguments, failed where the learner had done nothing wrong, and nothing
+  reported why. The declared configuration is now stamped on the container as a
+  label at `docker run` and compared on reuse; a divergent container is
+  replaced. A container left by an earlier version carries no label, so it is
+  treated as divergent and recreated once.
+
 ## [0.1.39] - 2026-07-28
 
 ### Added

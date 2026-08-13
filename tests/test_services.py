@@ -162,14 +162,16 @@ def test_ready_exec_jamais_satisfaite_leve(monkeypatch: pytest.MonkeyPatch) -> N
         stdout = ""
         stderr = ""
 
-    monkeypatch.setattr(svc, "_is_running", lambda name: True)
-    monkeypatch.setattr(svc, "run_command", lambda cmd, **kw: _Res())
-    monkeypatch.setattr(svc.time, "sleep", lambda s: None)
-
     # ready_timeout=0 : la deadline est atteinte dès le premier échec. Figer
     # `monotonic` à une constante rendrait au contraire la sortie de boucle
     # inatteignable, et le test tournerait indéfiniment — vécu à l'écriture.
     service = Service(name="vault", image="x", ready_exec=["vault", "status"], ready_timeout=0)
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: True)
+    monkeypatch.setattr(svc, "_running_fingerprint",
+                        lambda name: svc._config_fingerprint(service))
+    monkeypatch.setattr(svc, "run_command", lambda cmd, **kw: _Res())
+    monkeypatch.setattr(svc.time, "sleep", lambda s: None)
     with pytest.raises(svc.ServiceError) as exc:
         svc.start(service, "repo")
     assert "vault status" in str(exc.value)
@@ -328,15 +330,116 @@ def test_post_start_rejoue_sur_conteneur_deja_debout(monkeypatch: pytest.MonkeyP
         stdout = ""
         stderr = ""
 
+    service = Service(name="vault", image="x", post_start=[["init"]])
+
     monkeypatch.setattr(svc, "_is_running", lambda name: True)
+    # Le conteneur en place porte bien la configuration déclarée : c'est la
+    # condition de la réutilisation depuis 0.1.40.
+    monkeypatch.setattr(svc, "_running_fingerprint",
+                        lambda name: svc._config_fingerprint(service))
     monkeypatch.setattr(svc, "run_command",
                         lambda cmd, **kw: (appels.append(list(cmd)), _Res())[1])
 
-    service = Service(name="vault", image="x", post_start=[["init"]])
     svc.start(service, "repo")
 
     assert ["docker", "exec", "dsoxlab-repo-vault", "init"] in appels
     assert not [c for c in appels if c[:2] == ["docker", "run"]]  # pas de recréation
+
+
+def test_conteneur_debout_mais_config_divergente_est_recree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deux labs, un même nom de service, des options différentes.
+
+    Le conteneur laissé par le lab précédent n'a ni les ports ni les arguments
+    que celui-ci déclare. Le réutiliser donnerait un lab inutilisable sans que
+    rien ne le signale : il doit être remplacé.
+    """
+    appels: list[list[str]] = []
+
+    class _Res:
+        ok = True
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: True)
+    monkeypatch.setattr(svc, "_exists", lambda name: True)
+    monkeypatch.setattr(svc, "_wait_ready", lambda service, name: None)
+    monkeypatch.setattr(svc, "_running_fingerprint", lambda name: "empreinte-du-lab-precedent")
+    monkeypatch.setattr(svc, "run_command",
+                        lambda cmd, **kw: (appels.append(list(cmd)), _Res())[1])
+
+    service = Service(name="cloud", image="x", ports=["14566:4566"],
+                      run_args=["-u", "root", "-v", "/var/run/docker.sock:/var/run/docker.sock"])
+    svc.start(service, "repo")
+
+    assert ["docker", "rm", "-f", "dsoxlab-repo-cloud"] in appels
+    lancements = [c for c in appels if c[:2] == ["docker", "run"]]
+    assert len(lancements) == 1, "le conteneur divergent doit être relancé"
+    assert "-v" in lancements[0] and "14566:4566" in lancements[0]
+
+
+def test_le_lancement_estampille_la_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sans label posé au `run`, la comparaison suivante ne peut rien conclure."""
+    appels: list[list[str]] = []
+
+    class _Res:
+        ok = True
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: False)
+    monkeypatch.setattr(svc, "_exists", lambda name: False)
+    monkeypatch.setattr(svc, "_wait_ready", lambda service, name: None)
+    monkeypatch.setattr(svc, "run_command",
+                        lambda cmd, **kw: (appels.append(list(cmd)), _Res())[1])
+
+    service = Service(name="cloud", image="x", ports=["14566:4566"])
+    svc.start(service, "repo")
+
+    lancement = [c for c in appels if c[:2] == ["docker", "run"]][0]
+    attendu = f"{svc._CONFIG_LABEL}={svc._config_fingerprint(service)}"
+    assert "--label" in lancement
+    assert attendu in lancement
+
+
+def test_l_empreinte_distingue_ce_qui_change_le_conteneur() -> None:
+    """Image, ports, variables et arguments bruts font un conteneur différent."""
+    base = Service(name="cloud", image="img:1", ports=["4566:4566"],
+                   env={"A": "1"}, run_args=["-u", "root"])
+    empreinte = svc._config_fingerprint(base)
+
+    assert empreinte == svc._config_fingerprint(
+        Service(name="cloud", image="img:1", ports=["4566:4566"],
+                env={"A": "1"}, run_args=["-u", "root"])
+    )
+    # Le nom du service ne change pas le conteneur produit : il nomme déjà le
+    # conteneur, et l'inclure ferait diverger l'empreinte pour rien.
+    assert empreinte != svc._config_fingerprint(
+        Service(name="cloud", image="img:2", ports=["4566:4566"],
+                env={"A": "1"}, run_args=["-u", "root"]))
+    assert empreinte != svc._config_fingerprint(
+        Service(name="cloud", image="img:1", ports=["14566:4566"],
+                env={"A": "1"}, run_args=["-u", "root"]))
+    assert empreinte != svc._config_fingerprint(
+        Service(name="cloud", image="img:1", ports=["4566:4566"],
+                env={"A": "2"}, run_args=["-u", "root"]))
+    assert empreinte != svc._config_fingerprint(
+        Service(name="cloud", image="img:1", ports=["4566:4566"],
+                env={"A": "1"}, run_args=["-u", "nobody"]))
+
+
+def test_conteneur_sans_label_est_traite_comme_divergent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un conteneur d'une version antérieure n'a pas de label : on le recrée une fois."""
+    class _Res:
+        ok = True
+        stdout = "null"
+        stderr = ""
+
+    monkeypatch.setattr(svc, "run_command", lambda cmd, **kw: _Res())
+    assert svc._running_fingerprint("dsoxlab-repo-cloud") is None
 
 
 def test_post_start_en_echec_leve_service_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -346,10 +449,13 @@ def test_post_start_en_echec_leve_service_error(monkeypatch: pytest.MonkeyPatch)
         stdout = ""
         stderr = "permission denied on secret/lab"
 
+    service = Service(name="vault", image="x", post_start=[["vault", "kv", "put", "secret/lab"]])
+
     monkeypatch.setattr(svc, "_is_running", lambda name: True)
+    monkeypatch.setattr(svc, "_running_fingerprint",
+                        lambda name: svc._config_fingerprint(service))
     monkeypatch.setattr(svc, "run_command", lambda cmd, **kw: _Res())
 
-    service = Service(name="vault", image="x", post_start=[["vault", "kv", "put", "secret/lab"]])
     with pytest.raises(svc.ServiceError) as exc:
         svc.start(service, "repo")
     # Le message doit nommer la commande fautive ET la sortie du service : sans

@@ -21,6 +21,8 @@ est nommé ``dsoxlab-<repo_id>-<service>`` pour éviter les collisions entre dé
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import socket
 import time
@@ -103,6 +105,51 @@ def _exists(name: str) -> bool:
     return run_command(["docker", "inspect", name], check=False, timeout=15).ok
 
 
+_CONFIG_LABEL = "info.dsoxlab.service-config"
+
+
+def _config_fingerprint(service: Service) -> str:
+    """Empreinte de ce que le lab déclare : image, ports, env, arguments bruts.
+
+    Deux labs d'un même dépôt qui déclarent un service de même ``name`` visent
+    le même nom de conteneur. Si leurs déclarations diffèrent, le conteneur du
+    premier ne convient pas au second, et le réutiliser tel quel donne un lab
+    silencieusement inutilisable.
+    """
+    charge = json.dumps(
+        {
+            "image": service.image,
+            "ports": list(service.ports),
+            "env": dict(sorted(service.env.items())),
+            "run_args": list(service.run_args),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(charge.encode("utf-8")).hexdigest()[:16]
+
+
+def _running_fingerprint(name: str) -> str | None:
+    """Empreinte portée par le conteneur en place, ``None`` s'il n'en a pas.
+
+    Un conteneur créé par une version antérieure de dsoxlab n'a pas le label :
+    il est alors traité comme divergent, donc recréé une fois.
+    """
+    res = run_command(
+        ["docker", "inspect", "-f", "{{json .Config.Labels}}", name],
+        check=False,
+        timeout=15,
+    )
+    if not res.ok:
+        return None
+    try:
+        labels = json.loads(res.stdout.strip() or "null") or {}
+    except json.JSONDecodeError:
+        return None
+    valeur = labels.get(_CONFIG_LABEL)
+    return valeur if isinstance(valeur, str) else None
+
+
 def _wait_tcp(port: int, timeout: int) -> bool:
     """Sonde ``localhost:port`` jusqu'à acceptation d'une connexion, ou timeout."""
     deadline = time.monotonic() + timeout
@@ -171,8 +218,16 @@ def _run_post_start(service: Service, name: str) -> None:
 def start(service: Service, repo_id: str) -> str:
     """Démarre (ou réutilise) le conteneur d'un service et attend sa disponibilité.
 
-    Idempotent : si le conteneur tourne déjà, on ne le recrée pas. S'il existe
-    mais est arrêté, on le retire d'abord. Retourne le nom du conteneur.
+    Idempotent : si le conteneur tourne déjà **avec la configuration déclarée**,
+    on ne le recrée pas. S'il existe mais est arrêté, on le retire d'abord.
+    Retourne le nom du conteneur.
+
+    La réutilisation compare l'empreinte de la déclaration à celle du conteneur
+    en place. Sans cette comparaison, deux labs d'un même dépôt déclarant un
+    service homonyme aux options différentes se partagent le conteneur du
+    premier arrivé : le second démarre sur un service qui n'a ni ses ports, ni
+    ses variables, ni ses arguments de lancement, et le lab échoue là où
+    l'apprenant n'a rien fait de faux.
 
     ``post_start`` est rejoué dans les deux cas, y compris sur un conteneur
     réutilisé : c'est ce qui rend l'état de départ identique d'un lab à l'autre,
@@ -183,8 +238,9 @@ def start(service: Service, repo_id: str) -> str:
             prêt, ou commande ``post_start`` en échec.
     """
     name = container_name(repo_id, service)
+    empreinte = _config_fingerprint(service)
 
-    if _is_running(name):
+    if _is_running(name) and _running_fingerprint(name) == empreinte:
         _wait_ready(service, name)
         _run_post_start(service, name)
         return name
@@ -200,7 +256,8 @@ def start(service: Service, repo_id: str) -> str:
     _ensure_network(reseau)
 
     cmd = ["docker", "run", "-d", "--name", name,
-           "--network", reseau, "--network-alias", service.name]
+           "--network", reseau, "--network-alias", service.name,
+           "--label", f"{_CONFIG_LABEL}={empreinte}"]
     for mapping in service.ports:
         cmd += ["-p", mapping]
     for key, value in service.env.items():
