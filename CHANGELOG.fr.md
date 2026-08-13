@@ -9,6 +9,22 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.40] - 2026-08-13
+
+### Corrigé
+
+- **Un conteneur debout n'est réutilisé que s'il correspond à la déclaration.**
+  La réutilisation se décidait sur le seul nom du conteneur. Deux labs d'un même
+  dépôt déclarant un service sous le même `name` mais avec des `ports`, `env`,
+  `image` ou `run_args` différents se partageaient donc le conteneur du premier
+  arrivé : le second démarrait sur un service qui n'avait ni ses ports ni ses
+  arguments de lancement, échouait là où l'apprenant n'avait rien fait de faux,
+  et rien n'en disait la raison. La configuration déclarée est désormais
+  estampillée sur le conteneur en label au `docker run`, puis comparée à la
+  réutilisation ; un conteneur divergent est remplacé. Un conteneur laissé par
+  une version antérieure ne porte pas de label : il est traité comme divergent
+  et recréé une fois.
+
 ## [0.1.39] - 2026-07-28
 
 ### Ajouté
