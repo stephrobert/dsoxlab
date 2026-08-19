@@ -325,6 +325,8 @@ silent.
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installed: {path}  →  {source}",
+    "install_wrapper_deja":
+        "A launcher already points at this binary ({path}): it most likely comes from `uv tool install` or pipx. Leaving it alone, since overwriting it would only undo what their next upgrade restores.",
     "install_completion":           "Completion script: {path}",
     "install_rc":                   "Shell config updated: {path} — reload with: exec $SHELL",
     "install_completion_unsupported": "Auto-completion not supported for shell: {shell} (bash and zsh only).",

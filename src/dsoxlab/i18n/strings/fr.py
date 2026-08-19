@@ -323,6 +323,8 @@ hors ligne, elle se tait.
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installé : {path}  →  {source}",
+    "install_wrapper_deja":
+        "Un lanceur mène déjà à ce binaire ({path}) : il vient probablement de « uv tool install » ou de pipx. On n'y touche pas, l'écraser ne ferait que défaire ce que leur prochaine mise à jour remettra.",
     "install_completion":           "Script de complétion : {path}",
     "install_rc":                   "Config shell mise à jour : {path} — rechargez avec : exec $SHELL",
     "install_completion_unsupported": "Auto-complétion non supportée pour le shell : {shell} (bash et zsh uniquement).",

@@ -9,6 +9,46 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.43] - 2026-08-19
+
+Trois défauts qui ne se manifestaient que chez l'utilisateur : une complétion
+qui ne complétait pas, un lanceur qui ne lançait pas, et une CLI qui refusait
+de démarrer à cause de son propre fichier d'état.
+
+### Corrigé
+
+- **La complétion interrogeait la CLI par une variable qu'elle n'écoute pas.**
+  Le script généré employait `_DSOXL_COMPLETE`, quand Click dérive
+  `_DSOXLAB_COMPLETE` du nom du programme. dsoxlab répondait donc par sa page
+  d'aide, que le shell tentait d'évaluer à chaque tabulation. Le fichier zsh
+  était mal nommé par-dessus (`_dsoxl` au lieu de `_dsoxlab`), donc zsh ne le
+  chargeait jamais, quel qu'en soit le contenu. La variable est désormais
+  dérivée du nom du programme au lieu d'être recopiée : les deux ne peuvent
+  plus diverger.
+
+- **Le wrapper généré cassait sur tout chemin contenant une espace.** Il
+  écrivait `exec /home/moi/My Tools/dsoxlab "$@"` sans quoting, ce que le shell
+  découpait en deux arguments avant de répondre « not found ». Le chemin passe
+  maintenant par `shlex.quote`.
+
+- **`dsoxlab install` n'écrase plus le lanceur de `uv tool` ni de `pipx`.** Il
+  écrit exactement là où ces outils posent le leur. Le dégât était pire qu'un
+  simple écrasement, et il a fallu un test de mutation pour le voir : écrire
+  dans un lien symbolique écrit dans **sa cible**, donc dsoxlab remplaçait le
+  binaire réel de uv par un script qui s'exécutait lui-même. Le lien survivait,
+  `resolve()` ne bougeait pas, et la commande bouclait à l'infini. Quand un
+  lanceur mène déjà à ce binaire, on n'y touche plus.
+
+- **Un `.dsoxlab-context.json` malformé n'emporte plus toute la CLI.** Le
+  `except` ne couvrait que `JSONDecodeError` et `OSError`, alors que `null`
+  levait `TypeError`, `"foo"` levait `ValueError`, une racine non-objet levait
+  `AttributeError`, et un fichier d'octets arbitraires levait
+  `UnicodeDecodeError`, qui descend de `ValueError` et non d'`OSError`. Treize
+  formes malformées sont désormais absorbées en un contexte vide, avec un
+  avertissement qui nomme le fichier. Perdre le contexte coûte un
+  `dsoxlab use` ; lever coûtait toutes les commandes, y compris celles qui
+  n'ont rien à voir avec lui.
+
 ## [0.1.42] - 2026-08-19
 
 Un audit joué sur une VM Ubuntu 24.04 neuve a mesuré **six interventions non
