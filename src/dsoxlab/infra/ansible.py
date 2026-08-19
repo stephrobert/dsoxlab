@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import tempfile
 from collections.abc import Callable
 from contextlib import suppress
@@ -65,12 +66,32 @@ class AnsibleNotInstalled(RuntimeError):
 
 
 def is_available() -> bool:
-    """Retourne True si ``ansible-runner`` est importable et opérationnel."""
+    """True si un playbook peut réellement être joué.
+
+    Tester le seul import d'``ansible_runner`` ne suffit pas, et c'est un faux
+    positif coûteux : ``ansible-runner`` **ne tire pas** ``ansible-core``, et le
+    binaire qu'il finit par exécuter est ``ansible-playbook``. Sur une machine
+    où il manque, ce diagnostic répondait « OK » pendant que tout ``dsoxlab
+    run`` sur un lab ``vm`` sortait en ``rc=127``, sans que rien ne relie les
+    deux.
+
+    On vérifie donc les deux moitiés : la bibliothèque, et l'exécutable.
+    """
     try:
         import ansible_runner  # noqa: F401
     except ImportError:
         return False
-    return True
+    return has_ansible_playbook()
+
+
+def has_ansible_playbook() -> bool:
+    """``ansible-playbook`` est-il dans le PATH ?
+
+    Séparé d'``is_available()`` pour que le diagnostic puisse distinguer les
+    deux causes : la bibliothèque absente et l'exécutable absent ne se
+    réparent pas de la même façon.
+    """
+    return shutil.which("ansible-playbook") is not None
 
 
 def run_playbook(
@@ -107,11 +128,23 @@ def run_playbook(
         AnsibleNotInstalled: Si ``ansible-runner`` n'est pas importable.
         FileNotFoundError: Si le playbook n'existe pas.
     """
-    if not is_available():
+    # Les deux moitiés manquent pour des raisons différentes et se réparent
+    # différemment : les confondre dans un seul message envoyait l'utilisateur
+    # réinstaller une bibliothèque qu'il avait déjà.
+    try:
+        import ansible_runner  # noqa: F401
+    except ImportError:
         raise AnsibleNotInstalled(
-            "ansible-runner non installé. Lance : "
+            "ansible-runner n'est pas installé. Lance : "
             "uv tool install --force --with ansible-runner dsoxlab "
             "ou : pipx inject dsoxlab ansible-runner"
+        ) from None
+
+    if not has_ansible_playbook():
+        raise AnsibleNotInstalled(
+            "ansible-playbook est absent du PATH : un lab vm ne peut pas jouer "
+            "son setup.yaml sans lui. ansible-runner pilote ansible-core mais "
+            "ne l'installe pas. Lance : uv tool install ansible-core"
         )
 
     if not playbook_path.is_file():

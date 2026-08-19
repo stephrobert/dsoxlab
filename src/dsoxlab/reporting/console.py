@@ -284,10 +284,12 @@ def print_doctor(report: DoctorReport) -> None:
     ))
 
     if report.optional:
+        # Titre et pied viennent du rapport : « non requis ici » est faux quand
+        # le dépôt a des labs vm et qu'aucun provider n'est encore choisi.
         console.print(_doctor_table(
-            _('doctor_optional_title'), report.optional, blocking=False,
+            _(report.optional_title_key), report.optional, blocking=False,
         ))
-        console.print(f"[dim]{_('doctor_optional_hint')}[/dim]")
+        console.print(f"[dim]{_(report.optional_hint_key)}[/dim]")
 
     for note in report.notes:
         console.print(f"[cyan]ℹ[/cyan] {note}")

@@ -9,6 +9,70 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.42] - 2026-08-19
+
+Un audit joué sur une VM Ubuntu 24.04 neuve a mesuré **six interventions non
+documentées** entre un `dsoxlab doctor` vert et le premier lab vm jouable. Un
+débutant s'arrête à la première. Cette version comble l'écart : le diagnostic
+nomme désormais ce qui manque, avant l'échec plutôt qu'après.
+
+### Corrigé
+
+- **`ansible-core` est déclaré en dépendance, et un lab vm peut enfin
+  tourner.** `ansible-runner` ne le tire pas, contrairement à ce qu'affirmait
+  le commentaire de ce projet : le tool installé pesait 18 Mo et son `bin/` ne
+  contenait ni `ansible` ni `ansible-playbook`. Tout `dsoxlab run` sur un lab
+  vm sortait en `rc=127`, code shell de « commande introuvable », que rien ne
+  traduisait. Le contrôle aggravait le cas en ne testant que l'import du module
+  `ansible_runner` : il répondait OK sur une machine où aucun playbook ne
+  pouvait tourner. Il teste maintenant les deux moitiés, et le message nomme
+  `ansible-core` au lieu d'envoyer réinstaller ce qui est déjà là.
+
+- **`instructor bootstrap` ne sort plus en 0 après avoir affiché une erreur
+  bloquante.** Il annonçait « ✘ terraform absent du PATH » et rendait un
+  succès. Un apprenant qui vérifie son code de retour, ou un script
+  d'installation, en concluait que tout allait bien, alors que la clé SSH
+  venait d'être créée pour une infrastructure que rien ne pourrait
+  provisionner.
+
+- **Le message d'erreur de Terraform ne renvoie plus vers une commande qui ne
+  l'installe pas.** `provision` disait « Lance : dsoxlab instructor bootstrap »,
+  qui se contente à son tour de signaler l'absence. La boucle était fermée. Il
+  donne désormais l'URL d'installation.
+
+- **`doctor` n'écrit plus « non requis ici » au-dessus d'un composant qui est
+  requis.** Sur un catalogue de 64 labs vm sur 84 dont aucun provider n'est
+  encore choisi, les deux hyperviseurs figuraient sous « Informatif, non requis
+  ici », suivis de « ces composants ne bloquent rien dans ce dépôt ». Les
+  contrôles restent délibérément hors du tableau requis, car `--fix`
+  proposerait sinon d'installer kvm **et** incus pour un choix qui n'est pas
+  fait : c'est le libellé qui devait dire la vérité.
+
+### Ajouté
+
+- **`doctor` vérifie Terraform, `ansible-playbook`, le pool libvirt et l'outil
+  ISO.** Terraform n'était vérifié nulle part, alors que `provision` ne peut
+  rien faire sans lui. Le pool libvirt `default` n'existe pas sur une
+  installation fraîche, et le provisionnement échouait sur un « Pool Not Found »
+  brut. Incus fabrique son CD-ROM `agent:config` sur l'hôte, donc sans
+  `genisoimage` aucune instance ne démarre. Chacun n'apparaît que là où il
+  s'applique : un catalogue entièrement shell n'en voit aucun, et les contrôles
+  de configuration se taisent tant que l'hyperviseur lui-même manque, pour
+  qu'une seule cause ne produise pas trois lignes rouges.
+
+- **Le pool de stockage libvirt est configurable** par
+  `meta.yml: infra.providers.kvm.storage_pool`. Le nom était écrit en dur à
+  quatre endroits du template KVM, donc un dépôt ne pouvait pas viser le sien.
+
+- **Les échecs connus du provisionnement viennent avec leur cause et leur
+  correctif.** Terraform est exact mais opaque pour qui découvre l'outil. Trois
+  messages ont une cause connue et un remède d'une ligne : AppArmor qui refuse
+  les disques des VM, le pool de stockage absent, et une machine laissée par un
+  provisionnement précédent en échec. Le cas AppArmor n'est avancé qu'**après**
+  l'échec et jamais en prédiction : mesuré sur une machine où AppArmor est
+  actif, l'override absent, et huit domaines libvirt en fonctionnement sans
+  incident, son absence ne prouve donc rien à elle seule.
+
 ## [0.1.41] - 2026-08-19
 
 ### Ajouté

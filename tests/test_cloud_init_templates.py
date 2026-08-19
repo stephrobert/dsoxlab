@@ -70,3 +70,28 @@ def test_no_orphan_cloud_init_used() -> None:
     for tmpl in cloud_init_dir.glob("*.yaml.tmpl"):
         stem = tmpl.name[: -len(".yaml.tmpl")]
         assert cloud_init_template(stem) == tmpl
+
+
+def test_le_pool_libvirt_n_est_plus_code_en_dur() -> None:
+    """Le pool `default` n'existe pas sur une installation fraîche.
+
+    Sur une Ubuntu 24.04 avec `libvirt-daemon-system`, `virsh pool-list --all`
+    est vide : le provisionnement s'arrêtait sur un « Pool Not Found » brut de
+    Terraform, sans qu'aucun réglage ne permette d'en viser un autre. Le nom
+    était écrit en dur à quatre endroits du `main.tf`.
+    """
+    main_tf = (template_root() / "terraform" / "kvm" / "main.tf").read_text(
+        encoding="utf-8"
+    )
+
+    assert not re.search(r'^\s*pool\s*=\s*"default"', main_tf, re.MULTILINE), (
+        "aucun `pool = \"default\"` ne doit rester : le pool se lit dans "
+        "provider_config, sinon un dépôt ne peut pas viser le sien"
+    )
+    assert 'storage_pool = lookup(var.provider_config, "storage_pool", "default")' in main_tf, (
+        "le pool doit venir de meta.yml: infra.providers.kvm.storage_pool, "
+        "avec `default` comme repli"
+    )
+    assert main_tf.count("pool = local.storage_pool") + main_tf.count(
+        "pool     = local.storage_pool"
+    ) == 4, "les quatre emplacements doivent tous passer par le local"

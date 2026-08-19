@@ -421,6 +421,10 @@ hors ligne, elle se tait.
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
     "check_provider": "Provider d'infra",
+    "check_terraform":    "Terraform",
+    "check_ansible":      "ansible-playbook",
+    "check_libvirt_pool": "Pool libvirt",
+    "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs détectés",
     "check_lab_home": "LAB_HOME",
 
@@ -436,6 +440,31 @@ hors ligne, elle se tait.
     "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
+    "detail_terraform_missing":
+        "introuvable : « provision » ne peut pas créer les machines",
+    "detail_ansible_missing":
+        "introuvable : « run » ne peut pas jouer le setup.yaml d'un lab vm "
+        "(ansible-runner ne l'installe pas)",
+    "detail_ansible_ok":     "présent",
+    "detail_pool_missing":
+        "le pool « {pool} » n'existe pas : « provision » échouera sur "
+        "« Pool Not Found »",
+    "detail_pool_unknown":   "non vérifiable sans virsh",
+    "explain_apparmor_denied":
+        "Cause connue : AppArmor refuse les disques des VM. virt-aa-helper ne "
+        "sait pas résoudre un disque déclaré par référence de pool, donc aucun "
+        "n'entre dans le profil du domaine. Pose l'autorisation, le droit « k » "
+        "compris (sans lui : « Failed to lock byte 100 ») :",
+    "explain_pool_not_found":
+        "Cause connue : le pool de stockage libvirt n'existe pas. Une "
+        "installation fraîche n'en déclare aucun. Crée-le :",
+    "explain_domain_exists":
+        "Cause connue : un provisionnement précédent a échoué APRÈS avoir "
+        "défini cette machine, qui n'est donc pas dans le state Terraform. "
+        "« destroy » ne peut pas la voir. Retire-la à la main :",
+    "detail_iso_tool_missing":
+        "introuvable : incus fabrique le CD-ROM agent:config sur l'hôte, "
+        "sans lui aucune VM ne démarre",
     "detail_unknown_error":  "erreur inconnue",
     "detail_labs_count":     "{count} lab(s) dans {root}",
 
@@ -449,8 +478,9 @@ hors ligne, elle se tait.
         "Le provider {provider} tourne dans le cloud : aucun hyperviseur "
         "local n'est nécessaire.",
     "doctor_note_provider_unresolved":
-        "Ce dépôt déclare plusieurs providers. Choisissez-en un avec "
-        "[bold]dsoxlab use --provider <nom>[/bold] avant de provisionner.",
+        "Ce dépôt a des labs qui exigent une VM, et aucun provider n'est "
+        "choisi. Choisissez-en un avec [bold]dsoxlab use --provider <nom>"
+        "[/bold] : tant que ce n'est pas fait, aucun de ces labs ne tourne.",
 
     # ── doctor — remédiation ──────────────────────────────────────────────────
     "fix_nothing": "Aucune remédiation nécessaire.",
@@ -523,6 +553,12 @@ hors ligne, elle se tait.
     # ── console — doctor ──────────────────────────────────────────────────────
     "doctor_table_title":    "Requis pour ce dépôt",
     "doctor_optional_title": "Informatif — non requis ici",
+    "doctor_choose_title": "Hyperviseurs : il en faut un, aucun n'est choisi",
+    "doctor_choose_hint":
+        "Ce dépôt a des labs qui exigent une VM. Choisissez un provider avec "
+        "[bold]dsoxlab use --provider <nom>[/bold], puis relancez doctor : il "
+        "ne diagnostiquera plus que celui-là. [bold]--fix[/bold] n'installe "
+        "rien tant que le choix n'est pas fait, il en faut un et non les deux.",
     "doctor_optional_hint":
         "Ces composants ne bloquent rien dans ce dépôt : [bold]--fix[/bold] "
         "ne les traite pas. Installez-les seulement si vous voulez ce provider.",

@@ -270,7 +270,8 @@ def init(
     tf_dir = workdir(repo_meta)
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     cmd = ["terraform", f"-chdir={tf_dir}", "init", "-input=false"]
@@ -411,7 +412,8 @@ def apply(
     """
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     tf_dir = workdir(repo_meta)
@@ -557,7 +559,8 @@ def destroy(
     """
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     tf_dir = workdir(repo_meta)
