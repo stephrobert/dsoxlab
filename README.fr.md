@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/dsoxlab-lockup-dark.svg">
+  <img src="docs/assets/brand/dsoxlab-lockup-light.svg" alt="dsoxlab" width="240">
+</picture>
+
 # dsoxlab — CLI DevSecOps XL Labs
 
 [![CI](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml/badge.svg)](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml)
@@ -356,6 +361,10 @@ est scanné par son propre outillage à chaque push et pull request.
   tournent en local avant chaque commit (voir [CONTRIBUTING.fr.md](./CONTRIBUTING.fr.md)).
 
 Pour signaler une vulnérabilité, suivez [SECURITY.fr.md](./SECURITY.fr.md).
+
+La marque et ses fichiers sont documentés dans
+[docs/brand.fr.md](./docs/brand.fr.md) ; **le nom et le logo ne sont pas
+couverts par la licence Apache 2.0**.
 
 ## Licence et attribution
 

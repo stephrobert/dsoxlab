@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="dsoxlab">
+  <!-- The flask is the lab, the prompt is what runs in it. Nothing else: two inks. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 15 7 H 33 M 19 7 V 18 L 9 41 H 39 L 29 18 V 7" stroke="#2563EB" stroke-width="4"/>
+    <path d="M 20 27 L 24.5 31 L 20 35" stroke="#0F172A" stroke-width="3.5"/>
+    <path d="M 27 35 H 31.5" stroke="#0F172A" stroke-width="3.5"/>
+  </g>
+</svg>
