@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from typer.testing import CliRunner
 
 from dsoxlab.cli import app
@@ -61,3 +63,50 @@ def test_un_vrai_depot_de_labs_passe_le_garde_fou(tmp_path: Path) -> None:
     assert resultat.exit_code == 0
     # La clé en place n'est pas écrasée : c'est celle des VM déjà provisionnées.
     assert (ssh_dir / "id_ed25519").read_text(encoding="utf-8") == "clé factice"
+
+
+def test_le_code_de_retour_dit_la_meme_chose_que_l_ecran(
+    tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    """Sortir en 0 après avoir affiché une erreur bloquante trompe deux fois.
+
+    Mesuré sur une machine neuve : la commande affichait « ✘ terraform absent
+    du PATH » puis rendait 0. Un apprenant qui vérifie son code de retour, ou
+    un script d'installation, en concluait que tout allait bien, alors que la
+    clé venait d'être créée pour une infrastructure que rien ne pourra
+    provisionner.
+    """
+    from dsoxlab.infra import ansible as ansible_infra
+    from dsoxlab.infra import terraform as tf
+
+    (tmp_path / "meta.yml").write_text(META_MINIMAL, encoding="utf-8")
+    monkeypatch.setattr(tf, "is_available", lambda: False)
+    monkeypatch.setattr(ansible_infra, "is_available", lambda: True)
+
+    resultat = runner.invoke(
+        app, ["instructor", "bootstrap", "--lab-home", str(tmp_path)]
+    )
+
+    assert resultat.exit_code == 1, (
+        "un outil requis manquant doit se voir dans le code de retour"
+    )
+    # La clé, elle, a bien été générée : l'échec porte sur l'outillage, et le
+    # dire sans avoir rien fait serait tout aussi faux.
+    assert (tmp_path / "ssh" / "id_ed25519").is_file()
+
+
+def test_tout_en_place_sort_en_zero(
+    tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    from dsoxlab.infra import ansible as ansible_infra
+    from dsoxlab.infra import terraform as tf
+
+    (tmp_path / "meta.yml").write_text(META_MINIMAL, encoding="utf-8")
+    monkeypatch.setattr(tf, "is_available", lambda: True)
+    monkeypatch.setattr(ansible_infra, "is_available", lambda: True)
+
+    resultat = runner.invoke(
+        app, ["instructor", "bootstrap", "--lab-home", str(tmp_path)]
+    )
+
+    assert resultat.exit_code == 0

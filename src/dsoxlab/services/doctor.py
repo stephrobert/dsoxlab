@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..i18n import _
+from ..infra import ansible as ansible_infra
 from ..models import LabDefinition, RepoMetadata
 from ..models.runtime import RuntimeType
 from .lab_service import get_all_labs, resolve_pytest_cmd
@@ -81,6 +82,17 @@ class DoctorReport:
     optional: list[Check] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     """Phrases qui expliquent *pourquoi* un composant est informatif ici."""
+
+    optional_title_key: str = "doctor_optional_title"
+    optional_hint_key: str = "doctor_optional_hint"
+    """Titre et pied du second tableau. Ils sont variables parce qu'ils
+    mentaient dans un cas précis : sur un catalogue qui compte des labs ``vm``
+    mais dont aucun provider n'est encore choisi, ce tableau s'intitulait
+    « non requis ici » et affirmait « ces composants ne bloquent rien », sous
+    les deux hyperviseurs dont l'un est indispensable pour jouer 64 labs sur
+    84. Les checks restent hors du requis, sans quoi ``--fix`` proposerait
+    d'installer kvm **et** incus pour un choix qui n'est pas fait ; c'est le
+    libellé qui devait dire la vérité, pas le classement."""
 
     def failing(self) -> list[Check]:
         return [c for c in self.required if not c.ok]
@@ -183,6 +195,177 @@ def _check_kvm() -> Check:
     return Check(_("check_kvm"), True, first_line)
 
 
+def _check_terraform() -> Check:
+    """Terraform provisionne les machines, quel que soit le provider.
+
+    Il ne figurait dans aucun contrôle, alors que ``provision`` s'arrête net
+    sans lui. Pire, son message renvoyait vers ``dsoxlab instructor bootstrap``,
+    qui se contente de signaler l'absence sans jamais l'installer : l'apprenant
+    tournait en rond entre deux commandes qui lui disaient la même chose.
+    """
+    if shutil.which("terraform") is None:
+        return Check(
+            _("check_terraform"), False, _("detail_terraform_missing"),
+            hint="https://developer.hashicorp.com/terraform/install",
+        )
+    result = subprocess.run(
+        ["terraform", "version"], capture_output=True, text=True, timeout=5,
+    )
+    first = result.stdout.splitlines()[0] if result.stdout else "ok"
+    return Check(_("check_terraform"), True, first)
+
+
+def _check_ansible() -> Check:
+    """``run`` sur un lab vm joue un playbook : il faut ``ansible-playbook``.
+
+    ``ansible-runner`` ne tire pas ``ansible-core``. Le contrôle portait sur
+    l'import de la bibliothèque, donc il était vert sur une machine où aucun
+    playbook ne pouvait tourner, et ``run`` sortait en ``rc=127`` sans que rien
+    ne relie les deux.
+    """
+    if not ansible_infra.has_ansible_playbook():
+        return Check(
+            _("check_ansible"), False, _("detail_ansible_missing"),
+            fix="uv tool install ansible-core",
+        )
+    return Check(_("check_ansible"), True, _("detail_ansible_ok"))
+
+
+def _check_libvirt_pool(pool: str) -> Check:
+    """Le template KVM écrit ses volumes dans un pool libvirt.
+
+    Une Ubuntu fraîche avec ``libvirt-daemon-system`` n'en déclare aucun :
+    ``virsh pool-list --all`` est vide, et ``provision`` échoue sur un « Pool
+    Not Found » brut de Terraform, que rien n'explique.
+
+    Le nom vient de ``meta.yml: infra.providers.kvm.storage_pool``, faute de
+    quoi ``default``. Le contrôle porte donc sur le pool que le dépôt vise
+    réellement, et non sur un nom présumé.
+    """
+    try:
+        probe = subprocess.run(
+            ["virsh", "-c", "qemu:///system", "pool-list", "--name"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # virsh absent ou injoignable : c'est le contrôle KVM qui le dira,
+        # celui-ci n'a rien à ajouter et ne doit pas doubler le rouge.
+        return Check(_("check_libvirt_pool"), True, _("detail_pool_unknown"))
+
+    if probe.returncode == 0 and pool in probe.stdout.split():
+        return Check(_("check_libvirt_pool"), True, pool)
+    return Check(
+        _("check_libvirt_pool"), False, _("detail_pool_missing", pool=pool),
+        fix=(
+            f"sudo virsh pool-define-as {pool} dir --target "
+            f"/var/lib/libvirt/images && sudo virsh pool-build {pool} && "
+            f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
+        ),
+    )
+
+
+#: Fichier d'override AppArmor qui rend les images libvirt lisibles par qemu.
+_APPARMOR_OVERRIDE = Path("/etc/apparmor.d/local/abstractions/libvirt-qemu")
+
+
+def apparmor_override_absent() -> bool:
+    """AppArmor est-il actif SANS l'override qui autorise les images libvirt ?
+
+    Volontairement **pas** un ``Check``. Sur une Ubuntu 24.04 fraîche, l'absence
+    de cet override fait échouer tout démarrage de domaine : ``virt-aa-helper``
+    construit le profil à partir du XML, or terraform-provider-libvirt déclare
+    ses disques par référence de pool (``<disk type='volume'>``), une forme
+    qu'il ne sait pas résoudre en chemin. Aucun disque n'entre dans le profil,
+    et qemu se voit tout refuser par un « Permission denied » qui ressemble à un
+    problème de propriétaire sans en être un.
+
+    Mais l'inverse n'est pas vrai, et c'est ce qui interdit d'en faire un
+    diagnostic préventif : mesuré sur une machine où AppArmor est actif, où cet
+    override est absent, et où huit domaines libvirt tournent pourtant sans
+    incident. La version de ``virt-aa-helper``, le pilote de sécurité déclaré
+    dans ``qemu.conf`` et l'emplacement réel des images changent la conclusion.
+
+    Ce module s'interdit précisément ce genre d'affirmation : un rouge affiché
+    devant une commande qui fonctionne est ce qui décourageait au premier
+    lancement. On garde donc l'information pour le seul moment où elle est
+    certaine, celui où le provisionnement a réellement échoué là-dessus.
+    """
+    if not Path("/sys/module/apparmor/parameters/enabled").is_file():
+        return False
+    try:
+        return "/var/lib/libvirt/images/" not in _APPARMOR_OVERRIDE.read_text(
+            encoding="utf-8"
+        )
+    except OSError:
+        return True
+
+
+def apparmor_fix_command() -> str:
+    """La commande qui pose l'override. Le droit ``k`` n'est pas décoratif :
+    avec ``r`` seul, l'erreur devient « Failed to lock byte 100 »."""
+    return (
+        "echo '  /var/lib/libvirt/images/** rwk,' | sudo tee "
+        f"{_APPARMOR_OVERRIDE} && sudo systemctl restart libvirtd"
+    )
+
+
+def explique_echec_provision(message: str) -> tuple[str, str] | None:
+    """Reconnaît une cause connue dans l'erreur brute d'un provisionnement.
+
+    Terraform rend des messages exacts mais opaques pour qui découvre l'outil.
+    Deux d'entre eux ont une cause connue et un correctif d'une ligne, et ce
+    sont ceux qui arrêtent un débutant sur une machine fraîche.
+
+    Rendre ``(explication, commande)``, ou ``None`` si rien n'est reconnu : on
+    ne devine pas, on nomme ce qu'on sait nommer.
+    """
+    bas = message.lower()
+
+    # « Permission denied » sur une image du pool : l'échec type d'AppArmor
+    # décrit dans apparmor_override_absent(). On ne le propose QUE si
+    # l'override manque effectivement, sans quoi ce serait une fausse piste.
+    if "permission denied" in bas and "/var/lib/libvirt/images" in bas:
+        if apparmor_override_absent():
+            return _("explain_apparmor_denied"), apparmor_fix_command()
+
+    # « Pool not found » : le pool `default` n'existe pas sur une installation
+    # fraîche. Le contrôle de doctor l'attrape en amont, mais un provisionnement
+    # lancé sans diagnostic préalable tombe directement ici.
+    if "pool not found" in bas or "no storage pool with matching name" in bas:
+        return _("explain_pool_not_found"), (
+            "sudo virsh pool-define-as default dir --target "
+            "/var/lib/libvirt/images && sudo virsh pool-build default && "
+            "sudo virsh pool-start default && sudo virsh pool-autostart default"
+        )
+
+    # « already exists » sur un domaine : un provisionnement précédent a échoué
+    # APRÈS avoir défini la machine, qui n'est donc pas dans le state Terraform.
+    # `destroy` ne peut pas la voir, et le message ne dit pas quoi faire.
+    if "already exists with uuid" in bas:
+        return _("explain_domain_exists"), (
+            "virsh -c qemu:///system undefine --nvram <machine>"
+        )
+
+    return None
+
+
+def _check_iso_tool() -> Check:
+    """Incus fabrique le CD-ROM ``agent:config`` sur l'hôte.
+
+    Sans ``mkisofs`` ni ``genisoimage``, aucune instance de type
+    ``virtual-machine`` ne démarre : « Neither mkisofs nor genisoimage could be
+    found in $PATH ». Rien ne le documentait, et la remédiation d'incus se
+    limitait à installer incus.
+    """
+    for outil in ("genisoimage", "mkisofs", "xorrisofs"):
+        if shutil.which(outil):
+            return Check(_("check_iso_tool"), True, outil)
+    return Check(
+        _("check_iso_tool"), False, _("detail_iso_tool_missing"),
+        fix="sudo apt install genisoimage",
+    )
+
+
 def _check_labs(root: Path, labs: list[LabDefinition]) -> Check:
     return Check(
         _("check_labs"), len(labs) > 0,
@@ -246,6 +429,13 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     else:
         # Plusieurs candidats déclarés, aucun choisi. On ne devine pas à la
         # place de l'apprenant : on nomme le choix qui reste à faire.
+        #
+        # On arrive ici avec `needs_vm` vrai : un hyperviseur EST indispensable.
+        # Les checks restent pourtant hors du requis, et c'est délibéré : les y
+        # mettre ferait proposer à `--fix` d'installer kvm **et** incus, pour un
+        # choix que l'apprenant n'a pas encore fait. C'est le libellé du tableau
+        # qui mentait, en annonçant « non requis ici » et « ces composants ne
+        # bloquent rien » au-dessus du composant qui bloque 64 labs sur 84.
         first = candidates[0] if candidates else "kvm"
         report.required.append(Check(
             _("check_provider"), False,
@@ -254,7 +444,32 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
             status_key="status_choose",
         ))
         report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
+        report.optional_title_key = "doctor_choose_title"
+        report.optional_hint_key = "doctor_choose_hint"
         report.notes.append(_("doctor_note_provider_unresolved"))
+
+    # Outillage exigé par `provision` et `run` dès qu'un lab a besoin d'une VM,
+    # quel que soit le provider. Ces deux-là manquaient au diagnostic, et leur
+    # absence ne se manifestait qu'au premier échec, en langage Terraform ou en
+    # `rc=127`.
+    if needs_vm:
+        report.required.append(_check_terraform())
+        report.required.append(_check_ansible())
+        # Contrôles propres à un hyperviseur : ils n'ont de sens qu'une fois le
+        # provider choisi, sinon ils affichent du rouge pour un backend que ce
+        # poste n'utilisera peut-être jamais.
+        # Ces contrôles-ci portent sur la CONFIGURATION d'un hyperviseur déjà
+        # installé. Les jouer quand l'hyperviseur lui-même manque empilerait
+        # trois lignes rouges pour une seule cause, et noierait celle qui
+        # compte : c'est exactement ce qui décourageait au premier lancement.
+        if active == "kvm" and hypervisors["kvm"].ok:
+            pool = "default"
+            if repo_meta is not None:
+                pool = str(repo_meta.infra.provider_config().get("storage_pool")
+                           or "default")
+            report.required.append(_check_libvirt_pool(pool))
+        elif active == "incus" and hypervisors["incus"].ok:
+            report.required.append(_check_iso_tool())
 
     report.required.append(_check_labs(root, labs))
     report.required.append(_check_lab_home(root))

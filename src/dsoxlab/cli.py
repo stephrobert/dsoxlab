@@ -1466,6 +1466,18 @@ def provision(
         raise typer.Exit(3)
     except Exception as exc:  # noqa: BLE001 — message utilisateur direct
         error(_("provision_failed", error=str(exc)))
+        # Terraform est exact mais opaque pour qui découvre l'outil. Quand la
+        # cause est connue et le correctif tient en une ligne, on les donne
+        # plutôt que de laisser l'apprenant chercher : c'est là qu'il est
+        # bloqué, et c'est le seul moment où l'on peut l'affirmer sans risque
+        # de fausse alerte.
+        from .services.doctor import explique_echec_provision
+
+        connu = explique_echec_provision(str(exc))
+        if connu is not None:
+            explication, commande = connu
+            info(explication)
+            info(f"  {commande}")
         raise typer.Exit(4)
 
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
@@ -2133,15 +2145,26 @@ def instructor_bootstrap(
     from .infra import ansible as ansible_infra
     from .infra import terraform as tf
 
+    manquant = False
+
     if not tf.is_available():
         error(_("bootstrap_no_terraform"))
+        manquant = True
     else:
         info(_("bootstrap_terraform_ok"))
 
     if not ansible_infra.is_available():
         error(_("bootstrap_no_ansible_runner"))
+        manquant = True
     else:
         info(_("bootstrap_ansible_runner_ok"))
+
+    # Sortir en 0 après avoir affiché une erreur bloquante trompe autant un
+    # apprenant qui vérifie son code de retour qu'un script d'installation :
+    # la clé SSH est bien créée, mais rien ne pourra la provisionner. Le code
+    # de retour doit dire la même chose que l'écran.
+    if manquant:
+        raise typer.Exit(1)
 
 
 # ── fullhelp ──────────────────────────────────────────────────────────────────

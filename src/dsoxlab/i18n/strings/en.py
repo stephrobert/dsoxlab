@@ -423,6 +423,10 @@ silent.
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
     "check_provider": "Infra provider",
+    "check_terraform":    "Terraform",
+    "check_ansible":      "ansible-playbook",
+    "check_libvirt_pool": "libvirt pool",
+    "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs detected",
     "check_lab_home": "LAB_HOME",
 
@@ -438,6 +442,31 @@ silent.
     "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
+    "detail_terraform_missing":
+        "not found: `provision` cannot create the machines",
+    "detail_ansible_missing":
+        "not found: `run` cannot play a vm lab's setup.yaml "
+        "(ansible-runner does not install it)",
+    "detail_ansible_ok":     "present",
+    "detail_pool_missing":
+        "the `{pool}` pool does not exist: `provision` will fail with "
+        "\"Pool Not Found\"",
+    "detail_pool_unknown":   "cannot be checked without virsh",
+    "explain_apparmor_denied":
+        "Known cause: AppArmor denies the VM disks. virt-aa-helper cannot "
+        "resolve a disk declared by pool reference, so none of them enters the "
+        "domain profile. Grant the permission, including the `k` right "
+        "(without it: \"Failed to lock byte 100\"):",
+    "explain_pool_not_found":
+        "Known cause: the libvirt storage pool does not exist. A fresh install "
+        "declares none. Create it:",
+    "explain_domain_exists":
+        "Known cause: an earlier provisioning failed AFTER defining this "
+        "machine, so it never entered the Terraform state and `destroy` cannot "
+        "see it. Remove it by hand:",
+    "detail_iso_tool_missing":
+        "not found: incus builds the agent:config CD-ROM on the host, "
+        "without it no VM starts",
     "detail_unknown_error":  "unknown error",
     "detail_labs_count":     "{count} lab(s) in {root}",
 
@@ -449,8 +478,9 @@ silent.
     "doctor_note_remote_provider":
         "Provider {provider} runs in the cloud: no local hypervisor needed.",
     "doctor_note_provider_unresolved":
-        "This repo declares several providers. Pick one with "
-        "[bold]dsoxlab use --provider <name>[/bold] before provisioning.",
+        "This repo has labs that require a VM, and no provider is selected. "
+        "Pick one with [bold]dsoxlab use --provider <name>[/bold]: until then, "
+        "none of those labs can run.",
 
     # ── doctor — fix ──────────────────────────────────────────────────────────
     "fix_nothing": "No remediation needed.",
@@ -524,6 +554,12 @@ silent.
     # ── console — doctor ──────────────────────────────────────────────────────
     "doctor_table_title":    "Required for this repo",
     "doctor_optional_title": "Informational — not required here",
+    "doctor_choose_title": "Hypervisors: one is required, none selected",
+    "doctor_choose_hint":
+        "This repo has labs that require a VM. Pick a provider with "
+        "[bold]dsoxlab use --provider <name>[/bold], then run doctor again: it "
+        "will only diagnose that one. [bold]--fix[/bold] installs nothing until "
+        "the choice is made, since one is needed and not both.",
     "doctor_optional_hint":
         "These components block nothing in this repo: [bold]--fix[/bold] "
         "leaves them alone. Install them only if you want that provider.",

@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.42] - 2026-08-19
+
+An audit run on a fresh Ubuntu 24.04 VM measured **six undocumented steps**
+between a green `dsoxlab doctor` and the first playable vm lab. A beginner
+stops at the first one. This release closes that gap: the diagnostic now names
+what is missing, before the failure rather than after it.
+
+### Fixed
+
+- **`ansible-core` is now a declared dependency, so a vm lab can actually
+  run.** `ansible-runner` does not pull it in, contrary to what this project's
+  own comment claimed: the installed tool weighed 18 MB and its `bin/`
+  contained neither `ansible` nor `ansible-playbook`. Every `dsoxlab run` on a
+  vm lab exited with `rc=127`, the shell code for "command not found", which
+  nothing translated. The check made it worse by testing only that the
+  `ansible_runner` module imports: it reported OK on a machine where no
+  playbook could run. It now tests both halves, and the error message names
+  `ansible-core` rather than sending the user to reinstall what they already
+  have.
+
+- **`instructor bootstrap` no longer exits 0 after printing a blocking
+  error.** It reported `✘ terraform not found in PATH` and returned success. A
+  learner checking the exit code, or an install script, concluded all was well
+  while the SSH key had just been created for infrastructure nothing could
+  provision.
+
+- **The Terraform error no longer points at a command that does not install
+  it.** `provision` said "run: dsoxlab instructor bootstrap", which only
+  reports the absence in turn. The loop was closed. It now gives the install
+  URL.
+
+- **`doctor` no longer writes "not required here" above a component that is
+  required.** On a catalog with 64 vm labs out of 84 and no provider selected
+  yet, both hypervisors were listed under "Informational — not required here",
+  followed by "these components block nothing in this repo". The checks
+  deliberately stay out of the required table, since `--fix` would otherwise
+  offer to install kvm **and** incus for a choice not yet made; it is the
+  heading that had to tell the truth.
+
+### Added
+
+- **`doctor` checks Terraform, `ansible-playbook`, the libvirt pool and the ISO
+  tool.** Terraform was verified nowhere, though `provision` cannot run without
+  it. The libvirt `default` pool does not exist on a fresh install, and
+  provisioning failed on a raw "Pool Not Found". Incus builds its
+  `agent:config` CD-ROM on the host, so without `genisoimage` no instance
+  starts at all. Each of these only appears when it applies: a shell-only
+  catalog sees none of them, and the configuration checks stay silent while the
+  hypervisor itself is missing, so one cause does not produce three red lines.
+
+- **The libvirt storage pool is configurable** through
+  `meta.yml: infra.providers.kvm.storage_pool`. The name was hardcoded in four
+  places of the KVM template, so a repository could not target its own pool.
+
+- **Known provisioning failures now come with their cause and their fix.**
+  Terraform is exact but opaque to a newcomer. Three messages have a known
+  cause and a one-line remedy: AppArmor denying VM disks, the missing storage
+  pool, and a domain left behind by an earlier failed run. Note that the
+  AppArmor case is only ever raised **after** the failure, never as a
+  prediction: measured on a machine where AppArmor is enabled, the override
+  absent, and eight libvirt domains running without incident, so its absence
+  proves nothing on its own.
+
 ## [0.1.41] - 2026-08-19
 
 ### Added
