@@ -9,6 +9,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.44] - 2026-08-19
+
+### Ajouté
+
+- **`--verbose` / `-v`, `--debug`, et un journal persistant.** Onze modules du
+  moteur écrivent dans un logger, et aucun de ces messages n'atteignait jamais
+  un utilisateur ni un fichier. Le cas le plus coûteux est connu : un `lab.yaml`
+  qui lève au parsing est avalé par un `logger.warning` puis un `continue`, donc
+  le lab disparaît du catalogue **sans un mot**. C'est le premier symptôme que
+  rencontre un auteur de catalogue, et le plus difficile à diagnostiquer.
+
+  Les avertissements sont désormais affichés par défaut, parce qu'un lab disparu
+  est une perte réelle de contenu, que l'auteur comme l'apprenant ont besoin de
+  voir. `-v` ajoute le niveau informatif, `-vv` (ou `--debug`) le détail complet,
+  et `DSOXLAB_LOG` fait de même là où la ligne de commande échappe.
+
+  Le diagnostic part toujours sur la **sortie d'erreur**, jamais sur la sortie
+  standard : `--json` reste lisible par un programme même en mode verbeux, ce
+  qu'un test épingle.
+
+  Un journal tournant est écrit dans `~/.local/state/dsoxlab/dsoxlab.log` quelle
+  que soit l'option, borné à 1 Mo et trois archives. C'est lui qui permet de
+  joindre une trace à un rapport de bug *après coup*, au lieu de demander à
+  l'utilisateur de reproduire avec la bonne option. Un journal impossible à
+  écrire (HOME en lecture seule, disque plein) ne fait jamais échouer la
+  commande : c'est un confort, pas une dépendance.
+
 ## [0.1.43] - 2026-08-19
 
 Trois défauts qui ne se manifestaient que chez l'utilisateur : une complétion

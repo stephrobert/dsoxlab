@@ -86,6 +86,9 @@ STRINGS: dict[str, str] = {
     "cmd_clean_arg":     "Lab identifier",
     "cmd_validate_help":  "Check structure and metadata of all labs.",
     "cmd_doctor_help":    "Diagnose the environment (runtimes, tools, detected labs).",
+    "opt_verbose":
+        "Say what the engine is doing, on standard error. Repeatable: -v for information, -vv for full detail.",
+    "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
     "cmd_install_help":   "Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion.",
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
@@ -284,7 +287,20 @@ Each lab exposes:
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.
 
-  [cyan]fullhelp[/cyan]             This guide.""",
+  [cyan]fullhelp[/cyan]             This guide.
+
+[bold]Global options[/bold] [dim](before the command)[/dim]
+
+  [dim]--verbose / -v[/dim]       Say what the engine is doing, on standard error.
+                       Repeatable: [bold]-v[/bold] for information,
+                       [bold]-vv[/bold] for full detail.
+  [dim]--debug[/dim]              Same as [bold]-vv[/bold].
+  [dim]--version[/dim]            Print the version and exit.
+
+  The full log is written to [bold]~/.local/state/dsoxlab/dsoxlab.log[/bold]
+  either way, so there is no need to replay the command. It never goes to
+  standard output: [bold]--json[/bold] stays machine-readable, even in verbose
+  mode.""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]

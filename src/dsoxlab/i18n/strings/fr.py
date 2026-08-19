@@ -86,6 +86,9 @@ STRINGS: dict[str, str] = {
     "cmd_clean_arg":      "Identifiant du lab",
     "cmd_validate_help":  "Vérifie la structure et les métadonnées de tous les labs.",
     "cmd_doctor_help":    "Diagnostique l'environnement (runtimes, outils, labs détectés).",
+    "opt_verbose":
+        "Détaille ce que fait le moteur, sur la sortie d'erreur. Répétable : -v pour les informations, -vv pour le détail complet.",
+    "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
     "cmd_install_help":   "Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell.",
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
@@ -282,7 +285,20 @@ Chaque lab expose :
   [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
                        Supporte bash et zsh. Rechargez le shell après exécution.
 
-  [cyan]fullhelp[/cyan]             Ce guide.""",
+  [cyan]fullhelp[/cyan]             Ce guide.
+
+[bold]Options globales[/bold] [dim](avant la commande)[/dim]
+
+  [dim]--verbose / -v[/dim]       Dit ce que fait le moteur, sur la sortie d'erreur.
+                       Répétable : [bold]-v[/bold] pour les informations,
+                       [bold]-vv[/bold] pour le détail complet.
+  [dim]--debug[/dim]              Équivaut à [bold]-vv[/bold].
+  [dim]--version[/dim]            Affiche la version et quitte.
+
+  Le journal complet est de toute façon écrit dans
+  [bold]~/.local/state/dsoxlab/dsoxlab.log[/bold], sans avoir à repasser la commande.
+  Il ne va jamais sur la sortie standard : [bold]--json[/bold] reste lisible par
+  un programme, même en mode verbeux.""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]

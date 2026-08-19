@@ -32,6 +32,19 @@ class ActiveContext:
         return "(aucun)"
 
 
+def xdg_state_home() -> Path:
+    """Racine XDG des données d'état, celles qui survivent à un redémarrage.
+
+    Publique et unique : le work-dir Terraform, le journal et tout ce qui
+    viendra ensuite doivent atterrir sous la même racine, sinon un
+    ``XDG_STATE_HOME`` personnalisé n'en déplace qu'une partie.
+    """
+    env = os.environ.get("XDG_STATE_HOME")
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path.home() / ".local" / "state"
+
+
 def get_context_path(root: Path) -> Path:
     return root / _CONTEXT_FILE
 

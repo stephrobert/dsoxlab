@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..config import xdg_state_home
 from ..models.repo import ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
@@ -85,10 +86,12 @@ def is_available() -> bool:
 
 
 def _xdg_state_home() -> Path:
-    env = os.environ.get("XDG_STATE_HOME")
-    if env:
-        return Path(env).expanduser().resolve()
-    return Path.home() / ".local" / "state"
+    """Alias historique : la définition vit désormais dans ``config``.
+
+    Deux copies du même chemin finissent par diverger, et un ``XDG_STATE_HOME``
+    personnalisé n'en aurait déplacé qu'une.
+    """
+    return xdg_state_home()
 
 
 def workdir(repo_meta: RepoMetadata) -> Path:

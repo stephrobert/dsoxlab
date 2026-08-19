@@ -36,6 +36,7 @@ from .config import (
     set_active_provider, set_course_pos, write_context,
 )
 from .i18n import _, get_lang, set_lang
+from .logging_setup import configurer as configurer_journal
 from .infra.inventory import InfraNotProvisioned
 from .models.hint import HintFile
 from .sessions.store import (
@@ -284,8 +285,21 @@ def _bootstrap(
             is_eager=True,
         ),
     ] = False,
+    verbose: Annotated[
+        int,
+        typer.Option("--verbose", "-v", count=True, help=_("opt_verbose")),
+    ] = 0,
+    debug: Annotated[
+        bool,
+        typer.Option("--debug", help=_("opt_debug")),
+    ] = False,
 ) -> None:
-    """Initialise la langue UI depuis le contexte avant toute commande."""
+    """Initialise la langue UI et la journalisation avant toute commande."""
+    # Avant le retour anticipé : `dsoxlab -v` sans sous-commande doit tout de
+    # même écrire son journal, et c'est aussi ce qui garantit qu'une commande
+    # qui échoue très tôt laisse une trace.
+    configurer_journal(verbose, debug=debug)
+
     if ctx.invoked_subcommand is None:
         return
     try:
