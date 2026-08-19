@@ -48,41 +48,63 @@ about a specific domain lives in the engine.
 
 ## Installation
 
-Requires **Python 3.11+** and [uv](https://docs.astral.sh/uv/).
+Requires **Python 3.11+**.
 
 ```bash
-# From the Git repository (development / editable mode)
-git clone https://github.com/stephrobert/dsoxlab.git
-cd dsoxlab
-uv tool install --editable .
-
-# Verify
+uv tool install dsoxlab      # or: pipx install dsoxlab
 dsoxlab --version
-dsoxlab doctor
 ```
 
-`dsoxlab doctor --fix` diagnoses (and repairs where possible) the local
-toolchain expected by the runtimes: SSH, Terraform, libvirt/Incus, and the
-embedded `pytest` stack.
+That is the whole installation. Nothing to clone, nothing to build.
 
 ---
 
-## Quickstart
+## Your first lab, in five minutes
 
-Labs live in their own repositories, published separately from the engine.
-Clone one first, then run `dsoxlab` from inside it:
+You do not need a catalog to start. `dsoxlab demo` installs a one-lab
+demonstration catalog whose subject is dsoxlab itself: the loop you will repeat
+on every other lab.
 
 ```bash
-# 1. Clone a lab catalog (e.g. linux-dsoxlab-training)
+dsoxlab demo                    # installs it and prints what to do next
+cd ~/.local/share/dsoxlab/demo
+
+dsoxlab course premiers-pas     # the lesson
+dsoxlab run premiers-pas        # drops you in the lab's work directory
+dsoxlab challenge premiers-pas  # the mission
+dsoxlab check premiers-pas      # the tests, and the score
+```
+
+No VM, no container, no Docker: it runs anywhere dsoxlab runs.
+
+---
+
+## Then, a real catalog
+
+Labs live in their own repositories, published separately from the engine.
+Clone one, then run `dsoxlab` from inside it:
+
+```bash
 git clone https://github.com/stephrobert/linux-dsoxlab-training.git
 cd linux-dsoxlab-training
 
-# 2. The active context is detected automatically from the repo's meta.yml
+dsoxlab doctor                  # what this catalog needs, and what is missing
 dsoxlab list-labs
-dsoxlab show linux.depanner.service-crash-loop
-dsoxlab guide linux.depanner.service-crash-loop   # read the course in your browser
-dsoxlab run linux.depanner.service-crash-loop
-dsoxlab check linux.depanner.service-crash-loop
+dsoxlab run <lab-id>
+dsoxlab check <lab-id>
+```
+
+`dsoxlab doctor` only reports what *this* catalog needs: a shell-only catalog
+never asks for a hypervisor. `dsoxlab doctor --fix` repairs what can be repaired
+safely. If something goes wrong, `dsoxlab support` produces an anonymised
+diagnostic report ready to paste into an issue.
+
+### Installing from source (contributors)
+
+```bash
+git clone https://github.com/stephrobert/dsoxlab.git
+cd dsoxlab
+uv tool install --editable .
 ```
 
 ### Reading the course
@@ -253,44 +275,38 @@ scripts and test files are present.
 
 ## Command reference
 
+<!-- BEGIN COMMANDES : généré par scripts/generer-doc.py, ne pas éditer -->
+
 | Command | Purpose |
 | --- | --- |
-| `dsoxlab use [section[/level]]` | Set the active context; `--reset` clears it, `--provider` selects the infra provider |
-| `dsoxlab list-labs` | List labs of the current repo (filter by `--section`/`--level`/`--type`/`--bloc`) |
-| `dsoxlab show <id>` | Show a lab's details |
-| `dsoxlab course [section]` | Display a course section, or the table of contents |
-| `dsoxlab guide [id]` | Open the lab's online guide in a browser (`--print` shows the URL) |
-| `dsoxlab run <id>` | Prepare and start the lab environment |
-| `dsoxlab challenge <id>` | Show the challenge mission for a lab |
-| `dsoxlab hint <id>` | Reveal a hint (deducted from the score) |
-| `dsoxlab check <id>` | Run the `pytest` validation and record the score |
-| `dsoxlab submit <id>` | Final submission: run tests, record score, close the session |
-| `dsoxlab scores` | Show run history (local SQLite) |
-| `dsoxlab progress` | Progression by bloc (labs done, average score, challenges) |
-| `dsoxlab next` | Recommend the next lab or challenge to tackle |
-| `dsoxlab reset <id>` | Reset the lab to its initial state |
-| `dsoxlab clean <id>` | Run the lab's `cleanup.sh` |
-| `dsoxlab provision` | Provision the lab infrastructure (`terraform apply`) |
-| `dsoxlab destroy` | Destroy the lab infrastructure (`terraform destroy`) |
-| `dsoxlab status` | Check SSH connectivity to all hosts in `meta.yml` |
-| `dsoxlab ssh <host>` | Open an interactive SSH session on a lab host |
-| `dsoxlab validate-structure` | Validate the contract (`meta.yml` + every `lab.yaml`) |
-| `dsoxlab doctor [--fix]` | Diagnose (and repair) the local environment |
-| `dsoxlab install` | Install the shell wrapper and auto-completion |
-| `dsoxlab instructor bootstrap` | Instructor tooling (e.g. generate the lab SSH key) |
-| `dsoxlab fullhelp` | Full multilingual guide (EN/FR) |
+| `dsoxlab challenge` | Display the challenge mission for this lab (challenge/README.md). |
+| `dsoxlab check` | Run tests, calculate score (hints deducted) and record result. |
+| `dsoxlab clean` | Remove all resources created by the lab. |
+| `dsoxlab course` | Display a course section, or the table of contents if no section is given. |
+| `dsoxlab demo` | Install a demonstration catalog and play a first lab, with nothing to clone and nothing to provision. |
+| `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy). |
+| `dsoxlab doctor` | Diagnose the environment (runtimes, tools, detected labs). |
+| `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
+| `dsoxlab guide` | Open the lab's online guide in your web browser. |
+| `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
+| `dsoxlab install` | Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion. |
+| `dsoxlab instructor bootstrap` | Generate the lab SSH key (if missing) and check that terraform/ansible-runner are installed. |
+| `dsoxlab list-labs` | List all available labs (filtered by active context if set). |
+| `dsoxlab next` | Recommend the next lab or challenge to complete in the active context. |
+| `dsoxlab progress` | Show progression by bloc (labs completed, average score, challenges and capstones). |
+| `dsoxlab provision` | Provision the lab infrastructure (terraform apply on the current provider). |
+| `dsoxlab reset` | Reset the lab to its initial state (clean + restart). |
+| `dsoxlab run` | Prepare and start the lab environment. |
+| `dsoxlab scores` | Show recorded scores history. |
+| `dsoxlab show` | Show details and status of a lab. |
+| `dsoxlab ssh` | Open an interactive SSH session on a lab host. |
+| `dsoxlab status` | Check SSH connectivity to all hosts declared in meta.yml. |
+| `dsoxlab submit` | Final submission: run tests, record score, then type 'exit' to leave the session. |
+| `dsoxlab support` | Produce an anonymised diagnostic report, ready to paste into an issue. |
+| `dsoxlab use` | Sets the active context (section and/or default level). Use --reset to clear it. |
+| `dsoxlab validate-structure` | Check structure and metadata of all labs. |
 
-Run `dsoxlab <command> --help` for the options of any command.
-
----
-
-## Runtimes
-
-| Runtime | Backend | Typical use |
-| --- | --- | --- |
-| `shell` | Local shell | Quick, single-host exercises with no VM overhead |
-| `incus` | Incus containers | Isolated, fast-booting Linux environments |
-| `kvm` | Terraform + libvirt | Full VMs with reboot/persistence testing |
+<!-- END COMMANDES -->
 
 Each runtime is opt-in and self-describing (`is_available()`), so the engine
 never hard-depends on a backend the user has not installed. Provisioning
@@ -325,14 +341,23 @@ works on whatever tree the `meta.yml` declares.
 
 ## Persistence
 
-- **Local sessions:** `.dsoxlab-context.json` in the current repo (gitignored
-  by each lab repository).
-- **Scores and hints:** `~/.local/share/dsoxlab/progress.db` (XDG). The global
-  lab id is `<category>.<section>.<lab>`, so the schema stays universal.
-- **User config:** `~/.config/dsoxlab/config.yaml` (optional).
+Everything dsoxlab keeps lives in four places, and **progress is per
+catalog**, never global: two catalogs side by side each keep their own history.
 
-Override the locations with the standard `XDG_DATA_HOME` / `XDG_CONFIG_HOME`
-environment variables.
+| What | Where | Override |
+| --- | --- | --- |
+| Scores and hints | `<catalog>/.dsoxlab.db` (SQLite) | none, it is the repo |
+| Session context | `<catalog>/.dsoxlab-context.json` | none, it is the repo |
+| Log, Terraform state | `~/.local/state/dsoxlab/` | `XDG_STATE_HOME` |
+| Demonstration catalog | `~/.local/share/dsoxlab/demo/` | `XDG_DATA_HOME` |
+
+The first two belong in each catalog's `.gitignore`.
+
+There is **no user configuration file**: nothing is read from
+`~/.config/dsoxlab/`. What can be set goes through the contract (`meta.yml`),
+the active context (`dsoxlab use`) or an environment variable
+(`DSOXLAB_PROVIDER`, `DSOXLAB_LANG`, `DSOXLAB_LOG`,
+`DSOXLAB_HOST_READY_TIMEOUT`).
 
 ---
 

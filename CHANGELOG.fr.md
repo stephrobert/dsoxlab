@@ -38,7 +38,28 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   décrites **nulle part** dans le guide, alors que ce sont les quatre commandes
   d'infrastructure. Elles le sont désormais.
 
+- **Le README ouvre sur l'installation de l'utilisateur, pas du contributeur.**
+  Il commençait par `git clone` puis `uv tool install --editable .`, une
+  procédure de développement, alors que le paquet est publié sur PyPI et que
+  `doctor` recommandait déjà l'installation par PyPI. Qui suivait le README se
+  retrouvait avec une copie éditable dont il n'avait aucune raison de vouloir.
+  Le parcours devient : installer, jouer un lab, puis choisir un catalogue.
+
+- **La table des commandes est générée depuis la CLI**
+  (`scripts/generer-doc.py`), entre marqueurs, dans les deux langues. Écrite à
+  la main, elle avait dérivé sans bruit : elle décrivait encore `dsoxlab clean`
+  exécutant un `cleanup.sh`, que le zéro-bash interdit, et il y manquait `demo`
+  et `support`. Un hook pre-commit et un test refusent une version périmée.
+
 ### Corrigé
+
+- **La section Persistance était fausse sur ses trois points.** Elle annonçait
+  `~/.local/share/dsoxlab/progress.db`, un `~/.config/dsoxlab/config.yaml` et
+  une surcharge par `XDG_CONFIG_HOME`. Vérifié dans le code : la base est
+  `<catalogue>/.dsoxlab.db`, aucun fichier de configuration n'est lu nulle part,
+  et les variables réellement honorées sont `XDG_DATA_HOME`, `XDG_STATE_HOME` et
+  `XDG_CACHE_HOME`. La progression est **par catalogue**, ce que la section dit
+  désormais.
 
 - **Cinq commandes manquaient au `fullhelp`**, dont quatre de longue date :
   `provision`, `status`, `ssh`, `destroy`, et la nouvelle `demo`. Une commande
