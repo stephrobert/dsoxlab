@@ -11,6 +11,22 @@ updates:
     # usually yanked within days, so a cooldown shrinks the exposure window.
     cooldown:
       default-days: 7
+    # One PR a week for everything that is not a major bump. Ungrouped, a
+    # single week produced four separate branches (ruff, pre-commit, typer,
+    # types-pyyaml), each with its own CI run, for updates nobody reviews one
+    # by one anyway.
+    #
+    # Majors stay on their own: they are the ones that break, and they are
+    # worth reading. Grouping them would also mean a single incompatible
+    # dependency blocks every other update in the same PR.
+    #
+    # Security updates are deliberately left ungrouped (the default,
+    # `applies-to: version-updates`): they are urgent and deserve a targeted
+    # PR, not a wait for the weekly batch.
+    groups:
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -20,3 +36,16 @@ updates:
       prefix: "chore(ci)"
     cooldown:
       default-days: 7
+    # Same rule, and the case for it is even clearer here: the three
+    # `github/codeql-action/*` actions always ship the same version on the
+    # same day, so they used to open three PRs that were only ever merged
+    # together.
+    #
+    # Note for a future edit: the `semver-{major,minor,patch}-days` cooldown
+    # tiers are NOT supported for the github-actions ecosystem, only
+    # `default-days` is. Declaring them fails validation on GitHub's side,
+    # which this project already learned the hard way.
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
