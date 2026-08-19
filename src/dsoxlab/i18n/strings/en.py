@@ -91,6 +91,13 @@ STRINGS: dict[str, str] = {
     "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
     "cmd_install_help":   "Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion.",
+    "cmd_support_help":
+        "Produce an anonymised diagnostic report, ready to paste into an issue.",
+    "opt_support_log_lines":
+        "How many log lines to include (0 to include none).",
+    "support_hint":
+        "Paste this report into your issue. It carries no personal path, no "
+        "public address and no machine name.",
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
     "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy).",
@@ -286,6 +293,12 @@ Each lab exposes:
 
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.
+
+  [cyan]support[/cyan]              Diagnostic report to paste into an issue:
+                       versions, tools, catalog, latest traces. Anonymised by
+                       default (no personal path, no public address).
+    [dim]--json[/dim]               The same content, as a machine document.
+    [dim]--log-lines <n>[/dim]      How many log lines to include (0 for none).
 
   [cyan]fullhelp[/cyan]             This guide.
 
