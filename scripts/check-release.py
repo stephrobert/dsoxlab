@@ -7,12 +7,20 @@ numéro de version consommé ne se réutilise jamais. D'où ce contrôle local,
 qui rejoue à froid les cinq étapes que RELEASING confie à la vigilance
 humaine, et qui a un cas de figure réel derrière chaque test.
 
+Le pendant existe pour l'APRÈS. Le workflow vert ne prouve pas que la version
+est installable : à la publication de la 0.1.42, l'upload avait bien reçu deux
+« 200 OK » de PyPI, la page projet répondait, et pourtant l'index simple, le
+seul que lisent pip et uv, ne listait pas encore la version. Un « c'est
+publié » fondé sur le statut du workflow était faux pendant plusieurs minutes.
+
 Usage :
     python3 scripts/check-release.py           # déduit la version du pyproject
     python3 scripts/check-release.py v0.1.28   # vérifie un tag précis
+    python3 scripts/check-release.py --publiee # APRÈS le tag : est-ce arrivé ?
 
 Sortie 0 : le tag peut être posé, la commande exacte est affichée.
 Sortie 1 : au moins un contrôle a échoué, chacun dit quoi corriger.
+Sortie 2 : rien n'est faux, mais il est trop tôt. Relancer plus tard.
 """
 
 from __future__ import annotations
@@ -228,12 +236,150 @@ def _verifier_ci(r: Rapport) -> None:
         r.ok("CI verte sur ce commit")
 
 
+# ── après le tag : la version est-elle réellement arrivée ? ──────────────────
+
+def _index_simple() -> str | None:
+    """Le contenu de l'index simple de PyPI, ou None s'il est injoignable.
+
+    C'est CET index que lisent pip et uv pour résoudre une version, et lui seul
+    fait foi. L'API JSON et la page projet peuvent répondre avant lui.
+    """
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - URL constante, https
+            "https://pypi.org/simple/dsoxlab/", timeout=10
+        ) as reponse:
+            return reponse.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError):
+        return None
+
+
+def _verifier_installable(r: Rapport, version: str) -> None:
+    """La version est-elle visible là où un installateur la cherche ?
+
+    Mesuré sur la 0.1.42 : la page projet et l'API JSON répondaient 200 alors
+    que l'index simple ne la listait pas encore, et `uv tool install` posait
+    donc la version précédente sans broncher.
+    """
+    index = _index_simple()
+    if index is None:
+        r.note(
+            "Index PyPI injoignable",
+            "Contrôle sauté. Vérifie à la main : "
+            "curl -s https://pypi.org/simple/dsoxlab/ | grep " + version,
+        )
+        return
+
+    if f"dsoxlab-{version}" in index:
+        r.ok(f"La version {version} est servie par l'index PyPI")
+        return
+
+    # L'API JSON répond-elle déjà ? La distinction dit s'il faut attendre ou
+    # s'inquiéter : connue de l'API mais absente de l'index, c'est la
+    # propagation ; inconnue des deux, l'upload n'a pas eu lieu.
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - URL constante, https
+            f"https://pypi.org/pypi/dsoxlab/{version}/json", timeout=10
+        ) as reponse:
+            connue = reponse.status == 200
+    except (urllib.error.URLError, OSError):
+        connue = False
+
+    if connue:
+        r.attendre(
+            f"La version {version} est publiée mais pas encore servie",
+            "L'index simple n'a pas fini de propager. Attends une minute puis "
+            "relance. N'annonce pas la publication tant que ce contrôle est "
+            "orange : un utilisateur qui installe maintenant aura la version "
+            "précédente.",
+        )
+    else:
+        r.ko(
+            f"La version {version} est absente de PyPI",
+            "Le workflow Release a-t-il vraiment publié ? Regarde le job "
+            "« Publish to PyPI » : un job vert peut avoir sauté l'upload.",
+        )
+
+
+def _verifier_release_github(r: Rapport, tag: str) -> None:
+    """La Release GitHub porte les artefacts et la provenance."""
+    sortie = subprocess.run(
+        ["gh", "release", "view", tag, "--json", "tagName,assets"],
+        cwd=RACINE, capture_output=True, text=True,
+    )
+    if sortie.returncode != 0:
+        r.ko(
+            f"Aucune Release GitHub pour {tag}",
+            "Le workflow Release ne part que sur push de tag. Vérifie qu'il a "
+            "tourné : gh run list --workflow Release",
+        )
+        return
+    try:
+        assets = json.loads(sortie.stdout).get("assets", [])
+    except ValueError:
+        r.note("Release GitHub illisible", "Vérifie à la main.")
+        return
+    noms = [a.get("name", "") for a in assets]
+    manquants = [
+        quoi for quoi, motif in (
+            ("le wheel", ".whl"),
+            ("la tarball", ".tar.gz"),
+            ("la provenance", "intoto"),
+        )
+        if not any(motif in n for n in noms)
+    ]
+    if manquants:
+        r.ko(
+            f"Release {tag} incomplète : il manque {', '.join(manquants)}",
+            f"Artefacts présents : {', '.join(noms) or 'aucun'}",
+        )
+    else:
+        r.ok(f"Release GitHub {tag} complète", f"({len(noms)} artefacts)")
+
+
+def _verifier_tag_pousse(r: Rapport, tag: str) -> None:
+    sortie = git("ls-remote", "--tags", "origin", f"refs/tags/{tag}")
+    if tag in sortie:
+        r.ok(f"Le tag {tag} est sur origin")
+    else:
+        r.ko(
+            f"Le tag {tag} n'est pas sur origin",
+            f"git push origin {tag} : sans push, aucun workflow ne part.",
+        )
+
+
+def controler_publication(version: str, tag: str) -> int:
+    """Le pendant d'après le tag : la release est-elle réellement livrée ?"""
+    print(f"\n{GRAS}Contrôle après publication de {tag}{RAZ}\n")
+    r = Rapport()
+    _verifier_tag_pousse(r, tag)
+    _verifier_release_github(r, tag)
+    _verifier_installable(r, version)
+
+    print()
+    if r.echecs:
+        print(f"{ROUGE}{GRAS}{len(r.echecs)} contrôle(s) en échec.{RAZ} "
+              "La publication n'est pas terminée.\n")
+        return 1
+    if r.attentes:
+        print(f"{JAUNE}{GRAS}Publié, mais pas encore servi.{RAZ} "
+              "Relance dans une minute.\n")
+        return 2
+    print(f"{VERT}{GRAS}La version {version} est livrée.{RAZ}\n")
+    print("    Pour l'installer, pense au cache : "
+          "uv tool install --force --refresh dsoxlab\n")
+    return 0
+
+
 def main() -> int:
     version = version_empaquetee()
     if version is None:
         print(f"{ROUGE}pyproject.toml ne déclare aucune version.{RAZ}")
         return 1
-    tag = sys.argv[1] if len(sys.argv) > 1 else f"v{version}"
+    arguments = [a for a in sys.argv[1:] if a != "--publiee"]
+    tag = arguments[0] if arguments else f"v{version}"
+
+    if "--publiee" in sys.argv:
+        return controler_publication(version, tag)
 
     print(f"\n{GRAS}Contrôle avant tag {tag}{RAZ}\n")
     r = Rapport()
