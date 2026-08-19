@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.44] - 2026-08-19
+
+### Added
+
+- **`--verbose` / `-v`, `--debug`, and a persistent log.** Eleven engine modules
+  write to a logger, and none of those messages ever reached a user or a file.
+  The costliest case is known: a `lab.yaml` that raises while parsing is
+  swallowed by a `logger.warning` then a `continue`, so the lab vanishes from
+  the catalog **without a word**. That is the first symptom a catalog author
+  meets, and the hardest to diagnose.
+
+  Warnings are now shown by default, because a vanished lab is a real loss of
+  content that both the author and the learner need to see. `-v` adds the
+  informational level, `-vv` (or `--debug`) the full detail, and `DSOXLAB_LOG`
+  does the same for cases where the command line is out of reach.
+
+  Diagnostics always go to **standard error**, never to standard output: `--json`
+  stays machine-readable even in verbose mode, which a test pins down.
+
+  A rotating log is written to `~/.local/state/dsoxlab/dsoxlab.log` regardless of
+  any option, bounded to 1 MB and three archives. That is what makes it possible
+  to attach a trace to a bug report *after the fact*, instead of asking the user
+  to reproduce with the right flag. A log that cannot be written (read-only HOME,
+  full disk) never fails the command: it is a convenience, not a dependency.
+
 ## [0.1.43] - 2026-08-19
 
 Three defects that only ever showed up on a user's machine: a completion that
