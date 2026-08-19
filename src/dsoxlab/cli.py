@@ -2209,6 +2209,31 @@ def instructor_bootstrap(
         raise typer.Exit(1)
 
 
+# ── support ───────────────────────────────────────────────────────────────────
+
+@app.command("support", help=_("cmd_support_help"))
+def support(
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+    lignes: Annotated[
+        int, typer.Option("--log-lines", help=_("opt_support_log_lines"))
+    ] = 30,
+) -> None:
+    """Rapport de diagnostic anonymisé, prêt à coller dans une issue."""
+    from .services.support import collecter, en_markdown
+
+    rapport = collecter(lignes_journal=max(0, lignes))
+
+    if as_json:
+        machine.emit(rapport)
+        return
+
+    # `print` et non la console Rich : ce texte est fait pour être copié dans
+    # une issue. Rich l'habillerait de couleurs et le couperait à la largeur du
+    # terminal, ce qui casserait les tableaux Markdown une fois collés.
+    print(en_markdown(rapport))
+    info(_("support_hint"))
+
+
 # ── fullhelp ──────────────────────────────────────────────────────────────────
 
 @app.command("fullhelp", help=_("cmd_fullhelp_help"))

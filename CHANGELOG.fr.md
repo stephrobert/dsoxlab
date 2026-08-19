@@ -13,6 +13,24 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **`dsoxlab support` : un rapport de diagnostic prêt à coller dans une issue.**
+  Répondre à « ça ne marche pas » supposait de redemander la version, le
+  système, le provider, le catalogue, l'état de chaque dépendance. Chaque
+  aller-retour coûte une journée, et l'outil connaissait déjà toutes les
+  réponses. La commande les rassemble d'un bloc en Markdown, avec `--json` pour
+  le même contenu en document machine.
+
+  **Anonymisé par défaut, et testé comme tel**, parce que ce rapport est fait
+  pour être collé publiquement : le répertoire personnel devient `~`, le nom
+  d'utilisateur devient `<user>`, les adresses IPv4 publiques deviennent `<ip>`,
+  et le nom de machine n'est tout simplement jamais collecté. Les adresses
+  privées restent lisibles délibérément : `10.10.30.11` est une VM de lab, elle
+  ne désigne personne hors du réseau local, et la masquer rendrait inexploitable
+  tout rapport portant sur l'infrastructure.
+
+  Le gabarit d'issue et les deux `CONTRIBUTING` demandent désormais ce rapport
+  plutôt que trois champs à recopier à la main.
+
 - **`--verbose` / `-v`, `--debug`, et un journal persistant.** Onze modules du
   moteur écrivent dans un logger, et aucun de ces messages n'atteignait jamais
   un utilisateur ni un fichier. Le cas le plus coûteux est connu : un `lab.yaml`

@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`dsoxlab support`: a diagnostic report ready to paste into an issue.**
+  Answering "it does not work" meant asking back for the version, the system,
+  the provider, the catalog, the state of every dependency. Each round trip
+  costs a day, and the tool already knew all of it. The command gathers it in
+  one Markdown block, with `--json` for the same content as a machine document.
+
+  **Anonymised by default, and tested as such**, because this report is meant to
+  be pasted publicly: the home directory becomes `~`, the user name becomes
+  `<user>`, public IPv4 addresses become `<ip>`, and the machine name is simply
+  never collected. Private addresses stay readable on purpose: `10.10.30.11` is
+  a lab VM, it identifies nobody outside the local network, and hiding it would
+  make every infrastructure report useless.
+
+  The bug report template and both `CONTRIBUTING` files now ask for this report
+  instead of three fields to copy by hand.
+
 - **`--verbose` / `-v`, `--debug`, and a persistent log.** Eleven engine modules
   write to a logger, and none of those messages ever reached a user or a file.
   The costliest case is known: a `lab.yaml` that raises while parsing is

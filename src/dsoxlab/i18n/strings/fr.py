@@ -91,6 +91,13 @@ STRINGS: dict[str, str] = {
     "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
     "cmd_install_help":   "Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell.",
+    "cmd_support_help":
+        "Produit un rapport de diagnostic anonymisé, à coller dans une issue.",
+    "opt_support_log_lines":
+        "Nombre de lignes de journal à joindre (0 pour n'en joindre aucune).",
+    "support_hint":
+        "Collez ce rapport dans votre issue. Il ne contient ni chemin personnel, "
+        "ni adresse publique, ni nom de machine.",
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
     "cmd_provision_help": "Provisionne l'infrastructure du lab (terraform apply sur le provider courant).",
     "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy).",
@@ -284,6 +291,12 @@ Chaque lab expose :
 
   [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
                        Supporte bash et zsh. Rechargez le shell après exécution.
+
+  [cyan]support[/cyan]              Rapport de diagnostic à coller dans une issue :
+                       versions, outils, catalogue, dernières traces. Anonymisé
+                       par défaut (ni chemin personnel, ni adresse publique).
+    [dim]--json[/dim]               Le même contenu, en document machine.
+    [dim]--log-lines <n>[/dim]      Nombre de lignes de journal jointes (0 pour aucune).
 
   [cyan]fullhelp[/cyan]             Ce guide.
 
