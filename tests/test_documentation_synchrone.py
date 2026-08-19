@@ -144,3 +144,31 @@ def test_le_catalogue_de_demonstration_ne_cite_que_des_commandes_reelles() -> No
             inconnues[markdown.name] = manquantes
 
     assert not inconnues, f"commandes inexistantes citées : {inconnues}"
+
+
+def test_la_table_des_commandes_du_readme_est_a_jour() -> None:
+    """La table du README est produite par la CLI, et doit le rester.
+
+    Écrite à la main, elle dérivait sans bruit : elle annonçait encore
+    `dsoxlab clean` exécutant un `cleanup.sh`, alors que le zéro-bash est un
+    invariant du contrat, et il y manquait `demo` et `support`.
+
+    Ce test joue le générateur en mode vérification. Il échoue si quelqu'un
+    ajoute une commande sans régénérer, ce qui est précisément le moment où la
+    documentation se met à mentir.
+    """
+    import subprocess
+    import sys
+
+    generateur = RACINE / "scripts" / "generer-doc.py"
+    if not generateur.is_file():
+        pytest.skip("générateur absent de ce dépôt")
+
+    proc = subprocess.run(  # noqa: S603 : notre propre script
+        [sys.executable, str(generateur), "--verifier"],
+        capture_output=True, text=True, cwd=RACINE,
+    )
+    assert proc.returncode == 0, (
+        f"la documentation a dérivé de la CLI :\n{proc.stdout}\n"
+        "Régénère-la : python3 scripts/generer-doc.py"
+    )

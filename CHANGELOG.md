@@ -35,7 +35,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   found that `provision`, `destroy`, `ssh` and `status` were described **nowhere**
   in the guide, though they are the four infrastructure commands. They are now.
 
+- **The README now opens on the user's installation, not the contributor's.**
+  It started with `git clone` and `uv tool install --editable .`, a development
+  setup, while the package is published on PyPI and `doctor` already recommended
+  the PyPI install. A reader following it ended up with an editable checkout they
+  had no reason to want. The path is now: install, play a lab, then pick a
+  catalog.
+
+- **The command table is generated from the CLI** (`scripts/generer-doc.py`),
+  between markers, in both languages. Written by hand it had drifted without a
+  sound: it still described `dsoxlab clean` running a `cleanup.sh`, which the
+  zero-bash rule forbids, and it was missing `demo` and `support`. A pre-commit
+  hook and a test refuse a stale version.
+
 ### Fixed
+
+- **The Persistence section was wrong on all three counts.** It announced
+  `~/.local/share/dsoxlab/progress.db`, a `~/.config/dsoxlab/config.yaml` and an
+  `XDG_CONFIG_HOME` override. Checked against the code: the database is
+  `<catalog>/.dsoxlab.db`, no configuration file is read anywhere, and the
+  variables actually honoured are `XDG_DATA_HOME`, `XDG_STATE_HOME` and
+  `XDG_CACHE_HOME`. Progress is **per catalog**, which the section now says.
 
 - **`fullhelp` was missing five commands**, four of them long-standing:
   `provision`, `status`, `ssh`, `destroy`, and the new `demo`. A command absent
