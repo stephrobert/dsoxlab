@@ -1,0 +1,24 @@
+# Catalogue de démonstration, packagé avec dsoxlab.
+#
+# Il existe pour une seule raison : qu'un utilisateur qui vient d'installer
+# l'outil puisse jouer un lab dans la minute, sans cloner de dépôt, sans
+# hyperviseur et sans Docker.
+#
+# Son unique lab porte sur dsoxlab lui-même, pas sur un domaine technique.
+# C'est ce qui le distingue d'un catalogue Linux ou Terraform embarqué, ce que
+# le projet s'interdit : ici, le sujet EST la boucle run / course / challenge /
+# hint / check.
+repo:
+  id: dsoxlab-demo
+  category: demo
+  title: Démonstration dsoxlab
+  description: |
+    Un lab unique pour prendre en main la boucle de travail de dsoxlab.
+    Aucune infrastructure requise.
+
+sections:
+  - id: demo
+    title: Prise en main
+    description: La boucle de travail, de bout en bout.
+    labs:
+      - demo/premiers-pas

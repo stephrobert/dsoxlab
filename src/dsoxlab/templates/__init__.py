@@ -38,6 +38,22 @@ def template_root() -> Path:
     return Path(__file__).parent.resolve()
 
 
+def demo_catalog() -> Path:
+    """Le catalogue de démonstration packagé avec l'outil.
+
+    C'est la seule exception à l'anti-pattern « ne pas embarquer de templates de
+    labs », et elle est bornée : son unique lab porte sur dsoxlab lui-même, la
+    boucle run / course / challenge / hint / check. Un lab Linux ou Terraform
+    ici serait le début du couplage que le projet s'interdit.
+
+    Il existe pour que l'outil se démontre sans rien cloner, sans hyperviseur et
+    sans Docker : entre l'installation et le premier lab joué, il n'y avait
+    sinon qu'une connaissance implicite, celle de savoir que les labs vivent
+    ailleurs.
+    """
+    return template_root() / "demo"
+
+
 def terraform_template(provider: str) -> Path:
     """Retourne le chemin du template Terraform pour un provider.
 

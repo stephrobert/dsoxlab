@@ -9,6 +9,41 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.45] - 2026-08-19
+
+### Ajouté
+
+- **`dsoxlab demo` : un premier lab jouable juste après l'installation, sans
+  rien cloner ni provisionner.** Entre `uv tool install dsoxlab` et le premier
+  lab joué, il y avait une connaissance implicite : savoir que les labs vivent
+  dans d'autres dépôts, savoir lesquels, savoir qu'il faut se placer dedans. Qui
+  installait l'outil et le lançait là où il se trouvait n'obtenait rien, avec un
+  code de retour `0` pour dire que tout allait bien.
+
+  Le catalogue de démonstration porte un seul lab `shell`, et **son sujet est
+  dsoxlab lui-même** : la boucle run / course / challenge / hint / check, rien
+  d'autre. C'est ce qui l'écarte de l'anti-pattern que le projet s'interdit,
+  embarquer des templates de labs pour un domaine technique. Le parcourir prend
+  cinq minutes et finit sur 100/100, un chemin qu'un test de bout en bout joue
+  en entier.
+
+  Une installation existante n'est jamais écrasée : ce répertoire porte la
+  progression et les réponses de l'apprenant, et `--force` est exigé pour
+  repartir de zéro.
+
+- **La documentation ne peut plus mentir sur la CLI.** Un test ferme les deux
+  sens : toute commande citée dans la documentation existe, et toute commande de
+  la CLI est décrite dans `fullhelp`, en anglais comme en français. Il a
+  immédiatement trouvé que `provision`, `destroy`, `ssh` et `status` n'étaient
+  décrites **nulle part** dans le guide, alors que ce sont les quatre commandes
+  d'infrastructure. Elles le sont désormais.
+
+### Corrigé
+
+- **Cinq commandes manquaient au `fullhelp`**, dont quatre de longue date :
+  `provision`, `status`, `ssh`, `destroy`, et la nouvelle `demo`. Une commande
+  absente du guide n'existe pas pour qui le lit.
+
 ## [0.1.44] - 2026-08-19
 
 ### Ajouté

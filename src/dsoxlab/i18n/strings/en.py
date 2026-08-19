@@ -91,6 +91,26 @@ STRINGS: dict[str, str] = {
     "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
     "cmd_install_help":   "Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion.",
+    "cmd_demo_help":
+        "Install a demonstration catalog and play a first lab, with nothing to "
+        "clone and nothing to provision.",
+    "opt_demo_force":
+        "Reinstall over the existing one, losing the progress and answers "
+        "already there.",
+    "demo_installee":  "Demonstration catalog installed in {path}",
+    "demo_deja_installee":
+        "The demonstration catalog is already installed in {path}.",
+    "demo_deja_installee_suite":
+        "It may hold your progress and your answers, so nothing was touched.\n"
+        "To pick it up: cd {path} && dsoxlab list-labs\n"
+        "To start over: dsoxlab demo --force",
+    "demo_echec":      "Cannot install: {error}",
+    "demo_suite":
+        "To get started:\n"
+        "  cd {path}\n"
+        "  dsoxlab course {lab}\n"
+        "  dsoxlab run {lab}\n"
+        "Then, once the mission is done: dsoxlab check {lab}",
     "cmd_support_help":
         "Produce an anonymised diagnostic report, ready to paste into an issue.",
     "opt_support_log_lines":
@@ -290,6 +310,20 @@ Each lab exposes:
                        [bold]Informational[/bold] and never shows up as an error.
     [dim]--fix[/dim]                Remediate the missing required components.
                        Informational components are left alone.
+
+  [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
+                       play right away, with nothing to clone or provision.
+    [dim]--force[/dim]              Reinstall over it (loses progress).
+
+  [cyan]provision[/cyan]            Bring up the infrastructure for vm labs (terraform apply).
+    [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
+
+  [cyan]status[/cyan]               Check SSH connectivity of the declared hosts.
+
+  [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
+
+  [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy).
+    [dim]--yes[/dim]                 Do not ask for confirmation.
 
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.

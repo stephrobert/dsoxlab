@@ -45,6 +45,19 @@ def xdg_state_home() -> Path:
     return Path.home() / ".local" / "state"
 
 
+def xdg_data_home() -> Path:
+    """Racine XDG des données de l'utilisateur.
+
+    Distincte de ``xdg_state_home()`` à dessein : le catalogue de démonstration
+    est un contenu que l'utilisateur peut modifier et dont il attend qu'il
+    survive, pas un cache ni un état recalculable.
+    """
+    env = os.environ.get("XDG_DATA_HOME")
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path.home() / ".local" / "share"
+
+
 def get_context_path(root: Path) -> Path:
     return root / _CONTEXT_FILE
 
