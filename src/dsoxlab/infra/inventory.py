@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import subprocess
 import time
@@ -351,6 +352,52 @@ class HostReadyTimeout(RuntimeError):
     """Levée quand un host ne devient pas joignable en SSH dans le délai imparti."""
 
 
+#: Variable d'environnement qui règle l'attente de disponibilité des hosts.
+HOST_READY_TIMEOUT_ENV = "DSOXLAB_HOST_READY_TIMEOUT"
+
+#: Défaut, en secondes. Confortable sur un poste dédié, juste sur un hôte
+#: modeste : le boot parallèle de plusieurs VMs y sature le CPU, et un rapport
+#: d'usage a mesuré un host prêt à 181 s, soit une seconde après l'abandon.
+HOST_READY_TIMEOUT_DEFAULT = 180.0
+
+
+def _host_ready_timeout(explicite: float | None) -> float:
+    """Résout le délai d'attente : argument, puis variable d'env, puis défaut.
+
+    Un délai en dur ne convient pas à tous les postes. Le matériel de l'apprenant
+    n'est pas un paramètre du dépôt de labs : c'est une propriété de SA machine,
+    donc une variable d'environnement, pas une clé du ``meta.yml``.
+
+    Une valeur non numérique ou négative est ignorée au profit du défaut : sur
+    ce chemin, un provision qui échoue parce qu'une variable est mal écrite
+    serait bien pire que le délai qu'elle voulait corriger.
+    """
+    if explicite is not None:
+        return explicite
+    brut = os.environ.get(HOST_READY_TIMEOUT_ENV, "").strip()
+    if not brut:
+        return HOST_READY_TIMEOUT_DEFAULT
+    try:
+        valeur = float(brut)
+    except ValueError:
+        logger.warning(
+            "%s=%r n'est pas un nombre : on garde %.0f s.",
+            HOST_READY_TIMEOUT_ENV,
+            brut,
+            HOST_READY_TIMEOUT_DEFAULT,
+        )
+        return HOST_READY_TIMEOUT_DEFAULT
+    if valeur <= 0:
+        logger.warning(
+            "%s=%r doit être positif : on garde %.0f s.",
+            HOST_READY_TIMEOUT_ENV,
+            brut,
+            HOST_READY_TIMEOUT_DEFAULT,
+        )
+        return HOST_READY_TIMEOUT_DEFAULT
+    return valeur
+
+
 def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
     """Envoie un ``virsh reset`` à un domaine KVM. Retourne True si tenté.
 
@@ -377,7 +424,7 @@ def wait_for_hosts_ready(
     repo_meta: RepoMetadata,
     hosts: list[str],
     *,
-    timeout: float = 180.0,
+    timeout: float | None = None,
     poll_interval: float = 3.0,
     connect_timeout: int = 8,
     reset_after: float = 60.0,
@@ -396,7 +443,8 @@ def wait_for_hosts_ready(
     Args:
         repo_meta: métadonnées du dépôt (pour construire le ssh_config).
         hosts: FQDN à attendre (typiquement ``result.hosts`` du provision).
-        timeout: délai global maximum, en secondes, par host.
+        timeout: délai global maximum, en secondes, par host. ``None`` (défaut)
+            résout par ``DSOXLAB_HOST_READY_TIMEOUT``, sinon 180 s.
         poll_interval: pause entre deux tentatives, en secondes.
         connect_timeout: ``ConnectTimeout`` SSH de chaque tentative, en secondes.
         on_attempt: callback ``(fqdn, numéro_tentative)`` pour l'affichage.
@@ -406,6 +454,8 @@ def wait_for_hosts_ready(
     """
     if not hosts:
         return
+
+    timeout = _host_ready_timeout(timeout)
 
     inventory = build_inventory(
         repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)

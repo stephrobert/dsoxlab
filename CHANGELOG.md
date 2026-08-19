@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.41] - 2026-08-19
+
+### Added
+
+- **`DSOXLAB_HOST_READY_TIMEOUT` sets how long `provision` waits for a host to
+  become reachable.** The delay was hard-coded to 180 s. On a modest machine,
+  booting several VMs at once saturates the CPU: a usage report measured a host
+  ready at 181 s, one second after the wait had given up, while an audit on
+  8 vCPU measured the same hosts ready in 45 s. The CPU at parallel boot is the
+  limiting factor, and the learner's hardware is a property of their machine
+  rather than of the labs repository, so this is an environment variable and
+  not a `meta.yml` key. A value that is not a positive number falls back to the
+  default instead of failing the provision, and the timeout message now names
+  the variable.
+
+- **AlmaLinux VMs install the Incus agent from the `agent:config` CD-ROM when
+  the image has not done it itself.** The RHEL family ships no 9p driver
+  (measured: no `9p` entry in `/proc/filesystems`), which is how cloud images
+  normally fetch that agent. Without an agent Incus reports no IP at all, and
+  the readiness wait expires on a VM that booted perfectly.
+
+  This is a safety net, not the fix of a reproduced defect: on Incus 6.0.0 with
+  `images:almalinux/10/cloud`, the agent already arrives through that very
+  CD-ROM and provisioning succeeds without this block. It covers the setups
+  where it does not, which is what a user reported in real use.
+
+  The block is a no-op everywhere else, and it discriminates on the presence of
+  `install.sh` rather than on `/dev/sr0`, because the KVM provider attaches a
+  CD-ROM too (its NoCloud seed). It can never exit non-zero either: a failing
+  `runcmd` ends cloud-init in `status: error`, which on its own is enough to
+  hang that same wait.
+
 ## [0.1.40] - 2026-08-13
 
 ### Fixed
