@@ -1,0 +1,10 @@
+# Indices du lab de démonstration.
+#
+# Le texte est encodé en base64, comme dans tous les catalogues : ce n'est pas
+# du chiffrement, seulement de quoi éviter qu'un indice se lise par accident en
+# ouvrant le fichier.
+points: 100
+hints:
+  - text_en: "VGhlIHdvcmQgdGhpcyBoaW50IHJldmVhbHMgaXM6IHByb2dyZXNzaW9uLiBXcml0ZSBpdCB0byByZXBvbnNlcy9pbmRpY2UudHh0LiBOb3RpY2UgdGhhdCBkc294bGFiIHNjb3JlcyBub3cgc2hvd3Mgd2hhdCB0aGlzIGhpbnQgY29zdCB5b3U6IHRoYXQgaXMgdGhlIHdob2xlIHBvaW50IG9mIHRha2luZyBvbmUgZGVsaWJlcmF0ZWx5Lg=="
+    text_fr: "TGUgbW90IHF1ZSBjZXQgaW5kaWNlIHLDqXbDqGxlIGVzdCA6IHByb2dyZXNzaW9uLiDDiWNyaXZlei1sZSBkYW5zIHJlcG9uc2VzL2luZGljZS50eHQuIFJlbWFycXVleiBxdWUgZHNveGxhYiBzY29yZXMgYWZmaWNoZSBkw6lzb3JtYWlzIGNlIHF1ZSBjZXQgaW5kaWNlIHZvdXMgYSBjb8O7dMOpIDogYydlc3QgdG91dCBsJ2ludMOpcsOqdCBkJ2VuIHByZW5kcmUgdW4gc2NpZW1tZW50Lg=="
+    cost: 20

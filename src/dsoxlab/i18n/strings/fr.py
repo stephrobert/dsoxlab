@@ -91,6 +91,27 @@ STRINGS: dict[str, str] = {
     "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
     "cmd_install_help":   "Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell.",
+    "cmd_demo_help":
+        "Installe un catalogue de démonstration et joue un premier lab, sans "
+        "rien cloner ni provisionner.",
+    "opt_demo_force":
+        "Réinstalle par-dessus, en perdant la progression et les réponses déjà "
+        "présentes.",
+    "demo_installee":  "Catalogue de démonstration installé dans {path}",
+    "demo_deja_installee":
+        "Le catalogue de démonstration est déjà installé dans {path}.",
+    "demo_deja_installee_suite":
+        "Il contient peut-être votre progression et vos réponses, donc rien "
+        "n'a été touché.\n"
+        "Pour le reprendre : cd {path} && dsoxlab list-labs\n"
+        "Pour repartir de zéro : dsoxlab demo --force",
+    "demo_echec":      "Installation impossible : {error}",
+    "demo_suite":
+        "Pour commencer :\n"
+        "  cd {path}\n"
+        "  dsoxlab course {lab}\n"
+        "  dsoxlab run {lab}\n"
+        "Puis, une fois la mission remplie : dsoxlab check {lab}",
     "cmd_support_help":
         "Produit un rapport de diagnostic anonymisé, à coller dans une issue.",
     "opt_support_log_lines":
@@ -288,6 +309,20 @@ Chaque lab expose :
                        [bold]Informatif[/bold] et ne s'affiche jamais en erreur.
     [dim]--fix[/dim]                Applique la remédiation des composants requis manquants.
                        Les composants informatifs ne sont pas touchés.
+
+  [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
+                       jouable immédiatement, sans rien cloner ni provisionner.
+    [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
+
+  [cyan]provision[/cyan]            Monte l'infrastructure des labs vm (terraform apply).
+    [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
+
+  [cyan]status[/cyan]               Vérifie la connectivité SSH des hôtes déclarés.
+
+  [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
+
+  [cyan]destroy[/cyan]              Détruit l'infrastructure des labs vm (terraform destroy).
+    [dim]--yes[/dim]                 Ne demande pas confirmation.
 
   [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
                        Supporte bash et zsh. Rechargez le shell après exécution.

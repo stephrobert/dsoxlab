@@ -2209,6 +2209,34 @@ def instructor_bootstrap(
         raise typer.Exit(1)
 
 
+# ── demo ──────────────────────────────────────────────────────────────────────
+
+@app.command("demo", help=_("cmd_demo_help"))
+def demo(
+    force: Annotated[bool, typer.Option("--force", help=_("opt_demo_force"))] = False,
+) -> None:
+    """Installe le catalogue de démonstration et dit quoi faire ensuite."""
+    from .services.demo import DemoExistante, installer
+
+    try:
+        installation = installer(force=force)
+    except DemoExistante as exc:
+        # Ne pas écraser : ce répertoire porte la progression et les réponses.
+        error(_("demo_deja_installee", path=str(exc)))
+        info(_("demo_deja_installee_suite", path=str(exc)))
+        raise typer.Exit(1) from None
+    except OSError as exc:
+        error(_("demo_echec", error=str(exc)))
+        raise typer.Exit(1) from None
+
+    success(_("demo_installee", path=str(installation.racine)))
+
+    # La marche à suivre est construite depuis le catalogue réellement
+    # installé : elle ne peut donc pas décrire un lab qui n'y serait plus.
+    premier = installation.labs[0] if installation.labs else ""
+    info(_("demo_suite", path=str(installation.racine), lab=premier))
+
+
 # ── support ───────────────────────────────────────────────────────────────────
 
 @app.command("support", help=_("cmd_support_help"))

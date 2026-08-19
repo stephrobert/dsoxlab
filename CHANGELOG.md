@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.45] - 2026-08-19
+
+### Added
+
+- **`dsoxlab demo`: a first lab you can play right after installing, with
+  nothing to clone and nothing to provision.** Between `uv tool install dsoxlab`
+  and the first lab played, there was an implicit piece of knowledge: that labs
+  live in other repositories, which ones, and that you have to stand inside one.
+  Whoever installed the tool and ran it where they were got nothing, with a `0`
+  exit code saying all was well.
+
+  The demonstration catalog holds a single `shell` lab, and **its subject is
+  dsoxlab itself**: the run / course / challenge / hint / check loop, nothing
+  else. That is what keeps it clear of the anti-pattern this project forbids,
+  which is shipping lab templates for a technical domain. Playing it takes about
+  five minutes and ends on 100/100, a path an end-to-end test walks in full.
+
+  An existing installation is never overwritten: that directory holds the
+  learner's progress and answers, and `--force` is required to start over.
+
+- **Documentation can no longer lie about the CLI.** A new test closes both
+  directions: every command quoted in the docs exists, and every command of the
+  CLI is described in `fullhelp`, in English and French alike. It immediately
+  found that `provision`, `destroy`, `ssh` and `status` were described **nowhere**
+  in the guide, though they are the four infrastructure commands. They are now.
+
+### Fixed
+
+- **`fullhelp` was missing five commands**, four of them long-standing:
+  `provision`, `status`, `ssh`, `destroy`, and the new `demo`. A command absent
+  from the guide does not exist for whoever reads it.
+
 ## [0.1.44] - 2026-08-19
 
 ### Added
