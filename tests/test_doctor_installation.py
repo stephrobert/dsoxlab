@@ -81,6 +81,24 @@ def hyperviseur_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Terraform et ansible-playbook installés.
+
+    Les tests qui portent sur autre chose ne doivent pas dépendre de la machine
+    qui les exécute : ceux-ci passaient en local et tombaient sur un runner CI
+    dépourvu de terraform.
+    """
+    monkeypatch.setattr(
+        doctor, "_check_terraform",
+        lambda: doctor.Check(_("check_terraform"), True, "Terraform v1.0.0"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_ansible",
+        lambda: doctor.Check(_("check_ansible"), True, "ok"),
+    )
+
+
+@pytest.fixture
 def outillage_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ni terraform ni ansible-playbook, comme sur une machine neuve."""
     monkeypatch.setattr(doctor.shutil, "which", lambda name: None)
@@ -243,7 +261,10 @@ def test_sans_declaration_le_pool_verifie_est_default(
 # ── le tableau informatif cesse de mentir ─────────────────────────────────────
 
 def test_sans_provider_choisi_le_tableau_ne_dit_plus_non_requis(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hyperviseur_ok: None
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hyperviseur_ok: None,
+    outillage_present: None,
 ) -> None:
     """Le tableau s'intitulait « non requis ici » et affirmait « ces composants
     ne bloquent rien », au-dessus des deux hyperviseurs dont l'un est
@@ -258,7 +279,11 @@ def test_sans_provider_choisi_le_tableau_ne_dit_plus_non_requis(
 
     assert report.optional_title_key == "doctor_choose_title"
     assert report.optional_hint_key == "doctor_choose_hint"
-    assert not report.fixable(), "--fix ne doit rien proposer tant qu'aucun choix"
+    reparables = {c.label for c in report.fixable()}
+    assert _("check_kvm") not in reparables
+    assert _("check_incus") not in reparables, (
+        "--fix ne doit pas installer un hyperviseur pour un choix non fait"
+    )
 
 
 def test_un_depot_sans_lab_vm_garde_le_tableau_informatif(

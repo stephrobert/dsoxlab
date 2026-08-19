@@ -208,9 +208,18 @@ def _check_terraform() -> Check:
             _("check_terraform"), False, _("detail_terraform_missing"),
             hint="https://developer.hashicorp.com/terraform/install",
         )
-    result = subprocess.run(
-        ["terraform", "version"], capture_output=True, text=True, timeout=5,
-    )
+    # Le binaire peut être dans le PATH sans être exécutable, ou disparaître
+    # entre les deux appels. Un diagnostic qui plante en cherchant à
+    # diagnostiquer est le pire des cas : il emporte toute la commande.
+    try:
+        result = subprocess.run(
+            ["terraform", "version"], capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return Check(
+            _("check_terraform"), False, _("detail_terraform_missing"),
+            hint="https://developer.hashicorp.com/terraform/install",
+        )
     first = result.stdout.splitlines()[0] if result.stdout else "ok"
     return Check(_("check_terraform"), True, first)
 

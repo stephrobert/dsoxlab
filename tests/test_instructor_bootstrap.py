@@ -43,13 +43,24 @@ def test_refuse_de_generer_hors_dun_depot_de_labs(tmp_path: Path) -> None:
     )
 
 
-def test_un_vrai_depot_de_labs_passe_le_garde_fou(tmp_path: Path) -> None:
+def test_un_vrai_depot_de_labs_passe_le_garde_fou(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Avec `meta.yml`, la commande travaille normalement.
 
     On lui présente une clé déjà en place : le chemin nominal est donc couvert
     sans dépendre de `ssh-keygen`, et surtout sans écrire de clé privée depuis
     une suite de tests.
+
+    L'outillage est stubé présent : depuis que le code de retour reflète les
+    outils manquants, ce test mesurerait sinon la machine qui l'exécute, et il
+    tomberait sur un runner CI dépourvu de terraform.
     """
+    from dsoxlab.infra import ansible as ansible_infra
+    from dsoxlab.infra import terraform as tf
+
+    monkeypatch.setattr(tf, "is_available", lambda: True)
+    monkeypatch.setattr(ansible_infra, "is_available", lambda: True)
     (tmp_path / "meta.yml").write_text(META_MINIMAL, encoding="utf-8")
     ssh_dir = tmp_path / "ssh"
     ssh_dir.mkdir()
