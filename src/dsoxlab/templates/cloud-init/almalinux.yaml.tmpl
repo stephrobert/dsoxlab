@@ -106,3 +106,37 @@ runcmd:
   # L'activation est conservée : le jour où un channel est déclaré (ou sur
   # un provider qui en fournit un), le service démarrera au boot.
   - [ systemctl, enable, qemu-guest-agent ]
+
+  # Agent Incus. Sans lui, `dsoxlab provision` échoue sur un provider incus
+  # alors que la VM a parfaitement booté.
+  #
+  # Le chargeur d'agent des images cloud monte le config drive en 9p. Or la
+  # famille RHEL (AlmaLinux) n'a pas ce driver : l'agent n'est jamais récupéré,
+  # `incus exec` répond « VM agent isn't currently running », et Incus ne
+  # remonte aucune IP, et l'attente réseau du provision expire systématiquement.
+  # Incus prévoit exactement ce cas : le device `agent:config` (déclaré par
+  # templates/terraform/incus/main.tf) expose les mêmes fichiers, et leur
+  # `install.sh`, sur un CD-ROM ISO 9660.
+  #
+  # Deux précautions font tout l'intérêt de la forme ci-dessous :
+  #
+  # 1. On discrimine sur `install.sh`, PAS sur l'existence de /dev/sr0. Le
+  #    provider KVM attache lui aussi un CD-ROM, le seed cloud-init NoCloud
+  #    (cf. devices.disks[].device = "cdrom" dans terraform/kvm/main.tf) :
+  #    un test sur /dev/sr0 seul ne distingue donc rien, et ferait tourner
+  #    ce bloc à vide sur KVM.
+  # 2. Le `exit 0` final n'est pas cosmétique. Un runcmd qui sort non nul fait
+  #    finir cloud-init en `status: error`, et l'attente de provision reste
+  #    alors bloquée sur une VM pourtant prête : c'est très exactement le
+  #    piège déjà documenté ci-dessus pour qemu-guest-agent.
+  - |
+    for dev in /dev/sr[0-9]*; do
+      [ -b "$dev" ] || continue
+      mkdir -p /run/incus_config || continue
+      mount -t iso9660 -o ro "$dev" /run/incus_config 2>/dev/null || continue
+      if [ -f /run/incus_config/install.sh ]; then
+        (cd /run/incus_config && bash install.sh) || true
+      fi
+      umount /run/incus_config 2>/dev/null || true
+    done
+    exit 0

@@ -125,7 +125,7 @@ STRINGS: dict[str, str] = {
     "provision_provider_conflict": "Cannot provision on '{current}': provider '{others}' still has active lab infrastructure.\nincus and KVM share the lab's network name and subnet, so they can't run at the same time.\nFinish or tear down the other one first:\n  DSOXLAB_PROVIDER={other} dsoxlab destroy",
     "provision_waiting_ssh": "Waiting for hosts to become reachable (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Waiting for {host} (SSH + cloud-init), attempt {attempt}…",
-    "provision_ssh_timeout": "Host readiness timed out: {error}\nThe VM may still be booting — retry `dsoxlab run` in a moment.",
+    "provision_ssh_timeout": "Host readiness timed out: {error}\nThe VM may still be booting — retry `dsoxlab run` in a moment.\nOn a modest machine, booting several VMs at once saturates the CPU and overruns this delay. Raise it:\n  DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
     "confirm_destroy":
         "Destroy the whole {provider} infrastructure? "
         "All VM data will be lost",

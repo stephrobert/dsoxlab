@@ -9,6 +9,41 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.41] - 2026-08-19
+
+### Ajouté
+
+- **`DSOXLAB_HOST_READY_TIMEOUT` règle la durée pendant laquelle `provision`
+  attend qu'un hôte devienne joignable.** Le délai était figé à 180 s. Sur une
+  machine modeste, le démarrage simultané de plusieurs VM sature le processeur :
+  un rapport d'usage a mesuré un hôte prêt à 181 s, une seconde après l'abandon
+  de l'attente, quand un audit sur 8 vCPU mesurait les mêmes hôtes prêts en
+  45 s. Le facteur limitant est le processeur au démarrage parallèle, et le
+  matériel de l'apprenant est une propriété de sa machine plutôt que du dépôt de
+  labs : c'est donc une variable d'environnement et non une clé du `meta.yml`.
+  Une valeur qui n'est pas un nombre positif retombe sur le défaut au lieu de
+  faire échouer le provisionnement, et le message d'expiration nomme désormais
+  la variable.
+
+- **Les VM AlmaLinux installent l'agent Incus depuis le CD-ROM `agent:config`
+  quand l'image ne l'a pas fait elle-même.** La famille RHEL ne fournit pas le
+  driver 9p (mesuré : aucune entrée `9p` dans `/proc/filesystems`), qui est la
+  voie par laquelle les images cloud récupèrent normalement cet agent. Sans
+  agent, Incus ne remonte aucune IP et l'attente expire sur une VM qui a
+  pourtant parfaitement démarré.
+
+  Il s'agit d'un filet de sécurité et non de la correction d'un défaut
+  reproduit : sur Incus 6.0.0 avec `images:almalinux/10/cloud`, l'agent arrive
+  déjà par ce même CD-ROM et le provisionnement réussit sans ce bloc. Il couvre
+  les environnements où ce n'est pas le cas, ce qu'un utilisateur a rapporté en
+  usage réel.
+
+  Le bloc est sans effet partout ailleurs, et il se décide sur la présence de
+  `install.sh` plutôt que sur celle de `/dev/sr0`, car le provider KVM attache
+  lui aussi un CD-ROM (son seed NoCloud). Il ne peut pas non plus sortir en
+  erreur : un `runcmd` en échec fait finir cloud-init en `status: error`, ce qui
+  suffit à bloquer cette même attente.
+
 ## [0.1.40] - 2026-08-13
 
 ### Corrigé
