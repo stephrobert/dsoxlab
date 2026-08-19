@@ -38,7 +38,8 @@ split of the name.
 
 ## Files
 
-Everything is in [`assets/brand/`](assets/brand/), SVG only.
+Everything is in [`assets/brand/`](assets/brand/). **The SVG files are the
+source**; the PNG files derive from them and are regenerated, never edited.
 
 | File | Use |
 |---|---|
@@ -47,6 +48,27 @@ Everything is in [`assets/brand/`](assets/brand/), SVG only.
 | `dsoxlab-lockup-mono.svg` | single ink, inherits `currentColor` |
 | `dsoxlab-icon.svg` / `dsoxlab-icon-dark.svg` | the mark alone, from 24px up |
 | `dsoxlab-icon-mono.svg` | the mark alone, single ink, for favicons and terminals |
+
+
+### PNG, for what does not take vectors
+
+[`assets/brand/png/`](assets/brand/png/) holds rasterised versions for the
+places that refuse SVG: GitHub's social preview, a slide, a platform thumbnail,
+a README rendered by a tool without SVG support.
+
+| File | Size | Use |
+|---|---|---|
+| `dsoxlab-icon-256/512/1024.png` | square, transparent | avatars, thumbnails, packaging |
+| `dsoxlab-icon-dark-512/1024.png` | square, transparent | the same, on dark backgrounds |
+| `dsoxlab-lockup-light-1024/2048.png` | 1024×215, 2048×429 | slides, articles |
+| `dsoxlab-lockup-dark-1024/2048.png` | idem | the same, on dark backgrounds |
+| `dsoxlab-social-preview.png` | 1280×640 | GitHub Settings → Social preview |
+| `dsoxlab-social-preview-dark.png` | 1280×640 | the same, dark variant |
+
+Regenerate them with `python3 scripts/generer-png-marque.py` rather than
+exporting by hand. The script rasterises **at the target resolution** through
+`-density`: `convert file.svg -resize 1024x` would rasterise at the 48-pixel
+viewBox first and then enlarge that bitmap, which is blurry and obvious at 100%.
 
 ## How it is embedded, and why that way
 
@@ -105,9 +127,9 @@ text. The icon files carry no text at all and can be edited directly.
 
 ## Two things this repository cannot version
 
-- **The social preview**, shown when the repository link is shared. It is a
-  GitHub setting rather than a file: Settings → Social preview, a 1280×640 PNG.
-  Rasterise the light lockup on a white background at 2x for it.
+- **The social preview setting.** The image itself is versioned, at
+  `assets/brand/png/dsoxlab-social-preview.png`; what cannot be is the setting
+  that points GitHub at it. Upload it by hand: Settings → Social preview.
 - **The account avatar**, which GitHub takes from the owner, not the repository.
 
 ## Licence

@@ -40,7 +40,8 @@ coupure bicolore du nom.
 
 ## Les fichiers
 
-Tout est dans [`assets/brand/`](assets/brand/), en SVG uniquement.
+Tout est dans [`assets/brand/`](assets/brand/). **Les fichiers SVG font foi** ;
+les PNG en dérivent et se régénèrent, ils ne s'éditent pas.
 
 | Fichier | Usage |
 |---|---|
@@ -49,6 +50,27 @@ Tout est dans [`assets/brand/`](assets/brand/), en SVG uniquement.
 | `dsoxlab-lockup-mono.svg` | encre unique, hérite de `currentColor` |
 | `dsoxlab-icon.svg` / `dsoxlab-icon-dark.svg` | le signe seul, à partir de 24 px |
 | `dsoxlab-icon-mono.svg` | le signe seul, encre unique, pour les favicons et les terminaux |
+
+
+### Les PNG, pour ce qui n'accepte pas le vecteur
+
+[`assets/brand/png/`](assets/brand/png/) contient les versions rastérisées, pour
+les endroits qui refusent le SVG : l'aperçu social de GitHub, une présentation,
+une vignette de plateforme, un README rendu par un outil sans support SVG.
+
+| Fichier | Taille | Usage |
+|---|---|---|
+| `dsoxlab-icon-256/512/1024.png` | carré, transparent | avatars, vignettes, empaquetage |
+| `dsoxlab-icon-dark-512/1024.png` | carré, transparent | les mêmes, sur fond sombre |
+| `dsoxlab-lockup-light-1024/2048.png` | 1024×215, 2048×429 | présentations, articles |
+| `dsoxlab-lockup-dark-1024/2048.png` | idem | les mêmes, sur fond sombre |
+| `dsoxlab-social-preview.png` | 1280×640 | GitHub Settings → Social preview |
+| `dsoxlab-social-preview-dark.png` | 1280×640 | la variante sombre |
+
+Régénérez-les par `python3 scripts/generer-png-marque.py` plutôt que d'exporter
+à la main. Le script rastérise **à la résolution visée** grâce à `-density` :
+`convert fichier.svg -resize 1024x` rastériserait d'abord au viewBox de
+48 pixels puis agrandirait ce bitmap, ce qui est flou et se voit à 100 %.
 
 ## Comment il s'intègre, et pourquoi ainsi
 
@@ -109,9 +131,10 @@ s'éditent directement.
 
 ## Deux choses que ce dépôt ne peut pas versionner
 
-- **L'aperçu social**, la carte affichée quand on partage le lien du dépôt.
-  C'est un réglage GitHub et non un fichier : Settings → Social preview, un PNG
-  de 1280×640. Rastérisez le logotype clair sur fond blanc en 2x pour l'obtenir.
+- **Le réglage de l'aperçu social.** L'image, elle, est versionnée, dans
+  `assets/brand/png/dsoxlab-social-preview.png` ; ce qui ne l'est pas, c'est le
+  réglage qui l'indique à GitHub. Déposez-la à la main : Settings → Social
+  preview.
 - **L'avatar du compte**, que GitHub prend sur le propriétaire et non sur le
   dépôt.
 
