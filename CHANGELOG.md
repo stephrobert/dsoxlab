@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.43] - 2026-08-19
+
+Three defects that only ever showed up on a user's machine: a completion that
+did not complete, a launcher that did not launch, and a CLI that refused to
+start because of its own state file.
+
+### Fixed
+
+- **Shell completion asked the CLI through a variable it does not listen to.**
+  The generated script used `_DSOXL_COMPLETE`, while Click derives
+  `_DSOXLAB_COMPLETE` from the program name. dsoxlab therefore answered with
+  its help page, which the shell then tried to evaluate on every Tab. The zsh
+  file was misnamed too (`_dsoxl` instead of `_dsoxlab`), so zsh never loaded
+  it whatever it contained. The variable is now derived from the program name
+  rather than copied, so the two cannot drift apart again.
+
+- **The generated wrapper broke on any path containing a space.** It wrote
+  `exec /home/me/My Tools/dsoxlab "$@"` unquoted, which the shell split into
+  two arguments and reported as "not found". The path is now quoted with
+  `shlex.quote`.
+
+- **`dsoxlab install` no longer overwrites the launcher of `uv tool` or
+  `pipx`.** It writes to exactly the path those tools use. The damage was worse
+  than a plain overwrite, and it took a mutation test to see it: writing to a
+  symlink writes to its *target*, so dsoxlab replaced uv's real binary with a
+  script that `exec`s itself. The symlink survived, `resolve()` did not move,
+  and the command looped forever. When a launcher already leads to this binary,
+  it is now left alone.
+
+- **A malformed `.dsoxlab-context.json` no longer takes the whole CLI down.**
+  The `except` covered `JSONDecodeError` and `OSError` only, while `null`
+  raised `TypeError`, `"foo"` raised `ValueError`, a non-object root raised
+  `AttributeError`, and a file of arbitrary bytes raised `UnicodeDecodeError`,
+  which descends from `ValueError` rather than `OSError`. Thirteen malformed
+  shapes are now absorbed into an empty context, with a warning naming the
+  file. Losing the context costs a `dsoxlab use`; raising cost every command,
+  including those with nothing to do with it.
+
 ## [0.1.42] - 2026-08-19
 
 An audit run on a fresh Ubuntu 24.04 VM measured **six undocumented steps**

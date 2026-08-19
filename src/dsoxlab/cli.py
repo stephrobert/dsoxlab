@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import shlex
 import webbrowser
 import shutil
 import subprocess
@@ -325,6 +326,18 @@ def _notify_update_available() -> None:
 
 # ── install ─────────────────────────────────────────────────────────────────
 
+#: Nom du programme, tel que la CLI est installée et invoquée.
+_PROG_NAME = "dsoxlab"
+
+#: Variable d'environnement par laquelle le shell demande une complétion.
+#: Elle est DÉRIVÉE du nom du programme, comme le fait Click lui-même, et non
+#: recopiée : la valeur codée en dur était « _DSOXL_COMPLETE », que la CLI
+#: n'écoute pas. Le script généré interrogeait donc dsoxlab avec une variable
+#: ignorée, la CLI répondait par sa page d'aide, et le shell tentait de
+#: l'évaluer à chaque tabulation.
+_COMPLETE_VAR = f"_{_PROG_NAME.replace('-', '_').upper()}_COMPLETE"
+
+
 @app.command("install", help=_("cmd_install_help"))
 def install() -> None:
     """Install the dsoxlab wrapper in ~/.local/bin and shell completion."""
@@ -336,9 +349,22 @@ def install() -> None:
 
     venv_binary = Path(sys.argv[0]).resolve()
     wrapper = local_bin / "dsoxlab"
-    wrapper.write_text(f"#!/bin/sh\nexec {venv_binary} \"$@\"\n")
-    wrapper.chmod(0o755)
-    success(_("install_wrapper", path=str(wrapper), source=str(venv_binary)))
+
+    # Ne pas écraser un lanceur qui mène déjà à ce binaire. `uv tool install` et
+    # `pipx` en posent un exactement ici : le remplacer par un script shell ne
+    # fait que défaire ce que leur prochaine mise à jour remettra. Surtout, si ce
+    # lanceur EST le fichier qu'on vient de résoudre (cas d'un vrai fichier
+    # plutôt que d'un lien), le wrapper s'exécuterait lui-même, en boucle.
+    if wrapper.exists() and wrapper.resolve() == venv_binary:
+        info(_("install_wrapper_deja", path=str(wrapper)))
+    else:
+        # shlex.quote : un chemin d'installation contenant une espace
+        # (« /home/moi/My Tools/… ») produisait un `exec` découpé en plusieurs
+        # arguments, donc un wrapper qui échouait sur « not found ».
+        cible = shlex.quote(str(venv_binary))
+        wrapper.write_text(f'#!/bin/sh\nexec {cible} "$@"\n')
+        wrapper.chmod(0o755)
+        success(_("install_wrapper", path=str(wrapper), source=str(venv_binary)))
 
     # ── 2. Shell completion ────────────────────────────────────────────────────
     shell_name = Path(os.environ.get("SHELL", "bash")).name
@@ -346,9 +372,11 @@ def install() -> None:
     if shell_name == "zsh":
         zfunc_dir = Path.home() / ".zfunc"
         zfunc_dir.mkdir(exist_ok=True)
-        comp_file = zfunc_dir / "_dsoxl"
+        # Le nom du fichier compte : zsh autoload la fonction `_dsoxlab` pour
+        # compléter `dsoxlab`, et cherche donc un fichier de ce nom exact.
+        comp_file = zfunc_dir / f"_{_PROG_NAME}"
         script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("zsh"), pas un subprocess shell=True
-            prog_name="dsoxlab", complete_var="_DSOXL_COMPLETE", shell="zsh"
+            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="zsh"
         )
         comp_file.write_text(script)
         success(_("install_completion", path=str(comp_file)))
@@ -370,7 +398,7 @@ def install() -> None:
         bash_comp_dir.mkdir(exist_ok=True)
         comp_file = bash_comp_dir / "dsoxlab"
         script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("bash"), pas un subprocess shell=True
-            prog_name="dsoxlab", complete_var="_DSOXL_COMPLETE", shell="bash"
+            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="bash"
         )
         comp_file.write_text(script)
         success(_("install_completion", path=str(comp_file)))

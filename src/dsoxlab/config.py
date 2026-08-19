@@ -1,9 +1,12 @@
 """Configuration globale : résolution de LAB_HOME, chemins et contexte actif."""
 
 import json
+import logging
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _CONTEXT_FILE = ".dsoxlab-context.json"
 
@@ -33,24 +36,75 @@ def get_context_path(root: Path) -> Path:
     return root / _CONTEXT_FILE
 
 
+def _texte(valeur: object) -> str | None:
+    """Un champ texte du contexte, ou ``None`` si la valeur n'en est pas un.
+
+    Ce fichier est écrit par l'outil, mais rien ne garantit son contenu : un
+    éditeur, une résolution de conflit, un disque plein ou une copie entre
+    machines peuvent le laisser dans n'importe quel état. Une valeur d'un autre
+    type se propagerait ensuite dans toute la CLI, loin de sa cause.
+    """
+    return valeur if isinstance(valeur, str) else None
+
+
+def _position(valeur: object) -> int:
+    """La position de lecture du cours, jamais négative.
+
+    ``int(valeur)`` levait ``TypeError`` sur ``null`` et ``ValueError`` sur
+    ``"foo"``, deux exceptions que le ``except`` ne couvrait pas : un contexte
+    corrompu faisait alors planter la CLI **entière**, y compris les commandes
+    qui n'ont rien à voir avec le cours.
+    """
+    # bool est un int en Python : `true` deviendrait la position 1, ce qui est
+    # une coïncidence de typage, pas une intention.
+    if isinstance(valeur, bool):
+        return 0
+    if isinstance(valeur, int):
+        return max(0, valeur)
+    if isinstance(valeur, str):
+        try:
+            return max(0, int(valeur.strip()))
+        except ValueError:
+            return 0
+    return 0
+
+
 def read_context(root: Path) -> ActiveContext:
-    """Lit le contexte actif depuis le fichier local. Retourne un contexte vide si absent."""
+    """Lit le contexte actif depuis le fichier local.
+
+    Retourne un contexte vide dès que le fichier est absent, illisible ou
+    malformé. Un fichier d'état local n'est pas une entrée de confiance : le
+    perdre coûte à l'apprenant un ``dsoxlab use``, alors qu'une exception lui
+    coûte la CLI tout entière, sans lui dire quel fichier supprimer.
+    """
     path = get_context_path(root)
     if not path.exists():
         return ActiveContext()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return ActiveContext(
-            section=data.get("section"),
-            level=data.get("level"),
-            lang=data.get("lang"),
-            active_lab=data.get("active_lab"),
-            active_target=data.get("active_target"),
-            active_provider=data.get("active_provider"),
-            course_pos=int(data.get("course_pos", 0)),
-        )
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        # UnicodeDecodeError descend de ValueError, pas d'OSError : un fichier
+        # d'octets arbitraires passait donc à travers l'ancien filet.
+        logger.warning("Contexte illisible, ignoré : %s", path)
         return ActiveContext()
+
+    # La racine du document peut être n'importe quel type JSON. Sur une liste
+    # ou une chaîne, `.get()` n'existe pas et lève un AttributeError que rien
+    # n'attrapait.
+    if not isinstance(data, dict):
+        logger.warning("Contexte non conforme (racine %s), ignoré : %s",
+                       type(data).__name__, path)
+        return ActiveContext()
+
+    return ActiveContext(
+        section=_texte(data.get("section")),
+        level=_texte(data.get("level")),
+        lang=_texte(data.get("lang")),
+        active_lab=_texte(data.get("active_lab")),
+        active_target=_texte(data.get("active_target")),
+        active_provider=_texte(data.get("active_provider")),
+        course_pos=_position(data.get("course_pos")),
+    )
 
 
 def _persist(root: Path, ctx: ActiveContext) -> None:
