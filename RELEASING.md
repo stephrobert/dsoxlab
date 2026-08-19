@@ -66,6 +66,28 @@ Two details of that pipeline are deliberate. The `publish` job runs no project
 code and holds `id-token: write` only; and `github_release` runs after PyPI
 succeeds, so no Release ever advertises a version that failed to upload.
 
+7. **Confirm the release actually landed**, once the workflow is done:
+
+   ```bash
+   python3 scripts/check-release.py --publiee
+   ```
+
+   A green workflow is not proof that the version is installable. When 0.1.42
+   was published, the upload had received two `200 OK` from PyPI and the
+   project page answered, yet `https://pypi.org/simple/dsoxlab/` — the only
+   index pip and uv read to resolve a version — did not list it yet. During
+   those minutes, `uv tool install dsoxlab` silently installed the *previous*
+   version.
+
+   This check looks at the tag on `origin`, at the Release assets (wheel,
+   sdist, provenance), and at the simple index. It distinguishes "published but
+   not served yet", which is a matter of waiting, from "absent from PyPI",
+   which means the upload never happened despite a green job.
+
+   One last trap it prints as a reminder: uv caches the index, so verifying by
+   installing needs `uv tool install --force --refresh dsoxlab`. Without
+   `--refresh`, uv happily reinstalls the version it already knows.
+
 `provenance.intoto.jsonl` is attached as a release asset on purpose: it is a
 *distinct* artifact from the attestation recorded on GitHub's API, and it is the
 one OpenSSF Scorecard's Signed-Releases control looks for. That control scores
