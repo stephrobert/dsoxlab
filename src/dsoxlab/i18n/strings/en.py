@@ -664,4 +664,10 @@ silent.
     "col_tests":         "Tests",
     "col_hints":         "Hints",
     "col_validated_at":  "Validated on",
+
+    # ── infra — libvirt ───────────────────────────────────────────────────────
+    "libvirt_domain_not_found":
+        "No libvirt domain matches host '{host}'. Names tried: {tried}. "
+        "Existing domains: {domains}.",
+    "libvirt_no_domain": "none",
 }

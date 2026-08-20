@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.46] - 2026-08-20
+
+### Fixed
+
+- **KVM snapshots aimed at a domain that does not exist.** The packaged
+  Terraform template names each libvirt domain after `infra.hosts[].name` from
+  `meta.yml`, unchanged, so a FQDN: `control-node.lab`. The snapshot backend
+  assumed the opposite convention and cut the FQDN at the first dot, so
+  `create`, `revert`, `delete` and `list_` all targeted `control-node`, which
+  libvirt does not know. Verified on a real hypervisor: `virsh domstate
+  control-node` answers `failed to get domain`, `virsh domstate
+  control-node.lab` answers `running`.
+
+  The domain name is now **resolved against libvirt** instead of being rebuilt
+  from a convention: the FQDN first, which is what the template produces, then
+  the short name as a fallback for infrastructures created by an earlier
+  version of the template. Renaming domains on the Terraform side would have
+  recreated every VM of every catalog for no benefit.
+
+  A host that matches no domain now raises an error naming the host, the names
+  tried and the domains that do exist, instead of letting `virsh`'s laconic
+  `error: failed to get domain` surface. `delete` stays best-effort and only
+  logs, so that cleaning up what is already gone never fails.
+
+  Nothing activated this path — no lab in any catalog sets
+  `snapshot_required: true`, and the module had no test — which is how the two
+  conventions drifted apart in silence. The module docstring, which stated the
+  wrong convention and authorised the drift, is corrected, and the resolution
+  is now covered by tests.
+
 ## [0.1.45] - 2026-08-19
 
 ### Added

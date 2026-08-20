@@ -9,6 +9,37 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.46] - 2026-08-20
+
+### Corrigé
+
+- **Le snapshot KVM visait un domaine qui n'existe pas.** Le template Terraform
+  packagé ici nomme chaque domaine libvirt avec le `infra.hosts[].name` du
+  `meta.yml`, tel quel, donc un FQDN : `control-node.lab`. Le backend de
+  snapshot supposait la convention inverse et coupait le FQDN au premier point,
+  si bien que `create`, `revert`, `delete` et `list_` visaient tous
+  `control-node`, que libvirt ne connaît pas. Vérifié sur un hyperviseur réel :
+  `virsh domstate control-node` répond `failed to get domain`, `virsh domstate
+  control-node.lab` répond `running`.
+
+  Le nom du domaine est désormais **résolu contre libvirt** au lieu d'être
+  reconstruit de tête : le FQDN d'abord, ce que produit le template, puis le
+  nom court en repli pour les infrastructures créées par une version antérieure
+  du template. Renommer les domaines côté Terraform aurait recréé toutes les VM
+  de tous les catalogues pour un bénéfice nul.
+
+  Un hôte qui ne correspond à aucun domaine lève maintenant une erreur qui
+  nomme l'hôte, les noms essayés et les domaines qui existent, au lieu de
+  laisser remonter le laconique `error: failed to get domain` de `virsh`.
+  `delete` reste tolérant et se contente de journaliser, pour qu'un nettoyage
+  n'échoue jamais sur ce qui a déjà disparu.
+
+  Rien n'activait ce chemin : aucun lab d'aucun catalogue ne pose
+  `snapshot_required: true`, et le module n'avait aucun test. C'est ainsi que
+  les deux conventions ont divergé sans bruit. La docstring du module, qui
+  énonçait la convention inverse et a autorisé la divergence, est corrigée, et
+  la résolution est désormais couverte par des tests.
+
 ## [0.1.45] - 2026-08-19
 
 ### Ajouté

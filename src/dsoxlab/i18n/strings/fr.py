@@ -664,4 +664,10 @@ hors ligne, elle se tait.
     "col_tests":          "Tests",
     "col_hints":          "Hints",
     "col_validated_at":   "Validé le",
+
+    # ── infra — libvirt ───────────────────────────────────────────────────────
+    "libvirt_domain_not_found":
+        "Aucun domaine libvirt ne correspond à l'hôte « {host} ». "
+        "Noms essayés : {tried}. Domaines existants : {domains}.",
+    "libvirt_no_domain":  "aucun",
 }
