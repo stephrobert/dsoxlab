@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/meta.schema.json",
+  "title": "dsoxlab meta.yml (contract v1)",
+  "description": "Declarative contract of a lab-hosting repository, read by dsoxlab from <repo>/meta.yml. Contract version 1. Point your editor at this schema with a first line: # yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/meta.schema.json",
+  "type": "object",
+  "required": ["repo"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1,
+      "default": 1,
+      "description": "Version of the INPUT contract this file follows. Leave it out and it is read as 1. Unrelated to the version of the JSON dsoxlab emits (reporting/machine.py: SCHEMA)."
+    },
+
+    "repo": {
+      "type": "object",
+      "required": ["id", "category"],
+      "additionalProperties": false,
+      "description": "Identity of the repository. The only block dsoxlab requires.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Slug of the repository. Namespaces the state directory and the service containers."
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Technical category of the repository. Becomes the default section of every lab. Free-form: dsoxlab knows no list of domains."
+        },
+        "title": { "type": "string", "description": "Human-readable name." },
+        "blog_url": { "type": "string", "description": "Home page of the online course." },
+        "description": { "type": "string", "description": "One paragraph about the repository." }
+      }
+    },
+
+    "infra": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Infrastructure topology. Optional, and needed only by labs declaring runtime: vm. A repository whose labs are all shell has no infra block at all.",
+      "properties": {
+        "provider": {
+          "description": "Infrastructure provider, or the list of candidates the learner may choose from. Providers packaged with dsoxlab: kvm, incus, outscale. Resolution order: DSOXLAB_PROVIDER, then the session context set by dsoxlab use --provider, then a bare string or a single-item list. Left unresolved is not an error: only infrastructure commands require one.",
+          "default": "kvm",
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+          ]
+        },
+        "network": {
+          "type": "string",
+          "description": "Name of the network the VMs join, dedicated to this repository so several catalogs can coexist."
+        },
+        "cidr": {
+          "type": "string",
+          "description": "Subnet of that network, in CIDR notation."
+        },
+        "hosts": {
+          "type": "array",
+          "description": "The VMs of the repository. Every runtime.targets[].host and every roles value of a lab must appear here by name.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "FQDN of the machine, the name labs refer to."
+              },
+              "distro": {
+                "type": "string",
+                "description": "Image and cloud-init to use. Values packaged with dsoxlab today: alma10, alma9, ubuntu26, ubuntu24, ubuntu22, debian13, debian12. Not enumerated here, because the list lives in the Terraform templates and grows with them."
+              },
+              "role": {
+                "type": "string",
+                "description": "Free-form role, exposed as an Ansible host_var."
+              },
+              "ram_mb": { "type": "integer", "minimum": 1, "default": 1024 },
+              "vcpu": { "type": "integer", "minimum": 1, "default": 1 },
+              "disk_gb": { "type": "integer", "minimum": 1, "default": 10 },
+              "extra_disk_gb": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Size of a second disk attached to the VM, for labs that need a real block device (partitioning, LVM, RAID). 0 = none."
+              },
+              "ip": {
+                "type": "string",
+                "deprecated": true,
+                "description": "Legacy. Addresses come from the provider (Terraform output) and are injected into the generated inventory. Do not declare them."
+              }
+            }
+          }
+        },
+        "providers": {
+          "type": "object",
+          "description": "Per-provider overrides, read by the matching Terraform module. Keys are provider names; values are free-form mappings, because each provider has its own variables.",
+          "additionalProperties": {
+            "type": ["object", "null"]
+          }
+        }
+      }
+    },
+
+    "sections": {
+      "type": "array",
+      "description": "Teaching order of the catalog. Optional. It orders and names the blocs; it never decides whether a lab exists, which is settled by the presence of labs/**/lab.yaml.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "Slug of the section." },
+          "title": { "type": "string", "description": "Human-readable name, shown as the bloc name." },
+          "description": { "type": "string", "description": "One short line." },
+          "labs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Paths relative to <repo>/labs/, in teaching order. The match is on the path, never on the lab id."
+          }
+        }
+      }
+    }
+  }
+}

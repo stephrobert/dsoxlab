@@ -156,6 +156,29 @@ dsoxlab course > course.txt                  # never paged: plain text
 
 A lab-hosting repository describes its catalog with two levels of files.
 
+The contract is **versioned**. Both files accept a `schema_version` integer at
+their root; leaving it out means version 1, so no existing catalog has anything
+to change. A file declaring a version this dsoxlab does not read is named in a
+message rather than vanishing from the catalog. Field by field, with the
+evolution rule and the migration path to a future v2:
+**[the v1 contract reference](docs/contract-v1.md)**.
+
+Two JSON Schemas describe the same contract for your editor and your CI:
+[`schemas/lab.schema.json`](schemas/lab.schema.json) and
+[`schemas/meta.schema.json`](schemas/meta.schema.json). Put this line at the top
+of a file and any editor running `yaml-language-server` (the YAML extension of
+VS Code, among others) completes fields and underlines mistakes as you type:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/lab.schema.json
+id: my-lab
+title: My lab
+```
+
+Swap `main` for a release tag (`v0.1.46`) to pin the schema in CI. A test
+confronts both schemas with the parser, in both directions, so they cannot
+quietly drift from the code.
+
 ### 1. `meta.yml` at the repository root
 
 Repository metadata, infrastructure topology (KVM/Incus), section ordering.

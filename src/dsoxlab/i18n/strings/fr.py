@@ -480,6 +480,27 @@ hors ligne, elle se tait.
         "Vérification des doc_url de {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Problèmes de métadonnées :[/bold red]",
 
+    # ── version du contrat (schema_version) ───────────────────────────────────
+    "contract_issues_header": "\n[bold red]Version du contrat :[/bold red]",
+    "schema_version_invalid":
+        "'schema_version' doit être un entier YAML supérieur ou égal à 1, et au "
+        "plus {supported}, la dernière version du contrat que ce dsoxlab lit "
+        "(reçu : {got}). Sans ce champ, le fichier est lu en version 1.",
+    "schema_version_too_new":
+        "déclare schema_version {found}, au-delà de la version {supported}, la "
+        "dernière que ce dsoxlab sait lire. Mets l'outil à jour : "
+        "uv tool upgrade dsoxlab",
+    "schema_version_meta_too_new":
+        "Ce catalogue exige une version plus récente de dsoxlab. {path} déclare "
+        "un contrat en schema_version {found}, alors que ce dsoxlab ne lit le "
+        "contrat que jusqu'à la version {supported}. Mets l'outil à jour : "
+        "uv tool upgrade dsoxlab",
+    "schema_version_lab_skipped":
+        "Lab écarté : {path} déclare un contrat en schema_version {found}, "
+        "au-delà de la version {supported}, la dernière que ce dsoxlab sait "
+        "lire. Le reste du catalogue est listé normalement. Mets l'outil à jour "
+        "pour récupérer ce lab : uv tool upgrade dsoxlab",
+
     # ── doctor — libellés composants ─────────────────────────────────────────
     "check_python":   "Python",
     "check_pytest":   "pytest",

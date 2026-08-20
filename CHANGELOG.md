@@ -38,6 +38,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conventions drifted apart in silence. The module docstring, which stated the
   wrong convention and authorised the drift, is corrected, and the resolution
   is now covered by tests.
+## [0.1.46] - 2026-08-20
+
+### Added
+
+- **The input contract is versioned: `schema_version` in `meta.yml` and
+  `lab.yaml`.** These two files are the public interface of the engine, and
+  until now that interface had no number. A field changing meaning could
+  therefore be neither announced, nor detected, nor refused: it showed up as a
+  lab disappearing from the catalog, without a word. That is the most expensive
+  symptom to diagnose in the whole project.
+
+  Leaving the field out means **version 1**, so none of the 284 labs of the
+  three existing catalogs has anything to change: not one declares it today.
+  A file that declares a version this dsoxlab does not read is now named, and
+  named differently depending on which file it is. A `meta.yml` from the future
+  **stops the command**, because it describes the whole catalog and reading it
+  wrong would make everything downstream untrustworthy. A single `lab.yaml` from
+  the future is **left out with a warning** while the rest of the catalog is
+  served normally, because otherwise nobody could ever publish the first v2 lab
+  without breaking every learner not yet upgraded.
+
+  The read is strict where the rest of the contract is lenient: `"1"`, `1.0` and
+  `true` are refused rather than rounded. A version number is not a measurement,
+  and silently turning `1.5` into `1` is exactly the silence this field exists to
+  remove.
+
+  Not to be confused with the JSON output version (`reporting/machine.py:
+  SCHEMA`), which versions what dsoxlab **writes** for other programs. Two
+  contracts, two audiences, two rhythms. They are never bumped together.
+
+- **`dsoxlab validate-structure` now sees files that no other check can see.**
+  It reads `schema_version` straight from disk, before discovery. Every other
+  validator iterates over labs that were already loaded, so a file the parser
+  rejects has always slipped through validation without a word. This one reports
+  it, names the file, and gives the value.
+
+- **`schemas/lab.schema.json` and `schemas/meta.schema.json`, published for
+  editors and CI.** Put a `# yaml-language-server: $schema=…` line at the top of
+  a file and any editor running `yaml-language-server` completes the fields and
+  underlines mistakes as you type. A catalog repository can also validate its own
+  YAML in CI without installing the Python tool.
+
+  A schema that lies is worse than no schema, because it carries authority it
+  does not deserve. So a test confronts both schemas with the parser **in both
+  directions**: it reads `models/lab.py` and `models/repo.py`, extracts the keys
+  they actually look up, and demands equality with the schema's `properties`. A
+  field read by the code and missing from the schema fails; a field invented in
+  the schema and read nowhere fails too; and a new nested mapping in the parser
+  fails until it is described. The enumerated values are checked against the code
+  constants rather than copied.
+
+- **The v1 contract is written down**: [`docs/contract-v1.md`](docs/contract-v1.md)
+  and its French counterpart list every field, whether it is required, the
+  enumerated values, what may be added without a version bump, what would demand
+  a v2, and the migration path to that v2 with the command that will help.
+
+### Changed
+
+- `discovery/scanner.py` gained `scan_catalog()`, which returns the labs **and**
+  the files it had to leave out. `discover_labs()` keeps its signature and
+  behaviour, as a wrapper. Callers that want to tell the user what is missing now
+  can; the others are untouched.
 
 ## [0.1.45] - 2026-08-19
 
