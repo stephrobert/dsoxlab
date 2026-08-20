@@ -9,7 +9,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-## [0.1.46] - 2026-08-20
+## [0.1.47] - 2026-08-20
 
 ### Corrigé
 
