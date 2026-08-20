@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.50] - 2026-08-20
+
+### Changed
+
+- **Shell completion no longer relies on `shell_complete`, which typer
+  deprecates.** The ten `lab_id` arguments (`show`, `run`, `course`,
+  `challenge`, `guide`, `hint`, `check`, `submit`, `reset`, `clean`) went
+  through click's `shell_complete=`, a keyword typer 0.27 warns about and
+  announces the removal of. Moving to `autocompletion=` is not a rename: the
+  callback no longer receives `(ctx, param, incomplete)` positionally, but the
+  parameters typer derives from its annotations, and it now returns
+  `(value, help)` pairs instead of click `CompletionItem` objects, which typer
+  refuses. The help text next to each proposal, the lab title, is preserved:
+  zsh still displays `lab-id -- Lab title`.
+
+- **The suite no longer emits a single typer `DeprecationWarning`,** down from
+  490 per run. A deprecation drowned in 490 others is no longer a signal, and
+  the next one, the one that will matter, would have arrived in that noise.
+
+### Added
+
+- **Completion is now covered by tests that actually trigger it.** Nothing
+  exercised the mechanism: the completion could have stopped proposing anything
+  at all while ruff, mypy and the whole suite stayed green, and the failure
+  would only have shown up as a `Tab` that does nothing on a learner's machine.
+  The new tests ask the CLI for a completion the way the shell does, through the
+  environment variable the generated zsh script sets, and read what comes back:
+  the proposals themselves, the prefix filtering, the help text, all ten
+  commands one by one, and the degraded cases (outside a lab repository, with a
+  broken `meta.yml`, with a contract too recent to read) where the blind
+  `except` must yield no proposal rather than a Python traceback in the shell.
+
 ## [0.1.49] - 2026-08-20
 
 ### Fixed

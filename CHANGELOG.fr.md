@@ -9,6 +9,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.50] - 2026-08-20
+
+### Modifié
+
+- **La complétion shell ne repose plus sur `shell_complete`, que typer
+  déprécie.** Les dix arguments `lab_id` (`show`, `run`, `course`, `challenge`,
+  `guide`, `hint`, `check`, `submit`, `reset`, `clean`) passaient par le
+  `shell_complete=` de click, un mot-clé dont typer 0.27 avertit et dont il
+  annonce la suppression. Le passage à `autocompletion=` n'est pas un
+  renommage : la fonction ne reçoit plus les trois positionnels
+  `(ctx, param, incomplete)`, mais les paramètres que typer déduit de ses
+  annotations, et elle rend désormais des couples `(valeur, aide)` au lieu des
+  `CompletionItem` de click, que typer refuse. L'aide affichée à côté de chaque
+  proposition, le titre du lab, est préservée : zsh affiche toujours
+  `identifiant-du-lab -- Titre du lab`.
+
+- **La suite n'émet plus un seul `DeprecationWarning` de typer,** contre 490 par
+  exécution. Une dépréciation noyée dans 490 autres n'est plus un signal, et la
+  prochaine, celle qui comptera vraiment, serait arrivée dans ce bruit.
+
+### Ajouté
+
+- **La complétion est enfin couverte par des tests qui la déclenchent
+  vraiment.** Rien n'exerçait le mécanisme : la complétion pouvait cesser de
+  proposer quoi que ce soit sans que ruff, mypy ni la suite ne bronchent, et la
+  panne ne serait apparue que sous la forme d'un `Tab` sans effet chez
+  l'apprenant. Les nouveaux tests demandent une complétion à la CLI comme le
+  fait le shell, par la variable d'environnement que pose le script zsh généré,
+  puis lisent ce qui revient : les propositions, le filtrage par le préfixe
+  saisi, l'aide affichée, les dix commandes une par une, et les cas dégradés
+  (hors d'un dépôt de labs, avec un `meta.yml` cassé, avec un contrat trop
+  récent pour être lu) où le `except` aveugle doit rendre une liste vide plutôt
+  qu'une trace Python dans le shell.
+
 ## [0.1.49] - 2026-08-20
 
 ### Corrigé
