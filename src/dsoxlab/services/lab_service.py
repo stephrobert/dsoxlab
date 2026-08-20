@@ -145,12 +145,21 @@ def get_all_labs(root: Path, lang: str = "en") -> list[LabDefinition]:
     return discover_labs(root, lang=lang)
 
 
-def get_lab(root: Path, lab_id: str, lang: str = "en") -> LabDefinition:
-    labs = discover_labs(root, lang=lang)
+def find_lab(labs: list[LabDefinition], lab_id: str) -> LabDefinition:
+    """Le lab d'identifiant ``lab_id`` dans un catalogue déjà balayé.
+
+    Extrait de :func:`get_lab` pour que la CLI, qui a besoin du balayage
+    complet (elle y lit aussi les fichiers écartés), n'ait pas à en refaire un
+    second ni à recopier le message d'erreur.
+    """
     for lab in labs:
         if lab.id == lab_id:
             return lab
     raise ValueError(f"Lab introuvable : {lab_id}")
+
+
+def get_lab(root: Path, lab_id: str, lang: str = "en") -> LabDefinition:
+    return find_lab(discover_labs(root, lang=lang), lab_id)
 
 
 def run_lab(

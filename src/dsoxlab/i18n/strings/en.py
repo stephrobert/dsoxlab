@@ -481,6 +481,26 @@ silent.
         "Checking doc_url for {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Metadata issues:[/bold red]",
 
+    # ── contract version (schema_version) ─────────────────────────────────────
+    "contract_issues_header": "\n[bold red]Contract version:[/bold red]",
+    "schema_version_invalid":
+        "'schema_version' must be a YAML integer of at least 1, and no greater "
+        "than {supported}, the latest contract this dsoxlab reads (got: {got}). "
+        "Leave the field out and the file is read as version 1.",
+    "schema_version_too_new":
+        "declares schema_version {found}, beyond version {supported}, which is "
+        "the latest contract this dsoxlab reads. Upgrade the tool: "
+        "uv tool upgrade dsoxlab",
+    "schema_version_meta_too_new":
+        "This catalog requires a newer dsoxlab. {path} declares contract "
+        "schema_version {found}, and this dsoxlab only reads the contract up to "
+        "version {supported}. Upgrade the tool: uv tool upgrade dsoxlab",
+    "schema_version_lab_skipped":
+        "Lab left out: {path} declares contract schema_version {found}, beyond "
+        "version {supported}, which is the latest this dsoxlab reads. The rest "
+        "of the catalog is listed as usual. Upgrade the tool to get this lab: "
+        "uv tool upgrade dsoxlab",
+
     # ── doctor — component labels ─────────────────────────────────────────────
     "check_python":   "Python",
     "check_pytest":   "pytest",
