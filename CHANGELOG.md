@@ -9,6 +9,389 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.48] - 2026-08-20
+
+### Fixed
+
+- **`virsh` was called through `sudo` without need, which switched the
+  diagnosis off exactly where it helps most.** The configuration libvirt
+  recommends is to add the user to the `libvirt` group: they then reach the
+  system URI without `sudo`, and with no `NOPASSWD` anywhere. Requiring
+  `sudo -n` up front therefore answered "hypervisor cannot be queried" on a
+  machine where `virsh list --all` works perfectly, and that machine is the one
+  belonging to a learner discovering the tool. dsoxlab now detects the path that
+  answers, direct first then `sudo -n`, and declares the URI
+  (`--connect qemu:///system`) instead of depending on whichever one the
+  distribution picks: the real reason `sudo` was needed here was the URI, not
+  the privilege.
+
+  The `-n` is kept on the fallback, and it is not decorative: the output of
+  these commands is captured, so a password prompt would have no terminal to
+  appear on and the call would hang until the timeout.
+
+  The snapshot backend now goes through the same door. Its four calls hardcoded
+  `sudo virsh` **without** `-n`: those were the ones that would hang.
+
+- **`status` printed two markers per host line**, `✘   ✘ host.lab`, because
+  `error()` already emits one. It reads as a rendering bug in the very output we
+  show a learner.
+
+
+- **A failed `provision` left machines behind, and `destroy` reported success
+  without seeing them.** When `libvirt_domain` fails at startup, the provider
+  has already *defined* the domain but never records it in the Terraform state.
+  `terraform destroy` therefore had nothing to delete: the command printed
+  `✔ Infrastructure destroyed.` and exited 0 while the machines were still
+  standing, and every later `apply` died on `domain already exists`. On a fresh
+  Ubuntu, where the first provisioning fails for other reasons, no `dsoxlab`
+  command got the learner out — and the recovery procedure documented in the
+  catalogues is precisely `destroy` then `provision`.
+
+  `provision` now looks at the hypervisor before starting: machines declared in
+  the `meta.yml` that exist there without being in the state are named, along
+  with the exact `virsh undefine` command that removes them, and the command
+  exits 5 instead of spending a minute on an `apply` that cannot succeed.
+  `destroy` looks again once Terraform has finished, and removes what it left
+  behind — after an explicit confirmation, since nothing proves to `dsoxlab`
+  that a domain with the same name is its own. `--yes` counts as confirmation.
+  A refused confirmation, or a removal that fails, exits 6 and names the manual
+  command: a machine still standing must never be reported as destroyed.
+
+  Only the `infra.hosts[].name` entries of the current repository are ever
+  considered, so a machine this catalogue does not declare is never named and
+  never removed. A successful `provision` followed by a `destroy` behaves
+  exactly as before, with no extra warning. (#107)
+
+- **`status` never asked libvirt for its state: two guesses instead of a
+  diagnosis.** The command captured the real reason for each SSH failure, host
+  by host, then discarded it to print a sentence offering two causes at once
+  (`Cloud-init may still be running … or run 'dsoxlab provision'`). Both were
+  wrong in the observed case: three hosts, one answering, two on
+  `No route to host`. `EHOSTUNREACH` and `ECONNREFUSED` say **opposite** things
+  about a machine, and the tool treated them alike.
+
+  On a provider whose machine state can be queried, `status` now asks the
+  hypervisor and names one cause, and one gesture, per host: a domain that does
+  not exist points at `dsoxlab provision`; a domain that is stopped points at
+  `virsh start` and says which state libvirt reports; a running domain with no
+  DHCP lease points at `virsh console`; a running domain holding its address
+  points at cloud-init and at waiting. Where the hypervisor cannot be asked, the
+  SSH layer alone still separates "nothing answers at this address" from
+  "something answers and refuses the port".
+
+  The interrogation is lazy — nothing is asked while every host answers — and
+  never fatal. A provider with no queryable state, a missing `virsh`, a refused
+  `sudo` or a dead daemon all fall back to the previous behaviour **and say so**,
+  because turning "I could not look" into "nothing exists" would be a false
+  diagnosis. `--json` carries `domain`, `domain_state` and `cause` per host, plus
+  a `hypervisor` block that distinguishes an empty answer from no answer at all.
+  (#122)
+
+### Changed
+
+- **`virsh` is invoked as `sudo -n virsh`.** The output of these commands is
+  captured, so a password prompt had no terminal to appear on and the call hung
+  until the timeout. With `-n`, `sudo` refuses immediately and the caller can
+  report it. This also affects the KVM snapshot backend, which used the
+  interactive form.
+
+- **`status` runs its SSH probes under `LC_ALL=C`.** The failure reason comes
+  from `strerror`, which the C library translates: without this lock,
+  `No route to host` reads differently on every machine and no diagnosis could
+  recognise it.
+
+- `incus` and `outscale` are explicitly out of scope for hypervisor
+  interrogation, and the code says why: the incus template creates
+  `incus_instance` resources, which the incus daemon owns and `virsh` cannot
+  see, and Outscale is a remote cloud with no local hypervisor. Both keep their
+  previous behaviour, stated rather than silent.
+
+## [0.1.47] - 2026-08-20
+
+### Fixed
+
+- **KVM snapshots aimed at a domain that does not exist.** The packaged
+  Terraform template names each libvirt domain after `infra.hosts[].name` from
+  `meta.yml`, unchanged, so a FQDN: `control-node.lab`. The snapshot backend
+  assumed the opposite convention and cut the FQDN at the first dot, so
+  `create`, `revert`, `delete` and `list_` all targeted `control-node`, which
+  libvirt does not know. Verified on a real hypervisor: `virsh domstate
+  control-node` answers `failed to get domain`, `virsh domstate
+  control-node.lab` answers `running`.
+
+  The domain name is now **resolved against libvirt** instead of being rebuilt
+  from a convention: the FQDN first, which is what the template produces, then
+  the short name as a fallback for infrastructures created by an earlier
+  version of the template. Renaming domains on the Terraform side would have
+  recreated every VM of every catalog for no benefit.
+
+  A host that matches no domain now raises an error naming the host, the names
+  tried and the domains that do exist, instead of letting `virsh`'s laconic
+  `error: failed to get domain` surface. `delete` stays best-effort and only
+  logs, so that cleaning up what is already gone never fails.
+
+  Nothing activated this path — no lab in any catalog sets
+  `snapshot_required: true`, and the module had no test — which is how the two
+  conventions drifted apart in silence. The module docstring, which stated the
+  wrong convention and authorised the drift, is corrected, and the resolution
+  is now covered by tests.
+## [0.1.46] - 2026-08-20
+
+### Added
+
+- **The input contract is versioned: `schema_version` in `meta.yml` and
+  `lab.yaml`.** These two files are the public interface of the engine, and
+  until now that interface had no number. A field changing meaning could
+  therefore be neither announced, nor detected, nor refused: it showed up as a
+  lab disappearing from the catalog, without a word. That is the most expensive
+  symptom to diagnose in the whole project.
+
+  Leaving the field out means **version 1**, so none of the 284 labs of the
+  three existing catalogs has anything to change: not one declares it today.
+  A file that declares a version this dsoxlab does not read is now named, and
+  named differently depending on which file it is. A `meta.yml` from the future
+  **stops the command**, because it describes the whole catalog and reading it
+  wrong would make everything downstream untrustworthy. A single `lab.yaml` from
+  the future is **left out with a warning** while the rest of the catalog is
+  served normally, because otherwise nobody could ever publish the first v2 lab
+  without breaking every learner not yet upgraded.
+
+  The read is strict where the rest of the contract is lenient: `"1"`, `1.0` and
+  `true` are refused rather than rounded. A version number is not a measurement,
+  and silently turning `1.5` into `1` is exactly the silence this field exists to
+  remove.
+
+  Not to be confused with the JSON output version (`reporting/machine.py:
+  SCHEMA`), which versions what dsoxlab **writes** for other programs. Two
+  contracts, two audiences, two rhythms. They are never bumped together.
+
+- **`dsoxlab validate-structure` now sees files that no other check can see.**
+  It reads `schema_version` straight from disk, before discovery. Every other
+  validator iterates over labs that were already loaded, so a file the parser
+  rejects has always slipped through validation without a word. This one reports
+  it, names the file, and gives the value.
+
+- **`schemas/lab.schema.json` and `schemas/meta.schema.json`, published for
+  editors and CI.** Put a `# yaml-language-server: $schema=…` line at the top of
+  a file and any editor running `yaml-language-server` completes the fields and
+  underlines mistakes as you type. A catalog repository can also validate its own
+  YAML in CI without installing the Python tool.
+
+  A schema that lies is worse than no schema, because it carries authority it
+  does not deserve. So a test confronts both schemas with the parser **in both
+  directions**: it reads `models/lab.py` and `models/repo.py`, extracts the keys
+  they actually look up, and demands equality with the schema's `properties`. A
+  field read by the code and missing from the schema fails; a field invented in
+  the schema and read nowhere fails too; and a new nested mapping in the parser
+  fails until it is described. The enumerated values are checked against the code
+  constants rather than copied.
+
+- **The v1 contract is written down**: [`docs/contract-v1.md`](docs/contract-v1.md)
+  and its French counterpart list every field, whether it is required, the
+  enumerated values, what may be added without a version bump, what would demand
+  a v2, and the migration path to that v2 with the command that will help.
+
+### Changed
+
+- `discovery/scanner.py` gained `scan_catalog()`, which returns the labs **and**
+  the files it had to leave out. `discover_labs()` keeps its signature and
+  behaviour, as a wrapper. Callers that want to tell the user what is missing now
+  can; the others are untouched.
+
+## [0.1.45] - 2026-08-19
+
+### Added
+
+- **`dsoxlab demo`: a first lab you can play right after installing, with
+  nothing to clone and nothing to provision.** Between `uv tool install dsoxlab`
+  and the first lab played, there was an implicit piece of knowledge: that labs
+  live in other repositories, which ones, and that you have to stand inside one.
+  Whoever installed the tool and ran it where they were got nothing, with a `0`
+  exit code saying all was well.
+
+  The demonstration catalog holds a single `shell` lab, and **its subject is
+  dsoxlab itself**: the run / course / challenge / hint / check loop, nothing
+  else. That is what keeps it clear of the anti-pattern this project forbids,
+  which is shipping lab templates for a technical domain. Playing it takes about
+  five minutes and ends on 100/100, a path an end-to-end test walks in full.
+
+  An existing installation is never overwritten: that directory holds the
+  learner's progress and answers, and `--force` is required to start over.
+
+- **Documentation can no longer lie about the CLI.** A new test closes both
+  directions: every command quoted in the docs exists, and every command of the
+  CLI is described in `fullhelp`, in English and French alike. It immediately
+  found that `provision`, `destroy`, `ssh` and `status` were described **nowhere**
+  in the guide, though they are the four infrastructure commands. They are now.
+
+- **The README now opens on the user's installation, not the contributor's.**
+  It started with `git clone` and `uv tool install --editable .`, a development
+  setup, while the package is published on PyPI and `doctor` already recommended
+  the PyPI install. A reader following it ended up with an editable checkout they
+  had no reason to want. The path is now: install, play a lab, then pick a
+  catalog.
+
+- **The command table is generated from the CLI** (`scripts/generer-doc.py`),
+  between markers, in both languages. Written by hand it had drifted without a
+  sound: it still described `dsoxlab clean` running a `cleanup.sh`, which the
+  zero-bash rule forbids, and it was missing `demo` and `support`. A pre-commit
+  hook and a test refuse a stale version.
+
+### Fixed
+
+- **The Persistence section was wrong on all three counts.** It announced
+  `~/.local/share/dsoxlab/progress.db`, a `~/.config/dsoxlab/config.yaml` and an
+  `XDG_CONFIG_HOME` override. Checked against the code: the database is
+  `<catalog>/.dsoxlab.db`, no configuration file is read anywhere, and the
+  variables actually honoured are `XDG_DATA_HOME`, `XDG_STATE_HOME` and
+  `XDG_CACHE_HOME`. Progress is **per catalog**, which the section now says.
+
+- **`fullhelp` was missing five commands**, four of them long-standing:
+  `provision`, `status`, `ssh`, `destroy`, and the new `demo`. A command absent
+  from the guide does not exist for whoever reads it.
+
+## [0.1.44] - 2026-08-19
+
+### Added
+
+- **`dsoxlab support`: a diagnostic report ready to paste into an issue.**
+  Answering "it does not work" meant asking back for the version, the system,
+  the provider, the catalog, the state of every dependency. Each round trip
+  costs a day, and the tool already knew all of it. The command gathers it in
+  one Markdown block, with `--json` for the same content as a machine document.
+
+  **Anonymised by default, and tested as such**, because this report is meant to
+  be pasted publicly: the home directory becomes `~`, the user name becomes
+  `<user>`, public IPv4 addresses become `<ip>`, and the machine name is simply
+  never collected. Private addresses stay readable on purpose: `10.10.30.11` is
+  a lab VM, it identifies nobody outside the local network, and hiding it would
+  make every infrastructure report useless.
+
+  The bug report template and both `CONTRIBUTING` files now ask for this report
+  instead of three fields to copy by hand.
+
+- **`--verbose` / `-v`, `--debug`, and a persistent log.** Eleven engine modules
+  write to a logger, and none of those messages ever reached a user or a file.
+  The costliest case is known: a `lab.yaml` that raises while parsing is
+  swallowed by a `logger.warning` then a `continue`, so the lab vanishes from
+  the catalog **without a word**. That is the first symptom a catalog author
+  meets, and the hardest to diagnose.
+
+  Warnings are now shown by default, because a vanished lab is a real loss of
+  content that both the author and the learner need to see. `-v` adds the
+  informational level, `-vv` (or `--debug`) the full detail, and `DSOXLAB_LOG`
+  does the same for cases where the command line is out of reach.
+
+  Diagnostics always go to **standard error**, never to standard output: `--json`
+  stays machine-readable even in verbose mode, which a test pins down.
+
+  A rotating log is written to `~/.local/state/dsoxlab/dsoxlab.log` regardless of
+  any option, bounded to 1 MB and three archives. That is what makes it possible
+  to attach a trace to a bug report *after the fact*, instead of asking the user
+  to reproduce with the right flag. A log that cannot be written (read-only HOME,
+  full disk) never fails the command: it is a convenience, not a dependency.
+
+## [0.1.43] - 2026-08-19
+
+Three defects that only ever showed up on a user's machine: a completion that
+did not complete, a launcher that did not launch, and a CLI that refused to
+start because of its own state file.
+
+### Fixed
+
+- **Shell completion asked the CLI through a variable it does not listen to.**
+  The generated script used `_DSOXL_COMPLETE`, while Click derives
+  `_DSOXLAB_COMPLETE` from the program name. dsoxlab therefore answered with
+  its help page, which the shell then tried to evaluate on every Tab. The zsh
+  file was misnamed too (`_dsoxl` instead of `_dsoxlab`), so zsh never loaded
+  it whatever it contained. The variable is now derived from the program name
+  rather than copied, so the two cannot drift apart again.
+
+- **The generated wrapper broke on any path containing a space.** It wrote
+  `exec /home/me/My Tools/dsoxlab "$@"` unquoted, which the shell split into
+  two arguments and reported as "not found". The path is now quoted with
+  `shlex.quote`.
+
+- **`dsoxlab install` no longer overwrites the launcher of `uv tool` or
+  `pipx`.** It writes to exactly the path those tools use. The damage was worse
+  than a plain overwrite, and it took a mutation test to see it: writing to a
+  symlink writes to its *target*, so dsoxlab replaced uv's real binary with a
+  script that `exec`s itself. The symlink survived, `resolve()` did not move,
+  and the command looped forever. When a launcher already leads to this binary,
+  it is now left alone.
+
+- **A malformed `.dsoxlab-context.json` no longer takes the whole CLI down.**
+  The `except` covered `JSONDecodeError` and `OSError` only, while `null`
+  raised `TypeError`, `"foo"` raised `ValueError`, a non-object root raised
+  `AttributeError`, and a file of arbitrary bytes raised `UnicodeDecodeError`,
+  which descends from `ValueError` rather than `OSError`. Thirteen malformed
+  shapes are now absorbed into an empty context, with a warning naming the
+  file. Losing the context costs a `dsoxlab use`; raising cost every command,
+  including those with nothing to do with it.
+
+## [0.1.42] - 2026-08-19
+
+An audit run on a fresh Ubuntu 24.04 VM measured **six undocumented steps**
+between a green `dsoxlab doctor` and the first playable vm lab. A beginner
+stops at the first one. This release closes that gap: the diagnostic now names
+what is missing, before the failure rather than after it.
+
+### Fixed
+
+- **`ansible-core` is now a declared dependency, so a vm lab can actually
+  run.** `ansible-runner` does not pull it in, contrary to what this project's
+  own comment claimed: the installed tool weighed 18 MB and its `bin/`
+  contained neither `ansible` nor `ansible-playbook`. Every `dsoxlab run` on a
+  vm lab exited with `rc=127`, the shell code for "command not found", which
+  nothing translated. The check made it worse by testing only that the
+  `ansible_runner` module imports: it reported OK on a machine where no
+  playbook could run. It now tests both halves, and the error message names
+  `ansible-core` rather than sending the user to reinstall what they already
+  have.
+
+- **`instructor bootstrap` no longer exits 0 after printing a blocking
+  error.** It reported `✘ terraform not found in PATH` and returned success. A
+  learner checking the exit code, or an install script, concluded all was well
+  while the SSH key had just been created for infrastructure nothing could
+  provision.
+
+- **The Terraform error no longer points at a command that does not install
+  it.** `provision` said "run: dsoxlab instructor bootstrap", which only
+  reports the absence in turn. The loop was closed. It now gives the install
+  URL.
+
+- **`doctor` no longer writes "not required here" above a component that is
+  required.** On a catalog with 64 vm labs out of 84 and no provider selected
+  yet, both hypervisors were listed under "Informational — not required here",
+  followed by "these components block nothing in this repo". The checks
+  deliberately stay out of the required table, since `--fix` would otherwise
+  offer to install kvm **and** incus for a choice not yet made; it is the
+  heading that had to tell the truth.
+
+### Added
+
+- **`doctor` checks Terraform, `ansible-playbook`, the libvirt pool and the ISO
+  tool.** Terraform was verified nowhere, though `provision` cannot run without
+  it. The libvirt `default` pool does not exist on a fresh install, and
+  provisioning failed on a raw "Pool Not Found". Incus builds its
+  `agent:config` CD-ROM on the host, so without `genisoimage` no instance
+  starts at all. Each of these only appears when it applies: a shell-only
+  catalog sees none of them, and the configuration checks stay silent while the
+  hypervisor itself is missing, so one cause does not produce three red lines.
+
+- **The libvirt storage pool is configurable** through
+  `meta.yml: infra.providers.kvm.storage_pool`. The name was hardcoded in four
+  places of the KVM template, so a repository could not target its own pool.
+
+- **Known provisioning failures now come with their cause and their fix.**
+  Terraform is exact but opaque to a newcomer. Three messages have a known
+  cause and a one-line remedy: AppArmor denying VM disks, the missing storage
+  pool, and a domain left behind by an earlier failed run. Note that the
+  AppArmor case is only ever raised **after** the failure, never as a
+  prediction: measured on a machine where AppArmor is enabled, the override
+  absent, and eight libvirt domains running without incident, so its absence
+  proves nothing on its own.
+
 ## [0.1.41] - 2026-08-19
 
 ### Added

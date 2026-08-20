@@ -86,12 +86,43 @@ STRINGS: dict[str, str] = {
     "cmd_clean_arg":      "Identifiant du lab",
     "cmd_validate_help":  "Vérifie la structure et les métadonnées de tous les labs.",
     "cmd_doctor_help":    "Diagnostique l'environnement (runtimes, outils, labs détectés).",
+    "opt_verbose":
+        "Détaille ce que fait le moteur, sur la sortie d'erreur. Répétable : -v pour les informations, -vv pour le détail complet.",
+    "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
     "cmd_install_help":   "Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell.",
+    "cmd_demo_help":
+        "Installe un catalogue de démonstration et joue un premier lab, sans "
+        "rien cloner ni provisionner.",
+    "opt_demo_force":
+        "Réinstalle par-dessus, en perdant la progression et les réponses déjà "
+        "présentes.",
+    "demo_installee":  "Catalogue de démonstration installé dans {path}",
+    "demo_deja_installee":
+        "Le catalogue de démonstration est déjà installé dans {path}.",
+    "demo_deja_installee_suite":
+        "Il contient peut-être votre progression et vos réponses, donc rien "
+        "n'a été touché.\n"
+        "Pour le reprendre : cd {path} && dsoxlab list-labs\n"
+        "Pour repartir de zéro : dsoxlab demo --force",
+    "demo_echec":      "Installation impossible : {error}",
+    "demo_suite":
+        "Pour commencer :\n"
+        "  cd {path}\n"
+        "  dsoxlab course {lab}\n"
+        "  dsoxlab run {lab}\n"
+        "Puis, une fois la mission remplie : dsoxlab check {lab}",
+    "cmd_support_help":
+        "Produit un rapport de diagnostic anonymisé, à coller dans une issue.",
+    "opt_support_log_lines":
+        "Nombre de lignes de journal à joindre (0 pour n'en joindre aucune).",
+    "support_hint":
+        "Collez ce rapport dans votre issue. Il ne contient ni chemin personnel, "
+        "ni adresse publique, ni nom de machine.",
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
     "cmd_provision_help": "Provisionne l'infrastructure du lab (terraform apply sur le provider courant).",
-    "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy).",
-    "cmd_status_help":    "Vérifie la connectivité SSH des hôtes déclarés dans meta.yml.",
+    "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises.",
+    "cmd_status_help":    "Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet.",
     "cmd_ssh_help":       "Ouvre une session SSH interactive sur un hôte du lab.",
     "cmd_ssh_arg":        "Nom de l'hôte ou alias court (ex. : alma-rhcsa-1, ubuntu-lfcs-1)",
 
@@ -152,8 +183,68 @@ STRINGS: dict[str, str] = {
     "status_no_key":       "Clé SSH privée introuvable : {path}. Lance 'dsoxlab instructor bootstrap' d'abord.",
     "status_checking":     "Vérification de la connectivité SSH sur {count} hôte(s)…",
     "status_all_ok":       "Les {count} hôtes répondent en SSH+sudo.",
-    "status_partial":      "Seulement {ok}/{total} hôtes répondent sur l'infrastructure {provider}. Cloud-init peut être encore en cours (attends 1-2 min) ou relance 'dsoxlab provision' si les VMs ont été détruites.",
+    "status_partial":      "Seulement {ok}/{total} hôtes répondent sur l'infrastructure {provider}.",
     "status_via_bastion":  "Connexion via bastion {bastion} (subnet privé)…",
+
+    # ── status : machines restées, et pourquoi un hôte reste muet ─────────────
+    "orphan_check_skipped":
+        "Impossible de demander à l'hyperviseur quelles machines il porte "
+        "({error}). Les machines laissées par un provisionnement échoué, s'il y "
+        "en a, passent inaperçues.",
+    "provision_orphan_domains":
+        "Ces machines existent déjà côté hyperviseur mais sont absentes du state "
+        "Terraform : {hosts}. Un provisionnement précédent a échoué après les "
+        "avoir définies, donc Terraform ne les connaît pas, ne les détruit pas, "
+        "et les recréer échouerait sur « domain already exists ».",
+    "provision_orphan_fix":
+        "Supprime-les, puis relance dsoxlab provision : {cmd}",
+    "destroy_orphan_domains":
+        "Terraform a détruit ce qu'il connaissait, mais ces machines sont "
+        "toujours définies côté hyperviseur : {hosts}. Un provisionnement "
+        "précédent les a définies sans jamais les inscrire au state.",
+    "confirm_destroy_orphans":
+        "Les retirer de l'hyperviseur ? L'opération est irréversible",
+    "destroy_orphan_removed":
+        "Retirées de l'hyperviseur : {hosts}",
+    "destroy_orphan_kept":
+        "Laissées en place. Retire-les toi-même, puis relance dsoxlab destroy : {cmd}",
+    "destroy_orphan_failed":
+        "Retrait impossible pour {host} : {error}",
+    "status_hypervisor_unavailable":
+        "L'hyperviseur n'a pas répondu ({error}) : le diagnostic ci-dessous ne "
+        "reflète que ce que dit SSH, pas l'état des machines.",
+    "status_provider_not_inspectable":
+        "Le provider « {provider} » n'expose ici aucun état de machine "
+        "interrogeable : le diagnostic ci-dessous ne reflète que ce que dit SSH.",
+    "status_cause_domain_absent":
+        "aucun domaine nommé « {host} » sur l'hyperviseur : le provisionnement "
+        "n'a jamais créé cette machine. Lance : dsoxlab provision",
+    "status_cause_domain_not_running":
+        "le domaine « {domain} » existe et vaut « {state} » : le template le "
+        "démarre au boot, il a donc été arrêté après coup (tueur de mémoire, "
+        "crash qemu, arrêt manuel). Lance : sudo virsh start {domain}",
+    "status_cause_domain_no_lease":
+        "le domaine « {domain} » tourne mais ne détient aucun bail DHCP : il "
+        "boote encore, ou son réseau n'a pas abouti. Regarde-le démarrer : "
+        "sudo virsh console {domain}",
+    "status_cause_booting":
+        "le domaine « {domain} » tourne et détient son adresse, mais SSH n'est "
+        "pas encore ouvert : cloud-init n'a pas fini. Attends une minute, puis "
+        "relance dsoxlab status.",
+    "status_cause_ssh_refused":
+        "quelque chose répond en {ip} et refuse la connexion : la machine est "
+        "debout, sshd n'écoute pas encore. Attends, puis relance dsoxlab status.",
+    "status_cause_unreachable":
+        "rien ne répond en {ip} : aucune machine ne porte cette adresse sur le "
+        "réseau.",
+    "status_cause_ssh_timeout":
+        "{ip} ne répond pas dans le délai : les paquets sont jetés (pare-feu) ou "
+        "la machine est figée.",
+    "status_cause_ssh_denied":
+        "{ip} répond mais refuse la clé : la machine est debout, et son compte "
+        "ou sa clé SSH ne correspond pas à celle de ce dépôt.",
+    "status_cause_unknown":
+        "SSH a échoué pour une raison que ce diagnostic ne reconnaît pas : {reason}",
     "ssh_unknown_host":    "Hôte inconnu : {host}. Disponibles : {hosts}",
     "ssh_connecting":      "Connexion à {host} ({ip})…",
     "ssh_via_bastion":     "Connexion à {host} ({ip}) via bastion {bastion}…",
@@ -279,10 +370,53 @@ Chaque lab expose :
     [dim]--fix[/dim]                Applique la remédiation des composants requis manquants.
                        Les composants informatifs ne sont pas touchés.
 
+  [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
+                       jouable immédiatement, sans rien cloner ni provisionner.
+    [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
+
+  [cyan]provision[/cyan]            Monte l'infrastructure des labs vm (terraform apply).
+                       Refuse de démarrer quand des machines laissées par un
+                       provisionnement échoué sont encore définies côté
+                       hyperviseur, et nomme la commande qui les retire.
+    [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
+
+  [cyan]status[/cyan]               Vérifie la connectivité SSH des hôtes déclarés, et dit
+                       pourquoi l'un reste muet. Sur un provider dont l'état des
+                       machines est interrogeable, l'hyperviseur est [bold]interrogé[/bold] :
+                       un domaine absent, un domaine arrêté et un domaine qui
+                       boote appellent trois gestes différents.
+
+  [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
+
+  [cyan]destroy[/cyan]              Détruit l'infrastructure des labs vm (terraform destroy),
+                       puis retire, après confirmation, les machines qu'un
+                       provisionnement échoué a laissées hors du state
+                       Terraform. Sort en code non nul s'il en reste une.
+    [dim]--yes[/dim]                 Ne demande pas confirmation, machines orphelines comprises.
+
   [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
                        Supporte bash et zsh. Rechargez le shell après exécution.
 
-  [cyan]fullhelp[/cyan]             Ce guide.""",
+  [cyan]support[/cyan]              Rapport de diagnostic à coller dans une issue :
+                       versions, outils, catalogue, dernières traces. Anonymisé
+                       par défaut (ni chemin personnel, ni adresse publique).
+    [dim]--json[/dim]               Le même contenu, en document machine.
+    [dim]--log-lines <n>[/dim]      Nombre de lignes de journal jointes (0 pour aucune).
+
+  [cyan]fullhelp[/cyan]             Ce guide.
+
+[bold]Options globales[/bold] [dim](avant la commande)[/dim]
+
+  [dim]--verbose / -v[/dim]       Dit ce que fait le moteur, sur la sortie d'erreur.
+                       Répétable : [bold]-v[/bold] pour les informations,
+                       [bold]-vv[/bold] pour le détail complet.
+  [dim]--debug[/dim]              Équivaut à [bold]-vv[/bold].
+  [dim]--version[/dim]            Affiche la version et quitte.
+
+  Le journal complet est de toute façon écrit dans
+  [bold]~/.local/state/dsoxlab/dsoxlab.log[/bold], sans avoir à repasser la commande.
+  Il ne va jamais sur la sortie standard : [bold]--json[/bold] reste lisible par
+  un programme, même en mode verbeux.""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
@@ -323,6 +457,8 @@ hors ligne, elle se tait.
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installé : {path}  →  {source}",
+    "install_wrapper_deja":
+        "Un lanceur mène déjà à ce binaire ({path}) : il vient probablement de « uv tool install » ou de pipx. On n'y touche pas, l'écraser ne ferait que défaire ce que leur prochaine mise à jour remettra.",
     "install_completion":           "Script de complétion : {path}",
     "install_rc":                   "Config shell mise à jour : {path} — rechargez avec : exec $SHELL",
     "install_completion_unsupported": "Auto-complétion non supportée pour le shell : {shell} (bash et zsh uniquement).",
@@ -414,6 +550,27 @@ hors ligne, elle se tait.
         "Vérification des doc_url de {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Problèmes de métadonnées :[/bold red]",
 
+    # ── version du contrat (schema_version) ───────────────────────────────────
+    "contract_issues_header": "\n[bold red]Version du contrat :[/bold red]",
+    "schema_version_invalid":
+        "'schema_version' doit être un entier YAML supérieur ou égal à 1, et au "
+        "plus {supported}, la dernière version du contrat que ce dsoxlab lit "
+        "(reçu : {got}). Sans ce champ, le fichier est lu en version 1.",
+    "schema_version_too_new":
+        "déclare schema_version {found}, au-delà de la version {supported}, la "
+        "dernière que ce dsoxlab sait lire. Mets l'outil à jour : "
+        "uv tool upgrade dsoxlab",
+    "schema_version_meta_too_new":
+        "Ce catalogue exige une version plus récente de dsoxlab. {path} déclare "
+        "un contrat en schema_version {found}, alors que ce dsoxlab ne lit le "
+        "contrat que jusqu'à la version {supported}. Mets l'outil à jour : "
+        "uv tool upgrade dsoxlab",
+    "schema_version_lab_skipped":
+        "Lab écarté : {path} déclare un contrat en schema_version {found}, "
+        "au-delà de la version {supported}, la dernière que ce dsoxlab sait "
+        "lire. Le reste du catalogue est listé normalement. Mets l'outil à jour "
+        "pour récupérer ce lab : uv tool upgrade dsoxlab",
+
     # ── doctor — libellés composants ─────────────────────────────────────────
     "check_python":   "Python",
     "check_pytest":   "pytest",
@@ -421,6 +578,10 @@ hors ligne, elle se tait.
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
     "check_provider": "Provider d'infra",
+    "check_terraform":    "Terraform",
+    "check_ansible":      "ansible-playbook",
+    "check_libvirt_pool": "Pool libvirt",
+    "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs détectés",
     "check_lab_home": "LAB_HOME",
 
@@ -436,6 +597,31 @@ hors ligne, elle se tait.
     "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
+    "detail_terraform_missing":
+        "introuvable : « provision » ne peut pas créer les machines",
+    "detail_ansible_missing":
+        "introuvable : « run » ne peut pas jouer le setup.yaml d'un lab vm "
+        "(ansible-runner ne l'installe pas)",
+    "detail_ansible_ok":     "présent",
+    "detail_pool_missing":
+        "le pool « {pool} » n'existe pas : « provision » échouera sur "
+        "« Pool Not Found »",
+    "detail_pool_unknown":   "non vérifiable sans virsh",
+    "explain_apparmor_denied":
+        "Cause connue : AppArmor refuse les disques des VM. virt-aa-helper ne "
+        "sait pas résoudre un disque déclaré par référence de pool, donc aucun "
+        "n'entre dans le profil du domaine. Pose l'autorisation, le droit « k » "
+        "compris (sans lui : « Failed to lock byte 100 ») :",
+    "explain_pool_not_found":
+        "Cause connue : le pool de stockage libvirt n'existe pas. Une "
+        "installation fraîche n'en déclare aucun. Crée-le :",
+    "explain_domain_exists":
+        "Cause connue : un provisionnement précédent a échoué APRÈS avoir "
+        "défini cette machine, qui n'est donc pas dans le state Terraform. "
+        "« destroy » ne peut pas la voir. Retire-la à la main :",
+    "detail_iso_tool_missing":
+        "introuvable : incus fabrique le CD-ROM agent:config sur l'hôte, "
+        "sans lui aucune VM ne démarre",
     "detail_unknown_error":  "erreur inconnue",
     "detail_labs_count":     "{count} lab(s) dans {root}",
 
@@ -449,8 +635,9 @@ hors ligne, elle se tait.
         "Le provider {provider} tourne dans le cloud : aucun hyperviseur "
         "local n'est nécessaire.",
     "doctor_note_provider_unresolved":
-        "Ce dépôt déclare plusieurs providers. Choisissez-en un avec "
-        "[bold]dsoxlab use --provider <nom>[/bold] avant de provisionner.",
+        "Ce dépôt a des labs qui exigent une VM, et aucun provider n'est "
+        "choisi. Choisissez-en un avec [bold]dsoxlab use --provider <nom>"
+        "[/bold] : tant que ce n'est pas fait, aucun de ces labs ne tourne.",
 
     # ── doctor — remédiation ──────────────────────────────────────────────────
     "fix_nothing": "Aucune remédiation nécessaire.",
@@ -523,6 +710,12 @@ hors ligne, elle se tait.
     # ── console — doctor ──────────────────────────────────────────────────────
     "doctor_table_title":    "Requis pour ce dépôt",
     "doctor_optional_title": "Informatif — non requis ici",
+    "doctor_choose_title": "Hyperviseurs : il en faut un, aucun n'est choisi",
+    "doctor_choose_hint":
+        "Ce dépôt a des labs qui exigent une VM. Choisissez un provider avec "
+        "[bold]dsoxlab use --provider <nom>[/bold], puis relancez doctor : il "
+        "ne diagnostiquera plus que celui-là. [bold]--fix[/bold] n'installe "
+        "rien tant que le choix n'est pas fait, il en faut un et non les deux.",
     "doctor_optional_hint":
         "Ces composants ne bloquent rien dans ce dépôt : [bold]--fix[/bold] "
         "ne les traite pas. Installez-les seulement si vous voulez ce provider.",
@@ -562,4 +755,10 @@ hors ligne, elle se tait.
     "col_tests":          "Tests",
     "col_hints":          "Hints",
     "col_validated_at":   "Validé le",
+
+    # ── infra — libvirt ───────────────────────────────────────────────────────
+    "libvirt_domain_not_found":
+        "Aucun domaine libvirt ne correspond à l'hôte « {host} ». "
+        "Noms essayés : {tried}. Domaines existants : {domains}.",
+    "libvirt_no_domain":  "aucun",
 }

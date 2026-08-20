@@ -27,7 +27,7 @@ variable "hosts" {
 }
 
 variable "provider_config" {
-  description = "Overrides spécifiques au provider KVM (libvirt_uri, bridge_name, images_dir, ssh_pubkey, image_url_<distro>)."
+  description = "Overrides spécifiques au provider KVM (libvirt_uri, bridge_name, images_dir, ssh_pubkey, storage_pool, image_url_<distro>)."
   type        = map(string)
   default     = {}
 }

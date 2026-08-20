@@ -204,7 +204,14 @@ Keep commits focused and the history readable. Before a grouped commit, check
 
 ## Reporting bugs and requesting features
 
-Use the GitHub issue templates. For bugs, include the `dsoxlab --version`
-output, your OS, the exact command, and what you expected versus what happened.
+Use the GitHub issue templates. For bugs, run `dsoxlab support` and paste its
+output: it gathers the version, the system, the external tools, the catalog and
+the latest log lines in one block, which saves a round trip that otherwise costs
+a day. The report is anonymised by default, so it carries no personal path, no
+public address and no machine name; `dsoxlab support --json` produces the same
+content for a program.
+
+Add the exact command you ran, and what you expected versus what happened. If
+dsoxlab does not start at all, `dsoxlab --version` and your OS are enough.
 For security issues, follow [SECURITY.md](./SECURITY.md) instead of opening a
 public issue.

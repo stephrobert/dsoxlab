@@ -16,6 +16,7 @@ from ._contract import (
     as_str_list,
 )
 from .runtime import RuntimeConfig, RuntimeType, Service, Target
+from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
 
 
 @dataclass
@@ -42,6 +43,12 @@ class LabDefinition:
     difficulty: str = "beginner"
     estimated_time: str = "30m"
     certification_tags: list[str] = field(default_factory=list)
+
+    schema_version: int = DEFAULT_SCHEMA_VERSION
+    """Version du contrat d'entrée que ce ``lab.yaml`` déclare respecter.
+
+    Absent du fichier = 1, la seule valeur possible aujourd'hui. Voir
+    :mod:`dsoxlab.models.schema_version`."""
 
     lab_type: str = "lab"       # "lab" | "challenge" | "capstone"
     bloc: int = 0               # bloc number 1-8; 0 = unassigned
@@ -72,6 +79,12 @@ class LabDefinition:
                 f"{lab_yaml}: le document doit être un mapping YAML "
                 f"(reçu : {type(data).__name__})."
             )
+
+        # AVANT toute autre lecture : si le fichier annonce une version du
+        # contrat que ce dsoxlab ne connaît pas, aucun de ses champs n'a de
+        # sens ici. Échouer sur `schema_version` nomme la vraie cause ; échouer
+        # trois champs plus loin enverrait l'auteur corriger un champ correct.
+        schema_version = read_schema_version(data, lab_yaml)
 
         # Fusion des traductions
         if lang and lang != "en":
@@ -158,6 +171,7 @@ class LabDefinition:
         )
 
         return cls(
+            schema_version=schema_version,
             id=data["id"],
             title=data["title"],
             level=data["level"],

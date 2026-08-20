@@ -76,6 +76,17 @@ repos:
         language: system
         files: '^\.github/dependabot\.yml$'
 
+      # Une table de commandes écrite à la main dérive sans que personne
+      # ne s'en aperçoive : celle du README annonçait encore un `cleanup.sh`
+      # que le zéro-bash interdit, et il y manquait deux commandes. Elle est
+      # désormais produite par la CLI, et ce hook refuse une version périmée.
+      - id: doc-a-jour
+        name: la documentation décrit la CLI réelle
+        entry: python3 scripts/generer-doc.py --verifier
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/(cli\.py|i18n/)|README(\.fr)?\.md|scripts/generer-doc\.py)'
+
       # Full test suite runs on push (kept off the per-commit path for speed).
       - id: pytest
         name: pytest

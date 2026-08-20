@@ -86,12 +86,42 @@ STRINGS: dict[str, str] = {
     "cmd_clean_arg":     "Lab identifier",
     "cmd_validate_help":  "Check structure and metadata of all labs.",
     "cmd_doctor_help":    "Diagnose the environment (runtimes, tools, detected labs).",
+    "opt_verbose":
+        "Say what the engine is doing, on standard error. Repeatable: -v for information, -vv for full detail.",
+    "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
     "cmd_install_help":   "Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion.",
+    "cmd_demo_help":
+        "Install a demonstration catalog and play a first lab, with nothing to "
+        "clone and nothing to provision.",
+    "opt_demo_force":
+        "Reinstall over the existing one, losing the progress and answers "
+        "already there.",
+    "demo_installee":  "Demonstration catalog installed in {path}",
+    "demo_deja_installee":
+        "The demonstration catalog is already installed in {path}.",
+    "demo_deja_installee_suite":
+        "It may hold your progress and your answers, so nothing was touched.\n"
+        "To pick it up: cd {path} && dsoxlab list-labs\n"
+        "To start over: dsoxlab demo --force",
+    "demo_echec":      "Cannot install: {error}",
+    "demo_suite":
+        "To get started:\n"
+        "  cd {path}\n"
+        "  dsoxlab course {lab}\n"
+        "  dsoxlab run {lab}\n"
+        "Then, once the mission is done: dsoxlab check {lab}",
+    "cmd_support_help":
+        "Produce an anonymised diagnostic report, ready to paste into an issue.",
+    "opt_support_log_lines":
+        "How many log lines to include (0 to include none).",
+    "support_hint":
+        "Paste this report into your issue. It carries no personal path, no "
+        "public address and no machine name.",
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
-    "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy).",
-    "cmd_status_help":    "Check SSH connectivity to all hosts declared in meta.yml.",
+    "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy), including machines left outside the state.",
+    "cmd_status_help":    "Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent.",
     "cmd_ssh_help":       "Open an interactive SSH session on a lab host.",
     "cmd_ssh_arg":        "Host name or short alias (e.g.: alma-rhcsa-1, ubuntu-lfcs-1)",
 
@@ -152,8 +182,66 @@ STRINGS: dict[str, str] = {
     "status_no_key":       "SSH private key not found: {path}. Run 'dsoxlab instructor bootstrap' first.",
     "status_checking":     "Checking SSH connectivity on {count} host(s)…",
     "status_all_ok":       "All {count} hosts respond on SSH+sudo.",
-    "status_partial":      "Only {ok}/{total} hosts respond on the {provider} infrastructure. Cloud-init may still be running (wait 1-2 min) or run 'dsoxlab provision' if VMs were destroyed.",
+    "status_partial":      "Only {ok}/{total} hosts respond on the {provider} infrastructure.",
     "status_via_bastion":  "Going through bastion {bastion} (private subnet)…",
+
+    # ── status — machines left behind, and why a host stays silent ────────────
+    "orphan_check_skipped":
+        "Cannot ask the hypervisor which machines it holds ({error}). "
+        "Machines left behind by a failed provisioning, if any, go undetected.",
+    "provision_orphan_domains":
+        "These machines already exist on the hypervisor but are absent from the "
+        "Terraform state: {hosts}. A previous provisioning failed after defining "
+        "them, so Terraform neither knows nor destroys them, and creating them "
+        "again would fail on 'domain already exists'.",
+    "provision_orphan_fix":
+        "Remove them, then run dsoxlab provision again: {cmd}",
+    "destroy_orphan_domains":
+        "Terraform destroyed what it knew about, but these machines are still "
+        "defined on the hypervisor: {hosts}. A previous provisioning defined "
+        "them without ever recording them in the state.",
+    "confirm_destroy_orphans":
+        "Remove them from the hypervisor? This cannot be undone",
+    "destroy_orphan_removed":
+        "Removed from the hypervisor: {hosts}",
+    "destroy_orphan_kept":
+        "Left in place. Remove them yourself, then run dsoxlab destroy again: {cmd}",
+    "destroy_orphan_failed":
+        "Could not remove {host}: {error}",
+    "status_hypervisor_unavailable":
+        "The hypervisor did not answer ({error}), so the diagnosis below only "
+        "reflects what SSH says, not the state of the machines.",
+    "status_provider_not_inspectable":
+        "Provider '{provider}' exposes no machine state that can be queried from "
+        "here: the diagnosis below only reflects what SSH says.",
+    "status_cause_domain_absent":
+        "no domain named '{host}' on the hypervisor: provisioning never created "
+        "this machine. Run: dsoxlab provision",
+    "status_cause_domain_not_running":
+        "domain '{domain}' exists and is '{state}': the template starts it at "
+        "boot, so it was stopped afterwards (out-of-memory killer, qemu crash, "
+        "manual stop). Run: sudo virsh start {domain}",
+    "status_cause_domain_no_lease":
+        "domain '{domain}' is running but holds no DHCP lease: it is still "
+        "booting, or its network did not come up. Watch it boot: "
+        "sudo virsh console {domain}",
+    "status_cause_booting":
+        "domain '{domain}' is running and holds its address, but SSH is not open "
+        "yet: cloud-init has not finished. Wait a minute, then run dsoxlab status "
+        "again.",
+    "status_cause_ssh_refused":
+        "something answers at {ip} and refuses the connection: the machine is up, "
+        "sshd is not listening yet. Wait, then run dsoxlab status again.",
+    "status_cause_unreachable":
+        "nothing answers at {ip}: no machine holds this address on the network.",
+    "status_cause_ssh_timeout":
+        "{ip} does not answer within the timeout: packets are being dropped "
+        "(firewall) or the machine is frozen.",
+    "status_cause_ssh_denied":
+        "{ip} answers but refuses the key: the machine is up and its SSH account "
+        "or key does not match the one this repository holds.",
+    "status_cause_unknown":
+        "SSH failed for a reason this diagnosis does not recognise: {reason}",
     "ssh_unknown_host":    "Unknown host: {host}. Available: {hosts}",
     "ssh_connecting":      "Connecting to {host} ({ip})…",
     "ssh_via_bastion":     "Connecting to {host} ({ip}) via bastion {bastion}…",
@@ -281,10 +369,53 @@ Each lab exposes:
     [dim]--fix[/dim]                Remediate the missing required components.
                        Informational components are left alone.
 
+  [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
+                       play right away, with nothing to clone or provision.
+    [dim]--force[/dim]              Reinstall over it (loses progress).
+
+  [cyan]provision[/cyan]            Bring up the infrastructure for vm labs (terraform apply).
+                       Refuses to start when machines left by a failed
+                       provisioning are still defined on the hypervisor, and
+                       names the command that removes them.
+    [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
+
+  [cyan]status[/cyan]               Check SSH connectivity of the declared hosts, and say why
+                       one stays silent. On a provider whose machine state can
+                       be queried, the hypervisor is [bold]asked[/bold]: a domain that
+                       does not exist, one that is stopped and one that is
+                       booting call for three different gestures.
+
+  [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
+
+  [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy),
+                       then remove — after confirmation — the machines a failed
+                       provisioning left defined outside the Terraform state.
+                       Exits non-zero if any of them remains.
+    [dim]--yes[/dim]                 Do not ask for confirmation, orphan machines included.
+
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.
 
-  [cyan]fullhelp[/cyan]             This guide.""",
+  [cyan]support[/cyan]              Diagnostic report to paste into an issue:
+                       versions, tools, catalog, latest traces. Anonymised by
+                       default (no personal path, no public address).
+    [dim]--json[/dim]               The same content, as a machine document.
+    [dim]--log-lines <n>[/dim]      How many log lines to include (0 for none).
+
+  [cyan]fullhelp[/cyan]             This guide.
+
+[bold]Global options[/bold] [dim](before the command)[/dim]
+
+  [dim]--verbose / -v[/dim]       Say what the engine is doing, on standard error.
+                       Repeatable: [bold]-v[/bold] for information,
+                       [bold]-vv[/bold] for full detail.
+  [dim]--debug[/dim]              Same as [bold]-vv[/bold].
+  [dim]--version[/dim]            Print the version and exit.
+
+  The full log is written to [bold]~/.local/state/dsoxlab/dsoxlab.log[/bold]
+  either way, so there is no need to replay the command. It never goes to
+  standard output: [bold]--json[/bold] stays machine-readable, even in verbose
+  mode.""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
@@ -325,6 +456,8 @@ silent.
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installed: {path}  →  {source}",
+    "install_wrapper_deja":
+        "A launcher already points at this binary ({path}): it most likely comes from `uv tool install` or pipx. Leaving it alone, since overwriting it would only undo what their next upgrade restores.",
     "install_completion":           "Completion script: {path}",
     "install_rc":                   "Shell config updated: {path} — reload with: exec $SHELL",
     "install_completion_unsupported": "Auto-completion not supported for shell: {shell} (bash and zsh only).",
@@ -416,6 +549,26 @@ silent.
         "Checking doc_url for {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Metadata issues:[/bold red]",
 
+    # ── contract version (schema_version) ─────────────────────────────────────
+    "contract_issues_header": "\n[bold red]Contract version:[/bold red]",
+    "schema_version_invalid":
+        "'schema_version' must be a YAML integer of at least 1, and no greater "
+        "than {supported}, the latest contract this dsoxlab reads (got: {got}). "
+        "Leave the field out and the file is read as version 1.",
+    "schema_version_too_new":
+        "declares schema_version {found}, beyond version {supported}, which is "
+        "the latest contract this dsoxlab reads. Upgrade the tool: "
+        "uv tool upgrade dsoxlab",
+    "schema_version_meta_too_new":
+        "This catalog requires a newer dsoxlab. {path} declares contract "
+        "schema_version {found}, and this dsoxlab only reads the contract up to "
+        "version {supported}. Upgrade the tool: uv tool upgrade dsoxlab",
+    "schema_version_lab_skipped":
+        "Lab left out: {path} declares contract schema_version {found}, beyond "
+        "version {supported}, which is the latest this dsoxlab reads. The rest "
+        "of the catalog is listed as usual. Upgrade the tool to get this lab: "
+        "uv tool upgrade dsoxlab",
+
     # ── doctor — component labels ─────────────────────────────────────────────
     "check_python":   "Python",
     "check_pytest":   "pytest",
@@ -423,6 +576,10 @@ silent.
     "check_incus":    "incus",
     "check_kvm":      "virsh/KVM",
     "check_provider": "Infra provider",
+    "check_terraform":    "Terraform",
+    "check_ansible":      "ansible-playbook",
+    "check_libvirt_pool": "libvirt pool",
+    "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs detected",
     "check_lab_home": "LAB_HOME",
 
@@ -438,6 +595,31 @@ silent.
     "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
+    "detail_terraform_missing":
+        "not found: `provision` cannot create the machines",
+    "detail_ansible_missing":
+        "not found: `run` cannot play a vm lab's setup.yaml "
+        "(ansible-runner does not install it)",
+    "detail_ansible_ok":     "present",
+    "detail_pool_missing":
+        "the `{pool}` pool does not exist: `provision` will fail with "
+        "\"Pool Not Found\"",
+    "detail_pool_unknown":   "cannot be checked without virsh",
+    "explain_apparmor_denied":
+        "Known cause: AppArmor denies the VM disks. virt-aa-helper cannot "
+        "resolve a disk declared by pool reference, so none of them enters the "
+        "domain profile. Grant the permission, including the `k` right "
+        "(without it: \"Failed to lock byte 100\"):",
+    "explain_pool_not_found":
+        "Known cause: the libvirt storage pool does not exist. A fresh install "
+        "declares none. Create it:",
+    "explain_domain_exists":
+        "Known cause: an earlier provisioning failed AFTER defining this "
+        "machine, so it never entered the Terraform state and `destroy` cannot "
+        "see it. Remove it by hand:",
+    "detail_iso_tool_missing":
+        "not found: incus builds the agent:config CD-ROM on the host, "
+        "without it no VM starts",
     "detail_unknown_error":  "unknown error",
     "detail_labs_count":     "{count} lab(s) in {root}",
 
@@ -449,8 +631,9 @@ silent.
     "doctor_note_remote_provider":
         "Provider {provider} runs in the cloud: no local hypervisor needed.",
     "doctor_note_provider_unresolved":
-        "This repo declares several providers. Pick one with "
-        "[bold]dsoxlab use --provider <name>[/bold] before provisioning.",
+        "This repo has labs that require a VM, and no provider is selected. "
+        "Pick one with [bold]dsoxlab use --provider <name>[/bold]: until then, "
+        "none of those labs can run.",
 
     # ── doctor — fix ──────────────────────────────────────────────────────────
     "fix_nothing": "No remediation needed.",
@@ -524,6 +707,12 @@ silent.
     # ── console — doctor ──────────────────────────────────────────────────────
     "doctor_table_title":    "Required for this repo",
     "doctor_optional_title": "Informational — not required here",
+    "doctor_choose_title": "Hypervisors: one is required, none selected",
+    "doctor_choose_hint":
+        "This repo has labs that require a VM. Pick a provider with "
+        "[bold]dsoxlab use --provider <name>[/bold], then run doctor again: it "
+        "will only diagnose that one. [bold]--fix[/bold] installs nothing until "
+        "the choice is made, since one is needed and not both.",
     "doctor_optional_hint":
         "These components block nothing in this repo: [bold]--fix[/bold] "
         "leaves them alone. Install them only if you want that provider.",
@@ -563,4 +752,10 @@ silent.
     "col_tests":         "Tests",
     "col_hints":         "Hints",
     "col_validated_at":  "Validated on",
+
+    # ── infra — libvirt ───────────────────────────────────────────────────────
+    "libvirt_domain_not_found":
+        "No libvirt domain matches host '{host}'. Names tried: {tried}. "
+        "Existing domains: {domains}.",
+    "libvirt_no_domain": "none",
 }

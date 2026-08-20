@@ -207,7 +207,14 @@ consultez `git log --oneline -5` pour coller au style.
 
 ## Signaler un bug ou demander une fonctionnalité
 
-Utilisez les gabarits d'issue GitHub. Pour un bug, indiquez la sortie de
-`dsoxlab --version`, votre OS, la commande exacte, et l'écart entre le
-comportement attendu et observé. Pour un problème de sécurité, suivez plutôt
+Utilisez les gabarits d'issue GitHub. Pour un bug, lancez `dsoxlab support` et
+collez sa sortie : elle rassemble d'un bloc la version, le système, les outils
+externes, le catalogue et les dernières lignes de journal, ce qui évite un
+aller-retour qui coûte sinon une journée. Le rapport est anonymisé par défaut,
+il ne porte donc ni chemin personnel, ni adresse publique, ni nom de machine ;
+`dsoxlab support --json` rend le même contenu pour un programme.
+
+Ajoutez la commande exacte jouée, et l'écart entre le comportement attendu et
+observé. Si dsoxlab ne démarre pas du tout, `dsoxlab --version` et votre OS
+suffisent. Pour un problème de sécurité, suivez plutôt
 [SECURITY.md](./SECURITY.md) au lieu d'ouvrir une issue publique.

@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/dsoxlab-lockup-dark.svg">
+  <img src="docs/assets/brand/dsoxlab-lockup-light.svg" alt="dsoxlab" width="240">
+</picture>
+
 # dsoxlab — CLI DevSecOps XL Labs
 
 [![CI](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml/badge.svg)](https://github.com/stephrobert/dsoxlab/actions/workflows/ci.yml)
@@ -48,41 +53,63 @@ domaine ne vit dans le moteur.
 
 ## Installation
 
-Nécessite **Python 3.11+** et [uv](https://docs.astral.sh/uv/).
+Nécessite **Python 3.11+**.
 
 ```bash
-# Depuis le dépôt Git (mode développement / editable)
-git clone https://github.com/stephrobert/dsoxlab.git
-cd dsoxlab
-uv tool install --editable .
-
-# Vérifier
+uv tool install dsoxlab      # ou : pipx install dsoxlab
 dsoxlab --version
-dsoxlab doctor
 ```
 
-`dsoxlab doctor --fix` diagnostique (et répare si possible) la boîte à outils
-locale attendue par les runtimes : SSH, Terraform, libvirt/Incus et la pile
-`pytest` embarquée.
+C'est toute l'installation. Rien à cloner, rien à compiler.
 
 ---
 
-## Prise en main
+## Votre premier lab, en cinq minutes
 
-Les labs vivent dans leurs propres dépôts, publiés séparément du moteur.
-Clonez-en un d'abord, puis lancez `dsoxlab` depuis l'intérieur :
+Nul besoin d'un catalogue pour commencer. `dsoxlab demo` installe un catalogue
+de démonstration d'un seul lab, dont le sujet est dsoxlab lui-même : la boucle
+que vous répéterez sur tous les autres labs.
 
 ```bash
-# 1. Cloner un catalogue de labs (ex. linux-dsoxlab-training)
+dsoxlab demo                    # l'installe et affiche la suite
+cd ~/.local/share/dsoxlab/demo
+
+dsoxlab course premiers-pas     # le cours
+dsoxlab run premiers-pas        # vous dépose dans le répertoire de travail
+dsoxlab challenge premiers-pas  # la mission
+dsoxlab check premiers-pas      # les tests, et le score
+```
+
+Ni VM, ni conteneur, ni Docker : cela tourne partout où dsoxlab tourne.
+
+---
+
+## Ensuite, un vrai catalogue
+
+Les labs vivent dans leurs propres dépôts, publiés séparément du moteur.
+Clonez-en un, puis lancez `dsoxlab` depuis l'intérieur :
+
+```bash
 git clone https://github.com/stephrobert/linux-dsoxlab-training.git
 cd linux-dsoxlab-training
 
-# 2. Le contexte actif est détecté automatiquement via le meta.yml du dépôt
+dsoxlab doctor                  # ce que ce catalogue exige, et ce qui manque
 dsoxlab list-labs
-dsoxlab show linux.depanner.service-crash-loop
-dsoxlab guide linux.depanner.service-crash-loop   # lire le cours dans le navigateur
-dsoxlab run linux.depanner.service-crash-loop
-dsoxlab check linux.depanner.service-crash-loop
+dsoxlab run <identifiant>
+dsoxlab check <identifiant>
+```
+
+`dsoxlab doctor` ne signale que ce dont *ce* catalogue a besoin : un catalogue
+entièrement `shell` ne réclame jamais d'hyperviseur. `dsoxlab doctor --fix`
+répare ce qui peut l'être sans risque. En cas de problème, `dsoxlab support`
+produit un rapport de diagnostic anonymisé, prêt à coller dans une issue.
+
+### Installer depuis les sources (contributeurs)
+
+```bash
+git clone https://github.com/stephrobert/dsoxlab.git
+cd dsoxlab
+uv tool install --editable .
 ```
 
 ### Lire le cours
@@ -126,10 +153,49 @@ dsoxlab course > cours.txt                   # jamais paginé : texte brut
 
 ---
 
+## Runtimes
+
+| Runtime | Backend | Usage typique |
+| --- | --- | --- |
+| `shell` | Shell local | Exercices rapides mono-hôte, sans surcoût de VM |
+| `incus` | Conteneurs Incus | Environnements Linux isolés, à démarrage rapide |
+| `kvm` | Terraform + libvirt | VM complètes avec test de reboot/persistance |
+
+Chaque runtime est opt-in et auto-descriptif (`is_available()`), le moteur ne
+dépend jamais en dur d'un backend non installé. Les templates de provisioning
+(HCL Terraform, cloud-init) vivent sous `dsoxlab.templates` et couvrent Incus,
+KVM/libvirt et Outscale.
+
+---
+
 ## Le contrat déclaratif
 
 Un dépôt qui héberge des labs décrit son catalogue avec deux niveaux de
 fichiers.
+
+Le contrat est **versionné**. Les deux fichiers acceptent un entier
+`schema_version` à leur racine ; l'omettre vaut la version 1, aucun catalogue
+existant n'a donc rien à changer. Un fichier qui déclare une version que ce
+dsoxlab ne lit pas est nommé dans un message, au lieu de disparaître du
+catalogue. Champ par champ, avec la règle d'évolution et le chemin de migration
+vers une future v2 : **[la référence du contrat v1](docs/contract-v1.fr.md)**.
+
+Deux schémas JSON décrivent le même contrat pour ton éditeur et pour ta CI :
+[`schemas/lab.schema.json`](schemas/lab.schema.json) et
+[`schemas/meta.schema.json`](schemas/meta.schema.json). Pose cette ligne en tête
+d'un fichier, et tout éditeur qui fait tourner `yaml-language-server`
+(l'extension YAML de VS Code, entre autres) complète les champs et souligne les
+fautes à la frappe :
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/lab.schema.json
+id: mon-lab
+title: Mon lab
+```
+
+Remplace `main` par un tag de release (`v0.1.46`) pour épingler le schéma en CI.
+Un test confronte les deux schémas au parseur, dans les deux sens : ils ne
+peuvent pas dériver du code en silence.
 
 ### 1. `meta.yml` à la racine du dépôt
 
@@ -194,44 +260,38 @@ test référencés sont présents.
 
 ## Référence des commandes
 
-| Commande | Effet |
+<!-- BEGIN COMMANDES : généré par scripts/generer-doc.py, ne pas éditer -->
+
+| Commande | Rôle |
 | --- | --- |
-| `dsoxlab use [section[/level]]` | Définit le contexte actif ; `--reset` l'efface, `--provider` choisit le provider d'infra |
-| `dsoxlab list-labs` | Liste les labs du dépôt courant (filtre `--section`/`--level`/`--type`/`--bloc`) |
-| `dsoxlab show <id>` | Détail d'un lab |
-| `dsoxlab course [section]` | Affiche une section de cours ou la table des matières |
-| `dsoxlab guide [id]` | Ouvre le guide en ligne du lab dans le navigateur (`--print` affiche l'URL) |
-| `dsoxlab run <id>` | Prépare et démarre l'environnement du lab |
-| `dsoxlab challenge <id>` | Affiche la mission de challenge d'un lab |
-| `dsoxlab hint <id>` | Révèle un indice (déduit du score) |
-| `dsoxlab check <id>` | Lance la validation `pytest` et enregistre le score |
-| `dsoxlab submit <id>` | Soumission finale : tests, score, fermeture de session |
-| `dsoxlab scores` | Historique des runs (SQLite local) |
-| `dsoxlab progress` | Progression par bloc (labs faits, score moyen, challenges) |
-| `dsoxlab next` | Recommande le prochain lab ou challenge à traiter |
-| `dsoxlab reset <id>` | Remet le lab à son état initial |
-| `dsoxlab clean <id>` | Exécute le `cleanup.sh` du lab |
-| `dsoxlab provision` | Provisionne l'infrastructure (`terraform apply`) |
-| `dsoxlab destroy` | Détruit l'infrastructure (`terraform destroy`) |
-| `dsoxlab status` | Vérifie la connectivité SSH de tous les hôtes du `meta.yml` |
-| `dsoxlab ssh <host>` | Ouvre une session SSH interactive sur un hôte |
-| `dsoxlab validate-structure` | Valide le contrat (`meta.yml` + chaque `lab.yaml`) |
-| `dsoxlab doctor [--fix]` | Diagnostique (et répare) l'environnement local |
-| `dsoxlab install` | Installe le wrapper shell et l'auto-complétion |
-| `dsoxlab instructor bootstrap` | Outillage formateur (génération de la clé SSH du lab) |
-| `dsoxlab fullhelp` | Guide complet multilingue (EN/FR) |
+| `dsoxlab challenge` | Affiche la mission du challenge (challenge/README.md). |
+| `dsoxlab check` | Exécute les tests, calcule le score (hints déduits) et enregistre le résultat. |
+| `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
+| `dsoxlab course` | Affiche une section du cours, ou le sommaire si aucune section n'est précisée. |
+| `dsoxlab demo` | Installe un catalogue de démonstration et joue un premier lab, sans rien cloner ni provisionner. |
+| `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises. |
+| `dsoxlab doctor` | Diagnostique l'environnement (runtimes, outils, labs détectés). |
+| `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
+| `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
+| `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
+| `dsoxlab install` | Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell. |
+| `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |
+| `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
+| `dsoxlab next` | Recommande le prochain lab ou challenge à compléter dans le contexte actif. |
+| `dsoxlab progress` | Affiche la progression par bloc (labs complétés, score moyen, challenges et capstones). |
+| `dsoxlab provision` | Provisionne l'infrastructure du lab (terraform apply sur le provider courant). |
+| `dsoxlab reset` | Remet le lab à l'état initial (clean + redémarrage). |
+| `dsoxlab run` | Prépare et démarre l'environnement du lab. |
+| `dsoxlab scores` | Affiche l'historique des scores enregistrés. |
+| `dsoxlab show` | Affiche le détail et le statut d'un lab. |
+| `dsoxlab ssh` | Ouvre une session SSH interactive sur un hôte du lab. |
+| `dsoxlab status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
+| `dsoxlab submit` | Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session. |
+| `dsoxlab support` | Produit un rapport de diagnostic anonymisé, à coller dans une issue. |
+| `dsoxlab use` | Définit le contexte actif (section et/ou niveau par défaut). Utilisez --reset pour l'effacer. |
+| `dsoxlab validate-structure` | Vérifie la structure et les métadonnées de tous les labs. |
 
-Lancer `dsoxlab <commande> --help` pour les options de chaque commande.
-
----
-
-## Runtimes
-
-| Runtime | Backend | Usage typique |
-| --- | --- | --- |
-| `shell` | Shell local | Exercices rapides mono-hôte, sans surcoût de VM |
-| `incus` | Conteneurs Incus | Environnements Linux isolés, à démarrage rapide |
-| `kvm` | Terraform + libvirt | VM complètes avec test de reboot/persistance |
+<!-- END COMMANDES -->
 
 Chaque runtime est opt-in et auto-descriptif (`is_available()`), le moteur ne
 dépend jamais en dur d'un backend non installé. Les templates de provisioning
@@ -266,14 +326,24 @@ fonctionne sur n'importe quel arbre déclaré par le `meta.yml`.
 
 ## Persistance
 
-- **Sessions locales :** `.dsoxlab-context.json` dans le dépôt courant
-  (gitignored par chaque dépôt de labs).
-- **Scores et indices :** `~/.local/share/dsoxlab/progress.db` (XDG). L'id
-  global d'un lab est `<category>.<section>.<lab>`, le schéma reste universel.
-- **Config utilisateur :** `~/.config/dsoxlab/config.yaml` (optionnelle).
+Tout ce que dsoxlab conserve tient dans quatre emplacements, et **la
+progression est par catalogue**, jamais globale : deux catalogues côte à côte
+ont chacun leur historique.
 
-On surcharge ces emplacements avec les variables standard `XDG_DATA_HOME` /
-`XDG_CONFIG_HOME`.
+| Quoi | Où | Surcharge |
+| --- | --- | --- |
+| Scores et indices | `<catalogue>/.dsoxlab.db` (SQLite) | aucune, c'est le dépôt |
+| Contexte de session | `<catalogue>/.dsoxlab-context.json` | aucune, c'est le dépôt |
+| Journal, état Terraform | `~/.local/state/dsoxlab/` | `XDG_STATE_HOME` |
+| Catalogue de démonstration | `~/.local/share/dsoxlab/demo/` | `XDG_DATA_HOME` |
+
+Les deux premiers sont à ignorer dans le `.gitignore` de chaque catalogue.
+
+Il n'existe **aucun fichier de configuration utilisateur** : rien n'est lu dans
+`~/.config/dsoxlab/`. Ce que l'on règle passe par le contrat (`meta.yml`), par
+le contexte actif (`dsoxlab use`) ou par une variable d'environnement
+(`DSOXLAB_PROVIDER`, `DSOXLAB_LANG`, `DSOXLAB_LOG`,
+`DSOXLAB_HOST_READY_TIMEOUT`).
 
 ---
 
@@ -315,6 +385,10 @@ est scanné par son propre outillage à chaque push et pull request.
   tournent en local avant chaque commit (voir [CONTRIBUTING.fr.md](./CONTRIBUTING.fr.md)).
 
 Pour signaler une vulnérabilité, suivez [SECURITY.fr.md](./SECURITY.fr.md).
+
+La marque et ses fichiers sont documentés dans
+[docs/brand.fr.md](./docs/brand.fr.md) ; **le nom et le logo ne sont pas
+couverts par la licence Apache 2.0**.
 
 ## Licence et attribution
 
