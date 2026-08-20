@@ -120,8 +120,8 @@ STRINGS: dict[str, str] = {
         "public address and no machine name.",
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
-    "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy).",
-    "cmd_status_help":    "Check SSH connectivity to all hosts declared in meta.yml.",
+    "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy), including machines left outside the state.",
+    "cmd_status_help":    "Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent.",
     "cmd_ssh_help":       "Open an interactive SSH session on a lab host.",
     "cmd_ssh_arg":        "Host name or short alias (e.g.: alma-rhcsa-1, ubuntu-lfcs-1)",
 
@@ -182,8 +182,66 @@ STRINGS: dict[str, str] = {
     "status_no_key":       "SSH private key not found: {path}. Run 'dsoxlab instructor bootstrap' first.",
     "status_checking":     "Checking SSH connectivity on {count} host(s)…",
     "status_all_ok":       "All {count} hosts respond on SSH+sudo.",
-    "status_partial":      "Only {ok}/{total} hosts respond on the {provider} infrastructure. Cloud-init may still be running (wait 1-2 min) or run 'dsoxlab provision' if VMs were destroyed.",
+    "status_partial":      "Only {ok}/{total} hosts respond on the {provider} infrastructure.",
     "status_via_bastion":  "Going through bastion {bastion} (private subnet)…",
+
+    # ── status — machines left behind, and why a host stays silent ────────────
+    "orphan_check_skipped":
+        "Cannot ask the hypervisor which machines it holds ({error}). "
+        "Machines left behind by a failed provisioning, if any, go undetected.",
+    "provision_orphan_domains":
+        "These machines already exist on the hypervisor but are absent from the "
+        "Terraform state: {hosts}. A previous provisioning failed after defining "
+        "them, so Terraform neither knows nor destroys them, and creating them "
+        "again would fail on 'domain already exists'.",
+    "provision_orphan_fix":
+        "Remove them, then run dsoxlab provision again: {cmd}",
+    "destroy_orphan_domains":
+        "Terraform destroyed what it knew about, but these machines are still "
+        "defined on the hypervisor: {hosts}. A previous provisioning defined "
+        "them without ever recording them in the state.",
+    "confirm_destroy_orphans":
+        "Remove them from the hypervisor? This cannot be undone",
+    "destroy_orphan_removed":
+        "Removed from the hypervisor: {hosts}",
+    "destroy_orphan_kept":
+        "Left in place. Remove them yourself, then run dsoxlab destroy again: {cmd}",
+    "destroy_orphan_failed":
+        "Could not remove {host}: {error}",
+    "status_hypervisor_unavailable":
+        "The hypervisor did not answer ({error}), so the diagnosis below only "
+        "reflects what SSH says, not the state of the machines.",
+    "status_provider_not_inspectable":
+        "Provider '{provider}' exposes no machine state that can be queried from "
+        "here: the diagnosis below only reflects what SSH says.",
+    "status_cause_domain_absent":
+        "no domain named '{host}' on the hypervisor: provisioning never created "
+        "this machine. Run: dsoxlab provision",
+    "status_cause_domain_not_running":
+        "domain '{domain}' exists and is '{state}': the template starts it at "
+        "boot, so it was stopped afterwards (out-of-memory killer, qemu crash, "
+        "manual stop). Run: sudo virsh start {domain}",
+    "status_cause_domain_no_lease":
+        "domain '{domain}' is running but holds no DHCP lease: it is still "
+        "booting, or its network did not come up. Watch it boot: "
+        "sudo virsh console {domain}",
+    "status_cause_booting":
+        "domain '{domain}' is running and holds its address, but SSH is not open "
+        "yet: cloud-init has not finished. Wait a minute, then run dsoxlab status "
+        "again.",
+    "status_cause_ssh_refused":
+        "something answers at {ip} and refuses the connection: the machine is up, "
+        "sshd is not listening yet. Wait, then run dsoxlab status again.",
+    "status_cause_unreachable":
+        "nothing answers at {ip}: no machine holds this address on the network.",
+    "status_cause_ssh_timeout":
+        "{ip} does not answer within the timeout: packets are being dropped "
+        "(firewall) or the machine is frozen.",
+    "status_cause_ssh_denied":
+        "{ip} answers but refuses the key: the machine is up and its SSH account "
+        "or key does not match the one this repository holds.",
+    "status_cause_unknown":
+        "SSH failed for a reason this diagnosis does not recognise: {reason}",
     "ssh_unknown_host":    "Unknown host: {host}. Available: {hosts}",
     "ssh_connecting":      "Connecting to {host} ({ip})…",
     "ssh_via_bastion":     "Connecting to {host} ({ip}) via bastion {bastion}…",
@@ -316,14 +374,24 @@ Each lab exposes:
     [dim]--force[/dim]              Reinstall over it (loses progress).
 
   [cyan]provision[/cyan]            Bring up the infrastructure for vm labs (terraform apply).
+                       Refuses to start when machines left by a failed
+                       provisioning are still defined on the hypervisor, and
+                       names the command that removes them.
     [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
 
-  [cyan]status[/cyan]               Check SSH connectivity of the declared hosts.
+  [cyan]status[/cyan]               Check SSH connectivity of the declared hosts, and say why
+                       one stays silent. On a provider whose machine state can
+                       be queried, the hypervisor is [bold]asked[/bold]: a domain that
+                       does not exist, one that is stopped and one that is
+                       booting call for three different gestures.
 
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
 
-  [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy).
-    [dim]--yes[/dim]                 Do not ask for confirmation.
+  [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy),
+                       then remove — after confirmation — the machines a failed
+                       provisioning left defined outside the Terraform state.
+                       Exits non-zero if any of them remains.
+    [dim]--yes[/dim]                 Do not ask for confirmation, orphan machines included.
 
   [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
                        Supports bash and zsh. Reload your shell after running.

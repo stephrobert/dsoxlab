@@ -312,7 +312,7 @@ scripts and test files are present.
 | `dsoxlab clean` | Remove all resources created by the lab. |
 | `dsoxlab course` | Display a course section, or the table of contents if no section is given. |
 | `dsoxlab demo` | Install a demonstration catalog and play a first lab, with nothing to clone and nothing to provision. |
-| `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy). |
+| `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy), including machines left outside the state. |
 | `dsoxlab doctor` | Diagnose the environment (runtimes, tools, detected labs). |
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
 | `dsoxlab guide` | Open the lab's online guide in your web browser. |
@@ -328,7 +328,7 @@ scripts and test files are present.
 | `dsoxlab scores` | Show recorded scores history. |
 | `dsoxlab show` | Show details and status of a lab. |
 | `dsoxlab ssh` | Open an interactive SSH session on a lab host. |
-| `dsoxlab status` | Check SSH connectivity to all hosts declared in meta.yml. |
+| `dsoxlab status` | Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent. |
 | `dsoxlab submit` | Final submission: run tests, record score, then type 'exit' to leave the session. |
 | `dsoxlab support` | Produce an anonymised diagnostic report, ready to paste into an issue. |
 | `dsoxlab use` | Sets the active context (section and/or default level). Use --reset to clear it. |

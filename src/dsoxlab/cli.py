@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import shlex
 import webbrowser
@@ -37,6 +38,7 @@ from .config import (
 )
 from .i18n import _, get_lang, set_lang
 from .logging_setup import configurer as configurer_journal
+from .infra import libvirt
 from .infra.inventory import InfraNotProvisioned
 from .models.hint import HintFile
 from .sessions.store import (
@@ -80,6 +82,7 @@ from .models import (
 )
 from .reporting import machine
 from .runtimes.base import EventCallback
+from .services import host_diagnosis
 from .services import (
     CheckResult,
     check_lab,
@@ -97,6 +100,10 @@ from .services import (
     validate_all_metadata,
     validate_all_structure,
 )
+from .utils.shell import CommandError
+
+logger = logging.getLogger(__name__)
+
 
 class _I18nGroup(TyperGroup):
     """TyperGroup avec l'option --help traduite."""
@@ -1506,6 +1513,49 @@ def doctor(
 # ── provision / destroy / ssh / status ────────────────────────────────────────
 
 
+def _undefine_command(orphans: dict[str, str]) -> str:
+    """La commande exacte qui retire des machines restées sur l'hyperviseur.
+
+    Rendue copiable telle quelle : dire « supprime-les » sans donner le geste
+    laisse l'apprenant chercher ``virsh undefine``, qu'aucune page du parcours
+    ne lui a montré. ``sudo`` sans ``-n``, ici : c'est un humain qui la tape,
+    un mot de passe demandé au terminal ne pose aucun problème.
+    """
+    return "; ".join(
+        f"sudo virsh undefine --nvram {domain}" for domain in sorted(orphans.values())
+    )
+
+
+def _diagnostic_message(hote: dict[str, Any]) -> str:
+    """La phrase qui nomme la cause d'un hôte muet, et le geste qui la corrige.
+
+    Une cause, un message, une action. L'ancien texte en proposait deux à la
+    fois — « cloud-init tourne peut-être encore, ou alors reprovisionne » — pour
+    tous les hôtes et toutes les pannes : l'apprenant devait trancher lui-même
+    entre deux conseils dont l'un coûtait une infrastructure entière.
+    """
+    cause = hote["cause"]
+    domaine = hote.get("domain") or hote["fqdn"]
+    if cause == host_diagnosis.CAUSE_DOMAIN_ABSENT:
+        return _("status_cause_domain_absent", host=hote["fqdn"])
+    if cause == host_diagnosis.CAUSE_DOMAIN_NOT_RUNNING:
+        return _("status_cause_domain_not_running",
+                 domain=domaine, state=hote.get("domain_state") or "?")
+    if cause == host_diagnosis.CAUSE_DOMAIN_NO_LEASE:
+        return _("status_cause_domain_no_lease", domain=domaine)
+    if cause == host_diagnosis.CAUSE_BOOTING:
+        return _("status_cause_booting", domain=domaine)
+    if cause == host_diagnosis.CAUSE_SSH_REFUSED:
+        return _("status_cause_ssh_refused", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_UNREACHABLE:
+        return _("status_cause_unreachable", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_SSH_TIMEOUT:
+        return _("status_cause_ssh_timeout", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_SSH_DENIED:
+        return _("status_cause_ssh_denied", ip=hote["ip"])
+    return _("status_cause_unknown", reason=hote.get("reason") or "?")
+
+
 @app.command("provision", help=_("cmd_provision_help"))
 def provision(
     host: Annotated[Optional[list[str]], typer.Option(
@@ -1538,6 +1588,20 @@ def provision(
             others=", ".join(conflicts),
             other=conflicts[0],
         ))
+        raise typer.Exit(5)
+
+    # Garde-fou « machines fantômes » : un provisionnement interrompu après la
+    # définition d'un domaine le laisse sur l'hyperviseur sans jamais l'inscrire
+    # au state. Terraform ne le voit donc pas, et tout apply suivant meurt sur
+    # « domain already exists », une phrase qui ne dit pas quoi faire. On nomme
+    # les machines et la commande qui les retire, avant de perdre une minute
+    # d'init et d'apply.
+    scan = tf.find_orphan_domains(repo_meta)
+    if scan.reason:
+        warn(_("orphan_check_skipped", error=scan.reason))
+    if scan.orphans:
+        error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
+        info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
         raise typer.Exit(5)
 
     info(_("provision_starting", provider=provider))
@@ -1751,6 +1815,13 @@ def destroy(
         error(_("destroy_failed", error=str(exc)))
         raise typer.Exit(4)
 
+    # Terraform ne détruit que ce qu'il connaît. Un domaine défini puis jamais
+    # inscrit au state lui est invisible : il annonçait donc « infrastructure
+    # détruite » et sortait en 0 en laissant les machines debout, ce qui est le
+    # contraire de ce que la commande promet. On regarde l'hyperviseur.
+    if not _handle_orphans_after_destroy(repo_meta, assume_yes=yes):
+        raise typer.Exit(6)
+
     # Le fragment SSH pointe désormais des machines mortes : le laisser
     # enverrait l'apprenant vers des adresses recyclées, ce qui est pire que
     # pas de configuration du tout.
@@ -1760,6 +1831,53 @@ def destroy(
         info(_("ssh_fragment_removed", repo=repo_meta.id))
 
     success(_("destroy_done"))
+
+
+def _handle_orphans_after_destroy(
+    repo_meta: RepoMetadata, *, assume_yes: bool
+) -> bool:
+    """Retire les machines que Terraform a laissées derrière lui, ou le dit.
+
+    Le retrait est **confirmé**, jamais implicite : rien ne garantit à dsoxlab
+    qu'un domaine homonyme d'un ``infra.hosts[].name`` soit bien le sien, et
+    une machine dé-définie ne revient pas. ``--yes`` vaut confirmation — c'est
+    déjà lui qui a autorisé la destruction de cette infrastructure, et ces
+    machines-là en font partie par leur nom.
+
+    Returns:
+        ``True`` si l'hyperviseur ne porte plus rien de ce dépôt et que la
+        commande peut sortir en succès. ``False`` s'il reste des machines :
+        l'appelant doit alors sortir en code non nul, faute de quoi il
+        annoncerait une destruction qui n'a pas eu lieu.
+    """
+    from .infra import terraform as tf
+
+    scan = tf.find_orphan_domains(repo_meta)
+    if scan.reason:
+        warn(_("orphan_check_skipped", error=scan.reason))
+    if not scan.orphans:
+        return True
+
+    noms = sorted(scan.orphans)
+    warn(_("destroy_orphan_domains", hosts=", ".join(noms)))
+    if not assume_yes and not typer.confirm(_("confirm_destroy_orphans")):
+        info(_("destroy_orphan_kept", cmd=_undefine_command(scan.orphans)))
+        return False
+
+    restants: dict[str, str] = {}
+    for fqdn in noms:
+        domaine = scan.orphans[fqdn]
+        try:
+            libvirt.remove_domain(domaine)
+        except CommandError as exc:
+            restants[fqdn] = domaine
+            error(_("destroy_orphan_failed", host=domaine,
+                    error=exc.result.stderr.strip() or str(exc)))
+    if restants:
+        info(_("destroy_orphan_kept", cmd=_undefine_command(restants)))
+        return False
+    success(_("destroy_orphan_removed", hosts=", ".join(noms)))
+    return True
 
 
 def _run_ansible_with_progress(
@@ -2073,6 +2191,39 @@ def status(
         info(_("status_via_bastion",
                bastion=bastion["fqdn"] or bastion["public_ip"]))
 
+    # ── Interrogation de l'hyperviseur ───────────────────────────────────────
+    # Elle est PARESSEUSE : tant que tout répond, il n'y a rien à diagnostiquer
+    # et rien à demander. Elle n'a lieu qu'au premier hôte muet, et une seule
+    # fois pour toute la commande.
+    interrogeable = libvirt.supports_domain_state(provider)
+    domaines_connus: list[str] | None = None
+    hyperviseur_tente = False
+    hyperviseur_erreur: str | None = None
+
+    def _etat_domaine(fqdn: str) -> libvirt.DomainStatus | None:
+        """Ce que l'hyperviseur dit de cet hôte, ou ``None`` s'il ne dit rien.
+
+        ``None`` signifie « je n'ai pas pu regarder », jamais « rien n'existe » :
+        le diagnostic retombe alors sur ce que SSH sait, sans jamais conclure à
+        une machine absente.
+        """
+        nonlocal domaines_connus, hyperviseur_tente, hyperviseur_erreur
+        if not interrogeable:
+            return None
+        if not hyperviseur_tente:
+            hyperviseur_tente = True
+            try:
+                domaines_connus = libvirt.list_domains()
+            except CommandError as exc:
+                hyperviseur_erreur = exc.result.stderr.strip() or str(exc)
+        if domaines_connus is None:
+            return None
+        try:
+            return libvirt.inspect_host(fqdn, known=domaines_connus)
+        except CommandError as exc:
+            logger.debug("état libvirt indisponible pour %s : %s", fqdn, exc)
+            return None
+
     ok_count = 0
     for fqdn, host_vars in sorted(hosts_dict.items()):
         ip = host_vars["ansible_host"]
@@ -2108,25 +2259,53 @@ def status(
                 ),
             ]
         cmd += [f"{host_vars.get('ansible_user', 'ansible')}@{ip}", "true"]
-        result = subprocess.run(cmd, capture_output=True, timeout=15)  # noqa: S603
+        # LC_ALL=C : la raison de l'échec vient de ``strerror``, que la libc
+        # traduit. Sans ce verrou, « No route to host » devient une phrase
+        # différente sur chaque poste, et le diagnostic ne reconnaîtrait plus
+        # rien de ce que ssh lui dit.
+        result = subprocess.run(  # noqa: S603
+            cmd, capture_output=True, timeout=15,
+            env={**os.environ, "LC_ALL": "C"},
+        )
         joignable = result.returncode == 0
         raison = None
         if not joignable:
             stderr_tail = result.stderr.decode(errors="replace").strip().splitlines()[-1:]
             raison = stderr_tail[0] if stderr_tail else "timeout"
-        hotes.append({"fqdn": fqdn, "ip": ip, "reachable": joignable, "reason": raison})
+        etat = None if joignable else _etat_domaine(fqdn)
+        hotes.append({
+            "fqdn": fqdn,
+            "ip": ip,
+            "reachable": joignable,
+            "reason": raison,
+            "domain": etat.domain if etat else None,
+            "domain_state": etat.state if etat else None,
+            "cause": host_diagnosis.diagnose(
+                reachable=joignable, reason=raison or "", status=etat
+            ),
+        })
         if as_json:
             ok_count += 1 if joignable else 0
             continue
         if joignable:
-            success(f"  ✔ {fqdn} ({ip})")
+            # `success` et `error` posent déjà leur propre marqueur : en
+            # rajouter un dans la chaîne donnait « ✘   ✘ hote.lab », que
+            # l'utilisateur lit comme un défaut de rendu.
+            success(f"  {fqdn} ({ip})")
             ok_count += 1
         else:
-            error(f"  ✘ {fqdn} ({ip}) — {raison}")
+            error(f"  {fqdn} ({ip}) : {raison}")
 
     if as_json:
         machine.emit({
             "provider": provider,
+            # Un consommateur doit pouvoir distinguer « aucun domaine » d'un
+            # hyperviseur qui n'a rien répondu : sans ce bloc, les deux se
+            # ressembleraient à des `domain_state: null`.
+            "hypervisor": {
+                "queryable": interrogeable and hyperviseur_erreur is None,
+                "error": hyperviseur_erreur,
+            },
             "hosts": hotes,
             "summary": {"reachable": ok_count, "total": len(hosts_dict)},
         })
@@ -2135,11 +2314,20 @@ def status(
         return
     if ok_count == len(hosts_dict):
         success(_("status_all_ok", count=ok_count))
-    else:
-        error(_("status_partial",
-                ok=ok_count, total=len(hosts_dict),
-                provider=provider))
-        raise typer.Exit(1)
+        return
+
+    error(_("status_partial", ok=ok_count, total=len(hosts_dict), provider=provider))
+    # Dire pourquoi le diagnostic est limité, plutôt que de laisser croire que
+    # l'outil a regardé la machine alors qu'il n'a pu regarder que le réseau.
+    if not interrogeable:
+        warn(_("status_provider_not_inspectable", provider=provider))
+    elif hyperviseur_erreur is not None:
+        warn(_("status_hypervisor_unavailable", error=hyperviseur_erreur))
+    for hote in hotes:
+        if hote["reachable"]:
+            continue
+        info(f"  {hote['fqdn']} — {_diagnostic_message(hote)}")
+    raise typer.Exit(1)
 
 
 @app.command("ssh", help=_("cmd_ssh_help"))

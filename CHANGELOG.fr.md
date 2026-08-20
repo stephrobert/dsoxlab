@@ -9,6 +9,104 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.48] - 2026-08-20
+
+### Corrigé
+
+- **`virsh` était appelé par `sudo` sans nécessité, ce qui éteignait le
+  diagnostic là où il sert le plus.** La configuration que recommande libvirt
+  est d'ajouter l'utilisateur au groupe `libvirt` : il joint alors l'URI système
+  sans `sudo`, et sans qu'aucun `NOPASSWD` n'existe. Exiger `sudo -n` d'emblée
+  faisait donc répondre « hyperviseur non interrogeable » sur une machine où
+  `virsh list --all` fonctionne parfaitement, et c'est précisément la machine
+  d'un apprenant qui découvre l'outil. dsoxlab détecte désormais le chemin qui
+  répond, direct d'abord puis `sudo -n`, et déclare l'URI (`--connect
+  qemu:///system`) au lieu de dépendre de celle que la distribution choisit :
+  la vraie raison d'être de `sudo` ici était l'URI, pas le privilège.
+
+  Le `-n` est conservé sur le repli, et il n'est pas décoratif : la sortie de
+  ces commandes est capturée, donc un prompt de mot de passe n'aurait aucun
+  terminal où s'afficher et l'appel resterait pendu jusqu'au délai maximal.
+
+  Le backend de snapshot emprunte maintenant la même porte. Ses quatre appels
+  codaient `sudo virsh` en dur **sans** `-n` : ce sont eux qui pendaient.
+
+- **Les lignes par hôte de `status` affichaient deux marqueurs**, `✘   ✘
+  hote.lab`, parce que `error()` pose déjà le sien. Ce qui se lit comme un
+  défaut de rendu dans la sortie qu'on montre à un apprenant.
+
+
+- **Un `provision` échoué laissait des machines derrière lui, et `destroy`
+  sortait en succès sans les voir.** Quand `libvirt_domain` échoue au démarrage,
+  le provider a déjà *défini* le domaine mais ne l'inscrit jamais au state
+  Terraform. `terraform destroy` n'avait donc rien à supprimer : la commande
+  affichait `✔ Infrastructure détruite.` et sortait en 0 alors que les machines
+  étaient toujours debout, et tout `apply` suivant mourait sur `domain already
+  exists`. Sur une Ubuntu neuve, où le premier provisionnement échoue pour
+  d'autres raisons, aucune commande `dsoxlab` n'en sortait, et la procédure de
+  récupération documentée par les catalogues est justement `destroy` puis
+  `provision`.
+
+  `provision` regarde désormais l'hyperviseur avant de démarrer : les machines
+  déclarées dans le `meta.yml` qui y existent sans être au state sont nommées,
+  avec la commande `virsh undefine` exacte qui les retire, et la commande sort
+  en 5 au lieu de perdre une minute dans un `apply` qui ne peut pas aboutir.
+  `destroy` regarde à nouveau une fois Terraform terminé, et retire ce qu'il a
+  laissé, après une confirmation explicite : rien ne prouve à `dsoxlab` qu'un
+  domaine homonyme soit bien le sien. `--yes` vaut confirmation. Une
+  confirmation refusée, ou un retrait qui échoue, sort en 6 et nomme la commande
+  manuelle : une machine encore debout ne doit jamais être annoncée détruite.
+
+  Seuls les `infra.hosts[].name` du dépôt courant sont considérés : une machine
+  que ce catalogue ne déclare pas n'est jamais nommée, ni retirée. Un
+  `provision` réussi suivi d'un `destroy` se comporte exactement comme avant,
+  sans un avertissement de plus. (#107)
+
+- **`status` ne demandait jamais son état à libvirt : deux devinettes au lieu
+  d'un diagnostic.** La commande capturait la vraie raison de chaque échec SSH,
+  hôte par hôte, puis la jetait pour afficher une phrase qui proposait deux
+  causes à la fois (« cloud-init tourne peut-être encore, ou alors
+  reprovisionne »). Les deux étaient fausses dans le cas observé : trois hôtes,
+  un seul qui répond, deux en `No route to host`. Or `EHOSTUNREACH` et
+  `ECONNREFUSED` disent des choses **opposées** sur l'état d'une machine, et
+  l'outil les traitait pareil.
+
+  Sur un provider dont l'état des machines est interrogeable, `status` demande
+  maintenant cet état et nomme une cause, et un geste, par hôte : un domaine
+  inexistant renvoie vers `dsoxlab provision` ; un domaine arrêté renvoie vers
+  `virsh start` et cite l'état que libvirt rapporte ; un domaine en marche sans
+  bail DHCP renvoie vers `virsh console` ; un domaine en marche qui détient son
+  adresse renvoie vers cloud-init et vers l'attente. Là où l'hyperviseur ne peut
+  pas être interrogé, la couche SSH distingue déjà « personne ne répond à cette
+  adresse » de « quelque chose répond et refuse le port ».
+
+  L'interrogation est paresseuse, rien n'est demandé tant que tous les hôtes
+  répondent, et elle n'est jamais fatale. Un provider sans état interrogeable,
+  un `virsh` absent, un `sudo` refusé ou un démon éteint retombent sur le
+  comportement d'avant **et le disent**, parce que transformer « je n'ai pas pu
+  regarder » en « rien n'existe » serait un faux diagnostic. La sortie `--json`
+  porte `domain`, `domain_state` et `cause` par hôte, plus un bloc `hypervisor`
+  qui distingue une réponse vide d'une absence de réponse. (#122)
+
+### Modifié
+
+- **`virsh` est invoqué en `sudo -n virsh`.** La sortie de ces commandes est
+  capturée, donc un prompt de mot de passe n'avait aucun terminal où s'afficher
+  et l'appel restait pendu jusqu'au timeout. Avec `-n`, `sudo` refuse
+  immédiatement et l'appelant peut le dire. Le backend de snapshot KVM, qui
+  utilisait la forme interactive, en bénéficie aussi.
+
+- **`status` joue ses sondes SSH sous `LC_ALL=C`.** La raison de l'échec vient
+  de `strerror`, que la bibliothèque C traduit : sans ce verrou, `No route to
+  host` s'écrit différemment sur chaque poste et aucun diagnostic ne pourrait le
+  reconnaître.
+
+- `incus` et `outscale` sont explicitement hors périmètre de l'interrogation de
+  l'hyperviseur, et le code écrit pourquoi : le template incus crée des
+  ressources `incus_instance`, que le démon incus gère et que `virsh` ne voit
+  pas, et Outscale est un cloud distant sans hyperviseur local. Les deux gardent
+  leur comportement d'avant, énoncé plutôt que tacite.
+
 ## [0.1.47] - 2026-08-20
 
 ### Corrigé

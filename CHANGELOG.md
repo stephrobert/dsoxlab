@@ -9,6 +9,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.48] - 2026-08-20
+
+### Fixed
+
+- **`virsh` was called through `sudo` without need, which switched the
+  diagnosis off exactly where it helps most.** The configuration libvirt
+  recommends is to add the user to the `libvirt` group: they then reach the
+  system URI without `sudo`, and with no `NOPASSWD` anywhere. Requiring
+  `sudo -n` up front therefore answered "hypervisor cannot be queried" on a
+  machine where `virsh list --all` works perfectly, and that machine is the one
+  belonging to a learner discovering the tool. dsoxlab now detects the path that
+  answers, direct first then `sudo -n`, and declares the URI
+  (`--connect qemu:///system`) instead of depending on whichever one the
+  distribution picks: the real reason `sudo` was needed here was the URI, not
+  the privilege.
+
+  The `-n` is kept on the fallback, and it is not decorative: the output of
+  these commands is captured, so a password prompt would have no terminal to
+  appear on and the call would hang until the timeout.
+
+  The snapshot backend now goes through the same door. Its four calls hardcoded
+  `sudo virsh` **without** `-n`: those were the ones that would hang.
+
+- **`status` printed two markers per host line**, `✘   ✘ host.lab`, because
+  `error()` already emits one. It reads as a rendering bug in the very output we
+  show a learner.
+
+
+- **A failed `provision` left machines behind, and `destroy` reported success
+  without seeing them.** When `libvirt_domain` fails at startup, the provider
+  has already *defined* the domain but never records it in the Terraform state.
+  `terraform destroy` therefore had nothing to delete: the command printed
+  `✔ Infrastructure destroyed.` and exited 0 while the machines were still
+  standing, and every later `apply` died on `domain already exists`. On a fresh
+  Ubuntu, where the first provisioning fails for other reasons, no `dsoxlab`
+  command got the learner out — and the recovery procedure documented in the
+  catalogues is precisely `destroy` then `provision`.
+
+  `provision` now looks at the hypervisor before starting: machines declared in
+  the `meta.yml` that exist there without being in the state are named, along
+  with the exact `virsh undefine` command that removes them, and the command
+  exits 5 instead of spending a minute on an `apply` that cannot succeed.
+  `destroy` looks again once Terraform has finished, and removes what it left
+  behind — after an explicit confirmation, since nothing proves to `dsoxlab`
+  that a domain with the same name is its own. `--yes` counts as confirmation.
+  A refused confirmation, or a removal that fails, exits 6 and names the manual
+  command: a machine still standing must never be reported as destroyed.
+
+  Only the `infra.hosts[].name` entries of the current repository are ever
+  considered, so a machine this catalogue does not declare is never named and
+  never removed. A successful `provision` followed by a `destroy` behaves
+  exactly as before, with no extra warning. (#107)
+
+- **`status` never asked libvirt for its state: two guesses instead of a
+  diagnosis.** The command captured the real reason for each SSH failure, host
+  by host, then discarded it to print a sentence offering two causes at once
+  (`Cloud-init may still be running … or run 'dsoxlab provision'`). Both were
+  wrong in the observed case: three hosts, one answering, two on
+  `No route to host`. `EHOSTUNREACH` and `ECONNREFUSED` say **opposite** things
+  about a machine, and the tool treated them alike.
+
+  On a provider whose machine state can be queried, `status` now asks the
+  hypervisor and names one cause, and one gesture, per host: a domain that does
+  not exist points at `dsoxlab provision`; a domain that is stopped points at
+  `virsh start` and says which state libvirt reports; a running domain with no
+  DHCP lease points at `virsh console`; a running domain holding its address
+  points at cloud-init and at waiting. Where the hypervisor cannot be asked, the
+  SSH layer alone still separates "nothing answers at this address" from
+  "something answers and refuses the port".
+
+  The interrogation is lazy — nothing is asked while every host answers — and
+  never fatal. A provider with no queryable state, a missing `virsh`, a refused
+  `sudo` or a dead daemon all fall back to the previous behaviour **and say so**,
+  because turning "I could not look" into "nothing exists" would be a false
+  diagnosis. `--json` carries `domain`, `domain_state` and `cause` per host, plus
+  a `hypervisor` block that distinguishes an empty answer from no answer at all.
+  (#122)
+
+### Changed
+
+- **`virsh` is invoked as `sudo -n virsh`.** The output of these commands is
+  captured, so a password prompt had no terminal to appear on and the call hung
+  until the timeout. With `-n`, `sudo` refuses immediately and the caller can
+  report it. This also affects the KVM snapshot backend, which used the
+  interactive form.
+
+- **`status` runs its SSH probes under `LC_ALL=C`.** The failure reason comes
+  from `strerror`, which the C library translates: without this lock,
+  `No route to host` reads differently on every machine and no diagnosis could
+  recognise it.
+
+- `incus` and `outscale` are explicitly out of scope for hypervisor
+  interrogation, and the code says why: the incus template creates
+  `incus_instance` resources, which the incus daemon owns and `virsh` cannot
+  see, and Outscale is a remote cloud with no local hypervisor. Both keep their
+  previous behaviour, stated rather than silent.
+
 ## [0.1.47] - 2026-08-20
 
 ### Fixed

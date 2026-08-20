@@ -92,7 +92,6 @@ def langue_en(monkeypatch: pytest.MonkeyPatch) -> None:
 def virsh(monkeypatch: pytest.MonkeyPatch) -> VirshSimule:
     faux = VirshSimule()
     monkeypatch.setattr(libvirt, "run_command", faux)
-    monkeypatch.setattr(kvm, "run_command", faux)
     return faux
 
 
@@ -262,7 +261,6 @@ def test_list_rend_les_snapshots_existants(
 
     faux = AvecSnapshots()
     monkeypatch.setattr(libvirt, "run_command", faux)
-    monkeypatch.setattr(kvm, "run_command", faux)
     assert kvm.list_(meta, "control-node.lab") == ["pre-lab", "autre"]
 
 
