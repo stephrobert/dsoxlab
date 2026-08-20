@@ -2288,10 +2288,13 @@ def status(
             ok_count += 1 if joignable else 0
             continue
         if joignable:
-            success(f"  ✔ {fqdn} ({ip})")
+            # `success` et `error` posent déjà leur propre marqueur : en
+            # rajouter un dans la chaîne donnait « ✘   ✘ hote.lab », que
+            # l'utilisateur lit comme un défaut de rendu.
+            success(f"  {fqdn} ({ip})")
             ok_count += 1
         else:
-            error(f"  ✘ {fqdn} ({ip}) — {raison}")
+            error(f"  {fqdn} ({ip}) : {raison}")
 
     if as_json:
         machine.emit({

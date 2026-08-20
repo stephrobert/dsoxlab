@@ -20,8 +20,8 @@ from __future__ import annotations
 import logging
 
 from ...models.repo import RepoMetadata
-from ...utils.shell import CommandError, run_command
-from ..libvirt import DomainNotFound, list_domains, resolve_domain
+from ...utils.shell import CommandError
+from ..libvirt import DomainNotFound, list_domains, resolve_domain, run_virsh
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ def create(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
     for fqdn in hosts:
         domain = resolve_domain(fqdn, known=known)
         logger.info("virsh snapshot-create-as %s %s", domain, name)
-        run_command(
+        run_virsh(
             [
-                "sudo", "virsh", "snapshot-create-as",
+                "snapshot-create-as",
                 "--domain", domain,
                 "--name", name,
                 "--description", "dsoxlab checkpoint",
@@ -60,8 +60,8 @@ def revert(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
     for fqdn in hosts:
         domain = resolve_domain(fqdn, known=known)
         logger.info("virsh snapshot-revert %s %s", domain, name)
-        run_command(
-            ["sudo", "virsh", "snapshot-revert", domain, name],
+        run_virsh(
+            ["snapshot-revert", domain, name],
             timeout=120,
         )
 
@@ -82,8 +82,8 @@ def delete(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
             logger.warning("snapshot-delete ignoré : %s", exc)
             continue
         try:
-            run_command(
-                ["sudo", "virsh", "snapshot-delete", domain, name],
+            run_virsh(
+                ["snapshot-delete", domain, name],
                 timeout=60,
                 check=True,
             )
@@ -104,8 +104,8 @@ def list_(repo_meta: RepoMetadata, host: str) -> list[str]:
     """
     del repo_meta
     domain = resolve_domain(host)
-    result = run_command(
-        ["sudo", "virsh", "snapshot-list", domain, "--name"],
+    result = run_virsh(
+        ["snapshot-list", domain, "--name"],
         check=False,
     )
     if not result.ok:

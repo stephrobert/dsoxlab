@@ -13,6 +13,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **`virsh` était appelé par `sudo` sans nécessité, ce qui éteignait le
+  diagnostic là où il sert le plus.** La configuration que recommande libvirt
+  est d'ajouter l'utilisateur au groupe `libvirt` : il joint alors l'URI système
+  sans `sudo`, et sans qu'aucun `NOPASSWD` n'existe. Exiger `sudo -n` d'emblée
+  faisait donc répondre « hyperviseur non interrogeable » sur une machine où
+  `virsh list --all` fonctionne parfaitement, et c'est précisément la machine
+  d'un apprenant qui découvre l'outil. dsoxlab détecte désormais le chemin qui
+  répond, direct d'abord puis `sudo -n`, et déclare l'URI (`--connect
+  qemu:///system`) au lieu de dépendre de celle que la distribution choisit :
+  la vraie raison d'être de `sudo` ici était l'URI, pas le privilège.
+
+  Le `-n` est conservé sur le repli, et il n'est pas décoratif : la sortie de
+  ces commandes est capturée, donc un prompt de mot de passe n'aurait aucun
+  terminal où s'afficher et l'appel resterait pendu jusqu'au délai maximal.
+
+  Le backend de snapshot emprunte maintenant la même porte. Ses quatre appels
+  codaient `sudo virsh` en dur **sans** `-n` : ce sont eux qui pendaient.
+
+- **Les lignes par hôte de `status` affichaient deux marqueurs**, `✘   ✘
+  hote.lab`, parce que `error()` pose déjà le sien. Ce qui se lit comme un
+  défaut de rendu dans la sortie qu'on montre à un apprenant.
+
+
 - **Un `provision` échoué laissait des machines derrière lui, et `destroy`
   sortait en succès sans les voir.** Quand `libvirt_domain` échoue au démarrage,
   le provider a déjà *défini* le domaine mais ne l'inscrit jamais au state

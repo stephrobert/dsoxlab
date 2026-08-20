@@ -13,6 +13,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`virsh` was called through `sudo` without need, which switched the
+  diagnosis off exactly where it helps most.** The configuration libvirt
+  recommends is to add the user to the `libvirt` group: they then reach the
+  system URI without `sudo`, and with no `NOPASSWD` anywhere. Requiring
+  `sudo -n` up front therefore answered "hypervisor cannot be queried" on a
+  machine where `virsh list --all` works perfectly, and that machine is the one
+  belonging to a learner discovering the tool. dsoxlab now detects the path that
+  answers, direct first then `sudo -n`, and declares the URI
+  (`--connect qemu:///system`) instead of depending on whichever one the
+  distribution picks: the real reason `sudo` was needed here was the URI, not
+  the privilege.
+
+  The `-n` is kept on the fallback, and it is not decorative: the output of
+  these commands is captured, so a password prompt would have no terminal to
+  appear on and the call would hang until the timeout.
+
+  The snapshot backend now goes through the same door. Its four calls hardcoded
+  `sudo virsh` **without** `-n`: those were the ones that would hang.
+
+- **`status` printed two markers per host line**, `✘   ✘ host.lab`, because
+  `error()` already emits one. It reads as a rendering bug in the very output we
+  show a learner.
+
+
 - **A failed `provision` left machines behind, and `destroy` reported success
   without seeing them.** When `libvirt_domain` fails at startup, the provider
   has already *defined* the domain but never records it in the Terraform state.

@@ -32,6 +32,7 @@ une absence**. ``virsh`` absent, ``sudo`` refusé ou démon éteint lèvent
 from __future__ import annotations
 
 import logging
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -77,22 +78,98 @@ def supports_domain_state(provider: str) -> bool:
     return provider in INSPECTABLE_PROVIDERS
 
 
+#: L'URI que le template vise. Les domaines créés par ``provision`` vivent sur
+#: l'URI **système** ; l'URI session d'un utilisateur n'en contient aucun, et
+#: ``virsh`` sans ``--connect`` peut viser l'une ou l'autre selon la
+#: distribution. La déclarer supprime toute ambiguïté. ``LIBVIRT_DEFAULT_URI``
+#: reste prioritaire : qui l'a posée sait ce qu'elle fait.
+_URI_DEFAUT = "qemu:///system"
+
+#: Le préfixe retenu après détection, mémorisé pour ne pas resonder à chaque
+#: appel. ``None`` signifie « pas encore cherché », la liste vide « direct ».
+_prefixe_retenu: list[str] | None = None
+
+
+def _uri() -> str:
+    return os.environ.get("LIBVIRT_DEFAULT_URI") or _URI_DEFAUT
+
+
+def _sonder(prefixe: list[str]) -> bool:
+    """Ce préfixe permet-il de joindre l'hyperviseur ?"""
+    try:
+        run_command(
+            [*prefixe, "virsh", "--connect", _uri(), "list", "--name"],
+            check=True,
+            timeout=_TIMEOUT,
+        )
+    except CommandError:
+        return False
+    return True
+
+
+def _prefixe() -> list[str]:
+    """Rend le préfixe qui joint l'hyperviseur, ``[]`` ou ``["sudo", "-n"]``.
+
+    L'ordre n'est pas indifférent. La configuration que recommande libvirt est
+    d'ajouter l'utilisateur au groupe ``libvirt``, ce qui donne accès à l'URI
+    système **sans** sudo et n'implique aucun ``NOPASSWD``. Exiger ``sudo``
+    d'emblée éteindrait tout le diagnostic sur ces machines, en annonçant un
+    hyperviseur injoignable là où ``virsh list --all`` répond parfaitement.
+
+    Le repli ``sudo -n`` sert la machine où libvirt n'est joignable que par
+    root. Le ``-n`` est indispensable : la sortie de ces commandes est capturée,
+    donc un prompt de mot de passe n'aurait aucun terminal où s'afficher et
+    l'appel resterait pendu jusqu'au timeout.
+
+    Si aucun des deux ne répond, on rend le préfixe direct : l'appel réel
+    échouera et lèvera ``CommandError``, que l'appelant traduit en « hyperviseur
+    non interrogeable ». Une interrogation impossible n'est jamais une absence.
+    """
+    global _prefixe_retenu  # noqa: PLW0603 — un cache de processus, pas un état métier
+    if _prefixe_retenu is not None:
+        return _prefixe_retenu
+
+    for candidat in ([], ["sudo", "-n"]):
+        if _sonder(candidat):
+            logger.debug(
+                "virsh joignable avec le préfixe %r sur %s", candidat, _uri()
+            )
+            _prefixe_retenu = candidat
+            return candidat
+
+    logger.debug("virsh injoignable, ni en direct ni par sudo -n")
+    _prefixe_retenu = []
+    return _prefixe_retenu
+
+
+def _oublier_prefixe() -> None:
+    """Vide le cache de détection. Réservé aux tests."""
+    global _prefixe_retenu  # noqa: PLW0603
+    _prefixe_retenu = None
+
+
 def _virsh(
     args: list[str], *, check: bool = True, timeout: int = _TIMEOUT
 ) -> CommandResult:
-    """Invoque ``virsh`` sur l'URI système, sans jamais bloquer sur un mot de passe.
+    """Invoque ``virsh`` sur l'URI système, sans jamais bloquer sur un mot de passe."""
+    return run_command(
+        [*_prefixe(), "virsh", "--connect", _uri(), *args],
+        check=check,
+        timeout=timeout,
+    )
 
-    Deux décisions y sont figées :
 
-    - ``sudo`` : sans lui, ``virsh`` parle à l'URI **session** de l'utilisateur,
-      qui ne contient aucun des domaines créés par le template. Il rendrait donc
-      « aucun domaine » sur une machine qui en héberge dix.
-    - ``-n`` : la sortie de ces commandes est capturée, donc un prompt de mot de
-      passe n'aurait aucun terminal où s'afficher et l'appel resterait pendu
-      jusqu'au timeout. Avec ``-n``, ``sudo`` refuse immédiatement et l'appelant
-      peut le dire.
+def run_virsh(
+    args: list[str], *, check: bool = True, timeout: int = _TIMEOUT
+) -> CommandResult:
+    """Invoque ``virsh`` par le chemin détecté, pour les modules du paquet.
+
+    Une seule porte d'entrée : le backend de snapshot passe par ici plutôt que
+    de recomposer sa propre ligne de commande, sans quoi la détection du chemin
+    et le ``-n`` qui empêche de pendre ne vaudraient que pour la moitié des
+    appels.
     """
-    return run_command(["sudo", "-n", "virsh", *args], check=check, timeout=timeout)
+    return _virsh(args, check=check, timeout=timeout)
 
 
 class DomainNotFound(RuntimeError):
