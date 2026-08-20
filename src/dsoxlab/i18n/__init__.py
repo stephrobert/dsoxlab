@@ -22,7 +22,10 @@ def _read_context_lang() -> str | None:
             lang = data.get("lang")
             if lang:
                 return str(lang)[:2].lower()
-    except Exception:  # noqa: S110 — contexte illisible/absent : on retombe sur la langue par défaut
+    # Aveugle et silencieux : contexte absent, illisible ou JSON tronqué, la
+    # réponse est la même — on retombe sur la langue par défaut. Ce module est
+    # importé par tous les autres, il ne peut pas être une cause de panne.
+    except Exception:  # noqa: S110, BLE001
         pass
     return None
 
@@ -56,7 +59,7 @@ def set_lang(lang: str) -> None:
 
     À appeler une fois en début de CLI, après lecture du contexte.
     """
-    global _strings
+    global _strings  # noqa: PLW0603 — table de traduction, un cache de processus
     _strings = _load(lang)
 
 
@@ -70,7 +73,7 @@ def _load(lang: str = "en") -> dict[str, str]:
 
 def _(key: str, **kwargs: Any) -> str:
     """Retourne la chaîne traduite pour *key*, avec substitution optionnelle."""
-    global _strings
+    global _strings  # noqa: PLW0603 — idem : chargement paresseux du même cache
     if _strings is None:
         _strings = _load(get_lang())
     text = _strings.get(key, key)

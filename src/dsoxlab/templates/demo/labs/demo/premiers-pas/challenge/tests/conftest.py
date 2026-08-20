@@ -18,7 +18,7 @@ import pytest
 def set_workdir() -> Iterator[None]:
     work_dir = pathlib.Path(__file__).parent.parent / "work"
     work_dir.mkdir(parents=True, exist_ok=True)
-    original = os.getcwd()
+    original = pathlib.Path.cwd()
     os.chdir(work_dir)
     yield
     os.chdir(original)

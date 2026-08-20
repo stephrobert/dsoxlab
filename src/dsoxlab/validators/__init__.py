@@ -24,10 +24,10 @@ __all__ = [
     "check_doc_url",
     "validate_internal_links",
     "validate_language_parity",
-    "validate_scoring",
     "validate_metadata",
     "validate_schema_versions",
+    "validate_scoring",
     "validate_solutions_encrypted",
-    "validate_targets",
     "validate_structure",
+    "validate_targets",
 ]

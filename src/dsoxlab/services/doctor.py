@@ -137,13 +137,16 @@ def _check_incus() -> Check:
             fix="sudo apt install incus",
         )
 
+    # check=False : le numéro de version n'est qu'un ornement du diagnostic.
+    # Le verdict vient de la sonde suivante, qui, elle, lit son code retour.
     ver = subprocess.run(
-        ["incus", "--version"], capture_output=True, text=True, timeout=5,
+        ["incus", "--version"], capture_output=True, text=True, timeout=5, check=False,
     )
     version = ver.stdout.strip() or "?"
 
+    # check=False : un code retour non nul EST le diagnostic, pas un incident.
     probe = subprocess.run(
-        ["incus", "list"], capture_output=True, text=True, timeout=5,
+        ["incus", "list"], capture_output=True, text=True, timeout=5, check=False,
     )
     if probe.returncode == 0:
         return Check(_("check_incus"), True, _("detail_incus_ok", version=version))
@@ -152,8 +155,10 @@ def _check_incus() -> Check:
     if "permission" in err or "socket" in err:
         # Soit daemon inactif, soit user hors du groupe : deux causes,
         # deux remédiations, que l'erreur seule ne distingue pas.
+        # check=False : `is-active` répond par son code retour, c'est sa façon
+        # de dire non. Lever ici transformerait une réponse en panne.
         daemon_active = subprocess.run(
-            ["systemctl", "is-active", "--quiet", "incus.service"],
+            ["systemctl", "is-active", "--quiet", "incus.service"], check=False,
         ).returncode == 0
         if not daemon_active:
             return Check(
@@ -183,8 +188,10 @@ def _check_kvm() -> Check:
             _("check_kvm"), False, _("detail_kvm_missing"),
             fix="sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
         )
+    # check=False : un virsh qui sort en erreur est justement ce que ce
+    # contrôle cherche à rapporter, le code retour est lu juste en dessous.
     result = subprocess.run(
-        ["virsh", "version"], capture_output=True, text=True, timeout=5,
+        ["virsh", "version"], capture_output=True, text=True, timeout=5, check=False,
     )
     if result.returncode != 0:
         return Check(
@@ -211,13 +218,25 @@ def _check_terraform() -> Check:
     # Le binaire peut être dans le PATH sans être exécutable, ou disparaître
     # entre les deux appels. Un diagnostic qui plante en cherchant à
     # diagnostiquer est le pire des cas : il emporte toute la commande.
+    #
+    # check=False : on veut le code retour pour le RAPPORTER, pas pour lever.
     try:
         result = subprocess.run(
-            ["terraform", "version"], capture_output=True, text=True, timeout=5,
+            ["terraform", "version"], capture_output=True, text=True, timeout=5, check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return Check(
             _("check_terraform"), False, _("detail_terraform_missing"),
+            hint="https://developer.hashicorp.com/terraform/install",
+        )
+    # Un terraform présent mais qui sort en erreur passait pour vert : le code
+    # retour n'était pas lu, et « ok » s'affichait faute de stdout. `provision`
+    # échouait ensuite sur une machine que `doctor` venait de déclarer prête.
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        return Check(
+            _("check_terraform"), False,
+            detail[-1] if detail else _("detail_terraform_broken"),
             hint="https://developer.hashicorp.com/terraform/install",
         )
     first = result.stdout.splitlines()[0] if result.stdout else "ok"
@@ -251,10 +270,12 @@ def _check_libvirt_pool(pool: str) -> Check:
     quoi ``default``. Le contrôle porte donc sur le pool que le dépôt vise
     réellement, et non sur un nom présumé.
     """
+    # check=False : le code retour est lu plus bas pour décider, et un virsh
+    # injoignable est traité comme « rien à ajouter », pas comme une erreur.
     try:
         probe = subprocess.run(
             ["virsh", "-c", "qemu:///system", "pool-list", "--name"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, check=False,
         )
     except (OSError, subprocess.SubprocessError):
         # virsh absent ou injoignable : c'est le contrôle KVM qui le dira,
@@ -333,9 +354,12 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     # « Permission denied » sur une image du pool : l'échec type d'AppArmor
     # décrit dans apparmor_override_absent(). On ne le propose QUE si
     # l'override manque effectivement, sans quoi ce serait une fausse piste.
-    if "permission denied" in bas and "/var/lib/libvirt/images" in bas:
-        if apparmor_override_absent():
-            return _("explain_apparmor_denied"), apparmor_fix_command()
+    if (
+        "permission denied" in bas
+        and "/var/lib/libvirt/images" in bas
+        and apparmor_override_absent()
+    ):
+        return _("explain_apparmor_denied"), apparmor_fix_command()
 
     # « Pool not found » : le pool `default` n'existe pas sur une installation
     # fraîche. Le contrôle de doctor l'attrape en amont, mais un provisionnement

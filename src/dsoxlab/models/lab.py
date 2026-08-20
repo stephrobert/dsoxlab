@@ -36,7 +36,7 @@ class LabDefinition:
     distros: list[str]
     doc_url: str
     validation: ValidationConfig
-    path: Path = field(default_factory=lambda: Path("."))
+    path: Path = field(default_factory=Path)
     section: str = "linux"
     description: str = ""
     track: list[str] = field(default_factory=list)
@@ -59,7 +59,7 @@ class LabDefinition:
     _TRANSLATABLE = ("title", "description")
 
     @classmethod
-    def from_yaml(cls, lab_yaml: Path, lang: str = "en") -> "LabDefinition":
+    def from_yaml(cls, lab_yaml: Path, lang: str = "en") -> LabDefinition:
         """Load a LabDefinition from a lab.yaml file.
 
         If ``lang`` != "en" and a ``lab.<lang>.yaml`` file exists in the same

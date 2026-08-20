@@ -3,7 +3,6 @@
 from .console import (
     console,
     err_console,
-    update_console,
     error,
     info,
     paged,
@@ -24,13 +23,13 @@ from .console import (
     print_scores_table,
     print_structure_reports,
     success,
+    update_console,
     warn,
 )
 
 __all__ = [
     "console",
     "err_console",
-    "update_console",
     "error",
     "info",
     "paged",
@@ -51,5 +50,6 @@ __all__ = [
     "print_scores_table",
     "print_structure_reports",
     "success",
+    "update_console",
     "warn",
 ]

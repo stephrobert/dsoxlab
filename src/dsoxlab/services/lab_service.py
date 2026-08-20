@@ -405,8 +405,8 @@ def check_lab(
         return CheckResult(ok=False, output=str(exc), passed=0, total=0)
 
     assert proc.stdout is not None
-    for line in proc.stdout:
-        line = line.rstrip("\n")
+    for brute in proc.stdout:
+        line = brute.rstrip("\n")
         output_lines.append(line)
         m = _PYTEST_VERDICT_RE.match(line)
         if m:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.48"
+version = "0.1.49"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -93,14 +93,82 @@ src = ["src"]
 line-length = 100
 
 [tool.ruff.lint]
-# E/F are on by default; add flake8-bandit (S) as a lightweight security gate
-# so a single tool covers lint + security (mirrored in CI and pre-commit).
-extend-select = ["S"]
+# Le jeu de règles est déclaré ICI, en entier, et c'est le fond du sujet.
+#
+# Cette section disait « E/F sont actifs par défaut » et se contentait d'un
+# extend-select. Ruff 0.16 a élargi son jeu par défaut : la même commande, sur
+# le même code, est passée de 0 à 123 erreurs, dont aucune ne relevait de E, F
+# ou S. Personne n'avait décidé ce changement de périmètre — il est arrivé avec
+# une montée de version. Une configuration qui s'appuie sur le défaut d'un
+# linter se fait donc déplacer par lui.
+#
+# `select` remplace le défaut au lieu de l'étendre : ce fichier est désormais
+# la seule autorité sur ce que ce projet applique, et une future version de
+# ruff ne peut plus répondre à sa place.
+select = [
+    "F",     # pyflakes : nom indéfini, import mort. Le socle non négociable.
+    "E",     # pycodestyle (erreurs). E501 écarté plus bas, mesure à l'appui.
+    "W",     # pycodestyle (avertissements) : espaces morts, fin de fichier.
+    "I",     # isort : ordre d'import déterministe, donc pas de bruit de diff.
+    "UP",    # pyupgrade : le plancher est py3.11, la syntaxe doit s'y tenir.
+    "B",     # bugbear : classes de bugs réels (défaut mutable, zip inégal,
+             #           `raise` qui perd sa cause dans un `except`).
+    "S",     # bandit : le garde-fou sécurité d'un outil qui lance des process.
+    "SIM",   # simplify : `if` imbriqués et `with` empilés qui cachent la logique.
+    "ISC",   # concaténation implicite : ISC004 attrape la virgule oubliée dans
+             #        une liste de chaînes, qui fusionne deux éléments en silence.
+    "RUF",   # règles ruff, dont RUF100 : un `# noqa` qui ne sert plus est une
+             #        exception qui survit à sa raison, et personne ne le voit.
+    "PLE",   # pylint (erreurs) : ce qui casse à l'exécution.
+    "PLW",   # pylint (avertissements), dont PLW1510 : un `subprocess.run` sans
+             #        `check=` explicite. C'est LE défaut récurrent de ce dépôt
+             #        (un échec avalé qui ressort en succès), il doit être décidé
+             #        site par site, jamais par omission.
+    "BLE",   # `except Exception:` nu : même famille de défaut, autre porte.
+    "DTZ",   # datetime naïf : la base SQLite horodate, elle doit le faire en UTC.
+    "LOG",   # usage correct du module logging.
+    "G",     # formatage paresseux des logs (`%s`, pas de f-string).
+    "PTH",   # pathlib : « `pathlib.Path` partout » est une règle écrite du dépôt,
+             #        autant la faire tenir par l'outil.
+    "PYI",   # conventions de typage (`__enter__` qui rend `self`…), sous mypy strict.
+    "EXE",   # shebang et bit d'exécution cohérents.
+    "FURB",  # refurb : tournures obsolètes que le typage ne voit pas.
+]
+# Familles délibérément ÉCARTÉES, chacune mesurée sur ce code :
+#
+#   TRY  (86) — TRY003 (69) refuse les messages d'erreur écrits sur place, alors
+#               que ce contrat déclaratif tire sa valeur de phrases qui nomment
+#               le fichier et le champ fautifs. TRY004 (13) exigerait un
+#               `TypeError` là où les coercions du contrat lèvent `ValueError` :
+#               or `discovery/scanner.py` et le harnais de fuzz attrapent
+#               exactement `(KeyError, ValueError, YAMLError)`. Obéir ferait
+#               planter la CLI sur un `lab.yaml` mal typé au lieu de l'écarter.
+#   PLR  (71) — seuils arbitraires (nombre d'arguments, de branches).
+#   PLC  (88) — style d'import et de comparaison, sans classe de défaut derrière.
+#   N    (11) — N818 renommerait onze exceptions publiques (`HostReadyTimeout`…)
+#               que les dépôts de labs importent : une rupture d'API pour une
+#               convention de nommage.
+#   INP   (2) — vise les tests du lab de démonstration packagé, qui sont du
+#               CONTENU pédagogique, pas un paquet Python.
+#   PERF  (5) — micro-optimisation d'un CLI ; les boucles visées portent des
+#               commentaires qu'une compréhension avalerait.
+#   ANN, D, ARG, EM, FBT, TID, TC, SLF, T20, ERA, COM — soit redondantes avec
+#               mypy strict, soit purement stylistiques.
 ignore = [
-    # Inherent to a CLI that orchestrates external tools; not vulnerabilities.
-    "S603",  # subprocess called with an argument list (no shell) — the safe form
-    "S607",  # partial executable path — tools (git, ssh, terraform…) resolved via PATH
-    "S101",  # assert used for type narrowing in typed code
+    # Propre à un CLI qui orchestre des outils externes ; pas des vulnérabilités.
+    "S603",  # subprocess appelé avec une liste d'arguments (sans shell) — la forme sûre
+    "S607",  # chemin partiel — les outils (git, ssh, terraform…) sont résolus par le PATH
+    "S101",  # assert utilisé pour restreindre un type dans du code typé
+    # Mesuré : 202 violations, dont 159 dans i18n/strings/{en,fr}.py. Les
+    # replier découperait des phrases affichées à l'apprenant en concaténations
+    # implicites, où une espace manquante à la jointure ne se voit pas — et le
+    # projet n'a pas de formateur pour le faire à notre place. `line-length`
+    # reste déclaré ci-dessus : c'est la cible, pas un couperet.
+    "E501",  # ligne trop longue
+    # Ce code est francophone et sa sortie est typographiée : « – », « − »,
+    # « × », « ℹ » sont choisis, pas des coquilles. Les « corriger » dégraderait
+    # ce que lit l'apprenant.
+    "RUF001", "RUF002", "RUF003",  # caractères unicode « ambigus »
 ]
 
 [tool.ruff.lint.per-file-ignores]

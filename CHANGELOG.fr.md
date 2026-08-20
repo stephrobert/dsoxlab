@@ -9,6 +9,49 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.49] - 2026-08-20
+
+### Corrigé
+
+- **`doctor` déclarait Terraform vert sans lire son code retour.** Le contrôle
+  lançait `terraform version` et ne regardait que la sortie standard : un
+  binaire présent mais inutilisable — cache de plugins corrompu, wrapper cassé,
+  architecture incompatible — sort en code non nul sans rien écrire sur stdout,
+  et le contrôle affichait alors « ok » en se déclarant vert. `provision`
+  échouait ensuite sur une machine que `doctor` venait de dire prête, ce qui est
+  la pire chose qu'un diagnostic puisse faire. Le code retour est désormais lu,
+  et l'échec porte la dernière ligne de l'erreur de Terraform.
+
+- **Un bail DHCP refusé par libvirt disparaissait en silence.** `provision`
+  ajoute au mieux les baux statiques manquants d'un réseau KVM existant ; un
+  `virsh net-update` en échec ne journalisait rien du tout. Sans ce bail, l'hôte
+  n'obtient jamais son adresse, et la panne ne ressortait que bien plus tard en
+  « hôte injoignable » sans jamais nommer sa cause. Best-effort veut dire
+  « on continue », pas « on se tait » : le refus est désormais journalisé en
+  avertissement.
+
+### Modifié
+
+- **Le jeu de règles de lint est déclaré en entier dans `pyproject.toml`.** La
+  configuration s'appuyait sur la sélection par défaut de ruff et se contentait
+  de l'étendre avec `S`. Ruff 0.16 a élargi ce défaut : la même commande, sur le
+  même code, est passée de 0 à 123 erreurs, dont aucune ne relevait de `E`, `F`
+  ou `S` — un changement de périmètre que personne n'avait décidé, arrivé avec
+  une montée de version. `select` remplace maintenant le défaut au lieu de
+  l'étendre (`F`, `E`, `W`, `I`, `UP`, `B`, `S`, `SIM`, `ISC`, `RUF`, `PLE`,
+  `PLW`, `BLE`, `DTZ`, `LOG`, `G`, `PTH`, `PYI`, `EXE`, `FURB`), et chaque
+  famille écartée y est nommée avec la mesure qui le justifie.
+
+- **Chaque `subprocess.run` dit désormais s'il contrôle son code retour.** Les
+  19 appels qui omettaient `check=` ont été repris un par un : les 19 étaient
+  délibérés — une sonde dont le code retour EST la réponse, une boucle
+  d'attente, une cascade de réparations qui doit survivre à un échec. Ils le
+  disent maintenant, par un `check=False` et un commentaire. L'un d'eux, en
+  revanche, ne lisait son code retour nulle part : c'était le défaut Terraform
+  ci-dessus.
+
+- **`typer` 0.26.8 → 0.27.1, `pre-commit` 4.6.0 → 4.6.2, `ruff` → 0.16.3.**
+
 ## [0.1.48] - 2026-08-20
 
 ### Corrigé

@@ -177,8 +177,11 @@ jobs:
       - name: Sync dependencies (locked)
         run: uv sync --frozen --python "$PYTHON_VERSION"
 
+      # `scripts` is listed on purpose: the pre-commit hook runs ruff on EVERY
+      # Python file, so leaving it out here made this job pass while the parity
+      # job failed on the same code — the wrong order to learn it in.
       - name: Lint and security (ruff)
-        run: uv run ruff check src/dsoxlab tests fuzz
+        run: uv run ruff check src/dsoxlab tests fuzz scripts
 
       - name: Type-check (mypy strict)
         run: uv run mypy src/dsoxlab

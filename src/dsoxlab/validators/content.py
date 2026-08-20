@@ -172,7 +172,7 @@ def check_doc_url(lab: LabDefinition, *, timeout: float = _TIMEOUT_HTTP) -> str 
 #: Les `##` (sections d'un examen blanc) totalisent leurs `###` : les compter
 #: doublerait la somme, ce qui a produit un faux positif à 200 points.
 _TACHE_NOTEE = re.compile(
-    r"^###\s.*?\((\d+)\s*(?:pts|points)\)", re.M
+    r"^###\s.*?\((\d+)\s*(?:pts|points)\)", re.MULTILINE
 )
 
 #: L'en-tête annonce le format : « 5 tâches, 100 points, 20 minutes ».
@@ -181,7 +181,7 @@ _FORMAT_ANNONCE = re.compile(
     re.IGNORECASE,
 )
 
-_TEST_PYTHON = re.compile(r"^def test_", re.M)
+_TEST_PYTHON = re.compile(r"^def test_", re.MULTILINE)
 
 
 def _lire(chemin: Path) -> str:

@@ -283,7 +283,7 @@ class RepoMetadata:
     description: str = ""
     infra: InfraDefinition = field(default_factory=InfraDefinition)
     sections: list[SectionDefinition] = field(default_factory=list)
-    path: Path = field(default_factory=lambda: Path("."))
+    path: Path = field(default_factory=Path)
     """Répertoire racine du dépôt (parent du meta.yml)."""
 
     schema_version: int = DEFAULT_SCHEMA_VERSION
@@ -298,7 +298,7 @@ class RepoMetadata:
         meta_path: Path,
         *,
         context_provider: str | None = None,
-    ) -> "RepoMetadata":
+    ) -> RepoMetadata:
         """Charge RepoMetadata depuis un fichier meta.yml.
 
         Args:

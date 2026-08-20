@@ -182,7 +182,7 @@ def build_inventory(
 
 def bastion_info(
     terraform_outputs: dict[str, Any] | None,
-    repo_meta: "RepoMetadata | None" = None,
+    repo_meta: RepoMetadata | None = None,
 ) -> dict[str, str] | None:
     """Extrait les infos du bastion depuis les outputs Terraform.
 
@@ -411,8 +411,11 @@ def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
     infra = repo_meta.infra
     if infra is None or getattr(infra, "provider", None) != "kvm":
         return False
+    # check=False : la fonction rend un booléen « tenté ou non » et son
+    # appelant enchaîne. Un reset refusé (sudo absent, domaine déjà éteint) ne
+    # doit pas casser l'attente : c'est un dépannage opportuniste, pas une étape.
     res = subprocess.run(
-        ["sudo", "virsh", "reset", fqdn], capture_output=True, text=True
+        ["sudo", "virsh", "reset", fqdn], capture_output=True, text=True, check=False
     )
     if res.returncode == 0:
         logger.info("reset envoyé à %s (déblocage du premier boot)", fqdn)
@@ -487,6 +490,9 @@ def wait_for_hosts_ready(
             attempt += 1
             if on_attempt is not None:
                 on_attempt(fqdn, attempt)
+            # check=False : c'est une boucle d'attente. Un échec signifie
+            # « pas encore prêt » et doit être réessayé jusqu'au deadline ;
+            # lever au premier essai rendrait l'attente inutile.
             proc = subprocess.run(
                 [
                     "ssh",
@@ -501,6 +507,7 @@ def wait_for_hosts_ready(
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if proc.returncode == 0:
                 logger.info("Host %s prêt (tentative %d).", fqdn, attempt)

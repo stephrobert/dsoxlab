@@ -110,11 +110,11 @@ def _write_cache(latest: str, now: float) -> None:
 def fetch_latest_version() -> str | None:
     """Interroge PyPI. Rend None dès que quoi que ce soit se passe mal."""
     try:
-        request = urllib.request.Request(  # noqa: S310 - URL constante, https
+        request = urllib.request.Request(
             PYPI_URL,
             headers={"Accept": "application/json"},
         )
-        with urllib.request.urlopen(  # noqa: S310 - idem
+        with urllib.request.urlopen(  # noqa: S310 — URL constante, en https
             request, timeout=HTTP_TIMEOUT_SECONDS
         ) as response:
             payload = json.loads(response.read().decode("utf-8"))

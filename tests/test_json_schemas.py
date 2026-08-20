@@ -85,9 +85,11 @@ def _corps_de_methode(module: ast.Module, classe: str, methode: str) -> ast.AST:
     for noeud in ast.walk(module):
         if isinstance(noeud, ast.ClassDef) and noeud.name == classe:
             for membre in noeud.body:
-                if isinstance(membre, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if membre.name == methode:
-                        return membre
+                if (
+                    isinstance(membre, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and membre.name == methode
+                ):
+                    return membre
     raise AssertionError(f"{classe}.{methode} introuvable")
 
 
@@ -121,7 +123,7 @@ def cles_lues(chemin: Path, classe: str, methode: str) -> dict[str, set[str]]:
             and isinstance(noeud.left, ast.Constant)
             and isinstance(noeud.left.value, str)
         ):
-            for operateur, compare in zip(noeud.ops, noeud.comparators):
+            for operateur, compare in zip(noeud.ops, noeud.comparators, strict=True):
                 if isinstance(operateur, (ast.In, ast.NotIn)) and isinstance(
                     compare, ast.Name
                 ):

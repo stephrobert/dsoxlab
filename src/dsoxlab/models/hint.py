@@ -66,7 +66,7 @@ class HintFile:
     hints: list[Hint] = field(default_factory=list)
 
     @classmethod
-    def load(cls, challenge_dir: Path) -> "HintFile":
+    def load(cls, challenge_dir: Path) -> HintFile:
         """Charge ``challenge/hints.yaml``. Retourne un HintFile vide si absent."""
         path = challenge_dir / "hints.yaml"
         if not path.exists():

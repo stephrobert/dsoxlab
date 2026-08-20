@@ -397,7 +397,7 @@ def test_le_lancement_estampille_la_configuration(monkeypatch: pytest.MonkeyPatc
     service = Service(name="cloud", image="x", ports=["14566:4566"])
     svc.start(service, "repo")
 
-    lancement = [c for c in appels if c[:2] == ["docker", "run"]][0]
+    lancement = next(c for c in appels if c[:2] == ["docker", "run"])
     attendu = f"{svc._CONFIG_LABEL}={svc._config_fingerprint(service)}"
     assert "--label" in lancement
     assert attendu in lancement

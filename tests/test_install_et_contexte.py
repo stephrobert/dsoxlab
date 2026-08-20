@@ -38,7 +38,7 @@ def test_la_variable_de_completion_est_celle_que_click_attend() -> None:
 def test_le_script_genere_porte_la_bonne_variable(shell: str) -> None:
     from typer.completion import get_completion_script
 
-    script = get_completion_script(  # noqa: S604 : nom de shell, pas shell=True
+    script = get_completion_script(  # `shell` = nom du shell Typer, pas shell=True
         prog_name=cli._PROG_NAME, complete_var=cli._COMPLETE_VAR, shell=shell
     )
     assert "_DSOXLAB_COMPLETE" in script
@@ -97,8 +97,10 @@ def test_le_wrapper_fonctionne_avec_une_espace_dans_le_chemin(
     wrapper = tmp_path / ".local" / "bin" / "dsoxlab"
     assert wrapper.is_file()
 
-    joue = subprocess.run(  # noqa: S603 : wrapper généré par le test lui-même
-        [str(wrapper), "check", "un-lab"], capture_output=True, text=True,
+    # check=False : si le wrapper ne s'exécute pas, l'assertion doit pouvoir
+    # afficher son contenu — c'est ce qui rend le diagnostic possible.
+    joue = subprocess.run(
+        [str(wrapper), "check", "un-lab"], capture_output=True, text=True, check=False,
     )
     assert joue.returncode == 0, (
         f"le wrapper ne s'exécute pas : {joue.stderr.strip()}\n"

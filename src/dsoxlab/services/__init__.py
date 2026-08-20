@@ -1,5 +1,7 @@
 """Package services."""
 
+from .doctor import Check, DoctorReport, collect_checks, uses_vm
+from .guide_service import guide_url
 from .lab_service import (
     CheckResult,
     ScoreResult,
@@ -20,8 +22,6 @@ from .lab_service import (
     validate_all_metadata,
     validate_all_structure,
 )
-from .doctor import Check, DoctorReport, collect_checks, uses_vm
-from .guide_service import guide_url
 from .progress_service import (
     BlocProgress,
     build_progress,
