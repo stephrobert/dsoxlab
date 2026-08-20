@@ -130,9 +130,8 @@ def test_rendered_output_survives_an_exception(
     monkeypatch.setattr(type(console), "is_terminal", property(lambda self: True))
     monkeypatch.setattr(console_module, "_page", lambda text: print(text, end=""))
 
-    with pytest.raises(RuntimeError):
-        with paged():
-            console.print("printed before the failure")
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), paged():
+        console.print("printed before the failure")
+        raise RuntimeError("boom")
 
     assert "printed before the failure" in capsys.readouterr().out

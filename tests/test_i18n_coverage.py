@@ -33,7 +33,7 @@ CLI = Path(dsoxlab.__file__).parent / "cli.py"
 MESSAGE_FUNCS = {"error", "info", "warn", "success"}
 
 #: Balises Rich (`[bold]`, `[/green]`…) : de la mise en forme, pas du texte.
-_RICH_TAG = re.compile(r"\[/?[a-z0-9 #]+\]", re.I)
+_RICH_TAG = re.compile(r"\[/?[a-z0-9 #]+\]", re.IGNORECASE)
 
 #: « Mot » au sens de ce test : trois lettres consécutives ou plus. En dessous,
 #: on est dans les symboles, la ponctuation ou les unités, pas dans la phrase.
@@ -121,9 +121,9 @@ def test_the_guard_would_actually_catch_a_regression() -> None:
         if node.func.id not in MESSAGE_FUNCS or not node.args:
             continue
         premier = node.args[0]
-        if isinstance(premier, ast.Constant):
-            trouves += 1
-        elif isinstance(premier, ast.JoinedStr) and _literal_words(premier):
+        if isinstance(premier, ast.Constant) or (
+            isinstance(premier, ast.JoinedStr) and _literal_words(premier)
+        ):
             trouves += 1
 
     assert trouves == 2, "le garde-fou ne détecte plus les chaînes en dur"

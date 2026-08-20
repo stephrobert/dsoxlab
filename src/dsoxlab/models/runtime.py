@@ -12,7 +12,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-class RuntimeType(str, Enum):
+# UP042 propose `StrEnum`. On ne le suit pas : `str(RuntimeType.VM)` rend
+# « RuntimeType.VM » avec `(str, Enum)` et « vm » avec `StrEnum`. Le contrat
+# déclaratif, les sorties JSON et les messages en dépendent ; c'est une
+# migration à décider pour elle-même, pas un effet de bord de montée de linter.
+class RuntimeType(str, Enum):  # noqa: UP042
     """Type de runtime déclaré par un lab."""
 
     SHELL = "shell"

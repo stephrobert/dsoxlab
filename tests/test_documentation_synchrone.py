@@ -166,9 +166,11 @@ def test_la_table_des_commandes_du_readme_est_a_jour() -> None:
     if not generateur.is_file():
         pytest.skip("générateur absent de ce dépôt")
 
-    proc = subprocess.run(  # noqa: S603 : notre propre script
+    # check=False : le code retour non nul EST le cas que ce test attrape,
+    # et l'assertion en fait un message qui dit comment régénérer la doc.
+    proc = subprocess.run(
         [sys.executable, str(generateur), "--verifier"],
-        capture_output=True, text=True, cwd=RACINE,
+        capture_output=True, text=True, cwd=RACINE, check=False,
     )
     assert proc.returncode == 0, (
         f"la documentation a dérivé de la CLI :\n{proc.stdout}\n"

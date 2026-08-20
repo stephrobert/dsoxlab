@@ -21,7 +21,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from typer.testing import CliRunner
 
 from dsoxlab.cli import app
@@ -77,7 +76,7 @@ def test_un_vrai_depot_de_labs_passe_le_garde_fou(
 
 
 def test_le_code_de_retour_dit_la_meme_chose_que_l_ecran(
-    tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Sortir en 0 après avoir affiché une erreur bloquante trompe deux fois.
 
@@ -107,7 +106,7 @@ def test_le_code_de_retour_dit_la_meme_chose_que_l_ecran(
 
 
 def test_tout_en_place_sort_en_zero(
-    tmp_path: Path, monkeypatch: "pytest.MonkeyPatch"
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from dsoxlab.infra import ansible as ansible_infra
     from dsoxlab.infra import terraform as tf

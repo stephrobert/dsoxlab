@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pathlib
 
-WORK = pathlib.Path(".")
+WORK = pathlib.Path()
 REPONSES = WORK / "reponses"
 
 #: Le mot attendu dans chaque fichier, et où l'apprenant le trouve.

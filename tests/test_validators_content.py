@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import urllib.error
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -146,14 +147,14 @@ class _Reponse:
     def __init__(self, status: int) -> None:
         self.status = status
 
-    def __enter__(self) -> _Reponse:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_exc: object) -> None:
         return None
 
 
-def _reponse(status: int):  # noqa: ANN202 - fabrique de doublure
+def _reponse(status: int):  # fabrique de doublure
     def _ouvrir(*_a: object, **_k: object) -> _Reponse:
         return _Reponse(status)
 

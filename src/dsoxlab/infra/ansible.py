@@ -103,7 +103,7 @@ def run_playbook(
     quiet: bool = True,
     timeout_s: int | None = None,
     private_data_dir: Path | None = None,
-    on_event: "Callable[[dict[str, Any]], None] | None" = None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> PlaybookResult:
     """Exécute un playbook via ansible-runner et retourne le résultat.
 
@@ -132,7 +132,7 @@ def run_playbook(
     # différemment : les confondre dans un seul message envoyait l'utilisateur
     # réinstaller une bibliothèque qu'il avait déjà.
     try:
-        import ansible_runner  # noqa: F401
+        import ansible_runner  # sonde d'import : la valeur ne sert pas
     except ImportError:
         raise AnsibleNotInstalled(
             "ansible-runner n'est pas installé. Lance : "
@@ -186,7 +186,7 @@ def run_playbook(
                 la CLI plante."""
                 try:
                     on_event(event)
-                except Exception:  # noqa: BLE001
+                except Exception:  # le callback ne doit pas tuer le playbook
                     logger.exception("on_event callback failed")
                 return True
 

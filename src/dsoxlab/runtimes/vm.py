@@ -32,11 +32,11 @@ import os
 from typing import Any
 
 from ..discovery.repo import find_meta_yml, read_repo_metadata
-from ..models.repo import RepoMetadata
 from ..infra import ansible as ansible_infra
 from ..infra import snapshot as snapshot_infra
 from ..infra.inventory import build_inventory, read_terraform_outputs
 from ..models.lab import LabDefinition
+from ..models.repo import RepoMetadata
 from ..models.runtime import Target
 from .base import BaseRuntime, EventCallback, SessionSpec
 

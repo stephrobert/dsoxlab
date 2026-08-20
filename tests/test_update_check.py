@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -161,7 +162,7 @@ class TestFetchNeLevePas:
         self, reponse: bytes, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         class _Reponse:
-            def __enter__(self) -> _Reponse:
+            def __enter__(self) -> Self:
                 return self
 
             def __exit__(self, *_exc: object) -> None:

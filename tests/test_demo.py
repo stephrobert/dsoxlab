@@ -154,9 +154,11 @@ def test_de_l_installation_au_100_sur_100(maison: Path) -> None:
         pytest.skip("script console dsoxlab absent de cet environnement")
 
     def dsoxlab(*args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(  # noqa: S603 : c'est notre propre CLI
+        # check=False : le test joue un parcours où l'échec est ATTENDU (un lab
+        # non résolu vaut 0). Ce sont les assertions qui jugent, pas subprocess.
+        return subprocess.run(
             [str(binaire), *args],
-            cwd=catalogue, capture_output=True, text=True, timeout=120,
+            cwd=catalogue, capture_output=True, text=True, timeout=120, check=False,
         )
 
     avant = dsoxlab("check", "premiers-pas")

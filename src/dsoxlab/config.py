@@ -170,7 +170,7 @@ def write_context(
 def set_course_pos(root: Path, pos: int) -> None:
     """Met à jour la position courante dans le cours (1-based)."""
     ctx = read_context(root)
-    ctx.course_pos = pos if pos > 0 else 0
+    ctx.course_pos = max(0, pos)
     _persist(root, ctx)
 
 

@@ -6,7 +6,10 @@ import os
 import shlex
 import shutil
 import subprocess
+from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -14,16 +17,12 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from collections.abc import Iterator
-from pathlib import Path
-from typing import Any
-
-from ..models.lab import LabDefinition
+from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
+from ..models.lab import LabDefinition
 from ..services.doctor import Check, DoctorReport
 from ..services.progress_service import build_progress
 from ..validators.structure import StructureReport
-from ..i18n import _
 
 console = Console()
 err_console = Console(stderr=True, style="bold red")
@@ -72,7 +71,7 @@ def _page(text: str) -> None:
         _write_through(text)
         return
     try:
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, text=True)  # noqa: S603
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, text=True)
     except OSError:
         # Pas de pager utilisable : mieux vaut une sortie trop longue
         # qu'une commande qui échoue sur son affichage.
@@ -487,7 +486,7 @@ def print_course_list(labs: list[LabDefinition]) -> None:
     console.print(table)
 
 
-def print_course_toc(lab: "LabDefinition", manifest: "CourseManifest") -> None:
+def print_course_toc(lab: LabDefinition, manifest: CourseManifest) -> None:
     """Display the table of contents from a course.yaml."""
     table = Table(title=_("course_toc_title", title=manifest.title), show_lines=True)
     table.add_column(_("course_toc_col_n"), style="bold", justify="right", width=4)
@@ -502,8 +501,8 @@ def print_course_toc(lab: "LabDefinition", manifest: "CourseManifest") -> None:
 
 
 def print_course_section(
-    lab: "LabDefinition",
-    section: "CourseSection",
+    lab: LabDefinition,
+    section: CourseSection,
     *,
     pos: int = 0,
     total: int = 0,
@@ -543,7 +542,7 @@ def print_course_section(
             console.print("[dim]" + "   |   ".join(parts) + "[/dim]")
 
 
-def print_course_end(lab: "LabDefinition", manifest: "CourseManifest") -> None:
+def print_course_end(lab: LabDefinition, manifest: CourseManifest) -> None:
     """Display an end-of-course congratulation panel."""
     from rich.panel import Panel
 

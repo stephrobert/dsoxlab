@@ -21,7 +21,7 @@ class CourseManifest:
     sections: list[CourseSection] = field(default_factory=list)
 
     @classmethod
-    def load(cls, lab_path: Path, lang: str = "en") -> "CourseManifest | None":
+    def load(cls, lab_path: Path, lang: str = "en") -> CourseManifest | None:
         """Charge course.yaml (EN) puis fusionne course.fr.yaml si lang == 'fr'."""
         course_yaml = lab_path / "course.yaml"
         if not course_yaml.exists():

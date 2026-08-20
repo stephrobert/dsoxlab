@@ -59,6 +59,11 @@ def run_command(
     logger.debug("run: %s (cwd=%s)", " ".join(cmd), cwd)
 
     try:
+        # check=False délibéré : c'est CE wrapper qui implémente `check`, plus
+        # bas et à sa façon — une CommandError qui porte la commande, le code
+        # retour et stderr. Déléguer à subprocess lèverait un
+        # CalledProcessError nu, et le paramètre `check` de cette fonction
+        # n'aurait plus de sens.
         proc = subprocess.run(
             cmd,
             capture_output=True,
@@ -66,6 +71,7 @@ def run_command(
             cwd=cwd,
             timeout=timeout,
             env=env,
+            check=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise CommandError(cmd, CommandResult(returncode=-1, stdout="", stderr=str(exc))) from exc

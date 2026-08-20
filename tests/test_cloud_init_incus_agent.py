@@ -84,8 +84,10 @@ def test_le_bloc_ne_peut_pas_faire_echouer_cloud_init() -> None:
 @pytest.mark.parametrize("shell", ["sh", "bash"])
 def test_le_bloc_est_du_shell_valide(shell: str) -> None:
     """cloud-init passe une entrée runcmd de type chaîne au shell système."""
+    # check=False : le code retour est ce que le test mesure. Lever donnerait
+    # une CalledProcessError nue là où l'assertion nomme le shell fautif.
     proc = subprocess.run(
-        [shell, "-n"], input=_bloc_agent(), text=True, capture_output=True
+        [shell, "-n"], input=_bloc_agent(), text=True, capture_output=True, check=False
     )
     assert proc.returncode == 0, f"{shell} rejette le bloc :\n{proc.stderr}"
 

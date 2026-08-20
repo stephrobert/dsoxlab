@@ -11,6 +11,12 @@ Usage:
     dsoxlab validate-structure
     dsoxlab doctor
     dsoxlab quit
+
+Convention de ce module : un ``except`` qui a déjà rendu la cause en une phrase
+traduite (``error(...)``) sort par ``raise typer.Exit(n) from None``. Le ``from
+None`` n'est pas un raccourci, c'est l'affirmation que la cause a été dite à
+l'utilisateur, et qu'un chaînage d'exceptions n'ajouterait qu'une trace Python
+au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 """
 
 from __future__ import annotations
@@ -19,13 +25,13 @@ import atexit
 import logging
 import os
 import shlex
-import webbrowser
 import shutil
 import subprocess
 import sys
+import webbrowser
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, NoReturn, Optional
+from typing import Annotated, Any, NoReturn
 
 import click
 import typer
@@ -33,46 +39,18 @@ from typer.core import TyperGroup, TyperOption
 
 from . import __version__
 from .config import (
-    clear_context, get_lab_home, read_context, set_active_lab,
-    set_active_provider, set_course_pos, write_context,
+    clear_context,
+    get_lab_home,
+    read_context,
+    set_active_lab,
+    set_active_provider,
+    set_course_pos,
+    write_context,
 )
 from .i18n import _, get_lang, set_lang
-from .logging_setup import configurer as configurer_journal
 from .infra import libvirt
 from .infra.inventory import InfraNotProvisioned
-from .models.hint import HintFile
-from .sessions.store import (
-    get_best_scores,
-    get_results,
-    hints_cost_total,
-    next_hint_index,
-    record_hint,
-    reset_hints,
-)
-from .reporting import (
-    console,
-    error,
-    info,
-    paged,
-    print_check_result,
-    print_course_end,
-    print_doctor,
-    print_course_section,
-    print_course_toc,
-    print_fullhelp,
-    print_hint,
-    print_lab_detail,
-    print_labs_table,
-    print_progress_table,
-    print_scores_table,
-    print_structure_reports,
-    print_lab_challenge,
-    print_lab_course,
-    print_lab_welcome,
-    success,
-    update_console,
-    warn,
-)
+from .logging_setup import configurer as configurer_journal
 from .models import (
     CourseManifest,
     LabDefinition,
@@ -80,9 +58,33 @@ from .models import (
     RepoMetadata,
     UnsupportedSchemaVersion,
 )
-from .reporting import machine
+from .models.hint import HintFile
+from .reporting import (
+    console,
+    error,
+    info,
+    machine,
+    paged,
+    print_check_result,
+    print_course_end,
+    print_course_section,
+    print_course_toc,
+    print_doctor,
+    print_fullhelp,
+    print_hint,
+    print_lab_challenge,
+    print_lab_course,
+    print_lab_detail,
+    print_lab_welcome,
+    print_labs_table,
+    print_progress_table,
+    print_scores_table,
+    print_structure_reports,
+    success,
+    update_console,
+    warn,
+)
 from .runtimes.base import EventCallback
-from .services import host_diagnosis
 from .services import (
     CheckResult,
     check_lab,
@@ -92,6 +94,7 @@ from .services import (
     find_lab,
     get_all_labs,
     guide_url,
+    host_diagnosis,
     lab_status,
     next_pending_lab,
     open_lab_session,
@@ -99,6 +102,14 @@ from .services import (
     run_lab,
     validate_all_metadata,
     validate_all_structure,
+)
+from .sessions.store import (
+    get_best_scores,
+    get_results,
+    hints_cost_total,
+    next_hint_index,
+    record_hint,
+    reset_hints,
 )
 from .utils.shell import CommandError
 
@@ -144,7 +155,7 @@ app.add_typer(instructor_app, name="instructor")
 # ── Option globale lab-home ───────────────────────────────────────────────────
 
 LabHomeOption = Annotated[
-    Optional[Path],
+    Path | None,
     typer.Option(
         "--lab-home",
         envvar="LAB_HOME",
@@ -163,7 +174,7 @@ NoPagerOption = Annotated[
 ]
 
 
-def _root(lab_home: Optional[Path]) -> Path:
+def _root(lab_home: Path | None) -> Path:
     return lab_home.resolve() if lab_home else get_lab_home()
 
 
@@ -197,7 +208,7 @@ def _read_repo(root: Path) -> RepoMetadata | None:
         _contrat_trop_recent(exc)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def _catalogue(root: Path, lang: str, *, quiet: bool = False) -> list[LabDefinition]:
@@ -253,7 +264,7 @@ def _require_provider(repo_meta: RepoMetadata) -> str:
             error(_("provider_required",
                     candidates=", ".join(exc.candidates),
                     first=exc.candidates[0]))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def _services_repo_id(root: Path) -> str:
@@ -325,7 +336,11 @@ def _complete_lab_id(
             for lab in labs
             if lab.id.startswith(incomplete)
         ]
-    except Exception:
+    # Aveugle, et délibérément : une complétion s'exécute à chaque Tab, dans un
+    # répertoire quelconque. Un meta.yml absent, un lab.yaml qui lève, un
+    # catalogue à moitié écrit — rien de tout cela ne doit faire cracher une
+    # trace Python dans le shell de l'apprenant. Pas de proposition, et c'est tout.
+    except Exception:  # noqa: BLE001
         return []
 
 
@@ -369,7 +384,10 @@ def _bootstrap(
         root = get_lab_home()
         lang = _lang(root)
         set_lang(lang)
-    except Exception:  # noqa: S110 — silence volontaire : pas de contexte lab, on continue en langue par défaut
+    # Aveugle et silencieux, volontairement : choisir la langue est un préalable
+    # à TOUTES les commandes. Sans contexte de lab, on continue en langue par
+    # défaut ; échouer ici empêcherait jusqu'à `dsoxlab --help`.
+    except Exception:  # noqa: S110, BLE001
         pass  # silencieux si LAB_HOME introuvable
 
     # L'avis de mise à jour est posé ici, mais affiché à la toute fin par
@@ -397,7 +415,10 @@ def _notify_update_available() -> None:
         update_console.print(
             _("update_available", latest=latest, current=__version__)
         )
-    except Exception:  # noqa: S110 — un avis ne casse jamais une commande
+    # Aveugle, et c'est le but : un avis de mise à jour ne casse jamais la
+    # commande que l'utilisateur a lancée, quelle que soit la panne réseau,
+    # de parsing ou d'affichage rencontrée.
+    except Exception:  # noqa: BLE001
         return
 
 
@@ -497,12 +518,12 @@ def install() -> None:
 
 @app.command("use", help=_("cmd_use_help"))
 def use(
-    context: Annotated[Optional[str], typer.Argument(help=_("cmd_use_arg"))] = None,
+    context: Annotated[str | None, typer.Argument(help=_("cmd_use_arg"))] = None,
     lab_home: LabHomeOption = None,
-    lang: Annotated[Optional[str], typer.Option("--lang", help=_("opt_lang"))] = None,
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    lang: Annotated[str | None, typer.Option("--lang", help=_("opt_lang"))] = None,
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_target"))] = None,
-    provider: Annotated[Optional[str], typer.Option("--provider", "-p",
+    provider: Annotated[str | None, typer.Option("--provider", "-p",
         help=_("opt_use_provider"))] = None,
     reset: Annotated[bool, typer.Option("--reset", "-r", help=_("opt_use_reset"))] = False,
 ) -> None:
@@ -524,6 +545,7 @@ def use(
     declared_providers: list[str] = []
     declared_sections: list[str] = []
     import yaml as _yaml
+
     from .discovery.repo import find_meta_yml
 
     meta_path = find_meta_yml(root) or (root / "meta.yml")
@@ -532,7 +554,7 @@ def use(
             raw = _yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
         except _yaml.YAMLError as exc:
             error(_("meta_read_failed", error=exc))
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
         declared = (raw.get("infra") or {}).get("provider")
         if isinstance(declared, list):
             declared_providers = [str(p) for p in declared if p]
@@ -602,10 +624,10 @@ def use(
 @app.command("list-labs", help=_("cmd_list_labs_help"))
 def list_labs(
     lab_home: LabHomeOption = None,
-    level: Annotated[Optional[str], typer.Option("--level", "-l", help=_("opt_level"))] = None,
-    section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("opt_section"))] = None,
-    lab_type: Annotated[Optional[str], typer.Option("--type", "-t", help=_("opt_type"))] = None,
-    bloc: Annotated[Optional[int], typer.Option("--bloc", "-b", help=_("opt_bloc"))] = None,
+    level: Annotated[str | None, typer.Option("--level", "-l", help=_("opt_level"))] = None,
+    section: Annotated[str | None, typer.Option("--section", "-s", help=_("opt_section"))] = None,
+    lab_type: Annotated[str | None, typer.Option("--type", "-t", help=_("opt_type"))] = None,
+    bloc: Annotated[int | None, typer.Option("--bloc", "-b", help=_("opt_bloc"))] = None,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
@@ -653,7 +675,7 @@ def show(
         lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     try:
         status = lab_status(lab)
@@ -668,7 +690,7 @@ def show(
 @app.command("run", help=_("cmd_run_help"))
 def run(
     lab_id: Annotated[str, typer.Argument(help=_("cmd_run_arg"), shell_complete=_complete_lab_id)],
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -678,7 +700,7 @@ def run(
         lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     info(_("lab_starting", lab_id=lab.id, runtime=lab.runtime.type.value))
     _ensure_services(lab, root)
@@ -697,7 +719,7 @@ def run(
         raise typer.Exit(2) from None
     except RuntimeError as exc:
         error(str(exc))
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
 
     set_active_lab(root, lab.id)
     # Dire où l'on atterrit vraiment. Le message historique annonçait
@@ -741,8 +763,8 @@ def run(
 
 @app.command("course", help=_("cmd_course_help"))
 def course(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_course_arg"), shell_complete=_complete_lab_id)] = None,
-    section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("cmd_course_opt_section"))] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_course_arg"), shell_complete=_complete_lab_id)] = None,
+    section: Annotated[str | None, typer.Option("--section", "-s", help=_("cmd_course_opt_section"))] = None,
     next_section: Annotated[bool, typer.Option("--next", "-n", help=_("cmd_course_opt_next"))] = False,
     prev_section: Annotated[bool, typer.Option("--prev", "-p", help=_("cmd_course_opt_prev"))] = False,
     no_pager: NoPagerOption = False,
@@ -821,7 +843,7 @@ def _show_course_section(
 
 @app.command("challenge", help=_("cmd_challenge_help"))
 def challenge_cmd(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_challenge_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_challenge_arg"), shell_complete=_complete_lab_id)] = None,
     no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -835,7 +857,7 @@ def challenge_cmd(
 
 @app.command("guide", help=_("cmd_guide_help"))
 def guide(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_guide_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_guide_arg"), shell_complete=_complete_lab_id)] = None,
     print_only: Annotated[bool, typer.Option("--print", help=_("cmd_guide_opt_print"))] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -873,7 +895,7 @@ def guide(
 
 @app.command("hint", help=_("cmd_hint_help"))
 def hint(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_hint_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_hint_arg"), shell_complete=_complete_lab_id)] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
@@ -887,7 +909,7 @@ def hint(
         lab = _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     hint_file = HintFile.load(lab.path / "challenge")
     if not hint_file.hints:
@@ -924,7 +946,7 @@ def _resolve_lab(
         return _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def _run_check_with_progress(
@@ -1098,8 +1120,8 @@ def _run_check(
 
 @app.command("check", help=_("cmd_check_help"))
 def check(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_check_arg"), shell_complete=_complete_lab_id)] = None,
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_check_arg"), shell_complete=_complete_lab_id)] = None,
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_check_target"))] = None,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
     lab_home: LabHomeOption = None,
@@ -1136,8 +1158,8 @@ def check(
 
 @app.command("submit", help=_("cmd_submit_help"))
 def submit(
-    lab_id: Annotated[Optional[str], typer.Argument(help=_("cmd_submit_arg"), shell_complete=_complete_lab_id)] = None,
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_submit_arg"), shell_complete=_complete_lab_id)] = None,
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_check_target"))] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -1167,8 +1189,8 @@ def submit(
 @app.command("scores", help=_("cmd_scores_help"))
 def scores(
     lab_home: LabHomeOption = None,
-    section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("opt_section"))] = None,
-    lab_id: Annotated[Optional[str], typer.Option("--lab", "-l", help=_("opt_filter_lab"))] = None,
+    section: Annotated[str | None, typer.Option("--section", "-s", help=_("opt_section"))] = None,
+    lab_id: Annotated[str | None, typer.Option("--lab", "-l", help=_("opt_filter_lab"))] = None,
     top: Annotated[int, typer.Option("--top", help=_("opt_top"))] = 20,
 ) -> None:
     root = _root(lab_home)
@@ -1183,8 +1205,8 @@ def scores(
 @app.command("progress", help=_("cmd_progress_help"))
 def progress(
     lab_home: LabHomeOption = None,
-    section: Annotated[Optional[str], typer.Option("--section", "-s", help=_("opt_section"))] = None,
-    level: Annotated[Optional[str], typer.Option("--level", "-l", help=_("opt_level"))] = None,
+    section: Annotated[str | None, typer.Option("--section", "-s", help=_("opt_section"))] = None,
+    level: Annotated[str | None, typer.Option("--level", "-l", help=_("opt_level"))] = None,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
@@ -1254,7 +1276,7 @@ def next_lab(
 @app.command("reset", help=_("cmd_reset_help"))
 def reset(
     lab_id: Annotated[str, typer.Argument(help=_("cmd_reset_arg"), shell_complete=_complete_lab_id)],
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -1264,7 +1286,7 @@ def reset(
         lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     info(_("resetting", lab_id=lab.id))
     try:
@@ -1279,7 +1301,7 @@ def reset(
         success(_("lab_reset"))
     except RuntimeError as exc:
         error(str(exc))
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
 
 
 # ── clean ─────────────────────────────────────────────────────────────────────
@@ -1287,7 +1309,7 @@ def reset(
 @app.command("clean", help=_("cmd_clean_help"))
 def clean(
     lab_id: Annotated[str, typer.Argument(help=_("cmd_clean_arg"), shell_complete=_complete_lab_id)],
-    target: Annotated[Optional[str], typer.Option("--target", "-t",
+    target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
     yes: Annotated[bool, typer.Option("--yes", "-y", help=_("opt_yes"))] = False,
@@ -1298,7 +1320,7 @@ def clean(
         lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     if not yes:
         typer.confirm(_("confirm_clean", lab_id=lab.id), abort=True)
@@ -1316,7 +1338,7 @@ def clean(
         success(_("clean_done"))
     except RuntimeError as exc:
         error(str(exc))
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
 
 
 # ── validate-structure ────────────────────────────────────────────────────────
@@ -1328,8 +1350,8 @@ def validate_structure_cmd(
         "--check-urls", help=_("opt_check_urls"),
     )] = False,
 ) -> None:
-    from .discovery.scanner import discover_labs
     from .discovery.repo import read_repo_metadata
+    from .discovery.scanner import discover_labs
     from .validators.content import (
         check_doc_url,
         validate_internal_links,
@@ -1494,7 +1516,10 @@ def doctor(
             # pourrait avoir \u00e0 retaper son password \u00e0 chaque commande
             # (si sudo timestamp_timeout=0 ou si la cascade d\u00e9passe 5min).
             info(_("fix_sudo_preauth", count=len(sudo_fixes)))
-            preauth = subprocess.run(["sudo", "-v"])  # noqa: S603,S607
+            # check=False : un mot de passe refusé ou un Ctrl-C sur le prompt
+            # sudo est une réponse de l'utilisateur, pas une panne. On la
+            # traduit en message et en code de sortie, pas en trace Python.
+            preauth = subprocess.run(["sudo", "-v"], check=False)
             if preauth.returncode != 0:
                 error(_("fix_sudo_failed"))
                 raise typer.Exit(1)
@@ -1502,7 +1527,10 @@ def doctor(
         info(_("fix_count", count=len(failing)))
         for label, fix_cmd in failing:
             info(f"[bold]{label}[/bold] \u2192 {fix_cmd}")
-            result = subprocess.run(fix_cmd, shell=True, text=True)  # noqa: S602
+            # check=False : `--fix` joue une CASCADE. Un correctif en \u00e9chec
+            # doit \u00eatre signal\u00e9 puis laisser tourner les suivants ; lever ici
+            # abandonnerait les r\u00e9parations restantes sur la premi\u00e8re qui rate.
+            result = subprocess.run(fix_cmd, shell=True, text=True, check=False)  # noqa: S602
             if result.returncode == 0:
                 success(_("fix_success", label=label))
             else:
@@ -1558,7 +1586,7 @@ def _diagnostic_message(hote: dict[str, Any]) -> str:
 
 @app.command("provision", help=_("cmd_provision_help"))
 def provision(
-    host: Annotated[Optional[list[str]], typer.Option(
+    host: Annotated[list[str] | None, typer.Option(
         "--host",
         help=_("opt_provision_host"),
     )] = None,
@@ -1627,7 +1655,7 @@ def provision(
                 targets.extend(host_targets(provider, fqdn))
             except NotImplementedError as exc:
                 error(str(exc))
-                raise typer.Exit(2)
+                raise typer.Exit(2) from None
         info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
 
     try:
@@ -1647,10 +1675,10 @@ def provision(
         )
     except ProviderNotImplemented as exc:
         error(str(exc))
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     except TerraformNotInstalled as exc:
         error(str(exc))
-        raise typer.Exit(3)
+        raise typer.Exit(3) from None
     except Exception as exc:  # noqa: BLE001 — message utilisateur direct
         error(_("provision_failed", error=str(exc)))
         # Terraform est exact mais opaque pour qui découvre l'outil. Quand la
@@ -1665,7 +1693,7 @@ def provision(
             explication, commande = connu
             info(explication)
             info(f"  {commande}")
-        raise typer.Exit(4)
+        raise typer.Exit(4) from None
 
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
     # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
@@ -1744,7 +1772,7 @@ def provision(
 
 @app.command("destroy", help=_("cmd_destroy_help"))
 def destroy(
-    host: Annotated[Optional[list[str]], typer.Option(
+    host: Annotated[list[str] | None, typer.Option(
         "--host",
         help=_("opt_destroy_host"),
     )] = None,
@@ -1777,7 +1805,7 @@ def destroy(
                 targets.extend(host_targets(provider, fqdn))
             except NotImplementedError as exc:
                 error(str(exc))
-                raise typer.Exit(2)
+                raise typer.Exit(2) from None
         info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
         # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
         # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
@@ -1807,13 +1835,13 @@ def destroy(
         )
     except ProviderNotImplemented as exc:
         error(str(exc))
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     except TerraformNotInstalled as exc:
         error(str(exc))
-        raise typer.Exit(3)
+        raise typer.Exit(3) from None
     except Exception as exc:  # noqa: BLE001
         error(_("destroy_failed", error=str(exc)))
-        raise typer.Exit(4)
+        raise typer.Exit(4) from None
 
     # Terraform ne détruit que ce qu'il connaît. Un domaine défini puis jamais
     # inscrit au state lui est invisible : il annonçait donc « infrastructure
@@ -2263,9 +2291,12 @@ def status(
         # traduit. Sans ce verrou, « No route to host » devient une phrase
         # différente sur chaque poste, et le diagnostic ne reconnaîtrait plus
         # rien de ce que ssh lui dit.
-        result = subprocess.run(  # noqa: S603
+        # check=False : l'échec de ce ssh EST la mesure. Un hôte injoignable
+        # est un résultat à rapporter, pas un incident qui arrête le tour des
+        # autres hôtes.
+        result = subprocess.run(
             cmd, capture_output=True, timeout=15,
-            env={**os.environ, "LC_ALL": "C"},
+            env={**os.environ, "LC_ALL": "C"}, check=False,
         )
         joignable = result.returncode == 0
         raison = None
@@ -2436,7 +2467,10 @@ def instructor_bootstrap(
         info(_("bootstrap_generating_key", path=private_key))
         ssh_dir.mkdir(parents=True, exist_ok=True)
         ssh_dir.chmod(0o700)
-        result = subprocess.run(  # noqa: S603 — args contrôlés
+        # check=False : l'échec est traduit en message + Exit(2) juste en
+        # dessous. Une CalledProcessError sortirait la trace Python de
+        # ssh-keygen au visage du formateur, sans lui dire quoi faire.
+        result = subprocess.run(
             [
                 "ssh-keygen",
                 "-t", "ed25519",
@@ -2446,6 +2480,7 @@ def instructor_bootstrap(
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             error(_("bootstrap_keygen_failed", stderr=result.stderr.strip()))
