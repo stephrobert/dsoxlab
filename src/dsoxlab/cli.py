@@ -24,7 +24,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, NoReturn, Optional
 
 import click
 import typer
@@ -76,6 +76,7 @@ from .models import (
     LabDefinition,
     ProviderUnresolved,
     RepoMetadata,
+    UnsupportedSchemaVersion,
 )
 from .reporting import machine
 from .runtimes.base import EventCallback
@@ -85,8 +86,8 @@ from .services import (
     clean_lab,
     collect_checks,
     evaluate_lab,
+    find_lab,
     get_all_labs,
-    get_lab,
     guide_url,
     lab_status,
     next_pending_lab,
@@ -159,6 +160,21 @@ def _root(lab_home: Optional[Path]) -> Path:
     return lab_home.resolve() if lab_home else get_lab_home()
 
 
+def _contrat_trop_recent(exc: UnsupportedSchemaVersion) -> NoReturn:
+    """Rend l'erreur de version du ``meta.yml`` et sort.
+
+    Le ``meta.yml`` décrit tout le catalogue : ne pas savoir le lire ne laisse
+    rien de fiable derrière. On ne dégrade donc pas, on nomme la cause et la
+    réparation, qui n'est pas dans le dépôt de labs mais dans la version de
+    l'outil.
+    """
+    error(_(
+        "schema_version_meta_too_new",
+        path=exc.source, found=exc.found, supported=exc.supported,
+    ))
+    raise typer.Exit(1)
+
+
 def _read_repo(root: Path) -> RepoMetadata | None:
     """Wrapper de ``read_repo_metadata`` qui formate proprement les
     erreurs de résolution de provider (ValueError) en message CLI +
@@ -168,9 +184,49 @@ def _read_repo(root: Path) -> RepoMetadata | None:
 
     try:
         return read_repo_metadata(root)
+    # AVANT ValueError, dont elle hérite : `str(exc)` rendrait un message
+    # technique et non traduit là où la cause mérite une phrase.
+    except UnsupportedSchemaVersion as exc:
+        _contrat_trop_recent(exc)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
+
+
+def _catalogue(root: Path, lang: str, *, quiet: bool = False) -> list[LabDefinition]:
+    """Le catalogue, et un mot sur ce qu'il a fallu en écarter.
+
+    Un ``lab.yaml`` au contrat trop récent est laissé de côté — c'est la seule
+    chose honnête à en faire — mais jamais en silence : sans cet
+    avertissement, la seule trace serait un lab absent, le symptôme le plus
+    coûteux à diagnostiquer de tout le contrat.
+
+    ``quiet`` sert au mode ``--json``, où la sortie standard ne doit porter
+    qu'un document et rien d'autre.
+    """
+    from .discovery.scanner import scan_catalog
+
+    try:
+        scan = scan_catalog(root, lang=lang)
+    except UnsupportedSchemaVersion as exc:
+        _contrat_trop_recent(exc)
+    if not quiet:
+        for ecarte in scan.unsupported:
+            warn(_(
+                "schema_version_lab_skipped",
+                path=ecarte.source, found=ecarte.found, supported=ecarte.supported,
+            ))
+    return scan.labs
+
+
+def _lab(root: Path, lab_id: str, lang: str) -> LabDefinition:
+    """Un lab par son identifiant, en nommant d'abord ce qui a été écarté.
+
+    Sans cela, ``dsoxlab show <id>`` d'un lab au contrat trop récent répondrait
+    « lab introuvable », et laisserait croire à une faute de frappe plutôt qu'à
+    un outil à mettre à jour.
+    """
+    return find_lab(_catalogue(root, lang), lab_id)
 
 
 def _require_provider(repo_meta: RepoMetadata) -> str:
@@ -557,7 +613,7 @@ def list_labs(
         info(_("context_active", label=ctx.label()))
 
     lang = _lang(root)
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang, quiet=as_json)
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -587,7 +643,7 @@ def show(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -612,7 +668,7 @@ def run(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -821,7 +877,7 @@ def hint(
         error(_("no_active_lab"))
         raise typer.Exit(1)
     try:
-        lab = get_lab(root, effective_id, lang=lang)
+        lab = _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -858,7 +914,7 @@ def _resolve_lab(
         error(_("no_active_lab"))
         raise typer.Exit(1)
     try:
-        return get_lab(root, effective_id, lang=lang)
+        return _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1131,7 +1187,7 @@ def progress(
     effective_section = section or ctx.section
     effective_level = level or ctx.level
 
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang, quiet=as_json)
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -1171,7 +1227,7 @@ def next_lab(
         error(_("next_no_context"))
         raise typer.Exit(1)
 
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang)
     if ctx.section:
         labs = [lab for lab in labs if lab.section == ctx.section]
     if ctx.level:
@@ -1198,7 +1254,7 @@ def reset(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1232,7 +1288,7 @@ def clean(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1275,8 +1331,32 @@ def validate_structure_cmd(
         validate_solutions_encrypted,
         validate_targets,
     )
+    from .validators.contract import validate_schema_versions
 
     root = _root(lab_home)
+
+    # D'ABORD, et à la source : un `schema_version` illisible ou trop récent
+    # empêche le fichier d'être découvert, donc TOUS les contrôles suivants
+    # l'ignoreraient — c'est le trou connu du validator, qui n'itère que sur ce
+    # qui a déjà été chargé. Ce contrôle-ci relit les fichiers du disque.
+    contract = validate_schema_versions(root)
+    if not contract.ok:
+        console.print(_("contract_issues_header"))
+        for anomalie in contract.issues:
+            try:
+                rendu = anomalie.path.relative_to(root)
+            except ValueError:
+                rendu = anomalie.path
+            console.print(
+                f"  [red]✘[/red] {rendu}: {_(anomalie.key, **anomalie.params)}"
+            )
+        # Le meta.yml décrit tout le catalogue : illisible, il rend chaque
+        # contrôle suivant douteux, et la découverte lèverait de toute façon.
+        # Un lab isolé, lui, n'empêche pas de valider les 283 autres.
+        if contract.meta_is_unreadable:
+            error(_("labs_have_issues"))
+            raise typer.Exit(1)
+
     structure_reports = validate_all_structure(root)
     metadata_reports = validate_all_metadata(root)
 
@@ -1346,7 +1426,8 @@ def validate_structure_cmd(
                 console.print(f"  [red]✘[/red] {report.lab_id} — {issue.field}: {issue.message}")
 
     all_ok = (
-        all(r.ok for r in structure_reports)
+        contract.ok
+        and all(r.ok for r in structure_reports)
         and not issues
         and not content_issues
         and not url_issues
@@ -2286,4 +2367,14 @@ def main() -> None:
         app()
     except InfraNotProvisioned:
         error(_("infra_not_provisioned"))
+        raise SystemExit(1) from None
+    # Filet de dernier recours : les commandes qui lisent le catalogue passent
+    # par `_read_repo` ou `_catalogue`, qui disent déjà la même chose plus tôt.
+    # Celles qui liraient un meta.yml par un autre chemin ne doivent pas pour
+    # autant rendre un traceback là où une phrase suffit.
+    except UnsupportedSchemaVersion as exc:
+        error(_(
+            "schema_version_meta_too_new",
+            path=exc.source, found=exc.found, supported=exc.supported,
+        ))
         raise SystemExit(1) from None

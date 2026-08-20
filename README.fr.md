@@ -173,6 +173,30 @@ KVM/libvirt et Outscale.
 Un dépôt qui héberge des labs décrit son catalogue avec deux niveaux de
 fichiers.
 
+Le contrat est **versionné**. Les deux fichiers acceptent un entier
+`schema_version` à leur racine ; l'omettre vaut la version 1, aucun catalogue
+existant n'a donc rien à changer. Un fichier qui déclare une version que ce
+dsoxlab ne lit pas est nommé dans un message, au lieu de disparaître du
+catalogue. Champ par champ, avec la règle d'évolution et le chemin de migration
+vers une future v2 : **[la référence du contrat v1](docs/contract-v1.fr.md)**.
+
+Deux schémas JSON décrivent le même contrat pour ton éditeur et pour ta CI :
+[`schemas/lab.schema.json`](schemas/lab.schema.json) et
+[`schemas/meta.schema.json`](schemas/meta.schema.json). Pose cette ligne en tête
+d'un fichier, et tout éditeur qui fait tourner `yaml-language-server`
+(l'extension YAML de VS Code, entre autres) complète les champs et souligne les
+fautes à la frappe :
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/lab.schema.json
+id: mon-lab
+title: Mon lab
+```
+
+Remplace `main` par un tag de release (`v0.1.46`) pour épingler le schéma en CI.
+Un test confronte les deux schémas au parseur, dans les deux sens : ils ne
+peuvent pas dériver du code en silence.
+
 ### 1. `meta.yml` à la racine du dépôt
 
 Métadonnées du dépôt, topologie d'infrastructure (KVM/Incus), ordre des

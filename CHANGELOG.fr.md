@@ -9,6 +9,69 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.46] - 2026-08-20
+
+### Ajouté
+
+- **Le contrat d'entrée est versionné : `schema_version` dans `meta.yml` et
+  `lab.yaml`.** Ces deux fichiers sont l'interface publique du moteur, et cette
+  interface n'avait jusqu'ici aucun numéro. Un champ qui change de sens ne
+  pouvait donc être ni annoncé, ni détecté, ni refusé : il se manifestait par un
+  lab qui disparaît du catalogue, sans un mot. C'est le symptôme le plus coûteux
+  à diagnostiquer de tout le projet.
+
+  L'absence du champ vaut la **version 1** : aucun des 284 labs des trois
+  catalogues existants n'a quoi que ce soit à changer, puisque pas un seul ne le
+  déclare aujourd'hui. Un fichier qui annonce une version que ce dsoxlab ne lit
+  pas est désormais nommé, et nommé différemment selon le fichier. Un `meta.yml`
+  venu du futur **arrête la commande** : il décrit tout le catalogue, le lire de
+  travers rendrait tout le reste douteux. Un `lab.yaml` isolé venu du futur est
+  **écarté avec un avertissement**, le reste du catalogue continuant d'être
+  servi : sans cela, personne ne pourrait jamais publier le premier lab v2 sans
+  casser le catalogue de tous les apprenants pas encore à jour.
+
+  La lecture est stricte là où le reste du contrat est tolérant : `"1"`, `1.0` et
+  `true` sont refusés plutôt qu'arrondis. Un numéro de version n'est pas une
+  mesure, et transformer `1.5` en `1` sans un mot est exactement le silence que
+  ce champ existe pour supprimer.
+
+  À ne pas confondre avec la version de la sortie JSON (`reporting/machine.py :
+  SCHEMA`), qui versionne ce que dsoxlab **écrit** pour d'autres programmes. Deux
+  contrats, deux publics, deux rythmes. On ne les incrémente jamais ensemble.
+
+- **`dsoxlab validate-structure` voit maintenant des fichiers qu'aucun autre
+  contrôle ne peut voir.** Il lit `schema_version` directement sur le disque,
+  avant la découverte. Tous les autres validators itèrent sur des labs déjà
+  chargés : un fichier que le parseur rejette a toujours traversé la validation
+  sans un mot. Celui-ci le rapporte, nomme le fichier et donne la valeur.
+
+- **`schemas/lab.schema.json` et `schemas/meta.schema.json`, publiés pour les
+  éditeurs et pour la CI.** Une ligne `# yaml-language-server: $schema=…` en tête
+  de fichier suffit pour que tout éditeur faisant tourner `yaml-language-server`
+  complète les champs et souligne les fautes à la frappe. Un dépôt de catalogue
+  peut aussi valider son propre YAML en CI sans installer l'outil Python.
+
+  Un schéma qui ment est pire qu'un schéma absent : il fait autorité à tort. Un
+  test confronte donc les deux schémas au parseur **dans les deux sens** : il lit
+  `models/lab.py` et `models/repo.py`, en extrait les clés qu'ils vont réellement
+  chercher, et exige l'égalité avec les `properties` du schéma. Un champ lu par
+  le code et absent du schéma échoue ; un champ inventé dans le schéma et lu
+  nulle part échoue aussi ; et un nouveau mapping imbriqué dans le parseur échoue
+  tant qu'il n'est pas décrit. Les valeurs énumérées sont confrontées aux
+  constantes du code plutôt que recopiées.
+
+- **La v1 du contrat est écrite** : [`docs/contract-v1.fr.md`](docs/contract-v1.fr.md)
+  et sa version anglaise listent chaque champ, s'il est obligatoire, les valeurs
+  énumérées, ce qui peut être ajouté sans changer de version, ce qui exigerait une
+  v2, et le chemin de migration vers cette v2 avec la commande qui aidera.
+
+### Modifié
+
+- `discovery/scanner.py` gagne `scan_catalog()`, qui rend les labs **et** les
+  fichiers qu'il a dû écarter. `discover_labs()` garde sa signature et son
+  comportement, en enveloppe. Les appelants qui veulent dire à l'utilisateur ce
+  qui manque le peuvent désormais ; les autres ne changent pas.
+
 ## [0.1.45] - 2026-08-19
 
 ### Ajouté

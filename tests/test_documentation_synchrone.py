@@ -37,6 +37,8 @@ DOCUMENTS = [
     "CONTRIBUTING.md",
     "CONTRIBUTING.fr.md",
     "RELEASING.md",
+    "docs/contract-v1.md",
+    "docs/contract-v1.fr.md",
 ]
 
 #: `dsoxlab <mot>` dans un texte. On ignore ce qui suit un tiret : `dsoxlab
