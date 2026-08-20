@@ -33,7 +33,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
-import click
 import typer
 from typer.core import TyperGroup, TyperOption
 
@@ -323,16 +322,29 @@ def _lang(root: Path) -> str:
     return get_lang(ctx_lang=ctx.lang)
 
 
-def _complete_lab_id(
-    ctx: click.Context, param: click.Parameter, incomplete: str
-) -> list[Any]:
-    """Retourne la liste des lab IDs disponibles pour l'auto-complétion."""
-    from click.shell_completion import CompletionItem
+def _complete_lab_id(incomplete: str) -> list[tuple[str, str]]:
+    """Propose les lab IDs du dépôt courant, filtrés par ce qui est déjà saisi.
+
+    Contrat **typer**, pas celui de click. Deux différences, et elles ne sont
+    pas cosmétiques :
+
+    - typer construit lui-même les paramètres passés ici, d'après les
+      annotations de cette signature (``incomplete: str`` reçoit le préfixe
+      saisi). Il n'attend donc pas les trois positionnels
+      ``(ctx, param, incomplete)`` de click, et ce qu'on ne déclare pas n'est
+      pas injecté ;
+    - le retour est une liste de couples ``(valeur, aide)``. C'est typer qui en
+      fait des ``CompletionItem`` : lui rendre l'objet click directement casse
+      son adaptateur, qui exige une chaîne ou un couple.
+
+    Le second élément du couple est l'aide affichée à côté de la proposition,
+    c'est-à-dire le titre du lab. Elle survit à la migration, et zsh l'affiche.
+    """
     try:
         root = get_lab_home()
         labs = get_all_labs(root)
         return [
-            CompletionItem(lab.id, help=lab.title)
+            (lab.id, lab.title)
             for lab in labs
             if lab.id.startswith(incomplete)
         ]
@@ -666,7 +678,7 @@ def list_labs(
 
 @app.command("show", help=_("cmd_show_help"))
 def show(
-    lab_id: Annotated[str, typer.Argument(help=_("cmd_show_arg"), shell_complete=_complete_lab_id)],
+    lab_id: Annotated[str, typer.Argument(help=_("cmd_show_arg"), autocompletion=_complete_lab_id)],
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
@@ -689,7 +701,7 @@ def show(
 
 @app.command("run", help=_("cmd_run_help"))
 def run(
-    lab_id: Annotated[str, typer.Argument(help=_("cmd_run_arg"), shell_complete=_complete_lab_id)],
+    lab_id: Annotated[str, typer.Argument(help=_("cmd_run_arg"), autocompletion=_complete_lab_id)],
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
@@ -763,7 +775,7 @@ def run(
 
 @app.command("course", help=_("cmd_course_help"))
 def course(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_course_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_course_arg"), autocompletion=_complete_lab_id)] = None,
     section: Annotated[str | None, typer.Option("--section", "-s", help=_("cmd_course_opt_section"))] = None,
     next_section: Annotated[bool, typer.Option("--next", "-n", help=_("cmd_course_opt_next"))] = False,
     prev_section: Annotated[bool, typer.Option("--prev", "-p", help=_("cmd_course_opt_prev"))] = False,
@@ -843,7 +855,7 @@ def _show_course_section(
 
 @app.command("challenge", help=_("cmd_challenge_help"))
 def challenge_cmd(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_challenge_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_challenge_arg"), autocompletion=_complete_lab_id)] = None,
     no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -857,7 +869,7 @@ def challenge_cmd(
 
 @app.command("guide", help=_("cmd_guide_help"))
 def guide(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_guide_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_guide_arg"), autocompletion=_complete_lab_id)] = None,
     print_only: Annotated[bool, typer.Option("--print", help=_("cmd_guide_opt_print"))] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -895,7 +907,7 @@ def guide(
 
 @app.command("hint", help=_("cmd_hint_help"))
 def hint(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_hint_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_hint_arg"), autocompletion=_complete_lab_id)] = None,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
@@ -1120,7 +1132,7 @@ def _run_check(
 
 @app.command("check", help=_("cmd_check_help"))
 def check(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_check_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_check_arg"), autocompletion=_complete_lab_id)] = None,
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_check_target"))] = None,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
@@ -1158,7 +1170,7 @@ def check(
 
 @app.command("submit", help=_("cmd_submit_help"))
 def submit(
-    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_submit_arg"), shell_complete=_complete_lab_id)] = None,
+    lab_id: Annotated[str | None, typer.Argument(help=_("cmd_submit_arg"), autocompletion=_complete_lab_id)] = None,
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_check_target"))] = None,
     lab_home: LabHomeOption = None,
@@ -1275,7 +1287,7 @@ def next_lab(
 
 @app.command("reset", help=_("cmd_reset_help"))
 def reset(
-    lab_id: Annotated[str, typer.Argument(help=_("cmd_reset_arg"), shell_complete=_complete_lab_id)],
+    lab_id: Annotated[str, typer.Argument(help=_("cmd_reset_arg"), autocompletion=_complete_lab_id)],
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
@@ -1308,7 +1320,7 @@ def reset(
 
 @app.command("clean", help=_("cmd_clean_help"))
 def clean(
-    lab_id: Annotated[str, typer.Argument(help=_("cmd_clean_arg"), shell_complete=_complete_lab_id)],
+    lab_id: Annotated[str, typer.Argument(help=_("cmd_clean_arg"), autocompletion=_complete_lab_id)],
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
