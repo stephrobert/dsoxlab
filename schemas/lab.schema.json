@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/lab.schema.json",
+  "title": "dsoxlab lab.yaml (contract v1)",
+  "description": "Declarative contract of one lab, read by dsoxlab from <lab>/lab.yaml. Contract version 1. Point your editor at this schema with a first line: # yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/lab.schema.json",
+  "type": "object",
+  "required": ["id", "title", "level", "skills", "distros", "doc_url"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1,
+      "default": 1,
+      "description": "Version of the INPUT contract this file follows. Leave it out and it is read as 1. Unrelated to the version of the JSON dsoxlab emits (reporting/machine.py: SCHEMA)."
+    },
+
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier within the repository. The CLI key: dsoxlab run <id>. Discovery is by path, never by id."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "English title. lab.fr.yaml overrides it for French."
+    },
+    "level": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-form level, meaningful to the repository (l1, beginner, rhcsa…). Never validated against a list."
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Skills the lab exercises. Must not be empty: validate-structure rejects it."
+    },
+    "distros": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Distributions or platforms the lab is known to run on. Must not be empty."
+    },
+    "doc_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Online guide of the lab, opened by dsoxlab guide. http(s) only. validate-structure --check-urls also checks it answers."
+    },
+
+    "section": {
+      "type": "string",
+      "description": "Overrides the section the lab belongs to. Defaults to meta.yml repo.category."
+    },
+    "description": {
+      "type": "string",
+      "description": "One paragraph, shown by dsoxlab show. lab.fr.yaml overrides it for French."
+    },
+    "track": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form tracks the lab belongs to."
+    },
+    "difficulty": {
+      "type": "string",
+      "description": "Free-form, never validated, only displayed."
+    },
+    "estimated_time": {
+      "type": "string",
+      "description": "Free-form duration, only displayed (e.g. 30m, 1h)."
+    },
+    "certification_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form certification tags. Never validated against a list: the tool stays domain-agnostic."
+    },
+    "lab_type": {
+      "type": "string",
+      "enum": ["lab", "challenge", "capstone"],
+      "default": "lab",
+      "description": "Kind of exercise. Enumerated and enforced by validate-structure."
+    },
+    "bloc": {
+      "type": "integer",
+      "description": "Position of the teaching bloc. Normally NOT written here: it is derived from meta.yml sections[].labs[]. Declaring it forces an exception and duplicates information that already lives elsewhere."
+    },
+    "bloc_order": {
+      "type": "integer",
+      "description": "Position within the bloc. Same remark as bloc: derived from meta.yml unless declared."
+    },
+
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where and how the lab runs. Omitted entirely, it falls back to a shell runtime in challenge/work.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["shell", "vm", "incus", "kvm"],
+          "default": "shell",
+          "description": "shell = the learner's own machine; vm = a machine reached over SSH, whose backend comes from meta.yml infra.provider. incus and kvm are backward-compatible aliases of vm; write vm in new labs."
+        },
+        "targets": {
+          "type": "array",
+          "description": "Execution targets, for runtime: vm. Must not be empty for vm.",
+          "items": {
+            "type": "object",
+            "required": ["name", "host"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Short CLI id, passed to --target."
+              },
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "description": "FQDN, which must appear in meta.yml infra.hosts[].name."
+              },
+              "label_en": { "type": "string", "description": "Short English label, shown by dsoxlab show." },
+              "label_fr": { "type": "string", "description": "Short French label." },
+              "roles": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Extra hosts used at the same time, by role. Each role becomes the Ansible group lab_<role>. Every FQDN must appear in meta.yml infra.hosts[]."
+              }
+            }
+          }
+        },
+        "default": {
+          "type": "string",
+          "description": "Name of the default target. Must match one targets[].name."
+        },
+        "snapshot_required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Take a snapshot before setup.yaml, so the lab can be rolled back."
+        },
+        "session": {
+          "type": "string",
+          "enum": ["target", "local"],
+          "default": "target",
+          "description": "Where dsoxlab run drops the learner: an SSH session on the target, or a local subshell for a lab driven from their own machine. Only meaningful for runtime: vm."
+        },
+        "workdir": {
+          "type": "string",
+          "default": "challenge/work",
+          "description": "Working directory created by dsoxlab run, relative to the lab. Required for runtime: shell (must not be empty). Ignored for vm."
+        },
+        "fixtures": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files handed to the learner, as paths relative to <lab>/fixtures/. The path is preserved under workdir. A file NOT listed here is NOT copied, even if it sits in fixtures/. Absolute paths and .. are refused."
+        },
+        "services": {
+          "type": "array",
+          "description": "Containers the lab needs while it runs. dsoxlab launches exactly the image declared here and knows nothing of what runs inside.",
+          "items": {
+            "type": "object",
+            "required": ["name", "image"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Short name, unique within the lab. Also the HOSTNAME other services of the repository reach it by, since they share a Docker network."
+              },
+              "image": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Container image, tag included."
+              },
+              "ports": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Docker -p mappings, host:container."
+              },
+              "run_args": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Raw extra flags appended to docker run. dsoxlab does not interpret them."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": { "type": ["string", "number", "boolean"] },
+                "description": "Environment variables, passed as -e NAME=value."
+              },
+              "ready_tcp": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "HOST port to wait on (the left-hand side of ports). 0 = no TCP wait. On a published port this alone LIES: Docker's proxy accepts before the service listens. Declare ready_exec too."
+              },
+              "ready_exec": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                ],
+                "description": "Readiness probe run INSIDE the container, retried until it succeeds. A string is split shell-style; an array is taken as argv. No shell: no pipe, no redirection, no expansion."
+              },
+              "ready_timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 90,
+                "description": "Seconds before giving up. Applies to ready_tcp and ready_exec alike."
+              },
+              "post_start": {
+                "type": "array",
+                "description": "Commands run INSIDE the container once ready (schema, secrets, repository…). Replayed on EVERY start, even on a container that was already up, so they must be idempotent.",
+                "items": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "topology": {
+          "type": "string",
+          "deprecated": true,
+          "default": "local",
+          "description": "Historical field kept for backward compatibility. Nothing reads it any more."
+        }
+      }
+    },
+
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Purely DECLARATIVE. dsoxlab never reads it to decide anything: the tests are what prove.",
+      "properties": {
+        "functional": { "type": "boolean", "default": true },
+        "security": { "type": "boolean", "default": false },
+        "persistence_after_reboot": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}
