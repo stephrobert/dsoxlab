@@ -16,14 +16,28 @@ deux formes, dans cet ordre :
    version antérieure du template.
 
 Aucune troisième forme n'est tentée : au-delà, on ne résout plus, on devine.
+
+Le module sert aussi à **diagnostiquer** : ``inspect_host`` rend l'état d'un
+domaine et ses baux DHCP, de quoi distinguer « cette machine n'existe pas » de
+« elle existe et ne tourne pas » et de « elle tourne mais son réseau n'a pas
+abouti ». Ces trois faits appellent trois gestes opposés, et aucun ne se déduit
+d'un échec SSH.
+
+Une règle traverse tout le module : **une interrogation impossible n'est jamais
+une absence**. ``virsh`` absent, ``sudo`` refusé ou démon éteint lèvent
+``CommandError`` ; rendre une liste vide dans ces cas ferait dire à l'outil
+« aucune machine n'existe », ce qui est un faux diagnostic, pas une prudence.
 """
 
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 from ..i18n import _
-from ..utils.shell import run_command
+from ..utils.shell import CommandError, CommandResult, run_command
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +45,54 @@ logger = logging.getLogger(__name__)
 #: immédiate ; au-delà, c'est que le démon ne répond pas, et attendre plus
 #: longtemps n'y changera rien.
 _TIMEOUT = 30
+
+#: Les providers du contrat qui exposent leurs machines comme des domaines
+#: libvirt, donc les seuls que ce module sait interroger.
+#:
+#: ``incus`` est délibérément absent : son template Terraform crée des
+#: ``incus_instance``, que le démon incus gère et que ``virsh`` ne voit pas.
+#: Les interroger demanderait un second backend (``incus list``), qu'aucune
+#: machine de test ne permet aujourd'hui de vérifier. ``outscale`` est un cloud
+#: distant, sans hyperviseur local à interroger. Pour ces deux-là, l'outil dit
+#: qu'il ne sait pas plutôt que d'affirmer que rien n'existe.
+INSPECTABLE_PROVIDERS = frozenset({"kvm"})
+
+#: Les états libvirt qui signifient « le domaine exécute du code ». ``idle`` est
+#: un état de marche, pas un arrêt : le domaine tourne sans consommer de CPU.
+RUNNING_STATES = frozenset({"running", "idle"})
+
+#: Une adresse IPv4, éventuellement suivie de son préfixe, telle que
+#: ``virsh domifaddr`` la présente (``10.10.30.12/24``).
+_IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})(?:/\d{1,2})?\b")
+
+
+def supports_domain_state(provider: str) -> bool:
+    """Ce provider expose-t-il un état de machine interrogeable ici ?
+
+    Répondre ``False`` n'est pas une panne : c'est la seule réponse honnête
+    pour un provider dont les machines ne sont pas des domaines libvirt. Les
+    appelants doivent alors garder leur comportement d'avant et le dire, pas
+    conclure à une absence.
+    """
+    return provider in INSPECTABLE_PROVIDERS
+
+
+def _virsh(
+    args: list[str], *, check: bool = True, timeout: int = _TIMEOUT
+) -> CommandResult:
+    """Invoque ``virsh`` sur l'URI système, sans jamais bloquer sur un mot de passe.
+
+    Deux décisions y sont figées :
+
+    - ``sudo`` : sans lui, ``virsh`` parle à l'URI **session** de l'utilisateur,
+      qui ne contient aucun des domaines créés par le template. Il rendrait donc
+      « aucun domaine » sur une machine qui en héberge dix.
+    - ``-n`` : la sortie de ces commandes est capturée, donc un prompt de mot de
+      passe n'aurait aucun terminal où s'afficher et l'appel resterait pendu
+      jusqu'au timeout. Avec ``-n``, ``sudo`` refuse immédiatement et l'appelant
+      peut le dire.
+    """
+    return run_command(["sudo", "-n", "virsh", *args], check=check, timeout=timeout)
 
 
 class DomainNotFound(RuntimeError):
@@ -63,10 +125,7 @@ def list_domains() -> list[str]:
             Cet échec-là n'est pas une absence de domaine, et le confondre
             avec elle produirait un diagnostic faux.
     """
-    result = run_command(
-        ["sudo", "virsh", "list", "--all", "--name"],
-        timeout=_TIMEOUT,
-    )
+    result = _virsh(["list", "--all", "--name"])
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -94,3 +153,148 @@ def resolve_domain(host_fqdn: str, *, known: list[str] | None = None) -> str:
             logger.debug("domaine libvirt résolu : %s → %s", host_fqdn, candidate)
             return candidate
     raise DomainNotFound(host_fqdn, candidates, domains)
+
+
+def existing_domains(
+    host_fqdns: Iterable[str], *, known: list[str] | None = None
+) -> dict[str, str]:
+    """Parmi ``host_fqdns``, ceux qui correspondent à un domaine défini.
+
+    Args:
+        host_fqdns: les ``infra.hosts[].name`` du ``meta.yml`` courant, et
+            **eux seuls**. Un domaine que ce dépôt ne déclare pas n'a rien à
+            faire dans le résultat : c'est ce qui empêche l'outil de désigner,
+            puis de retirer, une machine qui ne lui appartient pas.
+        known: les domaines déjà listés, pour n'interroger libvirt qu'une fois.
+
+    Returns:
+        ``{fqdn déclaré: nom du domaine tel que libvirt le connaît}``, restreint
+        à ceux qui existent réellement.
+
+    Raises:
+        CommandError: si l'hyperviseur ne peut pas être interrogé. L'appelant
+            doit traiter ce cas comme « je ne sais pas », jamais comme « rien
+            n'existe ».
+    """
+    domains = list_domains() if known is None else known
+    trouves: dict[str, str] = {}
+    for fqdn in host_fqdns:
+        try:
+            trouves[fqdn] = resolve_domain(fqdn, known=domains)
+        except DomainNotFound:
+            continue
+    return trouves
+
+
+def domain_state(domain: str) -> str:
+    """L'état libvirt brut d'un domaine (``running``, ``shut off``, ``crashed``…).
+
+    Le mot est rendu tel que libvirt le dit, sans réinterprétation : c'est lui
+    que le diagnostic doit citer, parce que c'est lui que l'apprenant retrouvera
+    dans un ``virsh list --all``.
+
+    Raises:
+        CommandError: si l'hyperviseur ne peut pas être interrogé.
+    """
+    result = _virsh(["domstate", domain])
+    for line in result.stdout.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def lease_addresses(domain: str) -> list[str]:
+    """Les adresses IPv4 que libvirt a effectivement baillées à ce domaine.
+
+    Répond à une question que SSH ne sait pas poser : la machine tourne-t-elle
+    *sur le réseau* ? Un domaine en marche sans bail n'a pas fini de booter, ou
+    son interface n'a pas abouti — deux situations où attendre un SSH est vain.
+
+    Best-effort assumé : ``domifaddr`` échoue sur un domaine éteint et sur
+    certaines configurations réseau. Une liste vide veut donc dire « aucun bail
+    observé », ce que l'appelant ne doit croire que d'un domaine en marche.
+    """
+    result = _virsh(["domifaddr", domain, "--source", "lease"], check=False)
+    if not result.ok:
+        return []
+    return [m.group(1) for m in _IPV4.finditer(result.stdout)]
+
+
+@dataclass(frozen=True)
+class DomainStatus:
+    """Ce que l'hyperviseur sait d'un hôte déclaré, à un instant donné.
+
+    ``domain`` à ``None`` signifie « aucun domaine ne porte ce nom », un fait,
+    et non « je n'ai pas pu regarder » : ce second cas se signale par une
+    ``CommandError`` levée avant même de construire cet objet.
+    """
+
+    host: str
+    domain: str | None = None
+    state: str | None = None
+    addresses: list[str] = field(default_factory=list)
+
+    @property
+    def exists(self) -> bool:
+        return self.domain is not None
+
+    @property
+    def running(self) -> bool:
+        return self.state in RUNNING_STATES
+
+
+def inspect_host(host_fqdn: str, *, known: list[str] | None = None) -> DomainStatus:
+    """Interroge l'hyperviseur sur un hôte du ``meta.yml``.
+
+    N'interroge les baux que d'un domaine en marche : sur un domaine éteint la
+    réponse serait vide pour une raison sans intérêt, et la confondre avec
+    « ce domaine tourne sans adresse » inventerait un problème réseau.
+
+    Raises:
+        CommandError: si l'hyperviseur ne peut pas être interrogé du tout.
+    """
+    domains = list_domains() if known is None else known
+    try:
+        domain = resolve_domain(host_fqdn, known=domains)
+    except DomainNotFound:
+        return DomainStatus(host=host_fqdn)
+    try:
+        etat = domain_state(domain)
+    except CommandError as exc:
+        # Le domaine existe — on vient de le résoudre. Ne pas connaître son état
+        # n'autorise pas à le déclarer absent.
+        logger.debug("état indisponible pour %s : %s", domain, exc)
+        return DomainStatus(host=host_fqdn, domain=domain)
+    adresses = lease_addresses(domain) if etat in RUNNING_STATES else []
+    return DomainStatus(host=host_fqdn, domain=domain, state=etat, addresses=adresses)
+
+
+def remove_domain(domain: str) -> None:
+    """Retire un domaine de l'hyperviseur : l'arrête s'il tourne, puis le dé-définit.
+
+    ``undefine`` seul laisserait un domaine en marche en état **transitoire** :
+    il disparaîtrait de la configuration tout en continuant de tourner, donc de
+    tenir son nom, et le provisionnement suivant échouerait encore.
+
+    Ne supprime **aucun volume** : les disques appartiennent à Terraform, qui
+    les a déjà retirés dans le cas qui motive cette fonction. Détruire ici du
+    stockage que l'appelant n'a pas nommé serait irréversible et hors mandat.
+
+    Raises:
+        CommandError: si le retrait échoue.
+    """
+    try:
+        etat = domain_state(domain)
+    except CommandError:
+        etat = ""
+    if etat in RUNNING_STATES:
+        _virsh(["destroy", domain], check=False, timeout=60)
+    try:
+        # `--nvram` retire le fichier de variables UEFI, sans quoi libvirt
+        # refuse de dé-définir une machine qui en a un.
+        _virsh(["undefine", domain, "--nvram"], timeout=60)
+    except CommandError:
+        # Les libvirt anciens rejettent l'option sur un domaine sans nvram :
+        # on retente la forme nue plutôt que d'abandonner sur un détail
+        # d'options.
+        _virsh(["undefine", domain], timeout=60)

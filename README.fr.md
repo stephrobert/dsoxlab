@@ -269,7 +269,7 @@ test référencés sont présents.
 | `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
 | `dsoxlab course` | Affiche une section du cours, ou le sommaire si aucune section n'est précisée. |
 | `dsoxlab demo` | Installe un catalogue de démonstration et joue un premier lab, sans rien cloner ni provisionner. |
-| `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy). |
+| `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises. |
 | `dsoxlab doctor` | Diagnostique l'environnement (runtimes, outils, labs détectés). |
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
 | `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
@@ -285,7 +285,7 @@ test référencés sont présents.
 | `dsoxlab scores` | Affiche l'historique des scores enregistrés. |
 | `dsoxlab show` | Affiche le détail et le statut d'un lab. |
 | `dsoxlab ssh` | Ouvre une session SSH interactive sur un hôte du lab. |
-| `dsoxlab status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml. |
+| `dsoxlab status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
 | `dsoxlab submit` | Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session. |
 | `dsoxlab support` | Produit un rapport de diagnostic anonymisé, à coller dans une issue. |
 | `dsoxlab use` | Définit le contexte actif (section et/ou niveau par défaut). Utilisez --reset pour l'effacer. |
