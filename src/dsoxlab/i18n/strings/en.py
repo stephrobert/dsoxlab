@@ -597,6 +597,8 @@ silent.
     "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
     "detail_terraform_missing":
         "not found: `provision` cannot create the machines",
+    "detail_terraform_broken":
+        "present but `terraform version` fails: `provision` cannot use it",
     "detail_ansible_missing":
         "not found: `run` cannot play a vm lab's setup.yaml "
         "(ansible-runner does not install it)",

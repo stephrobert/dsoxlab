@@ -10,6 +10,7 @@ Chaque test ci-dessous épingle une de ces omissions.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -131,6 +132,50 @@ def test_terraform_et_ansible_sont_requis_par_un_depot_a_labs_vm(
     echecs = _labels(report.failing())
     assert _("check_terraform") in echecs
     assert _("check_ansible") in echecs
+
+
+def test_un_terraform_present_mais_en_erreur_ne_doit_pas_passer_pour_vert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le contrôle ne lisait pas le code retour de `terraform version`.
+
+    Un binaire présent mais inutilisable (plugin cache corrompu, wrapper cassé,
+    binaire d'une autre architecture) sortait en rc != 0 sans rien sur stdout.
+    Le contrôle affichait alors « ok » et se déclarait vert, puis `provision`
+    échouait sur une machine que `doctor` venait de dire prête.
+    """
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/terraform")
+    monkeypatch.setattr(
+        doctor.subprocess, "run",
+        lambda *a, **kw: subprocess.CompletedProcess(
+            args=a[0] if a else [], returncode=1,
+            stdout="", stderr="Error: Failed to load plugin schemas\n",
+        ),
+    )
+
+    check = doctor._check_terraform()
+
+    assert not check.ok, "un terraform qui sort en erreur n'est pas un terraform utilisable"
+    assert "Failed to load plugin schemas" in check.detail
+
+
+def test_un_terraform_qui_repond_correctement_reste_vert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le contre-cas, sans quoi le précédent passerait aussi sur un bug inverse."""
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/terraform")
+    monkeypatch.setattr(
+        doctor.subprocess, "run",
+        lambda *a, **kw: subprocess.CompletedProcess(
+            args=a[0] if a else [], returncode=0,
+            stdout="Terraform v1.9.5\non linux_amd64\n", stderr="",
+        ),
+    )
+
+    check = doctor._check_terraform()
+
+    assert check.ok
+    assert check.detail == "Terraform v1.9.5"
 
 
 def test_un_depot_sans_lab_vm_n_exige_ni_terraform_ni_ansible(
@@ -320,8 +365,10 @@ def test_les_nouvelles_cles_existent_dans_les_deux_langues(cle: str) -> None:
             "explain_pool_not_found",
         ),
         (
-            "operation failed: domain 'alma-rhcsa-2.lab' already exists with "
-            "uuid 95409cf2-d226-44c8-b8ee-16b5bd614ce6",
+            (
+                "operation failed: domain 'alma-rhcsa-2.lab' already exists with "
+                "uuid 95409cf2-d226-44c8-b8ee-16b5bd614ce6"
+            ),
             "explain_domain_exists",
         ),
     ],

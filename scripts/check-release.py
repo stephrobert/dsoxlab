@@ -77,23 +77,46 @@ class Rapport:
         self.attentes.append(titre)
 
 
-def git(*args: str) -> str:
+def git_resultat(*args: str) -> subprocess.CompletedProcess[str]:
+    # check=False : plusieurs appelants attendent un code retour non nul comme
+    # RÉPONSE (un tag inconnu, un `ls-remote` hors ligne). C'est à eux de
+    # décider ce qu'il signifie, pas à subprocess de lever.
     return subprocess.run(
-        ["git", *args], cwd=RACINE, capture_output=True, text=True
-    ).stdout.strip()
+        ["git", *args], cwd=RACINE, capture_output=True, text=True, check=False
+    )
+
+
+def git(*args: str) -> str:
+    """La sortie standard de git, vide si la commande a échoué.
+
+    Attention en l'appelant : une sortie vide ne distingue pas « git a répondu
+    rien » de « git a échoué ». Là où cette confusion transformerait un rouge en
+    vert, passer par :func:`git_resultat` et lire le code retour.
+    """
+    return git_resultat(*args).stdout.strip()
 
 
 def version_empaquetee() -> str | None:
     m = re.search(
         r'^version = "([^"]+)"',
         (RACINE / "pyproject.toml").read_text(encoding="utf-8"),
-        re.M,
+        re.MULTILINE,
     )
     return m.group(1) if m else None
 
 
 def _verifier_arbre(r: Rapport) -> None:
-    if git("status", "--porcelain"):
+    # Ce contrôle est un garde-fou : « rien à signaler » y vaut feu vert. Un
+    # git en échec rendrait lui aussi une sortie vide, donc un feu vert, sur
+    # une machine où l'on ne sait en réalité rien de l'arbre. On lit le code
+    # retour pour distinguer les deux.
+    sortie = git_resultat("status", "--porcelain")
+    if sortie.returncode != 0:
+        r.ko(
+            "Impossible de lire l'état de l'arbre de travail",
+            f"git status a échoué : {sortie.stderr.strip() or 'sans message'}",
+        )
+    elif sortie.stdout.strip():
         r.ko(
             "L'arbre de travail n'est pas propre",
             "Committe ou remise tes modifications : le tag figerait un état "
@@ -152,7 +175,7 @@ def _verifier_changelog(r: Rapport, version: str) -> None:
     # Sans section, la Release sort avec « Release X.Y.Z » et rien d'autre.
     for nom in ("CHANGELOG.md", "CHANGELOG.fr.md"):
         contenu = (RACINE / nom).read_text(encoding="utf-8")
-        if re.search(rf"^## \[{re.escape(version)}\]", contenu, re.M):
+        if re.search(rf"^## \[{re.escape(version)}\]", contenu, re.MULTILINE):
             r.ok(f"{nom} décrit la version {version}")
         else:
             r.ko(
@@ -179,7 +202,7 @@ def _verifier_pypi(r: Rapport, version: str) -> None:
     # PyPI est définitif. Republier un numéro déjà pris fait échouer le job
     # d'upload, après que le tag et la Release ont été créés.
     try:
-        with urllib.request.urlopen(  # noqa: S310 - URL constante, https
+        with urllib.request.urlopen(
             "https://pypi.org/pypi/dsoxlab/json", timeout=5
         ) as reponse:
             publiees = set(json.loads(reponse.read().decode("utf-8"))["releases"])
@@ -204,9 +227,11 @@ def _verifier_ci(r: Rapport) -> None:
     # RELEASING demande d'attendre une CI verte : le tag construit depuis ce
     # commit, et PyPI ne se rattrape pas.
     sha = git("rev-parse", "HEAD")
+    # check=False : `gh` absent ou non authentifié est un cas prévu, traité
+    # deux lignes plus bas en « état de la CI inconnu ».
     sortie = subprocess.run(
         ["gh", "run", "list", "--commit", sha, "--json", "conclusion,name,status"],
-        cwd=RACINE, capture_output=True, text=True,
+        cwd=RACINE, capture_output=True, text=True, check=False,
     )
     if sortie.returncode != 0 or not sortie.stdout.strip():
         r.note("État de la CI inconnu", "gh indisponible : vérifie à la main.")
@@ -245,7 +270,7 @@ def _index_simple() -> str | None:
     fait foi. L'API JSON et la page projet peuvent répondre avant lui.
     """
     try:
-        with urllib.request.urlopen(  # noqa: S310 - URL constante, https
+        with urllib.request.urlopen(
             "https://pypi.org/simple/dsoxlab/", timeout=10
         ) as reponse:
             return reponse.read().decode("utf-8", "replace")
@@ -277,7 +302,7 @@ def _verifier_installable(r: Rapport, version: str) -> None:
     # s'inquiéter : connue de l'API mais absente de l'index, c'est la
     # propagation ; inconnue des deux, l'upload n'a pas eu lieu.
     try:
-        with urllib.request.urlopen(  # noqa: S310 - URL constante, https
+        with urllib.request.urlopen(
             f"https://pypi.org/pypi/dsoxlab/{version}/json", timeout=10
         ) as reponse:
             connue = reponse.status == 200
@@ -302,9 +327,11 @@ def _verifier_installable(r: Rapport, version: str) -> None:
 
 def _verifier_release_github(r: Rapport, tag: str) -> None:
     """La Release GitHub porte les artefacts et la provenance."""
+    # check=False : « aucune Release pour ce tag » se dit par un code retour,
+    # et c'est précisément le constat que ce contrôle doit rapporter.
     sortie = subprocess.run(
         ["gh", "release", "view", tag, "--json", "tagName,assets"],
-        cwd=RACINE, capture_output=True, text=True,
+        cwd=RACINE, capture_output=True, text=True, check=False,
     )
     if sortie.returncode != 0:
         r.ko(

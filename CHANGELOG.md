@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.49] - 2026-08-20
+
+### Fixed
+
+- **`doctor` declared Terraform green without reading its exit code.** The check
+  ran `terraform version` and only ever looked at stdout: a binary that is
+  present but unusable — corrupted plugin cache, broken wrapper, wrong
+  architecture — exits non-zero with nothing on stdout, so the check printed
+  "ok" and reported success. `provision` then failed on a machine `doctor` had
+  just called ready, which is the worst thing a diagnostic can do. The exit code
+  is now read, and the failure carries the last line of Terraform's own error.
+
+- **A DHCP lease that libvirt refused was dropped in silence.** `provision`
+  adds the missing static leases of an existing KVM network on a best-effort
+  basis; a `virsh net-update` that failed logged nothing at all. Without that
+  lease the host never gets its address, and the failure only surfaced much
+  later as an "unreachable host" that named no cause. Best-effort now means
+  "keep going", not "say nothing": the refusal is logged as a warning.
+
+### Changed
+
+- **The lint rule set is declared in full in `pyproject.toml`.** The
+  configuration relied on ruff's default selection and only extended it with
+  `S`. Ruff 0.16 widened that default: the same command, on the same code, went
+  from 0 to 123 errors, none of which belonged to `E`, `F` or `S` — a change of
+  scope nobody decided, arriving with a version bump. `select` now replaces the
+  default rather than extending it (`F`, `E`, `W`, `I`, `UP`, `B`, `S`, `SIM`,
+  `ISC`, `RUF`, `PLE`, `PLW`, `BLE`, `DTZ`, `LOG`, `G`, `PTH`, `PYI`, `EXE`,
+  `FURB`), and every family left out is named there with the measurement that
+  justifies it.
+
+- **Every `subprocess.run` now states whether it checks its exit code.** The 19
+  calls that omitted `check=` were reviewed one by one: all 19 were deliberate —
+  a probe whose exit code *is* the answer, a wait loop, a fix cascade that must
+  survive one failure. They now say so with `check=False` and a comment. One of
+  them, however, read its exit code nowhere, and that one was the Terraform bug
+  above.
+
+- **`typer` 0.26.8 → 0.27.1, `pre-commit` 4.6.0 → 4.6.2, `ruff` → 0.16.3.**
+
 ## [0.1.48] - 2026-08-20
 
 ### Fixed

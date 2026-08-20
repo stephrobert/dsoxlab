@@ -599,6 +599,8 @@ hors ligne, elle se tait.
     "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
     "detail_terraform_missing":
         "introuvable : « provision » ne peut pas créer les machines",
+    "detail_terraform_broken":
+        "présent mais « terraform version » échoue : « provision » ne peut pas s'en servir",
     "detail_ansible_missing":
         "introuvable : « run » ne peut pas jouer le setup.yaml d'un lab vm "
         "(ansible-runner ne l'installe pas)",

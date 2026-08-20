@@ -463,10 +463,13 @@ def _ensure_kvm_dhcp_leases(
     infra = repo_meta.infra
     if infra is None or getattr(infra, "provider", None) != "kvm" or not infra.network:
         return
+    # check=False : « le réseau n'existe pas encore » est un cas NORMAL, et
+    # virsh le dit par un code retour. C'est une branche, pas une panne.
     dump = subprocess.run(
         ["sudo", "virsh", "net-dumpxml", infra.network],
         capture_output=True,
         text=True,
+        check=False,
     )
     if dump.returncode != 0:
         return  # réseau pas encore créé : Terraform le posera avec ses baux
@@ -488,14 +491,25 @@ def _ensure_kvm_dhcp_leases(
             continue
         ip = str(network.network_address + idx + 11)
         entry = f"<host mac='{mac}' name='{host.name}' ip='{ip}'/>"
+        # check=False : best-effort assumé (voir la docstring), Terraform reste
+        # la source de vérité pour la création initiale du réseau.
         res = subprocess.run(
             ["sudo", "virsh", "net-update", infra.network,
              "add-last", "ip-dhcp-host", entry, "--live", "--config"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if res.returncode == 0:
             logger.info("bail DHCP ajouté à chaud: %s -> %s (%s)", host.name, ip, mac)
+        else:
+            # Best-effort ne veut pas dire muet. Sans ce bail, l'hôte n'obtiendra
+            # pas son IP et l'attente échouera plus tard sur un « injoignable »
+            # qui ne dira jamais pourquoi. On continue, mais on le dit.
+            logger.warning(
+                "bail DHCP refusé pour %s (%s) : %s",
+                host.name, mac, (res.stderr or res.stdout).strip(),
+            )
 
 
 def apply(
@@ -603,7 +617,7 @@ def _stream_terraform(
 
     Lève RuntimeError si rc != 0 (avec diagnostic + stderr brut).
     """
-    proc = subprocess.Popen(  # noqa: S603 — commande maîtrisée
+    proc = subprocess.Popen(  # argv construit ici, jamais de shell
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,  # merge pour éviter le deadlock pipe
@@ -616,8 +630,8 @@ def _stream_terraform(
     last_diagnostic = ""
     raw_log_tail: list[str] = []
     try:
-        for line in proc.stdout:
-            line = line.rstrip("\n")
+        for brute in proc.stdout:
+            line = brute.rstrip("\n")
             if not line.strip():
                 continue
             # Conserve les 50 dernières lignes brutes pour reporting
@@ -640,7 +654,7 @@ def _stream_terraform(
                 )
             try:
                 on_event(event)
-            except Exception:  # noqa: BLE001 — callback ne doit pas tuer Terraform
+            except Exception:  # le callback ne doit pas tuer Terraform
                 logger.exception("on_event callback failed")
     finally:
         # Laisse Terraform se terminer proprement même si la boucle a été
