@@ -57,6 +57,14 @@ outscale="outscale"
 sections="sections:"
 labs="labs:"
 
+# ── Contrat versionné (les deux fichiers) ──
+schema_version="schema_version:"
+# Les valeurs comptent autant que la clé : la version courante, celle
+# d'après, et un type que le lecteur doit refuser sans planter.
+schema_version_1="schema_version: 1"
+schema_version_2="schema_version: 2"
+schema_version_str="schema_version: \x221\x22"
+
 # ── lab.yaml ──
 level="level:"
 skills="skills:"

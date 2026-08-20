@@ -28,6 +28,14 @@ locals {
 
   ssh_pubkey = lookup(var.provider_config, "ssh_pubkey", "")
 
+  # Pool libvirt où atterrissent volumes et images de base. Le nom était écrit
+  # en dur à quatre endroits, or « default » n'existe PAS sur une installation
+  # fraîche : sur une Ubuntu 24.04 avec libvirt-daemon-system, `virsh pool-list
+  # --all` est vide, et le provisionnement s'arrête sur un « Pool Not Found »
+  # brut de Terraform que rien n'explique. Un dépôt peut désormais viser son
+  # propre pool via meta.yml : infra.providers.kvm.storage_pool.
+  storage_pool = lookup(var.provider_config, "storage_pool", "default")
+
   # Mapping distro pédagogique → nom du template cloud-init packagé
   # dans dsoxlab/templates/cloud-init/<name>.yaml.tmpl. Aligné avec
   # le provider outscale (cf. terraform/outscale/main.tf).
@@ -158,7 +166,7 @@ resource "libvirt_volume" "base_image" {
   # son state ne contient pas le volume créé par le premier.
   # Coût assumé : l'image cloud est dupliquée par dépôt (sparse, ~600 Mo à 2 Go).
   name = "dsoxlab-base-${var.repo_id}-${each.key}.qcow2"
-  pool = "default"
+  pool = local.storage_pool
 
   # 10 GiB : capacity requise quand le serveur HTTP ne renvoie pas de
   # Content-Length (cas du miroir AlmaLinux derrière redirection).
@@ -188,7 +196,7 @@ resource "libvirt_volume" "host" {
   for_each = { for h in local.hosts_with_idx : h.name => h }
 
   name     = "${each.value.name}.qcow2"
-  pool     = "default"
+  pool     = local.storage_pool
   capacity = each.value.disk_gb * 1024 * 1024 * 1024 # GiB → bytes
 
   target = {
@@ -269,7 +277,7 @@ resource "libvirt_volume" "extra" {
   }
 
   name     = "${each.value.name}-extra.qcow2"
-  pool     = "default"
+  pool     = local.storage_pool
   capacity = each.value.extra_disk_gb * 1024 * 1024 * 1024
 
   target = {
@@ -285,7 +293,7 @@ resource "libvirt_volume" "cloudinit" {
   for_each = { for h in local.hosts_with_idx : h.name => h }
 
   name = "${each.value.name}-cloudinit.iso"
-  pool = "default"
+  pool = local.storage_pool
 
   create = {
     content = {

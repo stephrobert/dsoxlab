@@ -38,16 +38,24 @@ import re
 import shutil
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..config import xdg_state_home
 from ..models.repo import ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
 from . import credentials as creds_mod
+from . import libvirt
 
 logger = logging.getLogger(__name__)
+
+#: Les types de ressource Terraform qui **sont** une machine, par provider
+#: packagé. Seuls comptent ici les providers dont l'hyperviseur est
+#: interrogeable (cf. ``infra.libvirt.INSPECTABLE_PROVIDERS``) : ailleurs, la
+#: comparaison state/hyperviseur n'a pas de second terme.
+_DOMAIN_RESOURCE_TYPES = frozenset({"libvirt_domain"})
 
 
 class TerraformNotInstalled(RuntimeError):
@@ -85,10 +93,12 @@ def is_available() -> bool:
 
 
 def _xdg_state_home() -> Path:
-    env = os.environ.get("XDG_STATE_HOME")
-    if env:
-        return Path(env).expanduser().resolve()
-    return Path.home() / ".local" / "state"
+    """Alias historique : la définition vit désormais dans ``config``.
+
+    Deux copies du même chemin finissent par diverger, et un ``XDG_STATE_HOME``
+    personnalisé n'en aurait déplacé qu'une.
+    """
+    return xdg_state_home()
 
 
 def workdir(repo_meta: RepoMetadata) -> Path:
@@ -270,7 +280,8 @@ def init(
     tf_dir = workdir(repo_meta)
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     cmd = ["terraform", f"-chdir={tf_dir}", "init", "-input=false"]
@@ -293,6 +304,109 @@ def _state_has_resources(state_file: Path) -> bool:
     except (OSError, json.JSONDecodeError):
         return False
     return bool(data.get("resources"))
+
+
+def _domains_in_state(state_file: Path) -> set[str] | None:
+    """Les noms de machines que le state Terraform déclare connaître.
+
+    Returns:
+        L'ensemble des ``name`` des ressources domaine du state. Un state
+        **absent** rend un ensemble **vide** : c'est un fait, il ne connaît rien.
+        Un state présent mais **illisible** rend ``None``, qui veut dire « je
+        n'ai pas pu savoir ». Confondre les deux ferait passer toutes les
+        machines d'une infrastructure saine pour des restes, sur un simple
+        fichier tronqué.
+    """
+    if not state_file.is_file():
+        return set()
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("tfstate illisible (%s) : %s", state_file, exc)
+        return None
+    if not isinstance(data, dict):
+        return None
+    noms: set[str] = set()
+    for res in data.get("resources", []):
+        if not isinstance(res, dict) or res.get("type") not in _DOMAIN_RESOURCE_TYPES:
+            continue
+        for inst in res.get("instances", []):
+            if not isinstance(inst, dict):
+                continue
+            attrs = inst.get("attributes")
+            nom = attrs.get("name") if isinstance(attrs, dict) else None
+            if isinstance(nom, str) and nom:
+                noms.add(nom)
+    return noms
+
+
+@dataclass(frozen=True)
+class OrphanScan:
+    """Le résultat d'une recherche de machines restées sur l'hyperviseur.
+
+    Trois situations, que l'appelant doit traiter différemment :
+
+    - ``inspected`` vrai : l'hyperviseur a répondu, ``orphans`` fait foi (vide
+      inclus, qui veut alors dire « rien ne traîne »).
+    - ``inspected`` faux avec ``reason`` : on n'a **pas pu** regarder. Ne rien
+      dire ferait passer une ignorance pour une garantie.
+    - ``inspected`` faux sans ``reason`` : ce provider n'a pas d'état
+      interrogeable ici, et n'en a jamais eu. Rien à signaler.
+    """
+
+    orphans: dict[str, str] = field(default_factory=dict)
+    inspected: bool = False
+    reason: str = ""
+
+
+def find_orphan_domains(repo_meta: RepoMetadata) -> OrphanScan:
+    """Les machines déclarées qui existent sur l'hyperviseur sans être au state.
+
+    Cas vécu, reproduit sur une Ubuntu neuve : ``libvirt_domain`` échoue au
+    démarrage. Le provider a déjà **défini** le domaine, mais ne l'enregistre
+    pas dans le state. ``terraform destroy`` n'a donc rien à supprimer et sort
+    en succès, tandis que tout ``apply`` suivant échoue sur « domain already
+    exists ». Sans ce garde-fou, le premier échec est sans retour pour qui ne
+    connaît pas ``virsh undefine``.
+
+    Ne considère que les ``infra.hosts[].name`` du ``meta.yml`` courant : une
+    machine que ce dépôt ne déclare pas n'est jamais nommée, donc jamais
+    proposée au retrait.
+    """
+    infra = repo_meta.infra
+    if not infra.hosts:
+        return OrphanScan()
+    try:
+        provider = infra.require_provider()
+    except ProviderUnresolved:
+        return OrphanScan()
+    if not libvirt.supports_domain_state(provider):
+        return OrphanScan()
+
+    state_file = (
+        _xdg_state_home() / "dsoxlab" / repo_meta.id / "terraform" / provider
+        / "terraform.tfstate"
+    )
+    in_state = _domains_in_state(state_file)
+    if in_state is None:
+        return OrphanScan(reason=str(state_file))
+
+    try:
+        presents = libvirt.existing_domains(h.name for h in infra.hosts)
+    except CommandError as exc:
+        return OrphanScan(reason=exc.result.stderr.strip() or str(exc))
+
+    # Le state nomme les machines par leur FQDN, l'hyperviseur peut les porter
+    # sous leur nom court sur une infrastructure ancienne : les deux formes
+    # comptent comme « connue du state ».
+    return OrphanScan(
+        orphans={
+            fqdn: domain
+            for fqdn, domain in presents.items()
+            if fqdn not in in_state and domain not in in_state
+        },
+        inspected=True,
+    )
 
 
 def other_active_providers(repo_meta: RepoMetadata) -> list[str]:
@@ -411,7 +525,8 @@ def apply(
     """
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     tf_dir = workdir(repo_meta)
@@ -557,7 +672,8 @@ def destroy(
     """
     if not is_available():
         raise TerraformNotInstalled(
-            "terraform absent du PATH. Lance : dsoxlab instructor bootstrap"
+            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+            "Installe-le : https://developer.hashicorp.com/terraform/install"
         )
 
     tf_dir = workdir(repo_meta)

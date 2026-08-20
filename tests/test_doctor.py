@@ -74,6 +74,26 @@ def stub_hypervisors(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Terraform et ansible-playbook considérés installés, dans tout ce module.
+
+    Sans cela, ces tests mesurent la machine qui les exécute : ils passaient en
+    local, où les deux outils sont là, et échouaient sur un runner CI qui ne les
+    a pas. Ce que ce module vérifie est le CLASSEMENT des checks, pas la
+    présence réelle des outils, laquelle est couverte par
+    `test_doctor_installation.py`.
+    """
+    monkeypatch.setattr(
+        doctor, "_check_terraform",
+        lambda: doctor.Check(_("check_terraform"), True, "Terraform v1.0.0"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_ansible",
+        lambda: doctor.Check(_("check_ansible"), True, "ok"),
+    )
+
+
 def _labs(monkeypatch: pytest.MonkeyPatch, labs: list[LabDefinition]) -> None:
     monkeypatch.setattr(doctor, "get_all_labs", lambda root: labs)
 

@@ -39,6 +39,7 @@ from typing import Any
 import yaml
 
 from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
+from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
 
 
 def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, Any]]:
@@ -285,6 +286,12 @@ class RepoMetadata:
     path: Path = field(default_factory=lambda: Path("."))
     """Répertoire racine du dépôt (parent du meta.yml)."""
 
+    schema_version: int = DEFAULT_SCHEMA_VERSION
+    """Version du contrat d'entrée que ce ``meta.yml`` déclare respecter.
+
+    Absente du fichier = 1, la seule valeur possible aujourd'hui. Voir
+    :mod:`dsoxlab.models.schema_version`."""
+
     @classmethod
     def from_yaml(
         cls,
@@ -320,6 +327,11 @@ class RepoMetadata:
                 f"{meta_path}: le document doit être un mapping YAML "
                 f"(reçu : {type(data).__name__})."
             )
+
+        # AVANT `repo.id` : un meta.yml v2 pourrait très bien ne plus déclarer
+        # ce bloc. Réclamer d'abord un champ dont on ignore s'il existe encore
+        # dans cette version enverrait l'auteur sur une fausse piste.
+        schema_version = read_schema_version(data, meta_path)
 
         repo = data.get("repo") or {}
         if not isinstance(repo, dict):
@@ -381,6 +393,7 @@ class RepoMetadata:
         ]
 
         return cls(
+            schema_version=schema_version,
             id=str(repo["id"]),
             category=str(repo["category"]),
             title=str(repo.get("title", "")),

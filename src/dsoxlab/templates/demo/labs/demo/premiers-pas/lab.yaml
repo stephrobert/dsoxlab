@@ -1,0 +1,17 @@
+id: premiers-pas
+title: First steps with dsoxlab
+level: demo
+section: demo
+description: Walk the whole dsoxlab loop once, on a lab about dsoxlab itself.
+skills:
+  - dsoxlab-workflow
+distros:
+  - any
+doc_url: https://github.com/stephrobert/dsoxlab
+lab_type: lab
+estimated_time: 5m
+runtime:
+  type: shell
+  workdir: challenge/work
+validation:
+  functional: true

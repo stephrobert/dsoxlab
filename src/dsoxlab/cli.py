@@ -16,14 +16,16 @@ Usage:
 from __future__ import annotations
 
 import atexit
+import logging
 import os
+import shlex
 import webbrowser
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, NoReturn, Optional
 
 import click
 import typer
@@ -35,6 +37,8 @@ from .config import (
     set_active_provider, set_course_pos, write_context,
 )
 from .i18n import _, get_lang, set_lang
+from .logging_setup import configurer as configurer_journal
+from .infra import libvirt
 from .infra.inventory import InfraNotProvisioned
 from .models.hint import HintFile
 from .sessions.store import (
@@ -74,17 +78,19 @@ from .models import (
     LabDefinition,
     ProviderUnresolved,
     RepoMetadata,
+    UnsupportedSchemaVersion,
 )
 from .reporting import machine
 from .runtimes.base import EventCallback
+from .services import host_diagnosis
 from .services import (
     CheckResult,
     check_lab,
     clean_lab,
     collect_checks,
     evaluate_lab,
+    find_lab,
     get_all_labs,
-    get_lab,
     guide_url,
     lab_status,
     next_pending_lab,
@@ -94,6 +100,10 @@ from .services import (
     validate_all_metadata,
     validate_all_structure,
 )
+from .utils.shell import CommandError
+
+logger = logging.getLogger(__name__)
+
 
 class _I18nGroup(TyperGroup):
     """TyperGroup avec l'option --help traduite."""
@@ -157,6 +167,21 @@ def _root(lab_home: Optional[Path]) -> Path:
     return lab_home.resolve() if lab_home else get_lab_home()
 
 
+def _contrat_trop_recent(exc: UnsupportedSchemaVersion) -> NoReturn:
+    """Rend l'erreur de version du ``meta.yml`` et sort.
+
+    Le ``meta.yml`` décrit tout le catalogue : ne pas savoir le lire ne laisse
+    rien de fiable derrière. On ne dégrade donc pas, on nomme la cause et la
+    réparation, qui n'est pas dans le dépôt de labs mais dans la version de
+    l'outil.
+    """
+    error(_(
+        "schema_version_meta_too_new",
+        path=exc.source, found=exc.found, supported=exc.supported,
+    ))
+    raise typer.Exit(1)
+
+
 def _read_repo(root: Path) -> RepoMetadata | None:
     """Wrapper de ``read_repo_metadata`` qui formate proprement les
     erreurs de résolution de provider (ValueError) en message CLI +
@@ -166,9 +191,49 @@ def _read_repo(root: Path) -> RepoMetadata | None:
 
     try:
         return read_repo_metadata(root)
+    # AVANT ValueError, dont elle hérite : `str(exc)` rendrait un message
+    # technique et non traduit là où la cause mérite une phrase.
+    except UnsupportedSchemaVersion as exc:
+        _contrat_trop_recent(exc)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
+
+
+def _catalogue(root: Path, lang: str, *, quiet: bool = False) -> list[LabDefinition]:
+    """Le catalogue, et un mot sur ce qu'il a fallu en écarter.
+
+    Un ``lab.yaml`` au contrat trop récent est laissé de côté — c'est la seule
+    chose honnête à en faire — mais jamais en silence : sans cet
+    avertissement, la seule trace serait un lab absent, le symptôme le plus
+    coûteux à diagnostiquer de tout le contrat.
+
+    ``quiet`` sert au mode ``--json``, où la sortie standard ne doit porter
+    qu'un document et rien d'autre.
+    """
+    from .discovery.scanner import scan_catalog
+
+    try:
+        scan = scan_catalog(root, lang=lang)
+    except UnsupportedSchemaVersion as exc:
+        _contrat_trop_recent(exc)
+    if not quiet:
+        for ecarte in scan.unsupported:
+            warn(_(
+                "schema_version_lab_skipped",
+                path=ecarte.source, found=ecarte.found, supported=ecarte.supported,
+            ))
+    return scan.labs
+
+
+def _lab(root: Path, lab_id: str, lang: str) -> LabDefinition:
+    """Un lab par son identifiant, en nommant d'abord ce qui a été écarté.
+
+    Sans cela, ``dsoxlab show <id>`` d'un lab au contrat trop récent répondrait
+    « lab introuvable », et laisserait croire à une faute de frappe plutôt qu'à
+    un outil à mettre à jour.
+    """
+    return find_lab(_catalogue(root, lang), lab_id)
 
 
 def _require_provider(repo_meta: RepoMetadata) -> str:
@@ -283,8 +348,21 @@ def _bootstrap(
             is_eager=True,
         ),
     ] = False,
+    verbose: Annotated[
+        int,
+        typer.Option("--verbose", "-v", count=True, help=_("opt_verbose")),
+    ] = 0,
+    debug: Annotated[
+        bool,
+        typer.Option("--debug", help=_("opt_debug")),
+    ] = False,
 ) -> None:
-    """Initialise la langue UI depuis le contexte avant toute commande."""
+    """Initialise la langue UI et la journalisation avant toute commande."""
+    # Avant le retour anticipé : `dsoxlab -v` sans sous-commande doit tout de
+    # même écrire son journal, et c'est aussi ce qui garantit qu'une commande
+    # qui échoue très tôt laisse une trace.
+    configurer_journal(verbose, debug=debug)
+
     if ctx.invoked_subcommand is None:
         return
     try:
@@ -325,6 +403,18 @@ def _notify_update_available() -> None:
 
 # ── install ─────────────────────────────────────────────────────────────────
 
+#: Nom du programme, tel que la CLI est installée et invoquée.
+_PROG_NAME = "dsoxlab"
+
+#: Variable d'environnement par laquelle le shell demande une complétion.
+#: Elle est DÉRIVÉE du nom du programme, comme le fait Click lui-même, et non
+#: recopiée : la valeur codée en dur était « _DSOXL_COMPLETE », que la CLI
+#: n'écoute pas. Le script généré interrogeait donc dsoxlab avec une variable
+#: ignorée, la CLI répondait par sa page d'aide, et le shell tentait de
+#: l'évaluer à chaque tabulation.
+_COMPLETE_VAR = f"_{_PROG_NAME.replace('-', '_').upper()}_COMPLETE"
+
+
 @app.command("install", help=_("cmd_install_help"))
 def install() -> None:
     """Install the dsoxlab wrapper in ~/.local/bin and shell completion."""
@@ -336,9 +426,22 @@ def install() -> None:
 
     venv_binary = Path(sys.argv[0]).resolve()
     wrapper = local_bin / "dsoxlab"
-    wrapper.write_text(f"#!/bin/sh\nexec {venv_binary} \"$@\"\n")
-    wrapper.chmod(0o755)
-    success(_("install_wrapper", path=str(wrapper), source=str(venv_binary)))
+
+    # Ne pas écraser un lanceur qui mène déjà à ce binaire. `uv tool install` et
+    # `pipx` en posent un exactement ici : le remplacer par un script shell ne
+    # fait que défaire ce que leur prochaine mise à jour remettra. Surtout, si ce
+    # lanceur EST le fichier qu'on vient de résoudre (cas d'un vrai fichier
+    # plutôt que d'un lien), le wrapper s'exécuterait lui-même, en boucle.
+    if wrapper.exists() and wrapper.resolve() == venv_binary:
+        info(_("install_wrapper_deja", path=str(wrapper)))
+    else:
+        # shlex.quote : un chemin d'installation contenant une espace
+        # (« /home/moi/My Tools/… ») produisait un `exec` découpé en plusieurs
+        # arguments, donc un wrapper qui échouait sur « not found ».
+        cible = shlex.quote(str(venv_binary))
+        wrapper.write_text(f'#!/bin/sh\nexec {cible} "$@"\n')
+        wrapper.chmod(0o755)
+        success(_("install_wrapper", path=str(wrapper), source=str(venv_binary)))
 
     # ── 2. Shell completion ────────────────────────────────────────────────────
     shell_name = Path(os.environ.get("SHELL", "bash")).name
@@ -346,9 +449,11 @@ def install() -> None:
     if shell_name == "zsh":
         zfunc_dir = Path.home() / ".zfunc"
         zfunc_dir.mkdir(exist_ok=True)
-        comp_file = zfunc_dir / "_dsoxl"
+        # Le nom du fichier compte : zsh autoload la fonction `_dsoxlab` pour
+        # compléter `dsoxlab`, et cherche donc un fichier de ce nom exact.
+        comp_file = zfunc_dir / f"_{_PROG_NAME}"
         script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("zsh"), pas un subprocess shell=True
-            prog_name="dsoxlab", complete_var="_DSOXL_COMPLETE", shell="zsh"
+            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="zsh"
         )
         comp_file.write_text(script)
         success(_("install_completion", path=str(comp_file)))
@@ -370,7 +475,7 @@ def install() -> None:
         bash_comp_dir.mkdir(exist_ok=True)
         comp_file = bash_comp_dir / "dsoxlab"
         script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("bash"), pas un subprocess shell=True
-            prog_name="dsoxlab", complete_var="_DSOXL_COMPLETE", shell="bash"
+            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="bash"
         )
         comp_file.write_text(script)
         success(_("install_completion", path=str(comp_file)))
@@ -515,7 +620,7 @@ def list_labs(
         info(_("context_active", label=ctx.label()))
 
     lang = _lang(root)
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang, quiet=as_json)
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -545,7 +650,7 @@ def show(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -570,7 +675,7 @@ def run(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -779,7 +884,7 @@ def hint(
         error(_("no_active_lab"))
         raise typer.Exit(1)
     try:
-        lab = get_lab(root, effective_id, lang=lang)
+        lab = _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -816,7 +921,7 @@ def _resolve_lab(
         error(_("no_active_lab"))
         raise typer.Exit(1)
     try:
-        return get_lab(root, effective_id, lang=lang)
+        return _lab(root, effective_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1089,7 +1194,7 @@ def progress(
     effective_section = section or ctx.section
     effective_level = level or ctx.level
 
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang, quiet=as_json)
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -1129,7 +1234,7 @@ def next_lab(
         error(_("next_no_context"))
         raise typer.Exit(1)
 
-    labs = get_all_labs(root, lang=lang)
+    labs = _catalogue(root, lang)
     if ctx.section:
         labs = [lab for lab in labs if lab.section == ctx.section]
     if ctx.level:
@@ -1156,7 +1261,7 @@ def reset(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1190,7 +1295,7 @@ def clean(
     root = _root(lab_home)
     lang = _lang(root)
     try:
-        lab = get_lab(root, lab_id, lang=lang)
+        lab = _lab(root, lab_id, lang)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1)
@@ -1233,8 +1338,32 @@ def validate_structure_cmd(
         validate_solutions_encrypted,
         validate_targets,
     )
+    from .validators.contract import validate_schema_versions
 
     root = _root(lab_home)
+
+    # D'ABORD, et à la source : un `schema_version` illisible ou trop récent
+    # empêche le fichier d'être découvert, donc TOUS les contrôles suivants
+    # l'ignoreraient — c'est le trou connu du validator, qui n'itère que sur ce
+    # qui a déjà été chargé. Ce contrôle-ci relit les fichiers du disque.
+    contract = validate_schema_versions(root)
+    if not contract.ok:
+        console.print(_("contract_issues_header"))
+        for anomalie in contract.issues:
+            try:
+                rendu = anomalie.path.relative_to(root)
+            except ValueError:
+                rendu = anomalie.path
+            console.print(
+                f"  [red]✘[/red] {rendu}: {_(anomalie.key, **anomalie.params)}"
+            )
+        # Le meta.yml décrit tout le catalogue : illisible, il rend chaque
+        # contrôle suivant douteux, et la découverte lèverait de toute façon.
+        # Un lab isolé, lui, n'empêche pas de valider les 283 autres.
+        if contract.meta_is_unreadable:
+            error(_("labs_have_issues"))
+            raise typer.Exit(1)
+
     structure_reports = validate_all_structure(root)
     metadata_reports = validate_all_metadata(root)
 
@@ -1304,7 +1433,8 @@ def validate_structure_cmd(
                 console.print(f"  [red]✘[/red] {report.lab_id} — {issue.field}: {issue.message}")
 
     all_ok = (
-        all(r.ok for r in structure_reports)
+        contract.ok
+        and all(r.ok for r in structure_reports)
         and not issues
         and not content_issues
         and not url_issues
@@ -1383,6 +1513,49 @@ def doctor(
 # ── provision / destroy / ssh / status ────────────────────────────────────────
 
 
+def _undefine_command(orphans: dict[str, str]) -> str:
+    """La commande exacte qui retire des machines restées sur l'hyperviseur.
+
+    Rendue copiable telle quelle : dire « supprime-les » sans donner le geste
+    laisse l'apprenant chercher ``virsh undefine``, qu'aucune page du parcours
+    ne lui a montré. ``sudo`` sans ``-n``, ici : c'est un humain qui la tape,
+    un mot de passe demandé au terminal ne pose aucun problème.
+    """
+    return "; ".join(
+        f"sudo virsh undefine --nvram {domain}" for domain in sorted(orphans.values())
+    )
+
+
+def _diagnostic_message(hote: dict[str, Any]) -> str:
+    """La phrase qui nomme la cause d'un hôte muet, et le geste qui la corrige.
+
+    Une cause, un message, une action. L'ancien texte en proposait deux à la
+    fois — « cloud-init tourne peut-être encore, ou alors reprovisionne » — pour
+    tous les hôtes et toutes les pannes : l'apprenant devait trancher lui-même
+    entre deux conseils dont l'un coûtait une infrastructure entière.
+    """
+    cause = hote["cause"]
+    domaine = hote.get("domain") or hote["fqdn"]
+    if cause == host_diagnosis.CAUSE_DOMAIN_ABSENT:
+        return _("status_cause_domain_absent", host=hote["fqdn"])
+    if cause == host_diagnosis.CAUSE_DOMAIN_NOT_RUNNING:
+        return _("status_cause_domain_not_running",
+                 domain=domaine, state=hote.get("domain_state") or "?")
+    if cause == host_diagnosis.CAUSE_DOMAIN_NO_LEASE:
+        return _("status_cause_domain_no_lease", domain=domaine)
+    if cause == host_diagnosis.CAUSE_BOOTING:
+        return _("status_cause_booting", domain=domaine)
+    if cause == host_diagnosis.CAUSE_SSH_REFUSED:
+        return _("status_cause_ssh_refused", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_UNREACHABLE:
+        return _("status_cause_unreachable", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_SSH_TIMEOUT:
+        return _("status_cause_ssh_timeout", ip=hote["ip"])
+    if cause == host_diagnosis.CAUSE_SSH_DENIED:
+        return _("status_cause_ssh_denied", ip=hote["ip"])
+    return _("status_cause_unknown", reason=hote.get("reason") or "?")
+
+
 @app.command("provision", help=_("cmd_provision_help"))
 def provision(
     host: Annotated[Optional[list[str]], typer.Option(
@@ -1415,6 +1588,20 @@ def provision(
             others=", ".join(conflicts),
             other=conflicts[0],
         ))
+        raise typer.Exit(5)
+
+    # Garde-fou « machines fantômes » : un provisionnement interrompu après la
+    # définition d'un domaine le laisse sur l'hyperviseur sans jamais l'inscrire
+    # au state. Terraform ne le voit donc pas, et tout apply suivant meurt sur
+    # « domain already exists », une phrase qui ne dit pas quoi faire. On nomme
+    # les machines et la commande qui les retire, avant de perdre une minute
+    # d'init et d'apply.
+    scan = tf.find_orphan_domains(repo_meta)
+    if scan.reason:
+        warn(_("orphan_check_skipped", error=scan.reason))
+    if scan.orphans:
+        error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
+        info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
         raise typer.Exit(5)
 
     info(_("provision_starting", provider=provider))
@@ -1466,6 +1653,18 @@ def provision(
         raise typer.Exit(3)
     except Exception as exc:  # noqa: BLE001 — message utilisateur direct
         error(_("provision_failed", error=str(exc)))
+        # Terraform est exact mais opaque pour qui découvre l'outil. Quand la
+        # cause est connue et le correctif tient en une ligne, on les donne
+        # plutôt que de laisser l'apprenant chercher : c'est là qu'il est
+        # bloqué, et c'est le seul moment où l'on peut l'affirmer sans risque
+        # de fausse alerte.
+        from .services.doctor import explique_echec_provision
+
+        connu = explique_echec_provision(str(exc))
+        if connu is not None:
+            explication, commande = connu
+            info(explication)
+            info(f"  {commande}")
         raise typer.Exit(4)
 
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
@@ -1616,6 +1815,13 @@ def destroy(
         error(_("destroy_failed", error=str(exc)))
         raise typer.Exit(4)
 
+    # Terraform ne détruit que ce qu'il connaît. Un domaine défini puis jamais
+    # inscrit au state lui est invisible : il annonçait donc « infrastructure
+    # détruite » et sortait en 0 en laissant les machines debout, ce qui est le
+    # contraire de ce que la commande promet. On regarde l'hyperviseur.
+    if not _handle_orphans_after_destroy(repo_meta, assume_yes=yes):
+        raise typer.Exit(6)
+
     # Le fragment SSH pointe désormais des machines mortes : le laisser
     # enverrait l'apprenant vers des adresses recyclées, ce qui est pire que
     # pas de configuration du tout.
@@ -1625,6 +1831,53 @@ def destroy(
         info(_("ssh_fragment_removed", repo=repo_meta.id))
 
     success(_("destroy_done"))
+
+
+def _handle_orphans_after_destroy(
+    repo_meta: RepoMetadata, *, assume_yes: bool
+) -> bool:
+    """Retire les machines que Terraform a laissées derrière lui, ou le dit.
+
+    Le retrait est **confirmé**, jamais implicite : rien ne garantit à dsoxlab
+    qu'un domaine homonyme d'un ``infra.hosts[].name`` soit bien le sien, et
+    une machine dé-définie ne revient pas. ``--yes`` vaut confirmation — c'est
+    déjà lui qui a autorisé la destruction de cette infrastructure, et ces
+    machines-là en font partie par leur nom.
+
+    Returns:
+        ``True`` si l'hyperviseur ne porte plus rien de ce dépôt et que la
+        commande peut sortir en succès. ``False`` s'il reste des machines :
+        l'appelant doit alors sortir en code non nul, faute de quoi il
+        annoncerait une destruction qui n'a pas eu lieu.
+    """
+    from .infra import terraform as tf
+
+    scan = tf.find_orphan_domains(repo_meta)
+    if scan.reason:
+        warn(_("orphan_check_skipped", error=scan.reason))
+    if not scan.orphans:
+        return True
+
+    noms = sorted(scan.orphans)
+    warn(_("destroy_orphan_domains", hosts=", ".join(noms)))
+    if not assume_yes and not typer.confirm(_("confirm_destroy_orphans")):
+        info(_("destroy_orphan_kept", cmd=_undefine_command(scan.orphans)))
+        return False
+
+    restants: dict[str, str] = {}
+    for fqdn in noms:
+        domaine = scan.orphans[fqdn]
+        try:
+            libvirt.remove_domain(domaine)
+        except CommandError as exc:
+            restants[fqdn] = domaine
+            error(_("destroy_orphan_failed", host=domaine,
+                    error=exc.result.stderr.strip() or str(exc)))
+    if restants:
+        info(_("destroy_orphan_kept", cmd=_undefine_command(restants)))
+        return False
+    success(_("destroy_orphan_removed", hosts=", ".join(noms)))
+    return True
 
 
 def _run_ansible_with_progress(
@@ -1938,6 +2191,39 @@ def status(
         info(_("status_via_bastion",
                bastion=bastion["fqdn"] or bastion["public_ip"]))
 
+    # ── Interrogation de l'hyperviseur ───────────────────────────────────────
+    # Elle est PARESSEUSE : tant que tout répond, il n'y a rien à diagnostiquer
+    # et rien à demander. Elle n'a lieu qu'au premier hôte muet, et une seule
+    # fois pour toute la commande.
+    interrogeable = libvirt.supports_domain_state(provider)
+    domaines_connus: list[str] | None = None
+    hyperviseur_tente = False
+    hyperviseur_erreur: str | None = None
+
+    def _etat_domaine(fqdn: str) -> libvirt.DomainStatus | None:
+        """Ce que l'hyperviseur dit de cet hôte, ou ``None`` s'il ne dit rien.
+
+        ``None`` signifie « je n'ai pas pu regarder », jamais « rien n'existe » :
+        le diagnostic retombe alors sur ce que SSH sait, sans jamais conclure à
+        une machine absente.
+        """
+        nonlocal domaines_connus, hyperviseur_tente, hyperviseur_erreur
+        if not interrogeable:
+            return None
+        if not hyperviseur_tente:
+            hyperviseur_tente = True
+            try:
+                domaines_connus = libvirt.list_domains()
+            except CommandError as exc:
+                hyperviseur_erreur = exc.result.stderr.strip() or str(exc)
+        if domaines_connus is None:
+            return None
+        try:
+            return libvirt.inspect_host(fqdn, known=domaines_connus)
+        except CommandError as exc:
+            logger.debug("état libvirt indisponible pour %s : %s", fqdn, exc)
+            return None
+
     ok_count = 0
     for fqdn, host_vars in sorted(hosts_dict.items()):
         ip = host_vars["ansible_host"]
@@ -1973,25 +2259,53 @@ def status(
                 ),
             ]
         cmd += [f"{host_vars.get('ansible_user', 'ansible')}@{ip}", "true"]
-        result = subprocess.run(cmd, capture_output=True, timeout=15)  # noqa: S603
+        # LC_ALL=C : la raison de l'échec vient de ``strerror``, que la libc
+        # traduit. Sans ce verrou, « No route to host » devient une phrase
+        # différente sur chaque poste, et le diagnostic ne reconnaîtrait plus
+        # rien de ce que ssh lui dit.
+        result = subprocess.run(  # noqa: S603
+            cmd, capture_output=True, timeout=15,
+            env={**os.environ, "LC_ALL": "C"},
+        )
         joignable = result.returncode == 0
         raison = None
         if not joignable:
             stderr_tail = result.stderr.decode(errors="replace").strip().splitlines()[-1:]
             raison = stderr_tail[0] if stderr_tail else "timeout"
-        hotes.append({"fqdn": fqdn, "ip": ip, "reachable": joignable, "reason": raison})
+        etat = None if joignable else _etat_domaine(fqdn)
+        hotes.append({
+            "fqdn": fqdn,
+            "ip": ip,
+            "reachable": joignable,
+            "reason": raison,
+            "domain": etat.domain if etat else None,
+            "domain_state": etat.state if etat else None,
+            "cause": host_diagnosis.diagnose(
+                reachable=joignable, reason=raison or "", status=etat
+            ),
+        })
         if as_json:
             ok_count += 1 if joignable else 0
             continue
         if joignable:
-            success(f"  ✔ {fqdn} ({ip})")
+            # `success` et `error` posent déjà leur propre marqueur : en
+            # rajouter un dans la chaîne donnait « ✘   ✘ hote.lab », que
+            # l'utilisateur lit comme un défaut de rendu.
+            success(f"  {fqdn} ({ip})")
             ok_count += 1
         else:
-            error(f"  ✘ {fqdn} ({ip}) — {raison}")
+            error(f"  {fqdn} ({ip}) : {raison}")
 
     if as_json:
         machine.emit({
             "provider": provider,
+            # Un consommateur doit pouvoir distinguer « aucun domaine » d'un
+            # hyperviseur qui n'a rien répondu : sans ce bloc, les deux se
+            # ressembleraient à des `domain_state: null`.
+            "hypervisor": {
+                "queryable": interrogeable and hyperviseur_erreur is None,
+                "error": hyperviseur_erreur,
+            },
             "hosts": hotes,
             "summary": {"reachable": ok_count, "total": len(hosts_dict)},
         })
@@ -2000,11 +2314,20 @@ def status(
         return
     if ok_count == len(hosts_dict):
         success(_("status_all_ok", count=ok_count))
-    else:
-        error(_("status_partial",
-                ok=ok_count, total=len(hosts_dict),
-                provider=provider))
-        raise typer.Exit(1)
+        return
+
+    error(_("status_partial", ok=ok_count, total=len(hosts_dict), provider=provider))
+    # Dire pourquoi le diagnostic est limité, plutôt que de laisser croire que
+    # l'outil a regardé la machine alors qu'il n'a pu regarder que le réseau.
+    if not interrogeable:
+        warn(_("status_provider_not_inspectable", provider=provider))
+    elif hyperviseur_erreur is not None:
+        warn(_("status_hypervisor_unavailable", error=hyperviseur_erreur))
+    for hote in hotes:
+        if hote["reachable"]:
+            continue
+        info(f"  {hote['fqdn']} — {_diagnostic_message(hote)}")
+    raise typer.Exit(1)
 
 
 @app.command("ssh", help=_("cmd_ssh_help"))
@@ -2133,15 +2456,79 @@ def instructor_bootstrap(
     from .infra import ansible as ansible_infra
     from .infra import terraform as tf
 
+    manquant = False
+
     if not tf.is_available():
         error(_("bootstrap_no_terraform"))
+        manquant = True
     else:
         info(_("bootstrap_terraform_ok"))
 
     if not ansible_infra.is_available():
         error(_("bootstrap_no_ansible_runner"))
+        manquant = True
     else:
         info(_("bootstrap_ansible_runner_ok"))
+
+    # Sortir en 0 après avoir affiché une erreur bloquante trompe autant un
+    # apprenant qui vérifie son code de retour qu'un script d'installation :
+    # la clé SSH est bien créée, mais rien ne pourra la provisionner. Le code
+    # de retour doit dire la même chose que l'écran.
+    if manquant:
+        raise typer.Exit(1)
+
+
+# ── demo ──────────────────────────────────────────────────────────────────────
+
+@app.command("demo", help=_("cmd_demo_help"))
+def demo(
+    force: Annotated[bool, typer.Option("--force", help=_("opt_demo_force"))] = False,
+) -> None:
+    """Installe le catalogue de démonstration et dit quoi faire ensuite."""
+    from .services.demo import DemoExistante, installer
+
+    try:
+        installation = installer(force=force)
+    except DemoExistante as exc:
+        # Ne pas écraser : ce répertoire porte la progression et les réponses.
+        error(_("demo_deja_installee", path=str(exc)))
+        info(_("demo_deja_installee_suite", path=str(exc)))
+        raise typer.Exit(1) from None
+    except OSError as exc:
+        error(_("demo_echec", error=str(exc)))
+        raise typer.Exit(1) from None
+
+    success(_("demo_installee", path=str(installation.racine)))
+
+    # La marche à suivre est construite depuis le catalogue réellement
+    # installé : elle ne peut donc pas décrire un lab qui n'y serait plus.
+    premier = installation.labs[0] if installation.labs else ""
+    info(_("demo_suite", path=str(installation.racine), lab=premier))
+
+
+# ── support ───────────────────────────────────────────────────────────────────
+
+@app.command("support", help=_("cmd_support_help"))
+def support(
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+    lignes: Annotated[
+        int, typer.Option("--log-lines", help=_("opt_support_log_lines"))
+    ] = 30,
+) -> None:
+    """Rapport de diagnostic anonymisé, prêt à coller dans une issue."""
+    from .services.support import collecter, en_markdown
+
+    rapport = collecter(lignes_journal=max(0, lignes))
+
+    if as_json:
+        machine.emit(rapport)
+        return
+
+    # `print` et non la console Rich : ce texte est fait pour être copié dans
+    # une issue. Rich l'habillerait de couleurs et le couperait à la largeur du
+    # terminal, ce qui casserait les tableaux Markdown une fois collés.
+    print(en_markdown(rapport))
+    info(_("support_hint"))
 
 
 # ── fullhelp ──────────────────────────────────────────────────────────────────
@@ -2168,4 +2555,14 @@ def main() -> None:
         app()
     except InfraNotProvisioned:
         error(_("infra_not_provisioned"))
+        raise SystemExit(1) from None
+    # Filet de dernier recours : les commandes qui lisent le catalogue passent
+    # par `_read_repo` ou `_catalogue`, qui disent déjà la même chose plus tôt.
+    # Celles qui liraient un meta.yml par un autre chemin ne doivent pas pour
+    # autant rendre un traceback là où une phrase suffit.
+    except UnsupportedSchemaVersion as exc:
+        error(_(
+            "schema_version_meta_too_new",
+            path=exc.source, found=exc.found, supported=exc.supported,
+        ))
         raise SystemExit(1) from None

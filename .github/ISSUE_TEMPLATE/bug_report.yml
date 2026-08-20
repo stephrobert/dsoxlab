@@ -27,12 +27,26 @@ body:
         3. ...
     validations:
       required: true
-  - type: input
-    id: version
+  - type: textarea
+    id: support
     attributes:
-      label: dsoxlab version
-      description: Output of `dsoxlab --version`.
-      placeholder: dsoxlab 0.1.0
+      label: Diagnostic report
+      description: >-
+        Output of `dsoxlab support`. It gathers the version, the system, the
+        external tools, the catalog and the latest log lines in one block, and
+        it is anonymised by default: no personal path, no public address, no
+        machine name. If dsoxlab does not even start, paste `dsoxlab --version`
+        and your OS instead, and say what happened.
+      render: markdown
+      placeholder: |
+        ## dsoxlab support
+
+        ### Environnement
+
+        | | |
+        |---|---|
+        | dsoxlab | 0.1.44 |
+        ...
     validations:
       required: true
   - type: input

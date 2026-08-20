@@ -1,0 +1,10 @@
+schema_version: 2
+id: contrat-v2
+title: A lab from a contract version this engine does not know
+level: beginner
+skills: [contract]
+distros: [any]
+doc_url: https://example.invalid/docs/contract
+runtime:
+  type: shell
+  workdir: challenge/work

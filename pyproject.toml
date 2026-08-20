@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.40"
+version = "0.1.48"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -34,10 +34,20 @@ dependencies = [
     "pyyaml>=6",
     "click>=8",
     # ansible-runner pilote ansible-core programmatiquement (API officielle
-    # Red Hat utilisée par AAP et ansible-navigator). Tire ansible-core en
-    # transitive — environ 100 MB sur disque ; acceptable pour un outil de
-    # formation devops.
+    # Red Hat utilisée par AAP et ansible-navigator).
+    #
+    # ATTENTION, ce commentaire a longtemps affirmé le contraire : ansible-runner
+    # ne tire PAS ansible-core en transitif. Mesuré sur une machine neuve, le
+    # tool installé pesait 18 Mo et son bin/ ne contenait ni `ansible` ni
+    # `ansible-playbook`. Conséquence : tout `dsoxlab run` sur un lab vm sortait
+    # en rc=127, code shell de « commande introuvable », que rien ne traduisait.
+    #
+    # ansible-core est donc déclaré explicitement. Il pèse environ 100 Mo, y
+    # compris pour un catalogue entièrement `shell` qui ne s'en servira jamais ;
+    # c'est le prix d'un outil qui marche à l'installation plutôt qu'après une
+    # commande que rien ne documente.
     "ansible-runner>=2.4",
+    "ansible-core>=2.16",
     # pytest + pytest-testinfra : dsoxlab check les invoque pour valider
     # les labs. Embarqués dans le tool install pour que l'apprenant n'ait
     # rien à installer localement (cohérent avec la philosophie "dsoxlab

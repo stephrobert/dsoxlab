@@ -10,8 +10,16 @@ from .repo import (
     SectionDefinition,
 )
 from .runtime import RuntimeConfig, RuntimeType, Target
+from .schema_version import (
+    DEFAULT_SCHEMA_VERSION,
+    SUPPORTED_SCHEMA_VERSION,
+    UnsupportedSchemaVersion,
+    read_schema_version,
+)
 
 __all__ = [
+    "DEFAULT_SCHEMA_VERSION",
+    "SUPPORTED_SCHEMA_VERSION",
     "CourseManifest",
     "CourseSection",
     "HostDefinition",
@@ -23,5 +31,7 @@ __all__ = [
     "RuntimeType",
     "SectionDefinition",
     "Target",
+    "UnsupportedSchemaVersion",
     "ValidationConfig",
+    "read_schema_version",
 ]

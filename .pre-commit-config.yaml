@@ -57,6 +57,36 @@ repos:
         language: system
         pass_filenames: false
 
+      # An invalid dependabot.yml fails silently: GitHub rejects the whole file
+      # and simply stops opening update PRs, which looks exactly like "no
+      # updates available".
+      #
+      # What this catches, measured by feeding it each mistake: a misspelled
+      # key (`groupes:` for `groups:`), an invented `update-types` value, an
+      # unknown ecosystem.
+      #
+      # What it does NOT catch, also measured: per-ecosystem restrictions. The
+      # `semver-*-days` cooldown tiers that this project once declared under
+      # github-actions, which GitHub refuses, pass the schema without a word
+      # because they are legal for other ecosystems. So this hook narrows the
+      # gap, it does not close it.
+      - id: dependabot-schema
+        name: dependabot.yml matches the official schema
+        entry: uvx check-jsonschema --builtin-schema vendor.dependabot
+        language: system
+        files: '^\.github/dependabot\.yml$'
+
+      # Une table de commandes écrite à la main dérive sans que personne
+      # ne s'en aperçoive : celle du README annonçait encore un `cleanup.sh`
+      # que le zéro-bash interdit, et il y manquait deux commandes. Elle est
+      # désormais produite par la CLI, et ce hook refuse une version périmée.
+      - id: doc-a-jour
+        name: la documentation décrit la CLI réelle
+        entry: python3 scripts/generer-doc.py --verifier
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/(cli\.py|i18n/)|README(\.fr)?\.md|scripts/generer-doc\.py)'
+
       # Full test suite runs on push (kept off the per-commit path for speed).
       - id: pytest
         name: pytest
