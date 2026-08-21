@@ -32,7 +32,11 @@ def find_meta_yml(start: Path) -> Path | None:
         current = parent
 
 
-def read_repo_metadata(root: Path | None = None) -> RepoMetadata | None:
+def read_repo_metadata(
+    root: Path | None = None,
+    *,
+    lang: str = "en",
+) -> RepoMetadata | None:
     """Lit le ``meta.yml`` du dépôt fournisseur.
 
     Le provider courant est résolu en cascade :
@@ -43,6 +47,9 @@ def read_repo_metadata(root: Path | None = None) -> RepoMetadata | None:
     Args:
         root: Si fourni, cherche ``<root>/meta.yml``. Sinon, remonte
               depuis le CWD vers les parents.
+        lang: Langue préférée pour les surcharges ``meta.<lang>.yml``.
+              Seuls les titres et descriptions en dépendent ; aucun
+              appelant qui ne les affiche pas n'a à s'en soucier.
 
     Returns:
         ``RepoMetadata`` chargé, ou ``None`` si aucun ``meta.yml``
@@ -72,7 +79,7 @@ def read_repo_metadata(root: Path | None = None) -> RepoMetadata | None:
 
     try:
         return RepoMetadata.from_yaml(
-            meta_path, context_provider=context_provider
+            meta_path, context_provider=context_provider, lang=lang
         )
     except (ValueError, KeyError) as exc:
         # Erreur de résolution provider : on remonte le message

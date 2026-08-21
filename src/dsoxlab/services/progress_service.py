@@ -52,6 +52,37 @@ class BlocProgress:
         return self.validated > 0
 
 
+def exam_percentage(score: int, max_score: int) -> int:
+    """Le score, ramené au pourcentage du barème. ``0`` si le barème est nul.
+
+    Un barème à zéro n'est pas une réussite parfaite : c'est un contrat
+    incomplet, et il vaut 0 % comme il vaut 0 point dans :func:`compute_score`.
+    """
+    if max_score <= 0:
+        return 0
+    return score * 100 // max_score
+
+
+def exam_verdict(score: int, max_score: int, passing_score: int) -> bool | None:
+    """Le lab est-il réussi au sens de son ``exam_passing_score`` ?
+
+    Rend ``None`` quand le lab ne déclare pas de seuil : la très grande
+    majorité des labs, qui ne sont pas des examens. ``None`` n'est pas un
+    échec, et distinguer les deux est tout l'intérêt de cette fonction — un
+    lab ordinaire ne doit jamais s'afficher « recalé ».
+
+    La comparaison est faite en entiers, sans passer par un pourcentage
+    arrondi : à 69,5 % d'un barème, l'arrondi rendrait 70 et déclarerait reçu
+    un apprenant qui ne l'est pas. Un seuil d'examen ne s'arrondit pas en
+    faveur du candidat.
+    """
+    if passing_score <= 0:
+        return None
+    if max_score <= 0:
+        return False
+    return score * 100 >= passing_score * max_score
+
+
 def pedagogical_sort_key(lab: LabDefinition) -> tuple[int, int, int, str]:
     """Ordre dans lequel un apprenant doit rencontrer les labs.
 

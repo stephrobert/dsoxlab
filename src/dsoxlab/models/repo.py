@@ -27,6 +27,10 @@ Schéma :
         description: <courte>
         labs:
           - <chemin-relatif-depuis-labs/>
+
+Un ``meta.<lang>.yml`` posé à côté surcharge les titres et descriptions dans
+cette langue — même convention que ``lab.<lang>.yaml``. Voir
+:func:`_apply_translation`.
 """
 
 from __future__ import annotations
@@ -40,6 +44,69 @@ import yaml
 
 from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
 from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
+
+#: Champs qu'un ``meta.<lang>.yml`` peut surcharger, et eux seuls.
+#:
+#: Le contrat traduit **par fichier** : ``lab.fr.yaml`` à côté de ``lab.yaml``,
+#: ``course.fr.yaml`` à côté de ``course.yaml``. Le ``meta.yml`` était le seul
+#: document sans équivalent, d'où les ``title_en`` / ``description_en``
+#: apparus dans un catalogue — écrits par un auteur, lus par personne. La
+#: surcharge par fichier est le mécanisme cohérent avec le reste du contrat ;
+#: un suffixe de langue par champ ne l'aurait pas été, et aurait grandi d'une
+#: colonne à chaque langue.
+_TRANSLATABLE_REPO = ("title", "description")
+_TRANSLATABLE_SECTION = ("title", "description")
+
+
+def _apply_translation(data: dict[str, Any], meta_path: Path, lang: str) -> None:
+    """Fusionne ``meta.<lang>.yml`` dans ``data``, sur place.
+
+    Même contrat que ``lab.<lang>.yaml`` : le fichier de base est l'anglais,
+    la surcharge ne porte que sur les champs traduisibles, et tout le reste y
+    est ignoré. Un fichier de traduction illisible ne fait jamais échouer la
+    lecture du catalogue — on garde les valeurs de base, comme pour un lab.
+
+    Les sections sont appariées par ``id``, jamais par position : une section
+    insérée dans ``meta.yml`` décalerait sinon toutes les traductions
+    suivantes, en silence et sans qu'aucun contrôle ne puisse le voir.
+    """
+    if not lang or lang == "en":
+        return
+    lang_path = meta_path.parent / f"meta.{lang[:2].lower()}.yml"
+    if not lang_path.is_file():
+        return
+    try:
+        overrides = yaml.safe_load(lang_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return
+    if not isinstance(overrides, dict):
+        return
+
+    base_repo = data.get("repo")
+    over_repo = overrides.get("repo")
+    if isinstance(base_repo, dict) and isinstance(over_repo, dict):
+        for champ in _TRANSLATABLE_REPO:
+            if champ in over_repo:
+                base_repo[champ] = over_repo[champ]
+
+    base_sections = data.get("sections")
+    over_sections = overrides.get("sections")
+    if not isinstance(base_sections, list) or not isinstance(over_sections, list):
+        return
+    traductions = {
+        str(s["id"]): s
+        for s in over_sections
+        if isinstance(s, dict) and s.get("id") is not None
+    }
+    for section in base_sections:
+        if not isinstance(section, dict):
+            continue
+        traduite = traductions.get(str(section.get("id")))
+        if traduite is None:
+            continue
+        for champ in _TRANSLATABLE_SECTION:
+            if champ in traduite:
+                section[champ] = traduite[champ]
 
 
 def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, Any]]:
@@ -298,6 +365,7 @@ class RepoMetadata:
         meta_path: Path,
         *,
         context_provider: str | None = None,
+        lang: str = "en",
     ) -> RepoMetadata:
         """Charge RepoMetadata depuis un fichier meta.yml.
 
@@ -308,6 +376,9 @@ class RepoMetadata:
                 Utilisé en fallback si ``meta.yml`` déclare plusieurs
                 providers candidats et que ``DSOXLAB_PROVIDER`` n'est
                 pas posé.
+            lang: langue préférée. Si elle n'est pas ``en`` et qu'un
+                ``meta.<lang>.yml`` existe à côté, ses titres et
+                descriptions surchargent ceux du ``meta.yml``.
 
         Lève ``ValueError`` si ``repo.id``/``repo.category`` manquent.
 
@@ -332,6 +403,11 @@ class RepoMetadata:
         # ce bloc. Réclamer d'abord un champ dont on ignore s'il existe encore
         # dans cette version enverrait l'auteur sur une fausse piste.
         schema_version = read_schema_version(data, meta_path)
+
+        # Après la version, avant toute lecture de champ : la traduction ne
+        # décide de rien, elle ne fait que remplacer des libellés déjà
+        # structurés par le fichier de base.
+        _apply_translation(data, meta_path, lang)
 
         repo = data.get("repo") or {}
         if not isinstance(repo, dict):

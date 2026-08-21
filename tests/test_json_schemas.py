@@ -43,6 +43,7 @@ from dsoxlab.models.schema_version import (
     SCHEMA_VERSION_FIELD,
     SUPPORTED_SCHEMA_VERSION,
 )
+from dsoxlab.validators.contract import KNOWN_LAB_KEYS, KNOWN_META_KEYS
 from dsoxlab.validators.metadata import _VALID_LAB_TYPES
 
 RACINE = Path(__file__).resolve().parent.parent
@@ -246,6 +247,71 @@ def test_la_confrontation_echoue_dans_les_deux_sens() -> None:
 
     with pytest.raises(AssertionError, match="aucun nœud du schéma ne décrit"):
         _confronter(schema, noeuds, {"data": {"connu"}, "surprise": {"x"}}, "faux")
+
+
+# ── le garde-fou embarqué dit-il la même chose que le schéma publié ? ────────
+#
+# `validate-structure` refuse les clés inconnues, et il lui faut donc la liste
+# des clés connues À L'EXÉCUTION. Les schémas JSON la portent déjà — c'est le
+# sens de leur `additionalProperties: false` — mais `schemas/` ne fait pas
+# partie de la roue : le paquet ne peut pas les lire chez l'utilisateur. La
+# liste est donc recopiée dans `validators/contract.py`, et une copie non
+# tenue par un test aurait dérivé en trois versions, exactement comme les
+# schémas eux-mêmes avant ce module.
+
+
+def chemins_du_schema(schema: dict[str, Any], prefixe: str = "") -> set[str]:
+    """Les chemins pointés qu'un schéma décrit — `runtime.targets[].host`.
+
+    On descend dans `properties` et dans `items` (une liste ajoute `[]` au
+    chemin). On ne descend **pas** dans `additionalProperties` : un nœud qui
+    en porte un est ouvert, ses clés appartiennent au catalogue, et le
+    contrôle n'a rien à y dire. C'est ce qui laisse libres `targets[].roles`,
+    `services[].env` et `infra.providers.<provider>`.
+    """
+    chemins: set[str] = set()
+    proprietes = schema.get("properties")
+    if isinstance(proprietes, dict):
+        for cle, sous in proprietes.items():
+            chemin = f"{prefixe}.{cle}" if prefixe else str(cle)
+            chemins.add(chemin)
+            if isinstance(sous, dict):
+                chemins |= chemins_du_schema(sous, chemin)
+    items = schema.get("items")
+    if isinstance(items, dict):
+        chemins |= chemins_du_schema(items, f"{prefixe}[]")
+    return chemins
+
+
+@pytest.mark.parametrize(
+    ("nom", "constante"),
+    [
+        ("lab.schema.json", KNOWN_LAB_KEYS),
+        ("meta.schema.json", KNOWN_META_KEYS),
+    ],
+)
+def test_les_cles_connues_du_paquet_suivent_le_schema(
+    nom: str, constante: frozenset[str]
+) -> None:
+    assert chemins_du_schema(_charger(nom)) == set(constante), (
+        f"{nom} et validators/contract.py ne décrivent plus le même contrat. "
+        "Le schéma fait foi : aligne la constante."
+    )
+
+
+def test_la_derivation_voit_les_listes_et_saute_les_noeuds_ouverts() -> None:
+    """Une dérivation cassée rendrait le test précédent vert à vide."""
+    schema = {
+        "properties": {
+            "plat": {"type": "string"},
+            "bloc": {"properties": {"dedans": {"type": "string"}}},
+            "liste": {"items": {"properties": {"champ": {"type": "string"}}}},
+            "libre": {"additionalProperties": {"properties": {"cache": {}}}},
+        }
+    }
+    assert chemins_du_schema(schema) == {
+        "plat", "bloc", "bloc.dedans", "liste", "liste[].champ", "libre",
+    }
 
 
 # ── énumérés, versions, identité ─────────────────────────────────────────────

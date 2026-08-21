@@ -348,11 +348,14 @@ Chaque lab expose :
 
   [cyan]submit[/cyan] [dim][<id>][/dim]        Soumission finale : joue les tests, sauvegarde le score, puis tapez [bold]exit[/bold] pour terminer la session.
                        À utiliser quand vous avez fini le lab.
+                       Sur un lab qui déclare [bold]exam_passing_score[/bold], rend aussi un
+                       [yellow]verdict reçu / recalé[/yellow] face à ce seuil.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
   [cyan]progress[/cyan]             Résumé de progression par bloc (labs faits, score, challenge, capstone).
 
   [cyan]next[/cyan]                 Recommande le prochain lab à compléter dans le contexte actif.
-  [cyan]scores[/cyan]               Affiche l'historique des scores.
+  [cyan]scores[/cyan]               Affiche l'historique des scores. Une colonne [bold]Verdict[/bold] apparaît
+                       si le catalogue porte au moins un lab à seuil d'examen.
     [dim]--section / -s[/dim]       Filtre par section.
     [dim]--lab     / -l[/dim]       Filtre par lab.
     [dim]--top     / -n[/dim]       Limite le nombre de résultats.
@@ -923,4 +926,25 @@ hors ligne, elle se tait.
         "Interrompu : la session du lab s'est refermée. Ton travail est intact.",
     "interrupted_unknown":
         "Interrompu par Ctrl-C.",
+    # ── exam_passing_score — le verdict d'un examen blanc ─────────────────────
+    "field_exam_score": "[bold]Seuil de réussite :[/bold]",
+    "col_verdict":   "Verdict",
+    "verdict_pass":  "reçu",
+    "verdict_fail":  "recalé",
+    "exam_passed":
+        "Examen réussi : {pct} % du barème, pour un seuil de {threshold} %.",
+    "exam_failed":
+        "Examen échoué : {pct} % du barème, sous le seuil de {threshold} %. "
+        "Rejoue le lab : dsoxlab reset, puis dsoxlab run.",
+
+    # ── clés inconnues dans un fichier du contrat ─────────────────────────────
+    "unknown_keys_header": "\n[bold red]Clés que personne ne lit :[/bold red]",
+    "unknown_key":
+        "« {field} » ne fait pas partie du contrat. dsoxlab l'ignore, donc ce que "
+        "tu voulais déclarer ne se produit jamais. Retire-la, ou consulte "
+        "docs/contract-v1.fr.md.",
+    "unknown_key_suggest":
+        "« {field} » ne fait pas partie du contrat, et dsoxlab l'ignore. "
+        "La clé la plus proche qu'il lit vraiment, à ce niveau, est "
+        "« {suggestion} ».",
 }

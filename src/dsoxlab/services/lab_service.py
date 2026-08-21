@@ -128,7 +128,10 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
     record_result(
         root,
         lab_id=lab.id,
-        section=lab.section,
+        # `or ""` : la colonne `section` est NOT NULL, et un lab qu'aucune
+        # règle n'a rattaché n'en a pas. Vide se filtre comme absent ; None
+        # ferait lever l'insertion.
+        section=lab.section or "",
         score=score,
         max_score=max_score,
         passed_tests=result.passed,

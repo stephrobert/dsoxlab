@@ -345,13 +345,16 @@ Each lab exposes:
 
   [cyan]submit[/cyan] [dim][<id>][/dim]        Final submission: run tests, save score, then type [bold]exit[/bold] to end the session.
                        Use this when you are done with the lab.
+                       On a lab declaring [bold]exam_passing_score[/bold], also renders a
+                       [yellow]pass / fail verdict[/yellow] against that mark.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]progress[/cyan]             Bloc-by-bloc progression summary (labs done, score, challenge, capstone).
 
   [cyan]next[/cyan]                 Recommend the next lab to complete in the active context.
 
-  [cyan]scores[/cyan]               Show score history.
+  [cyan]scores[/cyan]               Show score history. A [bold]Verdict[/bold] column appears when the
+                       catalog holds at least one lab with an exam pass mark.
     [dim]--section / -s[/dim]       Filter by section.
     [dim]--lab     / -l[/dim]       Filter by lab.
     [dim]--top     / -n[/dim]       Limit number of results.
@@ -917,4 +920,23 @@ silent.
         "Interrupted: the lab session was closed. Your work is untouched.",
     "interrupted_unknown":
         "Interrupted by Ctrl-C.",
+    # ── exam_passing_score — the verdict of a mock exam ───────────────────────
+    "field_exam_score": "[bold]Pass mark:[/bold]",
+    "col_verdict":   "Verdict",
+    "verdict_pass":  "passed",
+    "verdict_fail":  "failed",
+    "exam_passed":
+        "Exam passed: {pct}% of the scale, for a pass mark of {threshold}%.",
+    "exam_failed":
+        "Exam failed: {pct}% of the scale, below the {threshold}% pass mark. "
+        "Replay the lab: dsoxlab reset, then dsoxlab run.",
+
+    # ── unknown keys in a contract file ───────────────────────────────────────
+    "unknown_keys_header": "\n[bold red]Keys nothing reads:[/bold red]",
+    "unknown_key":
+        "'{field}' is not part of the contract. dsoxlab ignores it, so whatever "
+        "you meant by it never happens. Remove it, or check docs/contract-v1.md.",
+    "unknown_key_suggest":
+        "'{field}' is not part of the contract, and dsoxlab ignores it. "
+        "The closest key it does read at that level is '{suggestion}'.",
 }

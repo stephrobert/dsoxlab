@@ -1306,6 +1306,22 @@ def submit(
     else:
         info(_("submit_partial", passed=result.passed, total=result.total, score=score, max_score=max_score))
 
+    # Un lab qui déclare un seuil est un examen blanc, et un examen rend un
+    # verdict. Sans lui, un apprenant qui rendait 40/100 sur un mock RHCSA ne
+    # lisait nulle part qu'il avait échoué : la note s'affichait, jamais son
+    # sens. Un lab ordinaire n'en déclare pas et n'affiche donc rien.
+    from .services.progress_service import exam_percentage, exam_verdict
+
+    verdict = exam_verdict(score, max_score, lab.exam_passing_score)
+    if verdict is not None:
+        cle = "exam_passed" if verdict else "exam_failed"
+        rendu = success if verdict else error
+        rendu(_(
+            cle,
+            pct=exam_percentage(score, max_score),
+            threshold=lab.exam_passing_score,
+        ))
+
     set_active_lab(root, None)
     console.print()
     # CTA "tape exit" uniquement si on est dans le sous-shell ouvert
@@ -1331,7 +1347,15 @@ def scores(
     ctx = read_context(root)
     effective_section = section or ctx.section
     results = get_results(root, lab_id=lab_id, section=effective_section, limit=top)
-    print_scores_table(results)
+    # Les seuils vivent dans le catalogue, les notes dans la base : le verdict
+    # d'un examen demande les deux. On ne balaie que pour les labs affichés.
+    affiches = {r["lab_id"] for r in results}
+    seuils = {
+        lab.id: lab.exam_passing_score
+        for lab in _catalogue(root, _lang(root))
+        if lab.exam_passing_score and lab.id in affiches
+    }
+    print_scores_table(results, seuils)
 
 
 # ── progress ──────────────────────────────────────────────────────────────────
@@ -1505,9 +1529,15 @@ def validate_structure_cmd(
         validate_solutions_encrypted,
         validate_targets,
     )
-    from .validators.contract import validate_schema_versions
+    from .validators.contract import validate_schema_versions, validate_unknown_keys
 
     root = _root(lab_home)
+
+    def _rendu(chemin: Path) -> Path:
+        try:
+            return chemin.relative_to(root)
+        except ValueError:
+            return chemin
 
     # D'ABORD, et à la source : un `schema_version` illisible ou trop récent
     # empêche le fichier d'être découvert, donc TOUS les contrôles suivants
@@ -1517,12 +1547,9 @@ def validate_structure_cmd(
     if not contract.ok:
         console.print(_("contract_issues_header"))
         for anomalie in contract.issues:
-            try:
-                rendu = anomalie.path.relative_to(root)
-            except ValueError:
-                rendu = anomalie.path
             console.print(
-                f"  [red]✘[/red] {rendu}: {_(anomalie.key, **anomalie.params)}"
+                f"  [red]✘[/red] {_rendu(anomalie.path)}: "
+                f"{_(anomalie.key, **anomalie.params)}"
             )
         # Le meta.yml décrit tout le catalogue : illisible, il rend chaque
         # contrôle suivant douteux, et la découverte lèverait de toute façon.
@@ -1530,6 +1557,19 @@ def validate_structure_cmd(
         if contract.meta_is_unreadable:
             error(_("labs_have_issues"))
             raise typer.Exit(1)
+
+    # Ensuite, toujours à la source : les clés que le moteur n'ira jamais lire.
+    # Le parseur les ignore et continuera de le faire — c'est une garantie de
+    # la v1 — mais « toléré » n'est pas « voulu » : onze labs d'examen ont posé
+    # un seuil de réussite que personne ne lisait, sans que rien ne le dise.
+    unknown = validate_unknown_keys(root)
+    if not unknown.ok:
+        console.print(_("unknown_keys_header"))
+        for anomalie in unknown.issues:
+            console.print(
+                f"  [red]✘[/red] {_rendu(anomalie.path)}: "
+                f"{_(anomalie.key, **anomalie.params)}"
+            )
 
     structure_reports = validate_all_structure(root)
     metadata_reports = validate_all_metadata(root)
@@ -1601,6 +1641,7 @@ def validate_structure_cmd(
 
     all_ok = (
         contract.ok
+        and unknown.ok
         and all(r.ok for r in structure_reports)
         and not issues
         and not content_issues
