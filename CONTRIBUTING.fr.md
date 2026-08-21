@@ -65,10 +65,27 @@ cd ~/Projets/ansible-training && dsoxlab list-labs
 À lancer avant d'ouvrir une pull request. La CI exécute les mêmes contrôles.
 
 ```bash
-uv run ruff check src/dsoxlab tests fuzz   # lint + sécurité (règles flake8-bandit S)
-uv run mypy src/dsoxlab                    # typage (strict)
-uv run pytest                              # tests
+uv run ruff check src/dsoxlab tests tests_e2e fuzz scripts   # lint + sécurité (règles flake8-bandit S)
+uv run mypy src/dsoxlab                                      # typage (strict)
+uv run pytest                                                # tests unitaires
+uv run pytest tests_e2e                                      # bout en bout, sur la roue construite
 ```
+
+### Les deux suites, et pourquoi elles sont séparées
+
+`tests/` importe le paquet et prouve que les fonctions font ce qu'elles disent.
+`tests_e2e/` ne l'importe jamais : elle construit la roue, l'installe dans un
+environnement virtuel jetable et pilote le binaire `dsoxlab` par sous-processus,
+en n'assérant que sur les codes de retour, la sortie standard, la sortie
+d'erreur et les fichiers laissés sur le disque. C'est la seule façon qu'un
+fichier de données absent de la roue, ou un point d'entrée `console_scripts`
+cassé, fasse rougir une construction.
+
+Une règle porte tout l'édifice, et un test porte la règle : **aucun fichier de
+`tests_e2e/` n'importe `dsoxlab`**. Ajoutez un tel import et
+`test_boite_noire.py` passe au rouge : c'est le moyen le plus rapide de
+comprendre à quoi sert cette suite. `tests_e2e/` a sa propre `pytest.ini`, donc
+le `testpaths` du projet la tient hors d'un simple `uv run pytest`.
 
 ### Scanners de workflow
 

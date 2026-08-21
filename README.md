@@ -396,8 +396,14 @@ uv sync                                     # install dev dependencies
 uv run pre-commit install --install-hooks   # enable the git hooks
 uv run ruff check src/dsoxlab               # lint + security
 uv run mypy src/dsoxlab                     # type-check (strict)
-uv run pytest                               # tests
+uv run pytest                               # unit tests
+uv run pytest tests_e2e                     # end-to-end, on the built wheel
 ```
+
+`tests_e2e/` is a black-box suite: it never imports `dsoxlab`. It builds the
+wheel, installs it into a throwaway virtualenv and drives the binary by
+subprocess, from `dsoxlab demo` to a 100/100 score. It is the only check that
+sees a packaging defect.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow, the commit
 conventions, and the non-negotiable rules (the engine must stay

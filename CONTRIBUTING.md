@@ -65,10 +65,26 @@ cd ~/Projets/ansible-training && dsoxlab list-labs
 Run these before opening a pull request. CI runs the same checks.
 
 ```bash
-uv run ruff check src/dsoxlab tests fuzz   # lint + security (flake8-bandit S rules)
-uv run mypy src/dsoxlab                    # type-check (strict)
-uv run pytest                              # tests
+uv run ruff check src/dsoxlab tests tests_e2e fuzz scripts   # lint + security (flake8-bandit S rules)
+uv run mypy src/dsoxlab                                      # type-check (strict)
+uv run pytest                                                # unit tests
+uv run pytest tests_e2e                                      # end-to-end, on the built wheel
 ```
+
+### The two suites, and why they are separate
+
+`tests/` imports the package and proves the functions do what they say.
+`tests_e2e/` never imports it: it builds the wheel, installs it into a
+throwaway virtualenv and drives the `dsoxlab` binary by subprocess, asserting
+only on exit codes, stdout, stderr and the files left on disk. That is the only
+way a data file missing from the wheel, or a broken `console_scripts` entry
+point, ever turns a build red.
+
+One rule holds the whole thing up, and a test holds the rule: **no file under
+`tests_e2e/` may import `dsoxlab`**. Add such an import and
+`test_boite_noire.py` goes red — try it, it is the fastest way to understand
+what the suite is for. `tests_e2e/` carries its own `pytest.ini`, so the
+project's `testpaths` keeps it out of a plain `uv run pytest`.
 
 ### Workflow scanners
 

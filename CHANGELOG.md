@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.51] - 2026-08-21
+
+### Added
+
+- **A black-box end-to-end suite, `tests_e2e/`.** The 421 unit tests all speak
+  to the engine from the inside. They prove the functions do what they say; they
+  never prove that *the installed program* behaves as promised. A broken entry
+  point, a data file missing from the wheel, a mis-declared `console_scripts`:
+  none of it was detectable by a green suite. The new suite builds the wheel,
+  installs it into a throwaway virtualenv and drives the `dsoxlab` binary by
+  subprocess, asserting only on the exit code, stdout, stderr and the files left
+  on disk.
+
+- **The newcomer's path is replayed in full:** `demo`, `list-labs`, `run`,
+  `check`, `scores`, from a bare machine to 100/100 on the packaged
+  demonstration lab. It needs no KVM, no Incus, no Docker and no privilege — the
+  demonstration catalog is a `shell` lab — and the job takes about six seconds,
+  wheel build included.
+
+- **The suite can fail, and that is the whole point.** The same lab is worth
+  100/100 once solved and 0/100 with a non-zero exit code when it is not; taking
+  its single hint drops the same flawless run to 80/100. Excluding the
+  demonstration catalog from the wheel turns the packaging checks red and takes
+  the whole journey down with them, which is the proof that what is under test
+  is the distribution and not the source tree.
+
+- **The "no `dsoxlab` import" rule is held by a test,** on the model of
+  `tests/test_i18n_coverage.py`. Three doors, because one alone can be walked
+  around: a syntax check over every file of the suite for `import dsoxlab`, a
+  second for the dynamic route (`importlib.import_module("dsoxlab")`), and a
+  third that reads `sys.modules` at run time, which no syntactic trick escapes.
+
+### Changed
+
+- **CI gains a job of its own, `End-to-end (black box, installed wheel)`.** It
+  is kept separate from the unit matrix on purpose: a red end-to-end run and a
+  red unit run do not mean the same thing, and only the first one says the
+  packaged tool is broken. `tests_e2e/` carries its own `pytest.ini`, so
+  `uv run pytest` still runs the unit suite alone and the contribution gate
+  keeps its measured duration.
+
+- The ruff step now lints `tests_e2e` as well, aligning it with the pre-commit
+  hook, which has always run on every Python file of the tree.
+
 ## [0.1.50] - 2026-08-20
 
 ### Changed
