@@ -178,6 +178,12 @@ STRINGS: dict[str, str] = {
     "ssh_fragment_removed": "SSH fragment for [bold]{repo}[/bold] removed: it pointed at destroyed machines.",
     "destroy_done":        "Infrastructure destroyed.",
     "destroy_failed":      "Destruction failed: {error}",
+    "snapshot_purge_done":
+        "{count} snapshot overlay file(s) removed before destruction: Terraform "
+        "does not know about them and would have left them behind.",
+    "snapshot_purge_failed":
+        "Snapshots could not be purged ({error}). If this infrastructure had "
+        "any, their overlay files stay in the storage pool after destruction.",
     "status_no_hosts":     "meta.yml declares no hosts.",
     "status_no_key":       "SSH private key not found: {path}. Run 'dsoxlab instructor bootstrap' first.",
     "status_checking":     "Checking SSH connectivity on {count} host(s)…",
@@ -828,6 +834,25 @@ silent.
     "err_snapshot_provider_unsupported":
         "Snapshots are not implemented yet for provider '{provider}'. "
         "See src/dsoxlab/infra/snapshot/__init__.py to add a backend.",
+    "err_snapshot_no_disk":
+        "Snapshot '{snapshot}' of domain {domain} froze no disk: there is "
+        "nothing to roll back to. Take it again with dsoxlab run.",
+    "err_snapshot_no_base":
+        "Snapshot '{snapshot}' of domain {domain}: cannot tell which disk "
+        "'{disk}' overlays. Rolling back would throw away the wrong file.",
+    "err_snapshot_no_capacity":
+        "libvirt does not report the size of {path}: an overlay cannot be "
+        "recreated without it.",
+    "err_snapshot_not_top_layer":
+        "Snapshot '{snapshot}' is no longer the top layer of {domain} disk "
+        "'{disk}': it writes to {found}, the snapshot created {expected}. "
+        "Rolling back here would drop changes the snapshot never covered.",
+    "err_vm_snapshot_required":
+        "Lab {lab_id} declares snapshot_required: true and the checkpoint "
+        "could not be taken on {host}: {error}\n"
+        "The lab is NOT started, because it would run without the safety net "
+        "it asks for. Either fix the hypervisor, or declare "
+        "snapshot_required: false in its lab.yaml.",
     "err_runtime_unavailable":
         "Runtime '{runtime}' is not available on this machine. Install the "
         "dependencies (`dsoxlab instructor bootstrap`), or pick a lab that "

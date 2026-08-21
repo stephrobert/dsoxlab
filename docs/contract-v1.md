@@ -225,7 +225,7 @@ rendered — which is the case of every lab that is not a capstone or a drill.
 | `type` | no | enum | `shell` | `shell`, `vm`, and the backward-compatible aliases `kvm` and `incus`. Write `vm` in new labs. |
 | `targets` | for `vm` | list of mappings | `[]` | Must not be empty for `vm`. |
 | `default` | no | string | — | Must match one `targets[].name`. |
-| `snapshot_required` | no | boolean | `false` | |
+| `snapshot_required` | no | boolean | `false` | Binding, not informational. See below. |
 | `session` | no | enum | `target` | `target` = SSH session on the host; `local` = local subshell. Only meaningful for `vm`. |
 | `workdir` | for `shell` | string | `challenge/work` | Must not be empty for `shell`. Ignored for `vm`. |
 | `fixtures` | no | list of strings | `[]` | Paths relative to `<lab>/fixtures/`, preserved under `workdir`. |
@@ -235,6 +235,38 @@ rendered — which is the case of every lab that is not a capstone or a drill.
 A fixture **not listed** is **not copied**, even if it sits in `fixtures/`. An
 absolute path, or one containing `..`, is refused: a fixture never writes
 outside the workdir.
+
+#### `runtime.snapshot_required`
+
+This field **binds the tool**. Declaring `true` changes three commands:
+
+| Command | With `snapshot_required: true` |
+| --- | --- |
+| `run` | Takes a checkpoint **before** `setup.yaml`, and **fails** if it cannot. The lab does not start without the safety net it asks for. |
+| `reset` | Rolls the machine back to the checkpoint instead of replaying `cleanup.yaml`, then replays `setup.yaml`. |
+| `clean` | Drops the checkpoint, and the overlay file it created with it. |
+
+A lab that can live without a safety net declares `false`, which is the
+default and what every lab in every catalogue declares today.
+
+**What a dsoxlab checkpoint captures — and what it does not.** On the `kvm`
+provider it is an **external disk snapshot** (`virsh snapshot-create-as
+--disk-only --atomic`), never an internal one: the packaged Terraform template
+boots its machines in UEFI, and libvirt refuses internal snapshots on pflash
+firmware. Three consequences the contract states rather than leaves to be
+discovered:
+
+- **the disk is captured, the memory is not.** Rolling back reboots the
+  machine from a consistent disk state; it does not put it back in the second
+  before. For a lab that is the right trade-off, but a lab whose exercise
+  depends on a running process must replay it, not expect it back;
+- **a checkpoint creates an overlay file** next to the disk. `clean` and
+  `destroy` remove it; nothing else does, so a lab that takes a checkpoint and
+  is never cleaned leaves one behind until the infrastructure is destroyed;
+- **rolling back is not `virsh snapshot-revert`.** dsoxlab stops the machine,
+  empties the overlay and restarts it. The checkpoint survives, so it can be
+  used again; but it must still be the disk's top layer, and dsoxlab refuses to
+  roll back when it is not, rather than dropping the wrong file.
 
 #### `runtime.targets[]`
 

@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.56] - 2026-08-21
+
+### Fixed
+
+- **Snapshots worked on no dsoxlab VM at all, and the failure was silent.** The
+  packaged Terraform template boots its machines in UEFI — modern cloud images
+  no longer ship a legacy BIOS bootloader — and libvirt refuses *internal*
+  snapshots on pflash firmware: `internal snapshots of a VM with pflash based
+  firmware are not supported`. `infra/snapshot/kvm.py` asked for exactly that.
+  It now takes an **external** snapshot (`--disk-only --atomic`), verified on a
+  real UEFI domain.
+
+- **The overlay path is passed, not guessed.** On a `type='volume'` disk — the
+  form the template produces — libvirt refuses to derive the name itself
+  (`cannot generate external snapshot name for disk 'vda' without source`), so
+  a naive external snapshot fails just as the internal one did. `create` now
+  passes one `--diskspec` per writable disk. The cloud-init cdrom is left out:
+  giving it a diskspec would fail the whole snapshot.
+
+- **`run` now fails when a required checkpoint cannot be taken.** This is the
+  change that matters most. `runtimes/vm.py` swallowed the failure in a
+  `logger.warning`, and no `logging.basicConfig` exists in this package: a lab
+  declaring `snapshot_required: true` started **without the safety net it asks
+  for**, `run` exited 0, and the learner found out when they needed it. That
+  silence is what let the feature stay broken unseen. A lab that can live
+  without a net still declares `snapshot_required: false`, which is the default
+  and what every lab in every catalogue declares today.
+
+- **Rolling back is a different operation, and it is implemented as one.**
+  libvirt refuses `snapshot-revert` on an external snapshot (`Invalid target
+  domain state 'disk-snapshot'`). `revert` now stops the machine, empties the
+  overlay through libvirt's own storage API and restarts it — the disk path
+  never changes, so the domain XML is never rewritten and the checkpoint stays
+  usable. It refuses to run when the checkpoint is no longer the disk's top
+  layer, rather than dropping the wrong file.
+
+- **`clean` and `destroy` know about the overlay file.** An external snapshot
+  leaves an artefact Terraform has never heard of: it is in no state file, and
+  the volume beneath it gets deleted from under it. `clean` drops the
+  checkpoint through `snapshot-delete`, which merges the overlay back and
+  removes the file; `destroy` purges every checkpoint **before** Terraform runs,
+  because after the `undefine` the metadata is gone with the domain and the file
+  becomes untraceable. Same defect family as the orphan domains of #107.
+
+### Added
+
+- **`reset` finally gives `snapshot_required` an observable effect.** On a lab
+  that declares it, `dsoxlab reset` rolls the machine back to its checkpoint
+  instead of replaying `cleanup.yaml`, then replays `setup.yaml`. Labs that do
+  not declare it keep the exact previous behaviour.
+
+- **The contract says what a checkpoint captures, and what it does not.**
+  `docs/contract-v1.md`, its French counterpart and `schemas/lab.schema.json`
+  now state the disk/memory boundary: rolling back reboots from a consistent
+  disk state, it does not put the machine back in the second before. A lab whose
+  exercise depends on a running process must replay it.
 ## [0.1.55] - 2026-08-21
 
 ### Added

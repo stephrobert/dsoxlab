@@ -1,0 +1,26 @@
+id: l4-selinux-booleans
+title: Recover a broken SELinux policy
+level: advanced
+lab_type: challenge
+section: linux
+description: A lab that breaks the machine on purpose, so it asks for a net.
+skills: [selinux, semanage, restorecon]
+distros: [alma10]
+doc_url: https://blog.stephane-robert.info/docs/linux/selinux/
+difficulty: advanced
+estimated_time: "45m"
+runtime:
+  type: vm
+  targets:
+    - name: rhel
+      host: alma-rhcsa-1.lab
+  default: rhel
+  session: target
+  # Engage l'outil : run échoue si le point de reprise ne peut pas être pris,
+  # reset y revient au lieu de rejouer le cleanup.yaml, clean le retire avec
+  # son fichier de recouvrement.
+  snapshot_required: true
+validation:
+  functional: true
+  security: true
+  persistence_after_reboot: true

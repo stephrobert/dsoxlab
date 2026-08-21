@@ -15,6 +15,19 @@ Contrat lab.yaml minimal pour ``runtime: vm`` ::
       default: rhel              # cible si l'apprenant ne précise pas
       snapshot_required: false
 
+``snapshot_required`` engage l'outil, il ne l'informe pas :
+
+- ``run`` prend un point de reprise du **disque** avant le ``setup.yaml``, et
+  **échoue** s'il n'y arrive pas — un lab qui réclame un filet ne démarre pas
+  sans lui ;
+- ``reset`` ramène la machine à ce point plutôt que de rejouer le
+  ``cleanup.yaml`` ;
+- ``clean`` retire le point de reprise, et avec lui le fichier de recouvrement
+  qu'il avait créé.
+
+L'état **mémoire** n'est pas capturé : la reprise repart d'un disque cohérent,
+pas de la seconde d'avant.
+
 Fichiers attendus à la racine du lab :
 
 - ``setup.yaml``   — playbook qui pose l'état initial
@@ -79,14 +92,20 @@ class VmRuntime(BaseRuntime):
             )
 
         if lab.runtime.snapshot_required:
-            snap_name = f"pre-{lab.id}"
+            # « required » veut dire required. Ce bloc avalait l'échec en
+            # `logger.warning`, et le journal n'est même pas configuré dans ce
+            # paquet : le lab démarrait sans le filet qu'il réclame, `run`
+            # sortait en 0, et l'apprenant l'apprenait au moment d'en avoir
+            # besoin. C'est ce silence qui a laissé la fonctionnalité cassée
+            # sans que personne ne le voie. Un lab qui tolère l'absence de
+            # filet a le droit de le déclarer : c'est snapshot_required: false.
             try:
-                snapshot_infra.create(repo_meta, [target.host], snap_name)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Snapshot pré-setup non créé (%s). Le lab continue mais "
-                    "le rollback ne sera pas disponible.", exc,
-                )
+                snapshot_infra.create(repo_meta, [target.host], self._snap_name(lab))
+            except Exception as exc:  # on ne filtre pas : tout échec du filet est un échec du lab
+                raise RuntimeError(_(
+                    "err_vm_snapshot_required",
+                    lab_id=lab.id, host=target.host, error=str(exc),
+                )) from exc
 
         result = ansible_infra.run_playbook(
             playbook_path=setup,
@@ -111,6 +130,24 @@ class VmRuntime(BaseRuntime):
         *,
         on_event: EventCallback | None = None,
     ) -> None:
+        """Remet le lab à son état de départ.
+
+        Un lab qui déclare ``snapshot_required: true`` est **ramené à son point
+        de reprise** plutôt que nettoyé par son ``cleanup.yaml`` : c'est là que
+        le filet sert, et c'est ce qui donne enfin un effet observable à ce
+        champ du contrat. Le point de reprise ayant été pris **avant** le
+        ``setup.yaml``, il faut rejouer celui-ci derrière.
+
+        L'échec du retour arrière n'est pas rattrapé par un ``cleanup.yaml`` de
+        repli : ce serait remplacer une garantie par une approximation sans le
+        dire, exactement le défaut que ce runtime vient de solder.
+        """
+        if lab.runtime.snapshot_required:
+            target = self._resolve_target(lab, target_name)
+            repo_meta = self._repo_meta(lab)
+            snapshot_infra.revert(repo_meta, [target.host], self._snap_name(lab))
+            self.start(lab, target_name, on_event=on_event)
+            return
         self.clean(lab, target_name, on_event=on_event)
         self.start(lab, target_name, on_event=on_event)
 
@@ -140,6 +177,19 @@ class VmRuntime(BaseRuntime):
                 lab_id=lab.id, target=target.name, rc=result.rc,
                 status=result.status,
             ))
+
+        # Le point de reprise a fait son temps. Le laisser laisserait un
+        # fichier de recouvrement que Terraform ne connaît pas, et qui
+        # survivrait à la machine — le cousin des domaines orphelins de #107.
+        # Best-effort : un nettoyage ne doit pas échouer sur ce qui a déjà
+        # disparu, mais il dit ce qu'il n'a pas su retirer.
+        if lab.runtime.snapshot_required:
+            try:
+                snapshot_infra.delete(repo_meta, [target.host], self._snap_name(lab))
+            except Exception as exc:  # noqa: BLE001 — nettoyage best-effort
+                logger.warning(
+                    "Point de reprise %s non retiré : %s", self._snap_name(lab), exc
+                )
 
     def status(self, lab: LabDefinition, target_name: str | None = None) -> str:
         del lab, target_name
@@ -213,6 +263,17 @@ class VmRuntime(BaseRuntime):
         return SessionSpec(command=cmd)
 
     # ─── helpers ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _snap_name(lab: LabDefinition) -> str:
+        """Le nom du point de reprise du lab, calculé en **un seul endroit**.
+
+        Il était recomposé sur place à chaque usage, ce qui ne se voyait pas
+        tant qu'un seul usage existait ; à trois, une divergence d'un caractère
+        aurait fait supprimer un snapshot qui n'existe pas et laissé le vrai
+        derrière.
+        """
+        return f"pre-{lab.id}"
 
     def _resolve_target(
         self, lab: LabDefinition, explicit_name: str | None

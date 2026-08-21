@@ -2028,6 +2028,7 @@ def destroy(
     # au clavier bloquerait l'autre terminal sans rien protéger.
     ctx.call_on_close(_verrou(root, "destroy").release)
     info(_("destroy_starting", provider=provider))
+    _purge_snapshots_before_destroy(repo_meta)
     try:
         # init est rapide en destroy (provider déjà téléchargé) mais
         # nécessaire si l'utilisateur a fait un upgrade dsoxlab entre temps
@@ -2071,6 +2072,35 @@ def destroy(
         info(_("ssh_fragment_removed", repo=repo_meta.id))
 
     success(_("destroy_done"))
+
+
+def _purge_snapshots_before_destroy(repo_meta: RepoMetadata) -> None:
+    """Retire les points de reprise **avant** que Terraform ne passe.
+
+    Un snapshot externe laisse un fichier de recouvrement que Terraform ne
+    connaît pas : il n'est dans aucun state, et le volume qu'il recouvre est
+    supprimé sous lui. Il faut donc le retirer tant que l'hyperviseur sait
+    encore qu'il existe — après l'``undefine``, la métadonnée du snapshot a
+    disparu avec le domaine, et le fichier devient introuvable autrement qu'à
+    la main.
+
+    Best-effort : un dépôt sans labs ``vm``, un provider sans backend snapshot
+    ou un hyperviseur muet ne doivent pas empêcher une destruction.
+    """
+    from .infra import snapshot as snapshot_infra
+
+    hosts = snapshot_infra.host_names(repo_meta)
+    if not hosts:
+        return
+    try:
+        retires = snapshot_infra.purge(repo_meta, hosts)
+    except Exception as exc:  # noqa: BLE001 — la destruction prime sur le ménage
+        warn(_("snapshot_purge_failed", error=str(exc)))
+        return
+    if retires:
+        info(_("snapshot_purge_done", count=len(retires)))
+        for chemin in retires:
+            info(f"  − {chemin}")
 
 
 def _handle_orphans_after_destroy(
