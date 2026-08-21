@@ -1,0 +1,22 @@
+id: rhcsa-mock-exam
+title: RHCSA mock exam
+level: l2
+section: capstones
+lab_type: capstone
+exam_passing_score: 70
+skills: [lvm, selinux, systemd]
+distros: [almalinux10]
+doc_url: https://blog.stephane-robert.info/docs/linux/rhcsa/
+runtime:
+  type: vm
+  session: local
+  default: server
+  targets:
+    - name: server
+      host: alma-rhcsa-1.lab
+      roles:
+        client: alma-rhcsa-2.lab
+validation:
+  functional: true
+  security: true
+  persistence_after_reboot: true

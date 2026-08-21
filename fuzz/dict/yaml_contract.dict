@@ -76,6 +76,10 @@ track="track:"
 difficulty="difficulty:"
 estimated_time="estimated_time:"
 certification_tags="certification_tags:"
+exam_passing_score="exam_passing_score:"
+# Le seuil est un entier borné 1..100 : les deux bords et un type refusé.
+exam_passing_score_70="exam_passing_score: 70"
+exam_passing_score_bad="exam_passing_score: \x22oui\x22"
 bloc="bloc:"
 bloc_order="bloc_order:"
 

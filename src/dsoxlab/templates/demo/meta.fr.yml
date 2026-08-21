@@ -1,0 +1,15 @@
+# Traduction française du `meta.yml` voisin.
+#
+# Même convention que `lab.fr.yaml` : seuls `repo.title`, `repo.description`,
+# `sections[].title` et `sections[].description` sont lus. Tout autre champ y
+# est ignoré, et les sections sont appariées par `id`, jamais par position.
+repo:
+  title: Démonstration dsoxlab
+  description: |
+    Un lab unique pour prendre en main la boucle de travail de dsoxlab.
+    Aucune infrastructure requise.
+
+sections:
+  - id: demo
+    title: Prise en main
+    description: La boucle de travail, de bout en bout.

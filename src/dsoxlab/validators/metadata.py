@@ -55,5 +55,18 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
                 f"Invalid value '{lab.lab_type}'. Expected one of: {', '.join(sorted(_VALID_LAB_TYPES))}",
             )
         )
+    # Le seuil est un POURCENTAGE du barème. Hors de 1..100, il ne veut rien
+    # dire : un examen qu'on ne peut jamais réussir, ou qu'on ne peut jamais
+    # rater. Le champ absent vaut 0, ce qui est « pas un examen », pas un
+    # seuil hors bornes.
+    if lab.exam_passing_score and not 1 <= lab.exam_passing_score <= 100:
+        report.issues.append(
+            MetadataIssue(
+                "exam_passing_score",
+                f"Invalid value '{lab.exam_passing_score}'. Expected a percentage "
+                f"of the lab scale, between 1 and 100 (omit the field for a lab "
+                f"that is not an exam).",
+            )
+        )
 
     return report
