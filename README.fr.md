@@ -354,8 +354,14 @@ uv sync                                     # installe les dépendances de dev
 uv run pre-commit install --install-hooks   # active les hooks git
 uv run ruff check src/dsoxlab               # lint + sécurité
 uv run mypy src/dsoxlab                     # typage (strict)
-uv run pytest                               # tests
+uv run pytest                               # tests unitaires
+uv run pytest tests_e2e                     # bout en bout, sur la roue construite
 ```
+
+`tests_e2e/` est une suite boîte noire : elle n'importe jamais `dsoxlab`. Elle
+construit la roue, l'installe dans un environnement virtuel jetable et pilote le
+binaire par sous-processus, de `dsoxlab demo` jusqu'au 100/100. C'est le seul
+contrôle qui voie un défaut d'empaquetage.
 
 Voir [CONTRIBUTING.fr.md](./CONTRIBUTING.fr.md) pour le workflow, les conventions de
 commit et les règles non négociables (le moteur reste neutre vis-à-vis du

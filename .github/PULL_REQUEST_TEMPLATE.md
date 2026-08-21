@@ -19,9 +19,13 @@ box reads as "forgotten", an explicit `N/A` reads as "considered".
 
 ### Always
 
-- [ ] `uv run ruff check src/dsoxlab tests fuzz` passes (lint + flake8-bandit)
+- [ ] `uv run ruff check src/dsoxlab tests tests_e2e fuzz scripts` passes
+      (lint + flake8-bandit)
 - [ ] `uv run mypy src/dsoxlab` passes (strict)
-- [ ] `uv run pytest` passes
+- [ ] `uv run pytest` passes (unit suite)
+- [ ] `uv run pytest tests_e2e` passes (black-box suite: it builds the wheel,
+      installs it and drives the binary — the only check that sees a packaging
+      defect)
 - [ ] The engine stays domain-agnostic — no domain-specific logic in
       `src/dsoxlab/` (no `if category == "linux"`)
 - [ ] No hardcoded personal path or host; `pathlib.Path` throughout

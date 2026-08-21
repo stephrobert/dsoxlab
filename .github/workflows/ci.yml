@@ -181,13 +181,62 @@ jobs:
       # Python file, so leaving it out here made this job pass while the parity
       # job failed on the same code — the wrong order to learn it in.
       - name: Lint and security (ruff)
-        run: uv run ruff check src/dsoxlab tests fuzz scripts
+        run: uv run ruff check src/dsoxlab tests tests_e2e fuzz scripts
 
       - name: Type-check (mypy strict)
         run: uv run mypy src/dsoxlab
 
       - name: Test (pytest)
         run: uv run pytest
+
+  # End-to-end gate — the only job that exercises the PROGRAM AS INSTALLED.
+  #
+  # The `quality` matrix above imports the package from `src/`, so it proves the
+  # functions do what they say and nothing about the distribution: a data file
+  # missing from the wheel, a broken `console_scripts` entry point or an import
+  # that only resolves in the source tree all pass it. This job builds the
+  # wheel, installs it into a throwaway venv and drives the `dsoxlab` binary by
+  # subprocess, from `demo` to a 100/100 score — the exact path a newcomer
+  # walks, and the one nobody replayed.
+  #
+  # No hypervisor, no Docker, no privilege: the packaged demonstration catalog
+  # is a `shell` lab, so this runs on a bare runner. Separate job on purpose —
+  # a red E2E and a red unit suite do not mean the same thing.
+  e2e:
+    name: End-to-end (black box, installed wheel)
+    needs: [zizmor, actionlint, poutine]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: "0.11.26"
+          enable-cache: true
+
+      # Warms the uv cache with exactly the dependencies the wheel declares, so
+      # the throwaway venv the suite creates is filled from disk instead of the
+      # network. It is also what provides pytest to run the suite itself.
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen
+
+      # `tests_e2e/pytest.ini` is this suite's own configuration: the project's
+      # `testpaths` deliberately excludes it, so `uv run pytest` never picks it
+      # up by accident and the contribution gate keeps its measured duration.
+      - name: End-to-end suite (build the wheel, install it, drive the binary)
+        run: uv run pytest tests_e2e
 
   # Parity gate — run EVERY pre-commit hook (commit AND push stages) exactly as
   # a contributor's local pre-commit would, from this project's locked env. The

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.50"
+version = "0.1.51"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -173,6 +173,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # assertions are the whole point of a test
+"tests_e2e/**" = ["S101"]  # même raison, pour la suite boîte noire
 
 [tool.mypy]
 strict = true

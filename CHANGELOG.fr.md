@@ -9,6 +9,52 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.51] - 2026-08-21
+
+### Ajouté
+
+- **Une suite de bout en bout « boîte noire », `tests_e2e/`.** Les 421 tests
+  unitaires parlent tous au moteur depuis l'intérieur. Ils prouvent que les
+  fonctions font ce qu'elles disent ; ils ne prouvent jamais que *le programme
+  installé* se comporte comme promis. Un point d'entrée cassé, un fichier de
+  données absent de la roue, un `console_scripts` mal déclaré : rien de cela
+  n'était détectable par une suite verte. La nouvelle suite construit la roue,
+  l'installe dans un environnement virtuel jetable et pilote le binaire
+  `dsoxlab` par sous-processus, en n'assérant que sur le code de retour, la
+  sortie standard, la sortie d'erreur et les fichiers laissés sur le disque.
+
+- **Le parcours de l'inconnu est rejoué en entier :** `demo`, `list-labs`,
+  `run`, `check`, `scores`, d'une machine nue jusqu'au 100/100 sur le lab de
+  démonstration packagé. Il n'exige ni KVM, ni Incus, ni Docker, ni le moindre
+  privilège (le catalogue de démonstration est un lab `shell`), et le job dure
+  environ six secondes, construction de la roue comprise.
+
+- **La suite peut échouer, et c'est tout son intérêt.** Le même lab vaut 100/100
+  une fois résolu et 0/100 avec un code de retour non nul quand il ne l'est
+  pas ; prendre son unique indice fait tomber le même travail parfait à 80/100.
+  Exclure le catalogue de démonstration de la roue fait rougir les contrôles
+  d'empaquetage et entraîne tout le parcours avec eux : c'est la preuve que le
+  sujet du test est bien la distribution, et pas l'arborescence source.
+
+- **La règle « aucun import de `dsoxlab` » est tenue par un test,** sur le
+  modèle de `tests/test_i18n_coverage.py`. Trois portes, parce qu'une seule se
+  contourne : une analyse syntaxique de chaque fichier de la suite pour
+  `import dsoxlab`, une deuxième pour la voie dynamique
+  (`importlib.import_module("dsoxlab")`), et une troisième qui lit `sys.modules`
+  à l'exécution, qu'aucune astuce syntaxique n'esquive.
+
+### Modifié
+
+- **La CI gagne un job à elle, `End-to-end (black box, installed wheel)`.** Il
+  est séparé de la matrice unitaire à dessein : une E2E rouge et une suite
+  unitaire rouge ne disent pas la même chose, et seule la première annonce que
+  l'outil empaqueté est cassé. `tests_e2e/` porte sa propre `pytest.ini`, donc
+  `uv run pytest` continue de ne jouer que la suite unitaire et la porte de
+  contribution garde la durée qu'on lui a mesurée.
+
+- L'étape ruff lint désormais aussi `tests_e2e`, ce qui l'aligne sur le hook
+  pre-commit, qui a toujours tourné sur tous les fichiers Python de l'arbre.
+
 ## [0.1.50] - 2026-08-20
 
 ### Modifié
