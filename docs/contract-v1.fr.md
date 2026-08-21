@@ -131,6 +131,36 @@ infra:
 lab : celle-ci tient à la présence de `labs/**/lab.yaml`, et le rattachement se
 fait sur le chemin, jamais sur l'identifiant du lab.
 
+### `meta.<langue>.yml`
+
+Un `meta.fr.yml` posé à côté de `meta.yml` surcharge `repo.title`,
+`repo.description`, `sections[].title` et `sections[].description` pour cette
+langue, **et rien d'autre**. Toute autre clé y est ignorée, `labs` compris :
+l'ordre pédagogique vit dans `meta.yml` et ne se traduit pas.
+
+Les sections sont appariées par **`id`**, jamais par position : une section
+insérée en tête de `meta.yml` décalerait sinon toutes les traductions
+suivantes, en silence.
+
+```yaml
+# meta.yml — le fichier de base est en anglais, comme partout dans le contrat
+sections:
+  - id: getting-started
+    title: Discover the tool
+```
+
+```yaml
+# meta.fr.yml
+sections:
+  - id: getting-started
+    title: Découvrir l'outil
+```
+
+C'est la même convention par fichier que `lab.<langue>.yaml` et
+`course.<langue>.yaml`. Un suffixe de langue par champ (`title_en:`) ne fait
+**pas** partie du contrat et n'est lu par personne : `dsoxlab
+validate-structure` le signale.
+
 ---
 
 ## `lab.yaml`, un par lab
@@ -145,13 +175,14 @@ fait sur le chemin, jamais sur l'identifiant du lab.
 | `skills` | **oui** | liste de chaînes | | Ne doit pas être vide. |
 | `distros` | **oui** | liste de chaînes | | Ne doit pas être vide. |
 | `doc_url` | **oui** | chaîne | | `http(s)` uniquement. |
-| `section` | non | chaîne | `repo.category` | |
+| `section` | non | chaîne | `repo.category` | Déclarée, elle est **toujours** conservée — y compris quand sa valeur se trouve nommer un domaine technique. |
 | `description` | non | chaîne | `""` | |
 | `track` | non | liste de chaînes | `[]` | |
 | `difficulty` | non | chaîne | `beginner` | Jamais validé, seulement affiché. |
 | `estimated_time` | non | chaîne | `30m` | Seulement affiché. |
 | `certification_tags` | non | liste de chaînes | `[]` | Libre : l'outil reste agnostique du domaine. |
 | `lab_type` | non | énuméré | `lab` | `lab`, `challenge` ou `capstone`. |
+| `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
 | `runtime` | non | mapping | défauts shell | Voir ci-dessous. |
@@ -161,6 +192,34 @@ fait sur le chemin, jamais sur l'identifiant du lab.
 n'est pas un lab. `skills`, `distros` et `doc_url` sont exigés par
 `dsoxlab validate-structure` : le fichier se lit sans eux, mais le lab n'est pas
 publiable.
+
+### `exam_passing_score`
+
+Un `lab_type: capstone` est un examen blanc, et un examen sans seuil de
+réussite n'en est pas un. Déclare la barre, et dsoxlab rend un verdict :
+
+```yaml
+lab_type: capstone
+exam_passing_score: 70   # pour cent du barème du lab
+```
+
+| Où | Ce que ça donne |
+| --- | --- |
+| `dsoxlab show` | Le seuil, avant que l'apprenant ne commence. |
+| `dsoxlab submit` | « Examen réussi » ou « Examen échoué », avec le pourcentage et la barre. |
+| `dsoxlab scores` | Une colonne **Verdict**, sur les catalogues qui portent au moins un examen. |
+
+C'est un **pourcentage**, pas un nombre de points. Le barème d'un lab est celui
+des `points` de son `challenge/hints.yaml` (100 par défaut, mais libre) : un
+seuil absolu voudrait donc dire autre chose d'un lab à l'autre.
+
+La comparaison est exacte : `score × 100 ≥ seuil × barème`. Une copie qui vaut
+69,5 % du barème échoue à une barre de 70 %. Un seuil d'examen ne s'arrondit
+pas en faveur du candidat.
+
+Absent, ou à `0`, le lab n'est pas un examen et aucun verdict n'est jamais
+rendu — c'est le cas de tout lab qui n'est ni un capstone ni un drill.
+`dsoxlab validate-structure` refuse une valeur hors de `1..100`.
 
 ### `runtime`
 
@@ -252,7 +311,9 @@ soit : ce sont les tests qui prouvent.
 ### `lab.<langue>.yaml`
 
 Un `lab.fr.yaml` posé à côté de `lab.yaml` surcharge `title` et `description`
-pour cette langue, **et rien d'autre**. Toute autre clé y est ignorée.
+pour cette langue, **et rien d'autre**. Toute autre clé y est ignorée, et
+`validate-structure` le dit. Un `id` y est toléré sans être lu : il nomme le
+lab pour qui ouvre le fichier.
 
 ---
 
@@ -293,12 +354,29 @@ qui déclare lire la v1.
 - retirer une valeur d'un énuméré ;
 - changer un défaut.
 
-Les clés inconnues sont **ignorées par le parseur** mais **refusées par les
-schémas JSON** (`additionalProperties: false`). C'est voulu : le moteur doit
-rester tolérant pour qu'un outil v1 survive à un catalogue v1.1, tandis que ton
-éditeur, lui, doit te dire que `skils:` ne sert à rien. Si un schéma signale une
-clé à laquelle tu crois, c'est que cette clé n'est pas dans le contrat : vérifie
-sur cette page.
+Les clés inconnues sont **ignorées par le parseur**, **refusées par les schémas
+JSON** (`additionalProperties: false`) et **signalées par `dsoxlab
+validate-structure`**. La combinaison est voulue, et chaque pièce répond à un
+besoin différent :
+
+- le **moteur** reste tolérant, pour qu'un outil v1 survive à un catalogue
+  v1.1. Cela ne changera pas : c'est ce qui fait tenir le versionnement ;
+- ton **éditeur** souligne `skils:` pendant que tu l'écris ;
+- `validate-structure` échoue dessus, parce que toléré n'est pas voulu. Quatre
+  clés écrites de bonne foi vivaient dans les catalogues réels sans que
+  personne ne les lise, dont un `exam_passing_score` dans onze labs d'examen :
+  leur auteur croyait poser un seuil de réussite, et rien ne le posait. À la
+  racine d'un `lab.yaml`, une clé inconnue est une faute de frappe ou une
+  attente déçue, presque jamais une extension délibérée.
+
+Le contrôle porte sur `meta.yml`, `lab.yaml` et leurs fichiers de traduction,
+et il descend dans chaque bloc que le contrat décrit. Il ne descend **pas**
+dans les mappings libres — `runtime.targets[].roles`,
+`runtime.services[].env`, `infra.providers.<provider>` — dont les clés
+appartiennent au catalogue.
+
+Si un schéma ou `validate-structure` signale une clé à laquelle tu crois, c'est
+que cette clé n'est pas dans le contrat : vérifie sur cette page.
 
 ---
 

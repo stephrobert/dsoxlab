@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from ..i18n import _
+from ..interrupt import EVENT_INTERRUPT, Interrupted, SignalRelay, Stage
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,12 @@ class PlaybookResult:
     """Code de retour (0 = succès)."""
 
     status: str
-    """``successful`` | ``failed`` | ``canceled`` | ``timeout`` | ``unknown``."""
+    """``successful`` | ``failed`` | ``timeout`` | ``unknown``.
+
+    ``canceled`` n'arrive jamais jusqu'ici : une annulation est une
+    interruption utilisateur, pas un résultat, et ``run_playbook`` lève
+    ``Interrupted`` plutôt que de la faire passer pour un échec.
+    """
 
     stats: dict[str, dict[str, int]] = field(default_factory=dict)
     """Stats agrégées par hôte : ``{ "ok": {host: n}, "changed": {...},
@@ -129,6 +135,9 @@ def run_playbook(
     Raises:
         AnsibleNotInstalled: Si ``ansible-runner`` n'est pas importable.
         FileNotFoundError: Si le playbook n'existe pas.
+        Interrupted: Si l'utilisateur a interrompu le playbook (Ctrl-C).
+            L'hôte peut alors être partiellement configuré : les playbooks
+            des labs sont idempotents, rejouer la commande suffit.
     """
     # Les deux moitiés manquent pour des raisons différentes et se réparent
     # différemment : les confondre dans un seul message envoyait l'utilisateur
@@ -188,17 +197,50 @@ def run_playbook(
 
             kwargs["event_handler"] = _safe_handler
 
-        runner = ansible_runner.run(
-            playbook=playbook_path.name,
-            private_data_dir=str(private_data_dir),
-            inventory=inventory if isinstance(inventory, dict) else str(inventory),
-            extravars=extra_vars or {},
-            cmdline=cmdline,
-            quiet=quiet,
-            timeout=timeout_s,
-            envvars=_env_overrides(),
-            **kwargs,
-        )
+        def _prevenir(rang: int) -> None:
+            """Fait remonter le Ctrl-C dans le flux d'events du playbook.
+
+            Passer par ``on_event`` plutôt qu'imprimer ici garde le texte
+            affiché dans ``cli.py``, traduit, et compatible avec la barre de
+            progression Rich qui possède le terminal à cet instant.
+            """
+            if on_event is None:
+                return
+            try:
+                on_event({"event": EVENT_INTERRUPT, "count": rang})
+            except Exception:  # un affichage ne casse pas un arrêt
+                logger.exception("on_event callback failed")
+
+        # Le relais **doit** fournir le cancel_callback : sans lui,
+        # ansible-runner installe ses propres handlers SIGINT/SIGTERM et ne les
+        # restaure jamais (cf. SignalRelay). Le Ctrl-C devenait alors invisible
+        # pour dsoxlab, et le playbook annulé ressortait en « échec ».
+        with SignalRelay(on_notice=_prevenir) as relais:
+            try:
+                runner = ansible_runner.run(
+                    playbook=playbook_path.name,
+                    private_data_dir=str(private_data_dir),
+                    inventory=inventory if isinstance(inventory, dict) else str(inventory),
+                    extravars=extra_vars or {},
+                    cmdline=cmdline,
+                    quiet=quiet,
+                    timeout=timeout_s,
+                    envvars=_env_overrides(),
+                    cancel_callback=relais.is_requested,
+                    **kwargs,
+                )
+            except KeyboardInterrupt:
+                # Second Ctrl-C : le relais l'a relancé pour que les `finally`
+                # jouent (verrou rendu, terminal restauré) plutôt que de mourir
+                # sur le signal.
+                raise Interrupted(Stage.ANSIBLE, hard=True) from None
+
+        # Un playbook annulé n'est pas un playbook en échec. Sans cette
+        # distinction, l'apprenant lisait « setup.yaml a échoué (rc=254,
+        # status=canceled) » là où il venait lui-même d'appuyer sur Ctrl-C, et
+        # la commande sortait avec le code d'un échec.
+        if relais.is_requested() or (runner.status or "") == "canceled":
+            raise Interrupted(Stage.ANSIBLE, hard=relais.count >= 2)
 
         return PlaybookResult(
             rc=runner.rc if runner.rc is not None else -1,

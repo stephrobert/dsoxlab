@@ -249,7 +249,10 @@ validation:
 ```
 
 Un `lab.fr.yaml` optionnel peut surcharger `title` et `description` pour le
-français uniquement.
+français uniquement. La même convention vaut un cran au-dessus : un
+`meta.fr.yml` posé à côté du `meta.yml` traduit `repo.title`,
+`repo.description` et les titres et descriptions des `sections[]`, appariées
+par `id`.
 
 `dsoxlab validate-structure` vérifie que tout le contrat tient : le `meta.yml`
 racine est conforme, chaque lab référencé existe avec un `lab.yaml` valide,

@@ -81,6 +81,13 @@
       "default": "lab",
       "description": "Kind of exercise. Enumerated and enforced by validate-structure."
     },
+    "exam_passing_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Pass mark of a mock exam, as a PERCENTAGE of the lab scale (the points of challenge/hints.yaml, 100 by default). dsoxlab submit renders a verdict against it and dsoxlab scores shows it. 0, or the field left out, means the lab is not an exam and no verdict is rendered."
+    },
     "bloc": {
       "type": "integer",
       "description": "Position of the teaching bloc. Normally NOT written here: it is derived from meta.yml sections[].labs[]. Declaring it forces an exception and duplicates information that already lives elsewhere."

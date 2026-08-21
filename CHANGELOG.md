@@ -65,6 +65,154 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now state the disk/memory boundary: rolling back reboots from a consistent
   disk state, it does not put the machine back in the second before. A lab whose
   exercise depends on a running process must replay it.
+## [0.1.55] - 2026-08-21
+
+### Added
+
+- **A write lock per repository, so two terminals stop overwriting each other.**
+  Nothing prevented two `dsoxlab` from working at once on the same repository,
+  and two open terminals is the normal case for a learner. The shared state is
+  spread wide: `.dsoxlab-context.json` is rewritten *whole* on every change, so
+  the second write silently discarded the first; the Terraform state under
+  `~/.local/state/dsoxlab/<repo-id>/`; the regenerated inventory and `ssh_config`
+  fragment; the `runtime.services` containers, named per repository and therefore
+  shared. Only the SQLite progress database was protected, by SQLite itself.
+  `provision`, `destroy`, `run`, `check`, `submit`, `reset`, `clean` and `use`
+  now take the lock. A second invocation is refused with exit code **7** and a
+  translated message naming the holding command, its PID and how long it has been
+  running.
+
+- **Read commands are never blocked.** `list-labs`, `show`, `scores`, `progress`,
+  `next`, `status`, `doctor`, `course`, `challenge`, `hint`, `guide`,
+  `validate-structure` and `support` do not take the lock: consulting the
+  catalogue while a `provision` runs in another terminal is normal use, not a
+  conflict.
+
+- **A stale lock is never something to delete by hand.** The lock is a `flock`
+  held on a file in the repository's own state directory, right next to the
+  Terraform state it protects. The kernel releases it when the descriptor closes,
+  so a holder killed with `SIGKILL`, or lost in a reboot, leaves nothing to clean
+  up: there is no stale lock to "recover", which is the hard part of every
+  sentinel-file lock. The file survives and is truncated on release, so it can
+  never name a command that finished hours ago, and it is never unlinked, which
+  is the classic race where one process pulls the inode out from under another.
+  On a filesystem that cannot lock (`ENOLCK`), the command runs unprotected with
+  a warning in the journal rather than refusing to start.
+
+- **`run` hands the lock back before opening the session.** A lock held "for the
+  whole command" would cover the interactive sub-shell, and that is exactly where
+  the learner types `dsoxlab check`, which would then be refused by its own
+  session.
+
+### Fixed
+
+- **Ctrl-C no longer returns the prompt without a word.** Nothing caught
+  `KeyboardInterrupt` outside the pager. Typer turns it into `Exit(130)` at the
+  very bottom, so the exit code was already right, and that is exactly what made
+  the defect invisible: the learner got their prompt back with no idea what had
+  been interrupted, what was still standing, or what to replay. Every long step
+  now names those three things, and still exits **130** (`128 + SIGINT`, what the
+  shell itself returns). One step also lied about the code, and it is the next
+  entry.
+
+- **Terraform is stopped in two steps instead of being raced.** It now runs in
+  its own session (`start_new_session`). In the shared process group, the
+  terminal's Ctrl-C reached dsoxlab and Terraform at the same instant, so dsoxlab
+  could never know whether the child had already been signalled, and sending it
+  one risked counting as the *second* interrupt, the one that makes Terraform
+  exit without finishing the resource in flight. Isolated, the child receives
+  only what dsoxlab sends: the first Ctrl-C forwards `SIGINT` and keeps draining
+  its output so it can finish and save its state, and the second escalates to
+  `SIGTERM` then `SIGKILL`. Before, a second Ctrl-C broke out of the
+  `finally: proc.wait()` and left Terraform running, orphaned, still creating
+  machines nobody was watching.
+
+- **An interrupted playbook is no longer reported as a failed playbook.** This
+  is the one path where the exit code itself was wrong. `ansible-runner`
+  installs its own `SIGINT` and `SIGTERM` handlers whenever no `cancel_callback`
+  is given, and never restores them. Two consequences, both measured on the
+  installed version: during a playbook, Ctrl-C raised no `KeyboardInterrupt` at
+  all, the run was cancelled, and the caller turned the resulting `rc=254,
+  status=canceled` into "setup.yaml failed" and exit code **2**; and after the
+  playbook, `SIGINT` *and* `SIGTERM` stayed hijacked for the rest of the process,
+  so a `kill` on dsoxlab had no effect. dsoxlab now supplies the callback and
+  restores the handlers it found.
+
+- **An interrupted `check` no longer leaves pytest running behind it.** The read
+  loop was abandoned without waiting for the child: pytest kept driving the lab
+  machine while the learner believed everything had stopped, and the process
+  stayed a zombie until the CLI exited. It is now killed, and nothing is
+  recorded, because an interrupted validation must not cost a score.
+
+- **The remaining interruption points are named too**: the Terraform provider
+  download, the post-provision SSH wait (the infrastructure itself is up, and
+  replaying `provision` is idempotent), the container services (one may be up
+  without having been initialised, which the next `run` repairs by replaying
+  `post_start`), and the interactive lab session. A Ctrl-C anywhere else is
+  caught by a last-resort net installed on the Click group, the last place able
+  to give the interruption a name before Typer turns it into a silent exit 130.
+## [0.1.54] - 2026-08-21
+
+### Fixed
+
+- **A declared `section` is no longer overwritten by the engine.** The default
+  value of `LabDefinition.section` was `linux`, and the scanner used that same
+  string as its "nothing declared" sentinel. The two were therefore
+  indistinguishable: a lab writing `section: linux` in a catalog whose category
+  is something else had its declaration silently replaced. The sentinel is now
+  `None`, the legacy path inference returns `None` rather than inventing a
+  value, and a domain name no longer lives anywhere in the code that reads a
+  catalog. No existing catalog changes behaviour — none of the 284 labs
+  declares `section: linux` — but the next third-party author would have hit
+  it.
+
+- **Section and level colours no longer come from a list of domains.**
+  `reporting/console.py` mapped `linux`, `ansible`, `terraform`, `kubernetes`,
+  `rhcsa`… to colours, which is domain knowledge in the engine, with one
+  visible consequence: catalogs on that list were coloured, every other one was
+  uniformly white. The colour is now derived from the name itself (`crc32` over
+  a fixed palette): stable across runs, and available to every catalog.
+
+- **`exam_passing_score` finally sets a pass mark.** Eleven exam labs declared
+  one — the RHCSA and LFCS mocks, and nine drills — with a comment explaining
+  the chosen threshold, and nothing read it: a learner handing in 40/100 on a
+  mock RHCSA read nowhere that they had failed. It is now part of the contract,
+  as a **percentage** of the lab scale, and it is rendered by `dsoxlab show`
+  before the exam, by `dsoxlab submit` as a pass/fail verdict, and by `dsoxlab
+  scores` as a Verdict column. The comparison is exact: 69.5 % of the scale
+  fails a 70 % bar.
+
+- **`meta.yml` gains the translation mechanism the rest of the contract
+  already had.** Section titles are the bloc names shown by `dsoxlab progress`,
+  and all three catalogs write them in French, so an English session read
+  French. One catalog had tried `title_en:` / `description_en:`, which nothing
+  read. A `meta.<lang>.yml` next to `meta.yml` now overrides `repo.title`,
+  `repo.description`, `sections[].title` and `sections[].description` — the
+  same per-file convention as `lab.<lang>.yaml`, with sections matched by `id`
+  rather than by position. The packaged demonstration catalog ships one.
+
+### Added
+
+- **`validate-structure` reports every key nothing reads.** The real fix for
+  the four dead keys is not to settle those four: it is that a fifth cannot
+  install itself in silence. The check re-reads `meta.yml`, `lab.yaml` and
+  their translation files from disk, descends into every block the contract
+  describes, and names each unknown key along with the closest key the engine
+  actually reads. It leaves the free-form mappings alone —
+  `runtime.targets[].roles`, `runtime.services[].env`,
+  `infra.providers.<provider>` — whose keys belong to the catalog. The known
+  keys are held against the published JSON Schemas by a test, so the two cannot
+  drift.
+
+  The **parser stays tolerant**: ignoring unknown keys is a v1 guarantee, and
+  it is what lets a v1 tool survive a v1.1 catalog. This is a lint, not the
+  parser.
+
+  Consequence for catalogs as they stand: `linux-dsoxlab-training` reports
+  `runtime.hosts_required` (one lab, redundant with the two targets it already
+  declares), and `terraform-training` reports `sections[].title_en` and
+  `sections[].description_en` (to be moved into a `meta.fr.yml`).
+  `ansible-training` is clean.
 
 ## [0.1.53] - 2026-08-21
 

@@ -6,6 +6,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import zlib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,7 +22,7 @@ from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
 from ..services.doctor import Check, DoctorReport
-from ..services.progress_service import build_progress
+from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
 
 console = Console()
@@ -112,8 +113,38 @@ def paged(*, enabled: bool = True) -> Iterator[None]:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+#: Palette employée pour teinter les valeurs LIBRES du contrat (`section`,
+#: `level`). Elle ne connaît aucune valeur : la couleur est tirée du nom, pas
+#: d'une table qui nommerait des domaines.
+_FREE_FIELD_PALETTE = (
+    "green", "yellow", "cyan", "magenta", "blue", "orange3", "purple4", "red",
+)
+
+
+def _stable_color(value: str, *, bold: bool = False) -> str:
+    """Une couleur stable pour une valeur libre du contrat.
+
+    ``section`` et ``level`` appartiennent au catalogue, pas au moteur : le
+    contrat les déclare libres et « dsoxlab ne connaît aucune liste de
+    domaines ». Ces deux fonctions portaient pourtant une table de noms —
+    ``linux``, ``ansible``, ``terraform``, ``kubernetes``, ``rhcsa`` — donc de
+    la connaissance de domaine dans le moteur, et une seule conséquence
+    visible : les catalogues de cette table étaient colorés, les autres
+    uniformément blancs.
+
+    La couleur vient donc du nom lui-même, par ``crc32`` : déterministe d'une
+    exécution à l'autre (là où ``hash()`` d'une ``str`` est randomisé par
+    ``PYTHONHASHSEED``), stable pour un catalogue donné, et disponible pour
+    tout nom, y compris celui d'un domaine que personne n'a prévu.
+    """
+    if not value:
+        return "white"
+    teinte = _FREE_FIELD_PALETTE[zlib.crc32(value.encode("utf-8")) % len(_FREE_FIELD_PALETTE)]
+    return f"bold {teinte}" if bold else teinte
+
+
 def _level_color(level: str) -> str:
-    return {"l1": "green", "l2": "yellow", "lfcs": "cyan", "rhcsa": "magenta"}.get(level, "white")
+    return _stable_color(level)
 
 
 def _difficulty_label(difficulty: str) -> str:
@@ -128,15 +159,8 @@ def _difficulty_label(difficulty: str) -> str:
     return difficulty if traduit == cle else traduit
 
 
-def _section_color(section: str) -> str:
-    return {
-        "linux": "bold green",
-        "ansible": "bold red",
-        "terraform": "bold purple4",
-        "docker": "bold blue",
-        "kubernetes": "bold cyan",
-        "git": "bold orange3",
-    }.get(section, "white")
+def _section_color(section: str | None) -> str:
+    return _stable_color(section or "", bold=True)
 
 
 def _type_badge(lab_type: str) -> str:
@@ -173,9 +197,10 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
         # Une seule section affichée par groupe : les lignes suivantes du
         # même groupe laissent la cellule vide.
         section_display = Text("", style="")
-        if lab.section != current_section:
-            current_section = lab.section
-            section_display = Text(lab.section, style=_section_color(lab.section))
+        section = lab.section or ""
+        if section != current_section:
+            current_section = section
+            section_display = Text(section, style=_section_color(section))
 
         if scores and lab.id in scores:
             best, max_s = scores[lab.id]
@@ -203,7 +228,7 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
 
 def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
     lines = [
-        f"{_('field_section')}    [{_section_color(lab.section)}]{lab.section}[/{_section_color(lab.section)}]",
+        f"{_('field_section')}    [{_section_color(lab.section)}]{lab.section or ''}[/{_section_color(lab.section)}]",
         f"{_('field_title')}      {lab.title}",
         f"{_('field_type')}       {_type_badge(lab.lab_type)}"
         + (f"  —  bloc {lab.bloc}" if lab.bloc else ""),
@@ -215,6 +240,10 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
         f"{_('field_skills')}     {', '.join(lab.skills)}",
         f"{_('field_doc')}        [link={lab.doc_url}]{lab.doc_url}[/link]",
     ]
+    # Le seuil d'un examen blanc se lit AVANT de le passer, pas après : c'est
+    # la barre que l'apprenant vise. Un lab ordinaire n'en déclare pas.
+    if lab.exam_passing_score:
+        lines.append(f"{_('field_exam_score')} {lab.exam_passing_score} %")
     if lab.track:
         lines.append(f"{_('field_track')}   {', '.join(lab.track)}")
     if lab.certification_tags:
@@ -428,15 +457,29 @@ def print_progress_table(
 
 # ── scores ────────────────────────────────────────────────────────────────────
 
-def print_scores_table(results: list[dict[str, Any]]) -> None:
+def print_scores_table(
+    results: list[dict[str, Any]],
+    exam_thresholds: dict[str, int] | None = None,
+) -> None:
+    """Le tableau des scores, et le verdict des labs qui sont des examens.
+
+    ``exam_thresholds`` associe un id de lab à son ``exam_passing_score``. La
+    colonne « verdict » n'apparaît que si au moins une ligne en relève : un
+    catalogue sans examen n'a pas à porter une colonne de tirets.
+    """
     if not results:
         console.print(f"[yellow]{_('no_scores')}[/yellow]")
         return
+
+    seuils = exam_thresholds or {}
+    avec_verdict = any(seuils.get(r["lab_id"], 0) > 0 for r in results)
 
     table = Table(title=_('scores_table_title'), show_lines=True)
     table.add_column(_('col_lab'), style="bold cyan", no_wrap=True)
     table.add_column(_('col_section'), justify="center")
     table.add_column(_('col_score'), justify="center")
+    if avec_verdict:
+        table.add_column(_('col_verdict'), justify="center")
     table.add_column(_('col_tests'), justify="center")
     table.add_column(_('col_hints'), justify="center")
     table.add_column(_('col_validated_at'))
@@ -451,16 +494,26 @@ def print_scores_table(results: list[dict[str, Any]]) -> None:
         tests = f"{r['passed_tests']}/{r['total_tests']}"
         validated_at = r["validated_at"][:16].replace("T", " ")
 
-        table.add_row(
+        cellules: list[str | Text] = [
             r["lab_id"],
             Text(r["section"], style=_section_color(r["section"])),
             score_text,
-            tests,
-            str(r["hints_used"]),
-            validated_at,
-        )
+        ]
+        if avec_verdict:
+            cellules.append(_verdict_cell(score, max_s, seuils.get(r["lab_id"], 0)))
+        cellules += [tests, str(r["hints_used"]), validated_at]
+        table.add_row(*cellules)
 
     console.print(table)
+
+
+def _verdict_cell(score: int, max_score: int, passing_score: int) -> Text:
+    """« reçu » / « recalé » et le seuil, ou un tiret si le lab n'est pas un examen."""
+    verdict = exam_verdict(score, max_score, passing_score)
+    if verdict is None:
+        return Text("—", style="dim")
+    libelle = _("verdict_pass") if verdict else _("verdict_fail")
+    return Text(f"{libelle} ({passing_score}%)", style="green" if verdict else "red")
 
 
 # ── fullhelp ──────────────────────────────────────────────────────────────────

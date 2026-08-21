@@ -81,6 +81,7 @@ def test_empty_validation_block_falls_back_to_defaults(tmp_path: Path) -> None:
         ("targets holds a scalar", VALID_LAB + "  targets:\n    - 42\n"),
         ("roles is a scalar", VALID_LAB + "  targets:\n    - name: a\n      host: h.lab\n      roles: nope\n"),
         ("bloc is not a number", VALID_LAB + "bloc: abc\n"),
+        ("exam_passing_score is not a number", VALID_LAB + "exam_passing_score: oui\n"),
         ("skills is a scalar", VALID_LAB.replace("skills: [demo]", "skills: 42")),
     ],
 )

@@ -37,7 +37,20 @@ class LabDefinition:
     doc_url: str
     validation: ValidationConfig
     path: Path = field(default_factory=Path)
-    section: str = "linux"
+
+    section: str | None = None
+    """Section déclarée par le ``lab.yaml``, ou ``None`` s'il n'en déclare pas.
+
+    La sentinelle est ``None``, jamais un nom de domaine. Le défaut était
+    ``"linux"``, ce qui rendait « non déclaré » et « déclaré à linux »
+    indiscernables : un lab qui écrivait ``section: linux`` dans un catalogue
+    d'une autre catégorie voyait sa déclaration écrasée en silence, et le
+    moteur portait un nom de domaine dans son code.
+
+    ``discovery/scanner.py`` remplace la sentinelle par ``repo.category`` (ou
+    par la section inférée du chemin en mode legacy). Elle ne survit donc que
+    pour un lab qu'aucune des deux règles ne rattache."""
+
     description: str = ""
     track: list[str] = field(default_factory=list)
     difficulty: str = "beginner"
@@ -51,6 +64,19 @@ class LabDefinition:
     :mod:`dsoxlab.models.schema_version`."""
 
     lab_type: str = "lab"       # "lab" | "challenge" | "capstone"
+
+    exam_passing_score: int = 0
+    """Pourcentage du barème à atteindre pour réussir, ou 0 s'il n'y a pas de seuil.
+
+    Un ``lab_type: capstone`` est un examen blanc, et un examen sans seuil de
+    réussite n'en est pas un : onze labs d'examen déclaraient ce champ, aucun
+    ne le posait. ``submit`` en rend désormais un verdict et ``scores``
+    l'affiche.
+
+    Un **pourcentage**, pas un nombre de points : le barème d'un lab est celui
+    de son ``challenge/hints.yaml`` (100 par défaut, mais libre), et un seuil
+    en points absolus voudrait dire autre chose d'un lab à l'autre."""
+
     bloc: int = 0               # bloc number 1-8; 0 = unassigned
     bloc_order: int = 0         # position within the bloc; 0 = unassigned
     bloc_name: str = ""         # nom lisible du bloc (section meta.yml), ex. "Fondamentaux (l1)"
@@ -163,6 +189,12 @@ class LabDefinition:
             services=services,
         )
 
+        # `None` — pas une chaîne — quand la clé est absente : c'est ce qui
+        # distingue « non déclaré » de « déclaré », y compris quand la valeur
+        # déclarée est le nom d'un domaine.
+        section_raw = data.get("section")
+        section = str(section_raw) if section_raw is not None else None
+
         validation_data = as_mapping(data.get("validation"), "validation", lab_yaml)
         validation = ValidationConfig(
             functional=validation_data.get("functional", True),
@@ -181,7 +213,7 @@ class LabDefinition:
             doc_url=data.get("doc_url", ""),
             validation=validation,
             path=lab_yaml.parent,
-            section=data.get("section", "linux"),
+            section=section,
             description=data.get("description", ""),
             track=as_str_list(data.get("track"), "track", lab_yaml),
             difficulty=data.get("difficulty", "beginner"),
@@ -190,6 +222,9 @@ class LabDefinition:
                 data.get("certification_tags"), "certification_tags", lab_yaml
             ),
             lab_type=data.get("lab_type", "lab"),
+            exam_passing_score=as_int(
+                data.get("exam_passing_score"), 0, "exam_passing_score", lab_yaml
+            ),
             bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
             bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),
         )

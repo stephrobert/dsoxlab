@@ -5,8 +5,13 @@ l'ordre des sections, scanne les ``lab.yaml`` du système de fichiers,
 et trie selon ``meta.sections.*.labs``.
 
 Mode legacy (compat) : si aucun ``meta.yml`` racine, infère la section
-depuis la position du ``lab.yaml`` dans l'arborescence (ancien
-``linux-training`` pré-extraction).
+depuis la position du ``lab.yaml`` dans l'arborescence (arborescences
+d'avant l'extraction du framework, qui n'avaient pas de ``meta.yml``).
+
+Dans les deux modes, la section **déclarée** par un ``lab.yaml`` gagne. La
+sentinelle « rien de déclaré » est ``None`` : aucun nom de domaine ne sert de
+valeur par défaut ici, sans quoi le moteur saurait quelque chose d'un domaine
+et écraserait la déclaration d'un auteur qui emploie ce nom-là.
 """
 
 from __future__ import annotations
@@ -26,6 +31,11 @@ logger = logging.getLogger(__name__)
 
 # Niveaux connus utilisés en mode legacy uniquement, pour distinguer
 # ``labs/<section>/<level>/<lab>`` de ``labs/<level>/<lab>``.
+#
+# Heuristique **figée** : ce sont les répertoires de la seule arborescence qui
+# ait jamais existé sans ``meta.yml``. Ce ne sont pas des valeurs du contrat, et
+# rien ne doit s'y ajouter : un catalogue d'aujourd'hui déclare son ordre dans
+# son ``meta.yml`` et ne passe jamais par ce chemin de code.
 _KNOWN_LEVELS = {"l1", "l2", "l3", "lfcs", "rhcsa", "capstones"}
 
 
@@ -69,7 +79,10 @@ def scan_catalog(
             l'erreur remonte au lieu d'être collectée.
     """
     if repo_meta is None:
-        repo_meta = read_repo_metadata(root)
+        # `lang` compte ici : les titres de section du meta.yml deviennent les
+        # noms de blocs affichés par `progress`, et ils se traduisent par
+        # fichier (meta.<lang>.yml), comme les titres de lab.
+        repo_meta = read_repo_metadata(root, lang=lang)
 
     scan = CatalogScan()
 
@@ -134,11 +147,16 @@ def _assign_section(
       défaut quand le ``lab.yaml`` n'override pas la section.
     - Sinon (mode legacy) : infère depuis le chemin
       ``labs/<section>/<level>/<lab>``.
+
+    Dans les deux cas, « le ``lab.yaml`` n'override pas » veut dire
+    ``section is None``, et **rien d'autre**. Comparer à un nom de domaine,
+    comme le faisait ce code, revenait à décréter qu'une valeur déclarée par
+    l'auteur n'en était pas une.
     """
     if repo_meta is not None:
         # En mode framework, le lab.yaml peut surcharger via ``section:`` ;
         # par défaut on prend la catégorie du dépôt.
-        if not lab.section or lab.section == "linux":
+        if lab.section is None:
             lab.section = repo_meta.category
         # Rattache le lab à sa section pédagogique du meta.yml (l1, l2, …) pour
         # que ``dsoxlab progress`` affiche un nom de bloc clair au lieu de « ? ».
@@ -164,24 +182,25 @@ def _assign_section(
 
     # Mode legacy : inférence depuis le chemin (compat ancienne
     # arborescence sans meta.yml racine).
-    if lab.section == "linux":
-        inferred = _infer_section_legacy(yaml_path, root)
-        if inferred != "linux":
-            lab.section = inferred
+    if lab.section is None:
+        lab.section = _infer_section_legacy(yaml_path, root)
 
 
-def _infer_section_legacy(yaml_path: Path, root: Path) -> str:
-    """Infère la section depuis la position du lab.yaml (mode legacy)."""
+def _infer_section_legacy(yaml_path: Path, root: Path) -> str | None:
+    """Infère la section depuis la position du lab.yaml (mode legacy).
+
+    Rend ``None`` quand le chemin ne porte pas de section : il n'y a alors
+    rien à en déduire, et inventer une valeur — c'était ``"linux"`` — ne
+    ferait que déguiser l'absence en déclaration.
+    """
     try:
         parts = yaml_path.relative_to(root / "labs").parts
     except ValueError:
-        return "linux"
-    if not parts:
-        return "linux"
+        return None
     # ``labs/<section>/<level>/<lab>/lab.yaml`` → parts[0] = section
     if len(parts) >= 3 and parts[0] not in _KNOWN_LEVELS:
         return parts[0]
-    return "linux"
+    return None
 
 
 def _sort_labs(
@@ -208,4 +227,7 @@ def _sort_labs(
 
         return sorted(labs, key=sort_key)
 
-    return sorted(labs, key=lambda lab: (lab.section, lab.level, lab.id))
+    # `or ""` : un lab qu'aucune règle n'a rattaché garde ``section = None``,
+    # que Python refuse de comparer à une chaîne. Il se range en tête, ce qui
+    # est le bon endroit pour ce qui n'appartient à aucune section.
+    return sorted(labs, key=lambda lab: (lab.section or "", lab.level, lab.id))

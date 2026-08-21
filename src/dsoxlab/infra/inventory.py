@@ -31,6 +31,7 @@ from typing import Any
 
 from ..i18n import _
 from ..models.repo import RepoMetadata
+from ..utils.fichiers import ecrire_atomiquement
 
 logger = logging.getLogger(__name__)
 
@@ -274,8 +275,11 @@ def write_ssh_config(
         lines.append("")
 
     path = ssh_config_path(repo_meta)
-    path.write_text("\n".join(lines), encoding="utf-8")
-    path.chmod(0o600)
+    # Atomique, et le mode posé AVANT le remplacement : un ssh_config coupé
+    # au milieu d'un bloc « Host » fait échouer ssh, scp et le conftest d'un
+    # dépôt de labs sur une configuration incohérente, ce qui est plus dur à
+    # diagnostiquer qu'une configuration absente.
+    ecrire_atomiquement(path, "\n".join(lines), mode=0o600)
     return path
 
 
@@ -326,8 +330,7 @@ def write_user_ssh_config(
     cible = user_ssh_config_path(repo_meta)
     cible.parent.mkdir(parents=True, exist_ok=True)
     cible.parent.chmod(0o700)
-    cible.write_text(entete + contenu, encoding="utf-8")
-    cible.chmod(0o600)
+    ecrire_atomiquement(cible, entete + contenu, mode=0o600)
     return cible
 
 
@@ -534,7 +537,7 @@ def write_inventory_file(
     ``ini`` à générer programmatiquement.
     """
     path = inventory_path(repo_meta)
-    path.write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    ecrire_atomiquement(path, json.dumps(inventory, indent=2))
     return path
 
 

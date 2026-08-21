@@ -10,7 +10,12 @@ from .content import (
     validate_solutions_encrypted,
     validate_targets,
 )
-from .contract import ContractIssue, ContractReport, validate_schema_versions
+from .contract import (
+    ContractIssue,
+    ContractReport,
+    validate_schema_versions,
+    validate_unknown_keys,
+)
 from .metadata import MetadataReport, validate_metadata
 from .structure import StructureReport, validate_structure
 
@@ -30,4 +35,5 @@ __all__ = [
     "validate_solutions_encrypted",
     "validate_structure",
     "validate_targets",
+    "validate_unknown_keys",
 ]
