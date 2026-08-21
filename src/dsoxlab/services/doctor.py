@@ -26,6 +26,7 @@ Le module reste agnostique du domaine : il ne connaît que le contrat
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -259,6 +260,47 @@ def _check_ansible() -> Check:
     return Check(_("check_ansible"), True, _("detail_ansible_ok"))
 
 
+def creer_pool_command(pool: str) -> str:
+    """La commande qui crée un pool libvirt de bout en bout.
+
+    Les quatre étapes comptent : ``pool-define-as`` seul laisse un pool défini
+    mais **inactif**, dans lequel Terraform ne peut rien écrire.
+    """
+    return (
+        f"sudo virsh pool-define-as {pool} dir --target "
+        f"/var/lib/libvirt/images && sudo virsh pool-build {pool} && "
+        f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
+    )
+
+
+def demarrer_pool_command(pool: str) -> str:
+    """La commande qui démarre un pool déjà défini, et le rend permanent."""
+    return f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
+
+
+def _pools_libvirt(*, definis: bool) -> list[str] | None:
+    """Noms des pools libvirt : les actifs seuls, ou tous ceux qui sont définis.
+
+    Rendre ``None`` quand la sonde n'aboutit pas. ``virsh`` absent ou muet est
+    l'affaire du contrôle KVM ; le redire ici empilerait deux rouges pour une
+    seule cause.
+    """
+    cmd = ["virsh", "-c", "qemu:///system", "pool-list"]
+    if definis:
+        cmd.append("--all")
+    cmd.append("--name")
+    # check=False : le code retour est lu juste en dessous pour décider.
+    try:
+        probe = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if probe.returncode != 0:
+        return None
+    return probe.stdout.split()
+
+
 def _check_libvirt_pool(pool: str) -> Check:
     """Le template KVM écrit ses volumes dans un pool libvirt.
 
@@ -269,28 +311,30 @@ def _check_libvirt_pool(pool: str) -> Check:
     Le nom vient de ``meta.yml: infra.providers.kvm.storage_pool``, faute de
     quoi ``default``. Le contrôle porte donc sur le pool que le dépôt vise
     réellement, et non sur un nom présumé.
-    """
-    # check=False : le code retour est lu plus bas pour décider, et un virsh
-    # injoignable est traité comme « rien à ajouter », pas comme une erreur.
-    try:
-        probe = subprocess.run(
-            ["virsh", "-c", "qemu:///system", "pool-list", "--name"],
-            capture_output=True, text=True, timeout=5, check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        # virsh absent ou injoignable : c'est le contrôle KVM qui le dira,
-        # celui-ci n'a rien à ajouter et ne doit pas doubler le rouge.
-        return Check(_("check_libvirt_pool"), True, _("detail_pool_unknown"))
 
-    if probe.returncode == 0 and pool in probe.stdout.split():
+    Absent et inactif sont **deux états distincts**, et les confondre faisait
+    mentir le diagnostic. ``virsh pool-list --name`` ne liste que les pools
+    **actifs** : un pool défini mais jamais démarré n'y figure pas, le contrôle
+    le déclarait donc introuvable et proposait un ``pool-define-as`` qui échoue
+    aussitôt (« pool already exists »). Or Terraform, lui, sort sur une erreur
+    entièrement différente (« storage pool 'x' is not active »), et le geste qui
+    débloque est ``pool-start``, pas une création.
+    """
+    actifs = _pools_libvirt(definis=False)
+    if actifs is None:
+        return Check(_("check_libvirt_pool"), True, _("detail_pool_unknown"))
+    if pool in actifs:
         return Check(_("check_libvirt_pool"), True, pool)
+
+    definis = _pools_libvirt(definis=True)
+    if definis is not None and pool in definis:
+        return Check(
+            _("check_libvirt_pool"), False, _("detail_pool_inactive", pool=pool),
+            fix=demarrer_pool_command(pool),
+        )
     return Check(
         _("check_libvirt_pool"), False, _("detail_pool_missing", pool=pool),
-        fix=(
-            f"sudo virsh pool-define-as {pool} dir --target "
-            f"/var/lib/libvirt/images && sudo virsh pool-build {pool} && "
-            f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
-        ),
+        fix=creer_pool_command(pool),
     )
 
 
@@ -339,12 +383,34 @@ def apparmor_fix_command() -> str:
     )
 
 
+#: Le nom du pool tel que libvirt le cite dans ses deux messages d'échec.
+#: L'extraire évite de nommer « default » à un dépôt qui vise le sien via
+#: ``meta.yml: infra.providers.kvm.storage_pool`` : la remédiation porterait
+#: alors sur un pool que personne n'utilise.
+_POOL_ABSENT = re.compile(
+    r"no storage pool with matching name '([^']+)'"
+    r"|storage pool '([^']+)' not found",
+    re.IGNORECASE,
+)
+_POOL_INACTIF = re.compile(
+    r"storage pool '([^']+)' is not active", re.IGNORECASE
+)
+
+
+def _pool_cite(motif: re.Pattern[str], message: str) -> str | None:
+    """Le pool que ``message`` nomme, ou ``None`` si le motif ne mord pas."""
+    trouve = motif.search(message)
+    if trouve is None:
+        return None
+    return next((groupe for groupe in trouve.groups() if groupe), None)
+
+
 def explique_echec_provision(message: str) -> tuple[str, str] | None:
     """Reconnaît une cause connue dans l'erreur brute d'un provisionnement.
 
     Terraform rend des messages exacts mais opaques pour qui découvre l'outil.
-    Deux d'entre eux ont une cause connue et un correctif d'une ligne, et ce
-    sont ceux qui arrêtent un débutant sur une machine fraîche.
+    Quelques-uns ont une cause connue et un correctif d'une ligne, et ce sont
+    ceux qui arrêtent un débutant sur une machine fraîche.
 
     Rendre ``(explication, commande)``, ou ``None`` si rien n'est reconnu : on
     ne devine pas, on nomme ce qu'on sait nommer.
@@ -354,6 +420,12 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     # « Permission denied » sur une image du pool : l'échec type d'AppArmor
     # décrit dans apparmor_override_absent(). On ne le propose QUE si
     # l'override manque effectivement, sans quoi ce serait une fausse piste.
+    #
+    # Depuis que le template déclare ses disques par chemin de fichier plutôt
+    # que par référence de pool, une machine provisionnée par cette version ne
+    # tombe plus là-dessus. La branche reste pour les domaines définis par une
+    # version antérieure, qui portent encore la forme que virt-aa-helper ne sait
+    # pas résoudre : eux ne guériront qu'en étant recréés.
     if (
         "permission denied" in bas
         and "/var/lib/libvirt/images" in bas
@@ -361,14 +433,20 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     ):
         return _("explain_apparmor_denied"), apparmor_fix_command()
 
-    # « Pool not found » : le pool `default` n'existe pas sur une installation
-    # fraîche. Le contrôle de doctor l'attrape en amont, mais un provisionnement
-    # lancé sans diagnostic préalable tombe directement ici.
-    if "pool not found" in bas or "no storage pool with matching name" in bas:
-        return _("explain_pool_not_found"), (
-            "sudo virsh pool-define-as default dir --target "
-            "/var/lib/libvirt/images && sudo virsh pool-build default && "
-            "sudo virsh pool-start default && sudo virsh pool-autostart default"
+    # « is not active » : le pool existe mais n'a jamais été démarré. C'est un
+    # état DIFFÉRENT de l'absence, et il appelle un autre geste. Un
+    # `pool-define-as` proposé ici échouerait sur « pool already exists ».
+    pool_inactif = _pool_cite(_POOL_INACTIF, message)
+    if pool_inactif is not None:
+        return _("explain_pool_inactive"), demarrer_pool_command(pool_inactif)
+
+    # « Pool not found » : le pool visé n'existe pas. Une installation fraîche
+    # n'en déclare aucun. Le contrôle de doctor l'attrape en amont, mais un
+    # provisionnement lancé sans diagnostic préalable tombe directement ici.
+    pool_absent = _pool_cite(_POOL_ABSENT, message)
+    if pool_absent is not None or "pool not found" in bas:
+        return _("explain_pool_not_found"), creer_pool_command(
+            pool_absent or "default"
         )
 
     # « already exists » sur un domaine : un provisionnement précédent a échoué
