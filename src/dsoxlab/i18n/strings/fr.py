@@ -763,4 +763,107 @@ hors ligne, elle se tait.
         "Aucun domaine libvirt ne correspond à l'hôte « {host} ». "
         "Noms essayés : {tried}. Domaines existants : {domains}.",
     "libvirt_no_domain":  "aucun",
+
+    # ── Erreurs levées hors de cli.py ─────────────────────────────────────────
+    # La CLI les rend par `error(str(exc))` : le texte d'une exception EST de
+    # l'interface, au même titre qu'un `help=`. Il vivait en dur, en français,
+    # dans infra/, runtimes/, services/ et templates/, et sortait tel quel sous
+    # DSOXLAB_LANG=en. C'est exactement le chemin que suit un apprenant quand
+    # quelque chose casse.
+    "err_terraform_missing":
+        "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
+        "Installe-le : https://developer.hashicorp.com/terraform/install",
+    "err_terraform_host_unsupported":
+        "--host non implémenté pour le provider « {provider} ».",
+    "err_ansible_runner_missing":
+        "ansible-runner n'est pas installé. Lance : "
+        "uv tool install --force --with ansible-runner dsoxlab "
+        "ou : pipx inject dsoxlab ansible-runner",
+    "err_ansible_playbook_missing":
+        "ansible-playbook est absent du PATH : un lab vm ne peut pas jouer "
+        "son setup.yaml sans lui. ansible-runner pilote ansible-core mais "
+        "ne l'installe pas. Lance : uv tool install ansible-core",
+    "err_ansible_playbook_file_missing": "Playbook absent : {path}",
+    "err_credentials_loader_unsupported":
+        "Loader credentials non implémenté pour le provider « {provider} ». "
+        "Voir src/dsoxlab/infra/credentials.py.",
+    "err_credentials_outscale_file":
+        "Fichier {path} absent. Configure tes credentials Outscale via "
+        "« oapi-cli configure » (ou crée le JSON manuellement).",
+    "err_credentials_outscale_json": "{path} : JSON invalide ({error}).",
+    "err_credentials_profile_unknown":
+        "Profil « {profile} » introuvable dans {path}. Profils disponibles : "
+        "{profiles}. Précise-le via meta.yml: {option}, ou {env}=<name>.",
+    "err_credentials_profile_unknown_plain":
+        "Profil « {profile} » introuvable dans {path}. Profils : {profiles}.",
+    "err_credentials_fields_required":
+        "Profil « {profile} » dans {path} : {fields} requis.",
+    "err_credentials_aws_file":
+        "Fichier {path} absent. Configure-le via « aws configure ».",
+    "err_credentials_gcp_file":
+        "Fichier {path} absent. Configure-le via "
+        "« gcloud auth application-default login ».",
+    "err_credentials_azure_file":
+        "Fichier {path} absent. Configure-le via « az login ».",
+    "err_credentials_proxmox_file":
+        "Fichier {path} absent. Crée-le manuellement avec un token API "
+        "Proxmox (api_url, token_id, token_secret).",
+    "err_inventory_not_provisioned":
+        "Aucun hôte n'a d'adresse : l'infrastructure du lab n'est pas "
+        "provisionnée.",
+    "err_inventory_target_unknown":
+        "target_fqdn « {fqdn} » n'est pas dans la liste des hôtes connus : {known}",
+    "err_inventory_role_unknown":
+        "role « {role} » → « {fqdn} » n'est pas dans la liste des hôtes "
+        "connus : {known} (host non déclaré dans meta.yml, ou non provisionné).",
+    "err_host_ready_timeout":
+        "{fqdn} injoignable en SSH après {timeout}s "
+        "(cloud-init trop long, ou VM en échec de démarrage).",
+    "err_snapshot_provider_unsupported":
+        "Snapshots non encore implémentés pour le provider « {provider} ». "
+        "Voir src/dsoxlab/infra/snapshot/__init__.py pour ajouter un backend.",
+    "err_runtime_unavailable":
+        "Le runtime « {runtime} » n'est pas disponible sur cette machine. "
+        "Installe les dépendances (`dsoxlab instructor bootstrap`), ou "
+        "utilise un lab compatible avec un autre runtime.",
+    "err_runtime_type_unknown": "RuntimeType inconnu : {rt_type}",
+    "err_service_network_failed":
+        "Impossible de créer le réseau « {name} » :\n{detail}",
+    "err_service_port_closed":
+        "Le service « {name} » n'a pas ouvert le port {port} en {timeout}s.",
+    "err_service_probe_failed":
+        "Le service « {name} » n'a jamais répondu à « {probe} » en {timeout}s.",
+    "err_service_start_failed":
+        "Le démarrage du service « {name} » a échoué :\n{detail}",
+    "err_service_post_start_failed":
+        "L'initialisation du service « {name} » a échoué sur « {command} » :\n{detail}",
+    "err_vm_setup_missing":
+        "Le lab {lab_id} doit fournir setup.yaml à la racine (contrat dsoxlab "
+        "pour runtime: vm). Fichier attendu : {path}",
+    "err_vm_setup_failed":
+        "setup.yaml a échoué pour {lab_id} sur la target « {target} » "
+        "(rc={rc}, status={status}). Stats : {stats}",
+    "err_vm_cleanup_missing":
+        "Le lab {lab_id} doit fournir cleanup.yaml à la racine (contrat "
+        "dsoxlab pour runtime: vm). Fichier attendu : {path}",
+    "err_vm_cleanup_failed":
+        "cleanup.yaml a échoué pour {lab_id} sur la target « {target} » "
+        "(rc={rc}, status={status}).",
+    "err_vm_no_target":
+        "Le lab {lab_id} (runtime: vm) doit déclarer au moins une target "
+        "dans runtime.targets[] de lab.yaml.",
+    "err_vm_target_unknown":
+        "Target « {name} » inconnue pour le lab {lab_id}. "
+        "Targets disponibles : {available}",
+    "err_vm_no_meta":
+        "Pas de meta.yml trouvé en remontant depuis {path}. "
+        "dsoxlab ne peut pas dériver l'inventory.",
+    "err_vm_meta_invalid": "meta.yml invalide : {path}",
+    "err_lab_not_found": "Lab introuvable : {lab_id}",
+    "err_template_terraform_missing":
+        "Template Terraform absent pour le provider « {provider} ». "
+        "Providers packagés dans dsoxlab : {available}",
+    "err_template_cloud_init_missing":
+        "Template cloud-init absent pour la distribution « {distro} ». "
+        "Distros packagées : {available}",
 }

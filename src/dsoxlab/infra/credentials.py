@@ -31,6 +31,8 @@ import logging
 import os
 from pathlib import Path
 
+from ..i18n import _
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,8 +78,7 @@ def load(provider: str, profile: str | None = None) -> dict[str, str]:
     loader = loaders.get(provider)
     if loader is None:
         raise NotImplementedError(
-            f"Loader credentials non implémenté pour le provider "
-            f"'{provider}'. Voir src/dsoxlab/infra/credentials.py."
+            _("err_credentials_loader_unsupported", provider=provider)
         )
     return loader(profile_resolved)
 
@@ -104,35 +105,31 @@ def _load_outscale(profile: str) -> dict[str, str]:
     """
     cfg_path = Path.home() / ".osc" / "config.json"
     if not cfg_path.is_file():
-        raise CredentialsNotFound(
-            f"Fichier {cfg_path} absent. Configure tes credentials "
-            f"Outscale via 'oapi-cli configure' (ou crée le JSON manuellement)."
-        )
+        raise CredentialsNotFound(_("err_credentials_outscale_file", path=cfg_path))
 
     try:
         data = json.loads(cfg_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise CredentialsNotFound(
-            f"{cfg_path} : JSON invalide ({exc})."
+            _("err_credentials_outscale_json", path=cfg_path, error=exc)
         ) from exc
 
     if profile not in data:
-        raise CredentialsNotFound(
-            f"Profil '{profile}' introuvable dans {cfg_path}. "
-            f"Profils disponibles : {sorted(data.keys())}. "
-            f"Précise via meta.yml: providers.outscale.profile ou "
-            f"DSOXLAB_OUTSCALE_PROFILE=<name>."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_profile_unknown",
+            profile=profile, path=cfg_path, profiles=sorted(data.keys()),
+            option="providers.outscale.profile", env="DSOXLAB_OUTSCALE_PROFILE",
+        ))
 
     cfg = data[profile]
     access_key = cfg.get("access_key")
     secret_key = cfg.get("secret_key")
     region = cfg.get("region") or "eu-west-2"
     if not access_key or not secret_key:
-        raise CredentialsNotFound(
-            f"Profil '{profile}' dans {cfg_path} : access_key et "
-            f"secret_key requis."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_fields_required",
+            profile=profile, path=cfg_path, fields="access_key, secret_key",
+        ))
 
     return {
         "OSC_ACCESS_KEY": str(access_key),
@@ -148,27 +145,25 @@ def _load_aws(profile: str) -> dict[str, str]:
     creds_path = Path.home() / ".aws" / "credentials"
     config_path = Path.home() / ".aws" / "config"
     if not creds_path.is_file():
-        raise CredentialsNotFound(
-            f"Fichier {creds_path} absent. Configure via 'aws configure'."
-        )
+        raise CredentialsNotFound(_("err_credentials_aws_file", path=creds_path))
 
     creds = configparser.ConfigParser()
     creds.read(creds_path)
     if profile not in creds:
-        raise CredentialsNotFound(
-            f"Profil '{profile}' introuvable dans {creds_path}. "
-            f"Profils : {sorted(creds.sections())}. "
-            f"Précise via meta.yml: providers.aws.profile ou "
-            f"DSOXLAB_AWS_PROFILE=<name>."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_profile_unknown",
+            profile=profile, path=creds_path, profiles=sorted(creds.sections()),
+            option="providers.aws.profile", env="DSOXLAB_AWS_PROFILE",
+        ))
     section = creds[profile]
     access_key = section.get("aws_access_key_id")
     secret_key = section.get("aws_secret_access_key")
     if not access_key or not secret_key:
-        raise CredentialsNotFound(
-            f"Profil '{profile}' dans {creds_path} : aws_access_key_id "
-            f"et aws_secret_access_key requis."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_fields_required",
+            profile=profile, path=creds_path,
+            fields="aws_access_key_id, aws_secret_access_key",
+        ))
 
     # La région est dans ~/.aws/config (parfois avec le préfixe "profile")
     region = ""
@@ -200,10 +195,7 @@ def _load_gcp(profile: str) -> dict[str, str]:
     del profile  # GCP ne distingue pas par profil au niveau ADC
     adc_path = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
     if not adc_path.is_file():
-        raise CredentialsNotFound(
-            f"Fichier {adc_path} absent. Configure via "
-            f"'gcloud auth application-default login'."
-        )
+        raise CredentialsNotFound(_("err_credentials_gcp_file", path=adc_path))
     return {
         "GOOGLE_APPLICATION_CREDENTIALS": str(adc_path),
     }
@@ -216,9 +208,7 @@ def _load_azure(profile: str) -> dict[str, str]:
     del profile
     cfg_path = Path.home() / ".azure" / "azureProfile.json"
     if not cfg_path.is_file():
-        raise CredentialsNotFound(
-            f"Fichier {cfg_path} absent. Configure via 'az login'."
-        )
+        raise CredentialsNotFound(_("err_credentials_azure_file", path=cfg_path))
     # Le provider azurerm Terraform lit directement la session az CLI.
     # Il suffit que `az login` ait été fait — pas besoin de variables.
     return {}
@@ -239,26 +229,24 @@ def _load_proxmox(profile: str) -> dict[str, str]:
     """
     cfg_path = Path.home() / ".proxmoxer" / "config"
     if not cfg_path.is_file():
-        raise CredentialsNotFound(
-            f"Fichier {cfg_path} absent. Crée-le manuellement avec "
-            f"un token API Proxmox (api_url, token_id, token_secret)."
-        )
+        raise CredentialsNotFound(_("err_credentials_proxmox_file", path=cfg_path))
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
     if profile not in cfg:
-        raise CredentialsNotFound(
-            f"Profil '{profile}' introuvable dans {cfg_path}. "
-            f"Profils : {sorted(cfg.sections())}."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_profile_unknown_plain",
+            profile=profile, path=cfg_path, profiles=sorted(cfg.sections()),
+        ))
     section = cfg[profile]
     api_url = section.get("api_url")
     token_id = section.get("token_id")
     token_secret = section.get("token_secret")
     if not (api_url and token_id and token_secret):
-        raise CredentialsNotFound(
-            f"Profil '{profile}' dans {cfg_path} : api_url, token_id "
-            f"et token_secret requis."
-        )
+        raise CredentialsNotFound(_(
+            "err_credentials_fields_required",
+            profile=profile, path=cfg_path,
+            fields="api_url, token_id, token_secret",
+        ))
     return {
         "PROXMOX_VE_ENDPOINT": api_url,
         "PROXMOX_VE_API_TOKEN": f"{token_id}={token_secret}",

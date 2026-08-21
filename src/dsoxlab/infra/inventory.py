@@ -29,6 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..i18n import _
 from ..models.repo import RepoMetadata
 
 logger = logging.getLogger(__name__)
@@ -139,10 +140,7 @@ def build_inventory(
     # ne doit surtout pas se manifester par une traceback : on lève une erreur
     # que la CLI sait rendre en une phrase actionnable.
     if repo_meta.infra.hosts and not inventory_hosts:
-        raise InfraNotProvisioned(
-            "Aucun hôte n'a d'adresse : l'infrastructure du lab n'est pas "
-            "provisionnée."
-        )
+        raise InfraNotProvisioned(_("err_inventory_not_provisioned"))
 
     children: dict[str, Any] = {
         "labenv": {"hosts": inventory_hosts},
@@ -155,10 +153,10 @@ def build_inventory(
     # ``hosts:`` — Ansible résout les vars depuis labenv).
     if target_fqdn:
         if target_fqdn not in inventory_hosts:
-            raise ValueError(
-                f"target_fqdn '{target_fqdn}' n'est pas dans la liste des "
-                f"hôtes connus : {sorted(inventory_hosts)}"
-            )
+            raise ValueError(_(
+                "err_inventory_target_unknown",
+                fqdn=target_fqdn, known=sorted(inventory_hosts),
+            ))
         children["lab_target"] = {
             "hosts": {target_fqdn: {}},
         }
@@ -168,11 +166,10 @@ def build_inventory(
     # ``lab_target``. Les host_vars restent hérités du groupe ``labenv``.
     for role_name, role_fqdn in (roles or {}).items():
         if role_fqdn not in inventory_hosts:
-            raise ValueError(
-                f"role '{role_name}' → '{role_fqdn}' n'est pas dans la liste "
-                f"des hôtes connus : {sorted(inventory_hosts)} "
-                "(host non déclaré dans meta.yml ou non provisionné)."
-            )
+            raise ValueError(_(
+                "err_inventory_role_unknown",
+                role=role_name, fqdn=role_fqdn, known=sorted(inventory_hosts),
+            ))
         children[f"lab_{role_name}"] = {
             "hosts": {role_fqdn: {}},
         }
@@ -513,10 +510,9 @@ def wait_for_hosts_ready(
                 logger.info("Host %s prêt (tentative %d).", fqdn, attempt)
                 break
             if time.monotonic() >= deadline:
-                raise HostReadyTimeout(
-                    f"{fqdn} injoignable en SSH après {timeout:.0f}s "
-                    "(cloud-init trop long, ou VM en échec de démarrage)."
-                )
+                raise HostReadyTimeout(_(
+                    "err_host_ready_timeout", fqdn=fqdn, timeout=f"{timeout:.0f}",
+                ))
             # Un host dont sshd n'a JAMAIS répondu après `reset_after` est
             # probablement coincé au boot (kernel panic Debian cloud + OVMF +
             # resize, cf. _reset_kvm_domain). Un reset unique le débloque. Sans

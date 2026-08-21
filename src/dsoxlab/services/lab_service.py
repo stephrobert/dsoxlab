@@ -14,6 +14,7 @@ from typing import Any
 
 from ..discovery.repo import find_meta_yml
 from ..discovery.scanner import discover_labs
+from ..i18n import _
 from ..models.hint import HintFile
 from ..models.lab import LabDefinition
 from ..runtimes.base import EventCallback, SessionSpec
@@ -155,7 +156,7 @@ def find_lab(labs: list[LabDefinition], lab_id: str) -> LabDefinition:
     for lab in labs:
         if lab.id == lab_id:
             return lab
-    raise ValueError(f"Lab introuvable : {lab_id}")
+    raise ValueError(_("err_lab_not_found", lab_id=lab_id))
 
 
 def get_lab(root: Path, lab_id: str, lang: str = "en") -> LabDefinition:

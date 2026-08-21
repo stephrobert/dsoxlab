@@ -22,6 +22,7 @@ from __future__ import annotations
 import importlib
 from typing import Protocol
 
+from ...i18n import _
 from ...models.repo import RepoMetadata
 
 
@@ -58,9 +59,7 @@ def _backend(repo_meta: RepoMetadata) -> SnapshotBackend:
         )
     except ImportError as exc:
         raise NotImplementedError(
-            f"Snapshots non encore implémentés pour le provider "
-            f"'{provider}'. Voir src/dsoxlab/infra/snapshot/__init__.py "
-            f"pour ajouter un backend."
+            _("err_snapshot_provider_unsupported", provider=provider)
         ) from exc
     return module
 
