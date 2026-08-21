@@ -873,4 +873,54 @@ hors ligne, elle se tait.
     "err_template_cloud_init_missing":
         "Template cloud-init absent pour la distribution « {distro} ». "
         "Distros packagées : {available}",
+
+    # ── verrou d'écriture par dépôt (issue #81) ─────────────────────────────
+    "lock_busy":
+        "Une autre commande dsoxlab travaille déjà sur ce dépôt : "
+        "« {command} » (PID {pid}, depuis {age}). Rien n'a été modifié.",
+    "lock_busy_anonymous":
+        "Une autre commande dsoxlab travaille déjà sur ce dépôt "
+        "(verrou : {path}). Rien n'a été modifié.",
+    "lock_busy_hint":
+        "Attends qu'elle se termine, ou arrête-la. Un verrou laissé par un "
+        "processus mort se relâche tout seul : il n'y a aucun fichier à "
+        "supprimer à la main.",
+
+    # ── interruption d'une opération longue (issue #82) ─────────────────────
+    "interrupt_notice_first":
+        "Interruption demandée. On laisse l'étape en cours se terminer pour "
+        "ne rien laisser à moitié écrit. Un second Ctrl-C arrête tout de suite.",
+    "interrupt_notice_second":
+        "Seconde interruption : arrêt immédiat.",
+    "interrupt_resume":
+        "Rejoue pour reprendre là où ça s'est arrêté : {cmd}",
+    "interrupted_hard":
+        "Tu as interrompu deux fois : l'opération a été tuée au lieu d'être "
+        "close, ce qu'elle laisse derrière elle peut être incomplet.",
+    "interrupted_terraform_init":
+        "Interrompu pendant le téléchargement du provider Terraform. "
+        "Aucune ressource n'a été créée.",
+    "interrupted_terraform_apply":
+        "Interrompu : Terraform s'est arrêté et a enregistré son état. Ce "
+        "qu'il avait déjà créé reste en place, et le state le connaît.",
+    "interrupted_terraform_destroy":
+        "Interrompu : Terraform s'est arrêté et a enregistré son état. Une "
+        "partie de l'infrastructure est encore debout.",
+    "interrupted_ansible":
+        "Interrompu : le playbook s'est arrêté en cours de route. La machine "
+        "peut être partiellement configurée ; les playbooks des labs sont "
+        "idempotents.",
+    "interrupted_services":
+        "Interrompu pendant le démarrage des services du lab. Un conteneur "
+        "peut être debout sans avoir été initialisé.",
+    "interrupted_hosts_wait":
+        "Interrompu pendant l'attente des machines en SSH. L'infrastructure, "
+        "elle, est en place.",
+    "interrupted_tests":
+        "Interrompu : les tests ont été arrêtés. Rien n'a été enregistré, "
+        "cette tentative ne te coûte aucun point.",
+    "interrupted_session":
+        "Interrompu : la session du lab s'est refermée. Ton travail est intact.",
+    "interrupted_unknown":
+        "Interrompu par Ctrl-C.",
 }

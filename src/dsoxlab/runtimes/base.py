@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..interrupt import Interrupted, Stage
 from ..models.lab import LabDefinition
 
 EventCallback = Callable[[dict[str, Any]], None]
@@ -118,8 +119,17 @@ class BaseRuntime(ABC):
             return
         if spec.cwd is not None:
             spec.cwd.mkdir(parents=True, exist_ok=True)
-        subprocess.call(
-            spec.command,
-            cwd=spec.cwd,
-            env={**os.environ, **spec.env} if spec.env else None,
-        )
+        # Un shell interactif prend le terminal au premier plan (job control) et
+        # un `ssh` transmet le Ctrl-C au distant : dans les deux cas, le signal
+        # ne remonte pas jusqu'ici. Il remonte en revanche dans l'intervalle où
+        # le fils n'a pas encore pris la main, et `subprocess.call` tue alors la
+        # session avant de propager. Le dire vaut mieux que la sortie muette
+        # d'avant, qui rendait l'invite sans expliquer ce qui venait de fermer.
+        try:
+            subprocess.call(
+                spec.command,
+                cwd=spec.cwd,
+                env={**os.environ, **spec.env} if spec.env else None,
+            )
+        except KeyboardInterrupt:
+            raise Interrupted(Stage.SESSION) from None

@@ -49,6 +49,14 @@ from .config import (
 from .i18n import _, get_lang, set_lang
 from .infra import libvirt
 from .infra.inventory import InfraNotProvisioned
+from .interrupt import (
+    EVENT_INTERRUPT,
+    EXIT_INTERRUPTED,
+    Interrupted,
+    Stage,
+    interruptible,
+)
+from .locking import EXIT_LOCKED, RepoLock, RepoLocked
 from .logging_setup import configurer as configurer_journal
 from .models import (
     CourseManifest,
@@ -129,6 +137,30 @@ class _I18nGroup(TyperGroup):
         if opt is not None:
             opt.help = _("opt_help")
         return opt
+
+    def invoke(self, ctx: Any) -> Any:
+        """Traduit un Ctrl-C resté sans propriétaire en interruption nommée.
+
+        C'est le **seul** endroit qui puisse le faire. Typer attrape lui-même
+        ``KeyboardInterrupt`` tout en bas de son ``_main()`` et le change en
+        ``Exit(130)`` : le code de retour était déjà juste, mais l'interruption
+        y perdait toute identité, et un filet posé autour de ``app()`` ne voit
+        jamais rien passer. ``invoke`` s'exécute à l'intérieur de ce ``_main()``,
+        donc en amont : c'est le dernier moment où l'on peut encore dire à
+        l'apprenant ce qui vient d'être interrompu, au lieu de lui rendre son
+        invite sans un mot.
+
+        On convertit ici, et **jamais** à la source par un handler de signal :
+        ``KeyboardInterrupt`` descend de ``BaseException``, ce qui est
+        exactement ce qui lui permet de traverser les ``except Exception`` que
+        ce code pose autour des callbacks d'affichage. Une exception ordinaire
+        levée depuis un handler s'y ferait avaler en silence, et le flux
+        Terraform continuerait comme si de rien n'était.
+        """
+        try:
+            return super().invoke(ctx)
+        except KeyboardInterrupt:
+            raise Interrupted(Stage.UNKNOWN) from None
 
 
 app = typer.Typer(
@@ -266,6 +298,58 @@ def _require_provider(repo_meta: RepoMetadata) -> str:
         raise typer.Exit(1) from None
 
 
+def _verrou(root: Path, commande: str) -> RepoLock:
+    """Prend le verrou d'écriture du dépôt, ou sort en nommant qui le tient.
+
+    À n'appeler que dans les commandes qui **modifient** l'état. Les commandes
+    de lecture (``list-labs``, ``show``, ``scores``, ``progress``, ``next``,
+    ``status``, ``doctor``, ``course``, ``challenge``, ``hint``, ``guide``,
+    ``validate-structure``, ``support``, ``fullhelp``) ne passent pas par ici :
+    consulter son catalogue pendant qu'un ``provision`` tourne dans un autre
+    terminal est un usage normal, pas un conflit.
+
+    Le verrou rendu est **déjà pris**. L'appelant choisit sa portée :
+
+    - ``ctx.call_on_close(_verrou(...).release)`` pour toute la commande ;
+    - ``with _verrou(...):`` pour la seule phase qui écrit. C'est ce que fait
+      ``run``, qui doit rendre le verrou **avant** d'ouvrir la session
+      interactive, sinon le ``dsoxlab check`` que l'apprenant tape dans ce
+      sous-shell serait refusé par sa propre session.
+    """
+    verrou = RepoLock(root, commande)
+    try:
+        verrou.acquire()
+    except RepoLocked as exc:
+        detenteur = exc.holder
+        if detenteur is None:
+            error(_("lock_busy_anonymous", path=exc.path))
+        else:
+            error(_(
+                "lock_busy",
+                command=detenteur.command, pid=detenteur.pid,
+                age=detenteur.age_label,
+            ))
+        info(_("lock_busy_hint"))
+        raise typer.Exit(EXIT_LOCKED) from None
+    return verrou
+
+
+def _interrompu(exc: Interrupted, reprise: str) -> NoReturn:
+    """Rend une interruption : ce qui reste en place, puis comment reprendre.
+
+    Trois affirmations, dans cet ordre, et le code de sortie **130** qui les
+    confirme (``128 + SIGINT``) : ce qui a été interrompu, ce que ça laisse
+    derrière, et la commande qui reprend. Le code, typer le rendait déjà ; ce
+    qui manquait, c'était la phrase, et sur le chemin Ansible le code lui-même,
+    qui annonçait un échec (2) là où l'apprenant avait appuyé sur Ctrl-C.
+    """
+    warn(_(exc.message_key))
+    if exc.hard:
+        warn(_("interrupted_hard"))
+    info(_("interrupt_resume", cmd=reprise))
+    raise typer.Exit(EXIT_INTERRUPTED)
+
+
 def _services_repo_id(root: Path) -> str:
     """Slug du dépôt, pour namespacer les conteneurs de services.
 
@@ -295,11 +379,15 @@ def _ensure_services(lab: LabDefinition, root: Path) -> None:
     repo_id = _services_repo_id(root)
     for service in lab.runtime.services:
         info(_("service_starting", name=service.name, image=service.image))
-        try:
-            svc.start(service, repo_id)
-        except svc.ServiceError as exc:
-            error(_("service_failed", name=service.name, detail=str(exc)))
-            raise typer.Exit(2) from None
+        # Le démarrage attend les sondes du service, jusqu'à `ready_timeout`
+        # secondes : c'est le point d'attente le plus long d'un lab shell, donc
+        # celui où le Ctrl-C tombe.
+        with interruptible(Stage.SERVICES):
+            try:
+                svc.start(service, repo_id)
+            except svc.ServiceError as exc:
+                error(_("service_failed", name=service.name, detail=str(exc)))
+                raise typer.Exit(2) from None
         success(_("service_ready", name=service.name))
 
 
@@ -530,6 +618,7 @@ def install() -> None:
 
 @app.command("use", help=_("cmd_use_help"))
 def use(
+    ctx: typer.Context,
     context: Annotated[str | None, typer.Argument(help=_("cmd_use_arg"))] = None,
     lab_home: LabHomeOption = None,
     lang: Annotated[str | None, typer.Option("--lang", help=_("opt_lang"))] = None,
@@ -540,6 +629,9 @@ def use(
     reset: Annotated[bool, typer.Option("--reset", "-r", help=_("opt_use_reset"))] = False,
 ) -> None:
     root = _root(lab_home)
+    # `.dsoxlab-context.json` est réécrit EN ENTIER à chaque changement : deux
+    # `use` concurrents, et le premier est perdu sans laisser de trace.
+    ctx.call_on_close(_verrou(root, "use").release)
     if reset:
         clear_context(root)
         success(_("context_cleared"))
@@ -715,25 +807,32 @@ def run(
         raise typer.Exit(1) from None
 
     info(_("lab_starting", lab_id=lab.id, runtime=lab.runtime.type.value))
-    _ensure_services(lab, root)
-    try:
-        if lab.runtime.type.value in ("vm", "kvm", "incus"):
-            _run_ansible_with_progress(
-                lab.path / "setup.yaml",
-                lambda cb: run_lab(lab, target_name=target, on_event=cb),
-            )
-        else:
-            run_lab(lab, target_name=target)
-    except InfraNotProvisioned:
-        # Avant le except RuntimeError : InfraNotProvisioned en hérite, et
-        # mérite la phrase actionnable plutôt que son message technique.
-        error(_("infra_not_provisioned"))
-        raise typer.Exit(2) from None
-    except RuntimeError as exc:
-        error(str(exc))
-        raise typer.Exit(2) from None
+    # Le verrou ne couvre QUE la phase qui écrit : services, playbook de setup,
+    # contexte. Il est rendu avant la session interactive, sinon le `dsoxlab
+    # check` que l'apprenant tape dans ce sous-shell serait refusé par sa
+    # propre session, blocage que personne ne comprendrait.
+    with _verrou(root, "run"):
+        _ensure_services(lab, root)
+        try:
+            if lab.runtime.type.value in ("vm", "kvm", "incus"):
+                _run_ansible_with_progress(
+                    lab.path / "setup.yaml",
+                    lambda cb: run_lab(lab, target_name=target, on_event=cb),
+                )
+            else:
+                run_lab(lab, target_name=target)
+        except Interrupted as exc:
+            _interrompu(exc, f"dsoxlab run {lab.id}")
+        except InfraNotProvisioned:
+            # Avant le except RuntimeError : InfraNotProvisioned en hérite, et
+            # mérite la phrase actionnable plutôt que son message technique.
+            error(_("infra_not_provisioned"))
+            raise typer.Exit(2) from None
+        except RuntimeError as exc:
+            error(str(exc))
+            raise typer.Exit(2) from None
 
-    set_active_lab(root, lab.id)
+        set_active_lab(root, lab.id)
     # Dire où l'on atterrit vraiment. Le message historique annonçait
     # « challenge/work/ » quel que soit le runtime : faux pour tout lab vm,
     # qui ouvre une session SSH ou, désormais, un shell à la racine du dépôt.
@@ -754,7 +853,10 @@ def run(
 
     print_lab_welcome(lab)
 
-    open_lab_session(lab)   # bloquant : sous-shell interactif
+    try:
+        open_lab_session(lab)   # bloquant : sous-shell interactif
+    except Interrupted as exc:
+        _interrompu(exc, f"dsoxlab run {lab.id}")
 
     # Retour au shell parent : on garde active_lab posé pour que
     # ``dsoxlab check`` et ``dsoxlab submit`` (sans argument) sachent
@@ -1091,6 +1193,20 @@ def _run_check(
         if session_target and lab.runtime.target(session_target) is not None:
             target = session_target
 
+    # Le verrou couvre les services ET pytest. Les tests pilotent la machine
+    # du lab (ou ses conteneurs) : deux validations concurrentes se marchent
+    # dessus, et la seconde note un état que la première est en train de
+    # changer. Il est pris ICI, pas au début : tout ce qui précède ne fait que
+    # lire, et refuser une faute de frappe sur `--target` pour cause de verrou
+    # serait absurde.
+    with _verrou(root, "check"):
+        return _valider(root, lab, target, quiet=quiet)
+
+
+def _valider(
+    root: Path, lab: LabDefinition, target: str | None, *, quiet: bool,
+) -> tuple[CheckResult, int, int]:
+    """Joue les tests et enregistre la note. Appelé sous verrou."""
     # Les services conteneurisés (émulateur cloud, base…) doivent être debout
     # avant que pytest ne s'exécute : les tests pilotent l'API qu'ils exposent.
     _ensure_services(lab, root)
@@ -1140,7 +1256,10 @@ def check(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    result, score, max_score = _run_check(root, lab, target, quiet=as_json)
+    try:
+        result, score, max_score = _run_check(root, lab, target, quiet=as_json)
+    except Interrupted as exc:
+        _interrompu(exc, f"dsoxlab check {lab.id}")
     if as_json:
         # La sortie brute de pytest est conservée : c'est là que l'appelant
         # trouve le détail des échecs, qu'aucun compteur ne résume.
@@ -1177,7 +1296,10 @@ def submit(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
-    result, score, max_score = _run_check(root, lab, target)
+    try:
+        result, score, max_score = _run_check(root, lab, target)
+    except Interrupted as exc:
+        _interrompu(exc, f"dsoxlab submit {lab.id}")
 
     if result.ok:
         success(_("submit_success", score=score, max_score=max_score))
@@ -1287,6 +1409,7 @@ def next_lab(
 
 @app.command("reset", help=_("cmd_reset_help"))
 def reset(
+    ctx: typer.Context,
     lab_id: Annotated[str, typer.Argument(help=_("cmd_reset_arg"), autocompletion=_complete_lab_id)],
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
@@ -1300,6 +1423,7 @@ def reset(
         error(str(exc))
         raise typer.Exit(1) from None
 
+    ctx.call_on_close(_verrou(root, "reset").release)
     info(_("resetting", lab_id=lab.id))
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
@@ -1311,6 +1435,8 @@ def reset(
             reset_lab(lab, target_name=target)
         reset_hints(root, lab.id)
         success(_("lab_reset"))
+    except Interrupted as exc:
+        _interrompu(exc, f"dsoxlab reset {lab.id}")
     except RuntimeError as exc:
         error(str(exc))
         raise typer.Exit(2) from None
@@ -1320,6 +1446,7 @@ def reset(
 
 @app.command("clean", help=_("cmd_clean_help"))
 def clean(
+    ctx: typer.Context,
     lab_id: Annotated[str, typer.Argument(help=_("cmd_clean_arg"), autocompletion=_complete_lab_id)],
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
@@ -1337,6 +1464,10 @@ def clean(
     if not yes:
         typer.confirm(_("confirm_clean", lab_id=lab.id), abort=True)
 
+    # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
+    # attend une réponse au clavier bloquerait l'autre terminal sur une
+    # question que personne ne voit.
+    ctx.call_on_close(_verrou(root, "clean").release)
     info(_("cleaning", lab_id=lab.id))
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
@@ -1348,6 +1479,8 @@ def clean(
             clean_lab(lab, target_name=target)
         _stop_services(lab, root)
         success(_("clean_done"))
+    except Interrupted as exc:
+        _interrompu(exc, f"dsoxlab clean {lab.id}")
     except RuntimeError as exc:
         error(str(exc))
         raise typer.Exit(2) from None
@@ -1598,6 +1731,7 @@ def _diagnostic_message(hote: dict[str, Any]) -> str:
 
 @app.command("provision", help=_("cmd_provision_help"))
 def provision(
+    ctx: typer.Context,
     host: Annotated[list[str] | None, typer.Option(
         "--host",
         help=_("opt_provision_host"),
@@ -1609,6 +1743,11 @@ def provision(
     from .infra.terraform import ProviderNotImplemented, TerraformNotInstalled, host_targets
 
     root = _root(lab_home)
+    # Le verrou est pris avant même de lire le contrat : ce qui suit interroge
+    # l'hyperviseur, puis écrit le state Terraform. Un `destroy` lancé dans un
+    # autre terminal pendant le scan des machines orphelines rendrait ce scan
+    # faux au moment où on s'en sert.
+    ctx.call_on_close(_verrou(root, "provision").release)
     repo_meta = _read_repo(root)
     if repo_meta is None:
         error(_("provision_no_meta", root=root))
@@ -1685,6 +1824,11 @@ def provision(
                 targets=targets or None, target_hosts=list(host) if host else None,
             ),
         )
+    except Interrupted as exc:
+        # AVANT le `except Exception` : une interruption n'est pas un échec de
+        # provisionnement, et sortir en 4 avec « provision failed » ferait
+        # chercher une panne là où l'apprenant a simplement appuyé sur Ctrl-C.
+        _interrompu(exc, "dsoxlab provision")
     except ProviderNotImplemented as exc:
         error(str(exc))
         raise typer.Exit(2) from None
@@ -1739,12 +1883,19 @@ def provision(
                 )
 
             try:
-                wait_for_hosts_ready(
-                    repo_meta, ready_hosts, on_attempt=_on_attempt
-                )
+                with interruptible(Stage.HOSTS_WAIT):
+                    wait_for_hosts_ready(
+                        repo_meta, ready_hosts, on_attempt=_on_attempt
+                    )
             except HostReadyTimeout as exc:
                 progress.stop()
                 warn(_("provision_ssh_timeout", error=str(exc)))
+            except Interrupted as exc:
+                # L'infrastructure existe déjà : c'est l'attente qui a été
+                # coupée, pas la création. Rejouer `provision` est idempotent
+                # et reprend exactement ici.
+                progress.stop()
+                _interrompu(exc, "dsoxlab provision")
 
     # Le fragment SSH, écrit à CHAQUE provision et non seulement quand des
     # machines viennent d'être créées : relancer un provision sur une infra
@@ -1784,6 +1935,7 @@ def provision(
 
 @app.command("destroy", help=_("cmd_destroy_help"))
 def destroy(
+    ctx: typer.Context,
     host: Annotated[list[str] | None, typer.Option(
         "--host",
         help=_("opt_destroy_host"),
@@ -1831,6 +1983,9 @@ def destroy(
     if not yes:
         typer.confirm(_("confirm_destroy", provider=provider), abort=True)
 
+    # Après la confirmation : tenir le verrou pendant l'attente d'une réponse
+    # au clavier bloquerait l'autre terminal sans rien protéger.
+    ctx.call_on_close(_verrou(root, "destroy").release)
     info(_("destroy_starting", provider=provider))
     try:
         # init est rapide en destroy (provider déjà téléchargé) mais
@@ -1845,6 +2000,10 @@ def destroy(
                 targets=targets or None, target_hosts=list(host) if host else None,
             ),
         )
+    except Interrupted as exc:
+        # Avant le `except Exception`, même raison qu'au provision : Terraform
+        # a écrit son state, ce qui reste debout est connu, et rejouer suffit.
+        _interrompu(exc, "dsoxlab destroy")
     except ProviderNotImplemented as exc:
         error(str(exc))
         raise typer.Exit(2) from None
@@ -1962,7 +2121,12 @@ def _run_ansible_with_progress(
             etype = event.get("event")
             data = event.get("event_data", {}) or {}
 
-            if etype == "playbook_on_task_start":
+            if etype == EVENT_INTERRUPT:
+                progress.console.print(_(
+                    "interrupt_notice_first" if event.get("count", 1) == 1
+                    else "interrupt_notice_second"
+                ))
+            elif etype == "playbook_on_task_start":
                 task_name = data.get("name") or data.get("task", "")
                 state["current_task"] = task_name
                 progress.update(task, description=_("progress_ansible_task", task=task_name))
@@ -2149,6 +2313,11 @@ def _run_terraform_with_progress(
                     diag = event.get("diagnostic", {})
                     summary = diag.get("summary", "")
                     progress.console.print(f"  [red]Error:[/red] {summary}")
+            elif etype == EVENT_INTERRUPT:
+                progress.console.print(_(
+                    "interrupt_notice_first" if event.get("count", 1) == 1
+                    else "interrupt_notice_second"
+                ))
 
         state["result"] = runner(on_event)
         # Une fois terminé, fixe la barre à 100 % avec un label final
@@ -2600,6 +2769,14 @@ def main() -> None:
     """
     try:
         app()
+    except Interrupted as exc:
+        # Interruption d'une commande qui n'avait pas de consigne de reprise à
+        # donner, ou survenue hors des étapes inventoriées. On dit au moins ce
+        # qui a été interrompu, et on sort en 130 plutôt qu'en 1.
+        warn(_(exc.message_key))
+        if exc.hard:
+            warn(_("interrupted_hard"))
+        raise SystemExit(EXIT_INTERRUPTED) from None
     except InfraNotProvisioned:
         error(_("infra_not_provisioned"))
         raise SystemExit(1) from None
