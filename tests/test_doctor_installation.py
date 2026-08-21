@@ -409,3 +409,163 @@ def test_une_erreur_inconnue_ne_produit_aucune_explication() -> None:
     """On ne devine pas : une explication inventée coûte plus qu'aucune."""
     assert doctor.explique_echec_provision("boom") is None
     assert doctor.explique_echec_provision("") is None
+
+
+# ── absent et inactif sont deux états, pas un seul ───────────────────────────
+
+def _virsh_pools(actifs: list[str], definis: list[str]):
+    """Simule `virsh pool-list [--all] --name`.
+
+    La sonde réelle est jouée : c'est bien elle qui oubliait le `--all`, donc
+    la remplacer par un faux `_pools_libvirt` ne prouverait rien. On ne
+    contrefait que virsh, au niveau du sous-processus.
+    """
+
+    def _run(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        noms = definis if "--all" in cmd else actifs
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=0, stdout="\n".join(noms) + "\n", stderr="",
+        )
+
+    return _run
+
+
+def test_un_pool_actif_est_vert(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le contre-cas, sans lequel les deux suivants passeraient sur un bug
+    qui rendrait tout pool rouge."""
+    monkeypatch.setattr(
+        doctor.subprocess, "run", _virsh_pools(["default"], ["default"])
+    )
+    check = doctor._check_libvirt_pool("default")
+
+    assert check.ok
+    assert check.detail == "default"
+    assert check.fix is None
+
+
+def test_un_pool_absent_fait_proposer_sa_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Une Ubuntu fraîche n'en déclare aucun. Les quatre étapes comptent :
+    `pool-define-as` seul laisse un pool inactif, où rien ne s'écrit."""
+    monkeypatch.setattr(doctor.subprocess, "run", _virsh_pools([], []))
+    check = doctor._check_libvirt_pool("default")
+
+    assert not check.ok
+    assert check.detail == _("detail_pool_missing", pool="default")
+    assert check.fix is not None
+    for etape in ("pool-define-as", "pool-build", "pool-start", "pool-autostart"):
+        assert etape in check.fix, f"« {etape} » manque à la création du pool"
+
+
+def test_un_pool_defini_mais_arrete_est_dit_tel_quel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le défaut que ce lot corrige.
+
+    `virsh pool-list --name` ne liste que les pools **actifs**. Un pool défini
+    mais jamais démarré n'y figurait pas, le contrôle le déclarait introuvable,
+    et proposait un `pool-define-as` qui échoue aussitôt sur « pool already
+    exists ». Terraform, lui, sort sur un tout autre message (« storage pool
+    'x' is not active ») et le geste qui débloque est `pool-start`.
+    """
+    monkeypatch.setattr(
+        doctor.subprocess, "run", _virsh_pools([], ["default"])
+    )
+    check = doctor._check_libvirt_pool("default")
+
+    assert not check.ok
+    assert check.detail == _("detail_pool_inactive", pool="default")
+    assert check.fix is not None
+    assert "pool-start" in check.fix
+    assert "pool-autostart" in check.fix
+    assert "pool-define-as" not in check.fix, (
+        "définir un pool qui existe déjà échoue : la remédiation mentirait"
+    )
+
+
+def test_le_pool_du_depot_est_celui_qui_est_sonde(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un dépôt qui vise son propre pool ne doit pas se voir répondre sur
+    « default », ni dans le constat ni dans la remédiation."""
+    monkeypatch.setattr(
+        doctor.subprocess, "run", _virsh_pools(["default"], ["default"])
+    )
+    check = doctor._check_libvirt_pool("labs-pool")
+
+    assert not check.ok
+    assert "labs-pool" in check.detail
+    assert check.fix is not None
+    assert "labs-pool" in check.fix
+    assert "default" not in check.fix
+
+
+def test_un_virsh_muet_ne_conclut_pas_a_l_absence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sonder n'est pas deviner : un virsh injoignable ne prouve pas qu'un pool
+    manque, et le rouge appartient alors au contrôle KVM, pas à celui-ci."""
+
+    def _run(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("virsh a disparu entre deux appels")
+
+    monkeypatch.setattr(doctor.subprocess, "run", _run)
+    check = doctor._check_libvirt_pool("default")
+
+    assert check.ok
+    assert check.detail == _("detail_pool_unknown")
+
+
+# ── la remédiation nomme le pool que Terraform a nommé ────────────────────────
+
+def test_le_pool_absent_est_lu_dans_le_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Message réel de terraform-provider-libvirt 0.9.8, relevé sur la machine.
+
+    La remédiation codait « default » en dur : un dépôt qui vise son pool via
+    `infra.providers.kvm.storage_pool` se voyait proposer la création d'un pool
+    que personne n'utilise, et restait bloqué.
+    """
+    erreur = (
+        "Error: Pool Not Found\n\nStorage pool 'labs-pool' not found: Storage "
+        "pool not found: no storage pool with matching name 'labs-pool'"
+    )
+    resultat = doctor.explique_echec_provision(erreur)
+
+    assert resultat is not None
+    explication, commande = resultat
+    assert explication == _("explain_pool_not_found")
+    assert "labs-pool" in commande
+    assert "default" not in commande
+
+
+def test_un_pool_inactif_est_reconnu_a_l_echec() -> None:
+    """Autre message réel, mesuré en appliquant sur un pool défini non démarré.
+
+    Il ne dit pas la même chose que « Pool Not Found » et n'appelle pas le même
+    geste : le confondre avec l'absence renverrait vers une création qui échoue.
+    """
+    erreur = (
+        "Error: Volume Creation Failed\n\nFailed to create storage volume: "
+        "Requested operation is not valid: storage pool 'labs-pool' is not active"
+    )
+    resultat = doctor.explique_echec_provision(erreur)
+
+    assert resultat is not None
+    explication, commande = resultat
+    assert explication == _("explain_pool_inactive")
+    assert "pool-start labs-pool" in commande
+    assert "pool-define-as" not in commande
+
+
+@pytest.mark.parametrize(
+    "cle",
+    ["detail_pool_inactive", "explain_pool_inactive"],
+)
+def test_les_cles_du_pool_inactif_sont_bilingues(cle: str) -> None:
+    """Une clé qui n'existe que d'un côté n'existe pas."""
+    from dsoxlab.i18n.strings.en import STRINGS as EN
+    from dsoxlab.i18n.strings.fr import STRINGS as FR
+
+    assert cle in EN and cle in FR
+    assert EN[cle] != FR[cle], "une traduction identique est probablement oubliée"

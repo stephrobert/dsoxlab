@@ -57,6 +57,73 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   simultanément dans `i18n/strings/en.py` et `i18n/strings/fr.py`, et
   `dsoxlab provision` sans terraform sur le PATH répond maintenant dans la langue
   de la session, ce qui était le symptôme à l'origine de l'issue.
+## [0.1.52] - 2026-08-21
+
+### Corrigé
+
+- **Les disques des VM se déclarent par chemin, et AppArmor cesse de tous les
+  refuser.** Le template KVM empaqueté demandait un disque déclaré par référence
+  de pool (`<disk type='volume'>`), or `virt-aa-helper`, qui fabrique le profil
+  AppArmor du domaine à partir de ce XML, ne sait pas résoudre cette forme en
+  chemin de fichier. Aucun disque n'entrait donc dans le profil, et qemu se
+  voyait tout refuser : `Could not open '…qcow2': Permission denied`, sur une
+  machine où `dsoxlab doctor` venait de passer au vert. Cela ressemblait à un
+  problème de propriétaire sans en être un : mettre tous les volumes en
+  `libvirt-qemu:kvm` n'y changeait rien.
+
+  Les trois disques (système, seed cloud-init et disque additionnel optionnel)
+  pointent désormais le chemin absolu de leur volume. Les volumes restent créés
+  dans le pool : seule la façon dont le domaine les désigne change. libvirt
+  accorde alors les droits de lui-même, droit de verrouillage `k` compris, celui
+  sans lequel l'échec devient `Failed to lock byte 100`.
+
+  Rien n'est modifié sur la machine de l'apprenant, et c'est tout l'intérêt.
+  Poser `security_driver = "none"` dans `/etc/libvirt/qemu.conf` fait bien
+  démarrer le domaine, et éteint du même geste le confinement de toutes les VM
+  de la machine : un contre-exemple enseigné, dans un outil DevSecOps, à des
+  gens qui apprennent le métier. Une règle AppArmor locale aurait marché aussi,
+  mais c'est une modification du système dont ce correctif n'a pas besoin.
+
+  Mesuré sur Ubuntu 24.04.2 avec dmacvicar/libvirt 0.9.8 et le `virt-aa-helper`
+  de la distribution, sur deux domaines créés côte à côte à partir du même
+  volume : `type='volume'` produit un profil ne portant aucune règle de disque,
+  `type='file'` produit `"/var/lib/…/x.qcow2" rwk,`. Ce qui reste à confirmer
+  sur une machine réellement neuve, c'est le bout du parcours : les profils
+  libvirt de la machine de développement sont en mode `complain`, où toute VM
+  démarre dans les deux cas.
+
+- **`doctor` ne confond plus un pool de stockage arrêté avec un pool absent.**
+  `virsh pool-list --name` ne liste que les pools **actifs**. Un pool défini
+  mais jamais démarré n'y figurait pas, le contrôle le déclarait introuvable, et
+  proposait un `pool-define-as` qui échoue aussitôt sur « pool already exists ».
+  Terraform, lui, sort sur un message entièrement différent (`storage pool 'x'
+  is not active`), et le geste qui débloque est `pool-start`. Les deux états
+  sont désormais distingués, chacun avec sa remédiation.
+
+- **La remédiation nomme le pool que le dépôt vise réellement.** L'explication
+  « Pool Not Found » affichée après un `provision` en échec codait `default` en
+  dur. Un catalogue pointant son propre pool via
+  `infra.providers.kvm.storage_pool` se voyait proposer la création d'un pool
+  que personne n'utilise. Le nom est maintenant lu dans le message que libvirt a
+  produit.
+
+### Ajouté
+
+- **`infra.providers.kvm.storage_pool` entre dans le contrat documenté.** Le
+  réglage est lisible par le template empaqueté depuis la 0.1.42 et n'était
+  décrit nulle part : un formateur dont le pool ne s'appelle pas `default`
+  n'avait aucun moyen de l'apprendre autrement qu'en lisant le Terraform
+  empaqueté. `docs/contract-v1.md`, sa version française et
+  `schemas/meta.schema.json` le portent désormais, avec `default` pour valeur
+  par défaut. Pas de montée de version du contrat : un champ optionnel muni
+  d'un défaut ne casse aucun catalogue.
+
+- **Un test lit le template et exige que le contrat en parle.** Il parcourt les
+  appels `lookup(var.provider_config, …)` du `main.tf` KVM et tombe sur toute
+  clé pilotable depuis `meta.yml` mais absente des trois documents, ou dont le
+  défaut a dérivé. Le contrôle bidirectionnel de `tests/test_json_schemas.py` ne
+  peut pas voir ces clés, qui ne passent jamais par `models/repo.py` : c'est la
+  porte qui manquait.
 
 ## [0.1.51] - 2026-08-21
 

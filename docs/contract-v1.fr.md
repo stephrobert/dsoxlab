@@ -74,12 +74,36 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. |
 | `cidr` | non | chaîne | | Sous-réseau de ce réseau. |
 | `hosts` | non | liste de mappings | `[]` | Les VM. Voir ci-dessous. |
-| `providers` | non | mapping | `{}` | Surcharges par provider, lues par le module Terraform correspondant. Valeurs libres : chaque provider a ses variables. |
+| `providers` | non | mapping | `{}` | Surcharges par provider, lues par le module Terraform correspondant. Valeurs libres : chaque provider a ses variables. Voir ci-dessous celles que lisent les templates empaquetés. |
 
 Résolution du provider, première règle gagnante : `DSOXLAB_PROVIDER`, puis le
 contexte de session posé par `dsoxlab use --provider`, puis une chaîne brute ou
 une liste à un seul élément. Non résolu n'est pas une erreur : seules les
 commandes d'infrastructure en exigent un.
+
+### `infra.providers.<provider>`
+
+Contenu libre, transmis tel quel au module Terraform du provider concerné. Une
+clé mérite d'être nommée, parce qu'une machine neuve en a besoin :
+
+| Champ | Provider | Obligatoire | Type | Défaut | Remarques |
+| --- | --- | --- | --- | --- | --- |
+| `storage_pool` | `kvm` | non | chaîne | `default` | Pool libvirt où sont créés les volumes. |
+
+Le défaut est précisément ce qu'une installation de libvirt ne fournit pas
+toujours : sur une Ubuntu 24.04 fraîche, `virsh pool-list --all` est vide, et
+`provision` s'arrête sur un `Pool Not Found` brut de Terraform. Deux issues,
+toutes deux prévues : créer le pool `default` (`dsoxlab doctor` affiche les
+quatre commandes), ou pointer cette clé sur un pool que l'on possède déjà. Ne
+jamais éditer le template empaqueté.
+
+```yaml
+infra:
+  provider: kvm
+  providers:
+    kvm:
+      storage_pool: labs-pool
+```
 
 ### `infra.hosts[]`
 

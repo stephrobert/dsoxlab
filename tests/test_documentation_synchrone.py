@@ -17,6 +17,7 @@ Il attrape donc aussi bien la commande oubliée que la commande fantôme.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -176,3 +177,60 @@ def test_la_table_des_commandes_du_readme_est_a_jour() -> None:
         f"la documentation a dérivé de la CLI :\n{proc.stdout}\n"
         "Régénère-la : python3 scripts/generer-doc.py"
     )
+
+
+# ── le contrat décrit les réglages que les templates lisent vraiment ──────────
+
+#: Les surcharges de `infra.providers.<provider>` ne passent pas par
+#: `models/repo.py` : elles sont transmises telles quelles au module Terraform,
+#: qui les lit par `lookup(var.provider_config, …)`. Le contrôle bidirectionnel
+#: de `tests/test_json_schemas.py` ne peut donc pas les voir, et une clé
+#: pilotable mais décrite nulle part reste introuvable pour l'auteur d'un
+#: catalogue. Ce test-ci lit le template et exige que le contrat en parle.
+_LOOKUP = re.compile(
+    r'lookup\(\s*var\.provider_config\s*,\s*"(\w+)"\s*,\s*"([^"]*)"\s*\)'
+)
+
+#: Clés que le template lit pour son propre compte, et qui ne relèvent pas du
+#: contrat : dsoxlab les pose lui-même dans les tfvars, un auteur ne les écrit
+#: jamais. Les documenter inviterait à les déclarer à la main.
+_POSEES_PAR_L_OUTIL = {"ssh_pubkey", "region", "profile", "cidr"}
+
+
+def test_les_reglages_kvm_du_contrat_sont_documentes() -> None:
+    """Une clé lue par le template packagé doit figurer dans le contrat.
+
+    `storage_pool` a vécu deux versions en étant lisible par le template et
+    absent des trois documents qui décrivent le contrat : un formateur dont le
+    pool ne s'appelle pas `default` n'avait aucun moyen de l'apprendre autrement
+    qu'en lisant le Terraform empaqueté.
+    """
+    from dsoxlab.templates import template_root
+
+    main_tf = (template_root() / "terraform" / "kvm" / "main.tf").read_text(
+        encoding="utf-8"
+    )
+    lues = {
+        cle: defaut
+        for cle, defaut in _LOOKUP.findall(main_tf)
+        if cle not in _POSEES_PAR_L_OUTIL and not cle.startswith("image_url_")
+    }
+    assert lues, "aucun lookup(var.provider_config, …) trouvé : ce test ne lit plus rien"
+
+    schema = json.loads((RACINE / "schemas" / "meta.schema.json").read_text("utf-8"))
+    decrites = schema["properties"]["infra"]["properties"]["providers"][
+        "additionalProperties"
+    ].get("properties", {})
+
+    for cle, defaut in sorted(lues.items()):
+        assert cle in decrites, (
+            f"« {cle} » est pilotable depuis meta.yml mais absent de "
+            "schemas/meta.schema.json"
+        )
+        assert decrites[cle].get("default") == defaut, (
+            f"le schéma annonce « {decrites[cle].get('default')} » comme défaut "
+            f"de « {cle} », le template applique « {defaut} »"
+        )
+        for document in ("docs/contract-v1.md", "docs/contract-v1.fr.md"):
+            texte = (RACINE / document).read_text(encoding="utf-8")
+            assert f"`{cle}`" in texte, f"« {cle} » n'est décrit nulle part dans {document}"

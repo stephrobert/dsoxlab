@@ -608,6 +608,9 @@ hors ligne, elle se tait.
     "detail_pool_missing":
         "le pool « {pool} » n'existe pas : « provision » échouera sur "
         "« Pool Not Found »",
+    "detail_pool_inactive":
+        "le pool « {pool} » est défini mais jamais démarré : « provision » "
+        "échouera sur « storage pool is not active »",
     "detail_pool_unknown":   "non vérifiable sans virsh",
     "explain_apparmor_denied":
         "Cause connue : AppArmor refuse les disques des VM. virt-aa-helper ne "
@@ -617,6 +620,10 @@ hors ligne, elle se tait.
     "explain_pool_not_found":
         "Cause connue : le pool de stockage libvirt n'existe pas. Une "
         "installation fraîche n'en déclare aucun. Crée-le :",
+    "explain_pool_inactive":
+        "Cause connue : le pool de stockage libvirt existe mais n'a jamais été "
+        "démarré. Le définir ne suffit pas, rien ne peut y être écrit tant "
+        "qu'il ne tourne pas. Démarre-le :",
     "explain_domain_exists":
         "Cause connue : un provisionnement précédent a échoué APRÈS avoir "
         "défini cette machine, qui n'est donc pas dans le state Terraform. "

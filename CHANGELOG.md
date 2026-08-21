@@ -53,6 +53,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keys were added to `i18n/strings/en.py` and `i18n/strings/fr.py` at the same
   time, and `dsoxlab provision` without terraform on the PATH now answers in the
   language of the session, which was the symptom that opened the issue.
+## [0.1.52] - 2026-08-21
+
+### Fixed
+
+- **VM disks are declared by path, and AppArmor stops denying every one of
+  them.** The packaged KVM template asked for a disk declared as a pool
+  reference (`<disk type='volume'>`), and `virt-aa-helper` — which builds the
+  per-domain AppArmor profile out of that XML — cannot resolve that form into a
+  file path. No disk entered the profile at all, and qemu was refused
+  everything: `Could not open '…qcow2': Permission denied`, on a machine where
+  `dsoxlab doctor` had just gone green. It looked like an ownership problem and
+  was not: setting every volume to `libvirt-qemu:kvm` changed nothing.
+
+  The three disks — system, cloud-init seed and the optional extra disk — now
+  point at the absolute path of their volume. The volumes are still created in
+  the pool; only the way the domain designates them changes. libvirt then grants
+  the rights by itself, lock right `k` included, the one without which the
+  failure becomes `Failed to lock byte 100`.
+
+  Nothing is changed on the learner's machine, and that is the point. Setting
+  `security_driver = "none"` in `/etc/libvirt/qemu.conf` does start the domain,
+  and also switches off the confinement of every VM on that host — taught, in a
+  DevSecOps tool, to people learning the trade. A local AppArmor rule would have
+  worked too, but it is a system change this fix does not need.
+
+  Measured on Ubuntu 24.04.2 with dmacvicar/libvirt 0.9.8 and the distribution's
+  `virt-aa-helper`, on two domains created side by side from the same volume:
+  `type='volume'` produced a profile carrying no disk rule at all, `type='file'`
+  produced `"/var/lib/…/x.qcow2" rwk,`. What remains to be confirmed on a truly
+  fresh machine is the end of the journey, because the development host runs its
+  libvirt profiles in `complain` mode, where every VM starts either way.
+
+- **`doctor` no longer mistakes a stopped storage pool for a missing one.**
+  `virsh pool-list --name` lists only the *active* pools. A pool defined but
+  never started did not appear there, the check declared it missing, and offered
+  a `pool-define-as` that fails on the spot with "pool already exists".
+  Terraform, for its part, exits on an entirely different message there
+  (`storage pool 'x' is not active`), and the gesture that unblocks is
+  `pool-start`. The two states are now told apart, each with its own
+  remediation.
+
+- **The remediation names the pool the repository really targets.** The "Pool
+  Not Found" explanation printed after a failed `provision` hardcoded `default`.
+  A catalog pointing at its own pool through `infra.providers.kvm.storage_pool`
+  was handed the creation command for a pool nobody uses. The name is now read
+  from the message libvirt produced.
+
+### Added
+
+- **`infra.providers.kvm.storage_pool` enters the documented contract.** The
+  setting has been readable by the packaged template since 0.1.42 and described
+  nowhere, so a trainer whose pool is not called `default` had no way to learn
+  of it short of reading the packaged Terraform. `docs/contract-v1.md`, its
+  French counterpart and `schemas/meta.schema.json` now carry it, with `default`
+  as its default value. No contract version bump: an optional field with a
+  default breaks no catalog.
+
+- **A test reads the template and demands that the contract describe it.** It
+  walks the `lookup(var.provider_config, …)` calls of the KVM `main.tf` and
+  fails on any key that is steerable from `meta.yml` yet absent from the three
+  documents, or whose default has drifted. The bidirectional check of
+  `tests/test_json_schemas.py` cannot see these keys, since they never pass
+  through `models/repo.py`: this is the door that was missing.
 
 ## [0.1.51] - 2026-08-21
 

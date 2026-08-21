@@ -358,6 +358,30 @@ resource "libvirt_domain" "host" {
     mode = "host-passthrough"
   }
 
+  # Les disques se déclarent par CHEMIN DE FICHIER (`source.file`), jamais par
+  # référence de pool (`source.volume`). Ce n'est pas une préférence de style :
+  # c'est ce qui rend les VM démarrables sur Ubuntu et Debian.
+  #
+  # `source.volume` produit `<disk type='volume'><source pool=… volume=…/>`.
+  # `virt-aa-helper`, qui fabrique le profil AppArmor du domaine à partir de ce
+  # XML, ne sait pas résoudre cette forme en chemin : AUCUN disque n'entre alors
+  # dans le profil, et qemu se voit tout refuser par un « Permission denied » qui
+  # ressemble à un problème de propriétaire sans en être un (le corriger ne
+  # change rien). Sur une Ubuntu 24.04 fraîche, où les profils par domaine sont
+  # en `enforce`, aucun lab `vm` ne démarrait.
+  #
+  # `source.file` produit `<disk type='file'><source file='/chemin/absolu'/>`,
+  # que `virt-aa-helper` résout et autorise de lui-même, droit de verrouillage
+  # `k` compris, celui sans lequel l'erreur devient « Failed to lock byte 100 ».
+  #
+  # Mesuré sur Ubuntu 24.04.2 avec dmacvicar/libvirt 0.9.8 et le virt-aa-helper
+  # du paquet, les deux domaines créés côte à côte :
+  #   type='volume'  → profil généré : aucune règle de disque
+  #   type='file'    → « /var/lib/libvirt/images/…/x.qcow2 » rwk,
+  #
+  # Le volume reste créé dans le pool : seule la façon de le DÉSIGNER au domaine
+  # change. `libvirt_volume.<x>.path` rend le chemin absolu que libvirt lui a
+  # attribué, quel que soit le pool visé.
   devices = {
     disks = concat(
       [
@@ -371,9 +395,8 @@ resource "libvirt_domain" "host" {
             type = "qcow2"
           }
           source = {
-            volume = {
-              pool   = libvirt_volume.host[each.key].pool
-              volume = libvirt_volume.host[each.key].name
+            file = {
+              file = libvirt_volume.host[each.key].path
             }
           }
           target = {
@@ -391,9 +414,8 @@ resource "libvirt_domain" "host" {
             type = "raw"
           }
           source = {
-            volume = {
-              pool   = libvirt_volume.cloudinit[each.key].pool
-              volume = libvirt_volume.cloudinit[each.key].name
+            file = {
+              file = libvirt_volume.cloudinit[each.key].path
             }
           }
           target = {
@@ -413,9 +435,8 @@ resource "libvirt_domain" "host" {
             type = "qcow2"
           }
           source = {
-            volume = {
-              pool   = libvirt_volume.extra[each.key].pool
-              volume = libvirt_volume.extra[each.key].name
+            file = {
+              file = libvirt_volume.extra[each.key].path
             }
           }
           target = {
