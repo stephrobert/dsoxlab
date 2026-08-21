@@ -21,6 +21,8 @@ infra:
     - name: ubuntu-lfcs-1.lab
       distro: ubuntu24
   providers:
+    kvm:
+      storage_pool: labs-pool
     outscale:
       network: lab-linux-osc
 
