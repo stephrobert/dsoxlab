@@ -98,9 +98,17 @@
         },
         "providers": {
           "type": "object",
-          "description": "Per-provider overrides, read by the matching Terraform module. Keys are provider names; values are free-form mappings, because each provider has its own variables.",
+          "description": "Per-provider overrides, read by the matching Terraform module. Keys are provider names; values are free-form mappings, because each provider has its own variables. The keys described below are the ones the packaged templates read; any other key is passed through untouched.",
           "additionalProperties": {
-            "type": ["object", "null"]
+            "type": ["object", "null"],
+            "properties": {
+              "storage_pool": {
+                "type": "string",
+                "minLength": 1,
+                "default": "default",
+                "description": "kvm only. libvirt storage pool the volumes are created in. Defaults to `default`, which a fresh install does not always declare: `virsh pool-list --all` is empty on a stock Ubuntu, and provisioning stops on a raw \"Pool Not Found\". Point this at a pool you own rather than editing the packaged template."
+              }
+            }
           }
         }
       }

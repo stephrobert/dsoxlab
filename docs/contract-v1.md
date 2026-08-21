@@ -75,11 +75,34 @@ omission.
 | `network` | no | string | — | Network the VMs join, dedicated to this repository. |
 | `cidr` | no | string | — | Subnet of that network. |
 | `hosts` | no | list of mappings | `[]` | The VMs. See below. |
-| `providers` | no | mapping | `{}` | Per-provider overrides, read by the matching Terraform module. Free-form values: each provider has its own variables. |
+| `providers` | no | mapping | `{}` | Per-provider overrides, read by the matching Terraform module. Free-form values: each provider has its own variables. See below for the ones the packaged templates read. |
 
 Provider resolution, first rule wins: `DSOXLAB_PROVIDER`, then the session
 context set by `dsoxlab use --provider`, then a bare string or a single-item
 list. Unresolved is not an error — only infrastructure commands require one.
+
+### `infra.providers.<provider>`
+
+Free-form, and passed to the Terraform module of that provider as-is. One key
+is worth naming, because a fresh machine needs it:
+
+| Field | Provider | Required | Type | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `storage_pool` | `kvm` | no | string | `default` | libvirt pool the volumes are created in. |
+
+The default is what a stock libvirt install does *not* always give you: on a
+fresh Ubuntu 24.04, `virsh pool-list --all` is empty, and `provision` stops on a
+raw `Pool Not Found` from Terraform. Two ways out, and both are supported:
+create the `default` pool (`dsoxlab doctor` prints the four commands), or point
+this key at a pool you already own. Never edit the packaged template.
+
+```yaml
+infra:
+  provider: kvm
+  providers:
+    kvm:
+      storage_pool: labs-pool
+```
 
 ### `infra.hosts[]`
 

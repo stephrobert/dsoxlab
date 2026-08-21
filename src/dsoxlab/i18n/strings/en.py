@@ -606,6 +606,9 @@ silent.
     "detail_pool_missing":
         "the `{pool}` pool does not exist: `provision` will fail with "
         "\"Pool Not Found\"",
+    "detail_pool_inactive":
+        "the `{pool}` pool is defined but never started: `provision` will fail "
+        "with \"storage pool is not active\"",
     "detail_pool_unknown":   "cannot be checked without virsh",
     "explain_apparmor_denied":
         "Known cause: AppArmor denies the VM disks. virt-aa-helper cannot "
@@ -615,6 +618,10 @@ silent.
     "explain_pool_not_found":
         "Known cause: the libvirt storage pool does not exist. A fresh install "
         "declares none. Create it:",
+    "explain_pool_inactive":
+        "Known cause: the libvirt storage pool exists but was never started. "
+        "Defining a pool is not enough, nothing can be written to it until it "
+        "runs. Start it:",
     "explain_domain_exists":
         "Known cause: an earlier provisioning failed AFTER defining this "
         "machine, so it never entered the Terraform state and `destroy` cannot "
