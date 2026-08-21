@@ -26,6 +26,10 @@ DONNEES_ATTENDUES = (
     "dsoxlab/py.typed",
     # Le catalogue de démonstration : le premier lab que voit un utilisateur.
     "dsoxlab/templates/demo/meta.yml",
+    # Sa traduction française. Le catalogue packagé est l'exemple de référence
+    # du mécanisme `meta.<langue>.yml` : absent de la roue, il l'enseignerait
+    # sans le montrer, et une session française lirait des titres anglais.
+    "dsoxlab/templates/demo/meta.fr.yml",
     "dsoxlab/templates/demo/labs/demo/premiers-pas/lab.yaml",
     "dsoxlab/templates/demo/labs/demo/premiers-pas/challenge/hints.yaml",
     "dsoxlab/templates/demo/labs/demo/premiers-pas/challenge/tests/test_functional.py",

@@ -8,17 +8,21 @@
 # C'est ce qui le distingue d'un catalogue Linux ou Terraform embarqué, ce que
 # le projet s'interdit : ici, le sujet EST la boucle run / course / challenge /
 # hint / check.
+#
+# Les libellés sont en anglais, comme le veut le contrat : c'est `meta.fr.yml`,
+# à côté, qui porte leur traduction française. Le catalogue de démonstration
+# est aussi l'exemple de référence du mécanisme.
 repo:
   id: dsoxlab-demo
   category: demo
-  title: Démonstration dsoxlab
+  title: dsoxlab demonstration
   description: |
-    Un lab unique pour prendre en main la boucle de travail de dsoxlab.
-    Aucune infrastructure requise.
+    A single lab to get a feel for the dsoxlab working loop.
+    No infrastructure required.
 
 sections:
   - id: demo
-    title: Prise en main
-    description: La boucle de travail, de bout en bout.
+    title: Getting started
+    description: The working loop, end to end.
     labs:
       - demo/premiers-pas

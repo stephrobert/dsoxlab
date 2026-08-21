@@ -56,6 +56,10 @@ def lab_dict(
         "bloc_order": lab.bloc_order or None,
         "level": lab.level,
         "type": lab.lab_type,
+        # Le seuil de réussite d'un examen blanc, en pourcentage du barème.
+        # `or None` comme les autres champs facultatifs : un lab ordinaire n'en
+        # déclare pas, et 0 se lirait comme « réussi d'office ».
+        "exam_passing_score": lab.exam_passing_score or None,
         "difficulty": lab.difficulty or None,
         "estimated_time": lab.estimated_time or None,
         "skills": list(lab.skills),

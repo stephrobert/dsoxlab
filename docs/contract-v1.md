@@ -130,6 +130,34 @@ infra:
 that is settled by the presence of `labs/**/lab.yaml`, and the match is on the
 path, never on the lab id.
 
+### `meta.<lang>.yml`
+
+A `meta.fr.yml` next to `meta.yml` overrides `repo.title`, `repo.description`,
+`sections[].title` and `sections[].description` for that language, **and
+nothing else**. Any other key in it is ignored — including `labs`: the teaching
+order lives in `meta.yml` and is never translated.
+
+Sections are matched by **`id`**, never by position: a section inserted at the
+top of `meta.yml` would otherwise shift every translation below it, silently.
+
+```yaml
+# meta.yml — the base file is English, as everywhere in the contract
+sections:
+  - id: getting-started
+    title: Discover the tool
+```
+
+```yaml
+# meta.fr.yml
+sections:
+  - id: getting-started
+    title: Découvrir l'outil
+```
+
+This is the same per-file convention as `lab.<lang>.yaml` and
+`course.<lang>.yaml`. A per-field language suffix (`title_en:`) is **not** part
+of the contract and is ignored: `dsoxlab validate-structure` reports it.
+
 ---
 
 ## `lab.yaml` — one per lab
@@ -144,13 +172,14 @@ path, never on the lab id.
 | `skills` | **yes** | list of strings | — | Must not be empty. |
 | `distros` | **yes** | list of strings | — | Must not be empty. |
 | `doc_url` | **yes** | string | — | `http(s)` only. |
-| `section` | no | string | `repo.category` | |
+| `section` | no | string | `repo.category` | Declared, it is **always** kept — including when the value happens to name a technical domain. |
 | `description` | no | string | `""` | |
 | `track` | no | list of strings | `[]` | |
 | `difficulty` | no | string | `beginner` | Never validated, only displayed. |
 | `estimated_time` | no | string | `30m` | Only displayed. |
 | `certification_tags` | no | list of strings | `[]` | Free-form: the tool stays domain-agnostic. |
 | `lab_type` | no | enum | `lab` | `lab`, `challenge` or `capstone`. |
+| `exam_passing_score` | no | integer | `0` | Pass mark of a mock exam, as a **percentage** of the lab scale. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
 | `runtime` | no | mapping | shell defaults | See below. |
@@ -160,6 +189,34 @@ path, never on the lab id.
 is not a lab at all. `skills`, `distros` and `doc_url` are required by
 `dsoxlab validate-structure`: the file parses without them, but the lab is not
 publishable.
+
+### `exam_passing_score`
+
+A `lab_type: capstone` is a mock exam, and an exam without a pass mark is not
+one. Declare the bar, and dsoxlab renders a verdict:
+
+```yaml
+lab_type: capstone
+exam_passing_score: 70   # per cent of the lab scale
+```
+
+| Where | What you get |
+| --- | --- |
+| `dsoxlab show` | The pass mark, before the learner starts. |
+| `dsoxlab submit` | `Exam passed` or `Exam failed`, with the percentage and the bar. |
+| `dsoxlab scores` | A **Verdict** column, on catalogs that have at least one exam. |
+
+It is a **percentage**, not a number of points. The scale of a lab is the
+`points` of its `challenge/hints.yaml` (100 by default, but free), so an
+absolute threshold would mean something different from one lab to the next.
+
+The comparison is exact: `score × 100 ≥ passing_score × scale`. A run worth
+69.5 % of the scale fails a 70 % bar. A pass mark is not rounded in the
+candidate's favour.
+
+Left out, or set to `0`, the lab is not an exam and no verdict is ever
+rendered — which is the case of every lab that is not a capstone or a drill.
+`dsoxlab validate-structure` refuses a value outside `1..100`.
 
 ### `runtime`
 
@@ -217,7 +274,9 @@ are what prove.
 ### `lab.<lang>.yaml`
 
 A `lab.fr.yaml` next to `lab.yaml` overrides `title` and `description` for that
-language, **and nothing else**. Any other key in it is ignored.
+language, **and nothing else**. Any other key in it is ignored, and
+`validate-structure` says so. An `id` is tolerated there without being read: it
+names the lab for whoever opens the file.
 
 ---
 
@@ -258,11 +317,29 @@ claims to support v1.
 - removing a value from an enumerated list;
 - changing a default.
 
-Unknown keys are **ignored by the parser** but **rejected by the JSON Schemas**
-(`additionalProperties: false`). That is on purpose: the engine must stay
-tolerant so a v1 tool survives a v1.1 catalog, while your editor should tell you
-that `skils:` does nothing. If a schema flags a key you believe in, the key is
-not in the contract — check this page.
+Unknown keys are **ignored by the parser**, **rejected by the JSON Schemas**
+(`additionalProperties: false`), and **reported by `dsoxlab
+validate-structure`**. That combination is on purpose, and each part answers a
+different need:
+
+- the **engine** stays tolerant, so a v1 tool survives a v1.1 catalog. That
+  will not change: it is what makes the version scheme work at all;
+- your **editor** underlines `skils:` as you type it;
+- `validate-structure` fails on it, because tolerated is not the same as
+  intended. Four keys written in good faith lived in the real catalogs and were
+  read by nobody, including an `exam_passing_score` in eleven exam labs: their
+  author believed they were setting a pass mark, and nothing set one. At the
+  root of a `lab.yaml`, an unknown key is a typo or a disappointed expectation,
+  almost never a deliberate extension.
+
+The check covers `meta.yml`, `lab.yaml` and their translation files, and it
+descends into every block the contract describes. It does **not** descend into
+the free-form mappings — `runtime.targets[].roles`,
+`runtime.services[].env`, `infra.providers.<provider>` — whose keys belong to
+the catalog.
+
+If a schema or `validate-structure` flags a key you believe in, the key is not
+in the contract — check this page.
 
 ---
 

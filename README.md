@@ -230,7 +230,9 @@ validation:
 ```
 
 An optional `lab.fr.yaml` may override `title` and `description` for French
-only.
+only. The same convention applies one level up: a `meta.fr.yml` next to
+`meta.yml` translates `repo.title`, `repo.description` and the `sections[]`
+titles and descriptions, with sections matched by `id`.
 
 #### Optional `runtime.fixtures`: the starting files of a `shell` lab
 
