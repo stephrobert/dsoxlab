@@ -9,6 +9,72 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.54] - 2026-08-21
+
+### Corrigé
+
+- **Une `section` déclarée n'est plus écrasée par le moteur.** La valeur par
+  défaut de `LabDefinition.section` était `linux`, et le scanner se servait de
+  cette même chaîne comme sentinelle « rien de déclaré ». Les deux étaient donc
+  indiscernables : un lab qui écrivait `section: linux` dans un catalogue d'une
+  autre catégorie voyait sa déclaration remplacée en silence. La sentinelle est
+  désormais `None`, l'inférence du mode legacy rend `None` au lieu d'inventer
+  une valeur, et plus aucun nom de domaine ne vit dans le code qui lit un
+  catalogue. Aucun catalogue existant ne change de comportement — aucun des 284
+  labs ne déclare `section: linux` — mais le premier auteur tiers y serait
+  tombé.
+
+- **Les couleurs de section et de niveau ne viennent plus d'une liste de
+  domaines.** `reporting/console.py` associait `linux`, `ansible`, `terraform`,
+  `kubernetes`, `rhcsa`… à des couleurs, ce qui est de la connaissance de
+  domaine dans le moteur, avec une seule conséquence visible : les catalogues
+  de cette liste étaient colorés, tous les autres uniformément blancs. La
+  couleur est maintenant tirée du nom lui-même (`crc32` sur une palette fixe) :
+  stable d'une exécution à l'autre, et disponible pour tout catalogue.
+
+- **`exam_passing_score` pose enfin un seuil de réussite.** Onze labs d'examen
+  en déclaraient un — les examens blancs RHCSA et LFCS, et neuf drills — avec
+  un commentaire expliquant le seuil retenu, et personne ne le lisait : un
+  apprenant qui rendait 40/100 sur un mock RHCSA ne lisait nulle part qu'il
+  avait échoué. Le champ fait désormais partie du contrat, en **pourcentage**
+  du barème du lab, et il est rendu par `dsoxlab show` avant l'examen, par
+  `dsoxlab submit` sous forme de verdict reçu/recalé, et par `dsoxlab scores`
+  dans une colonne Verdict. La comparaison est exacte : 69,5 % du barème échoue
+  à une barre de 70 %.
+
+- **`meta.yml` gagne le mécanisme de traduction que le reste du contrat avait
+  déjà.** Les titres de section sont les noms de blocs qu'affiche `dsoxlab
+  progress`, et les trois catalogues les écrivent en français : une session
+  anglaise lisait donc du français. Un catalogue avait tenté `title_en:` /
+  `description_en:`, que personne ne lisait. Un `meta.<langue>.yml` posé à côté
+  du `meta.yml` surcharge désormais `repo.title`, `repo.description`,
+  `sections[].title` et `sections[].description` — même convention par fichier
+  que `lab.<langue>.yaml`, avec les sections appariées par `id` plutôt que par
+  position. Le catalogue de démonstration packagé en fournit un.
+
+### Ajouté
+
+- **`validate-structure` signale toute clé que personne ne lit.** Le vrai
+  correctif des quatre clés mortes n'est pas de solder ces quatre-là : c'est
+  qu'une cinquième ne puisse plus s'installer en silence. Le contrôle relit
+  `meta.yml`, `lab.yaml` et leurs fichiers de traduction depuis le disque,
+  descend dans chaque bloc que le contrat décrit, et nomme chaque clé inconnue
+  avec la clé la plus proche que le moteur lit vraiment. Il laisse tranquilles
+  les mappings libres — `runtime.targets[].roles`, `runtime.services[].env`,
+  `infra.providers.<provider>` — dont les clés appartiennent au catalogue. Les
+  clés connues sont tenues contre les schémas JSON publiés par un test, pour
+  que les deux ne puissent pas diverger.
+
+  Le **parseur, lui, reste tolérant** : ignorer une clé inconnue est une
+  garantie de la v1, et c'est ce qui permet à un outil v1 de survivre à un
+  catalogue v1.1. Ceci est un lint, pas le parseur.
+
+  Conséquence sur les catalogues en l'état : `linux-dsoxlab-training` signale
+  `runtime.hosts_required` (un lab, redondant avec les deux targets qu'il
+  déclare déjà), et `terraform-training` signale `sections[].title_en` et
+  `sections[].description_en` (à déplacer dans un `meta.fr.yml`).
+  `ansible-training` est propre.
+
 ## [0.1.53] - 2026-08-21
 
 ### Modifié

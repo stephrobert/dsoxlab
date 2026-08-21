@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.54] - 2026-08-21
+
+### Fixed
+
+- **A declared `section` is no longer overwritten by the engine.** The default
+  value of `LabDefinition.section` was `linux`, and the scanner used that same
+  string as its "nothing declared" sentinel. The two were therefore
+  indistinguishable: a lab writing `section: linux` in a catalog whose category
+  is something else had its declaration silently replaced. The sentinel is now
+  `None`, the legacy path inference returns `None` rather than inventing a
+  value, and a domain name no longer lives anywhere in the code that reads a
+  catalog. No existing catalog changes behaviour — none of the 284 labs
+  declares `section: linux` — but the next third-party author would have hit
+  it.
+
+- **Section and level colours no longer come from a list of domains.**
+  `reporting/console.py` mapped `linux`, `ansible`, `terraform`, `kubernetes`,
+  `rhcsa`… to colours, which is domain knowledge in the engine, with one
+  visible consequence: catalogs on that list were coloured, every other one was
+  uniformly white. The colour is now derived from the name itself (`crc32` over
+  a fixed palette): stable across runs, and available to every catalog.
+
+- **`exam_passing_score` finally sets a pass mark.** Eleven exam labs declared
+  one — the RHCSA and LFCS mocks, and nine drills — with a comment explaining
+  the chosen threshold, and nothing read it: a learner handing in 40/100 on a
+  mock RHCSA read nowhere that they had failed. It is now part of the contract,
+  as a **percentage** of the lab scale, and it is rendered by `dsoxlab show`
+  before the exam, by `dsoxlab submit` as a pass/fail verdict, and by `dsoxlab
+  scores` as a Verdict column. The comparison is exact: 69.5 % of the scale
+  fails a 70 % bar.
+
+- **`meta.yml` gains the translation mechanism the rest of the contract
+  already had.** Section titles are the bloc names shown by `dsoxlab progress`,
+  and all three catalogs write them in French, so an English session read
+  French. One catalog had tried `title_en:` / `description_en:`, which nothing
+  read. A `meta.<lang>.yml` next to `meta.yml` now overrides `repo.title`,
+  `repo.description`, `sections[].title` and `sections[].description` — the
+  same per-file convention as `lab.<lang>.yaml`, with sections matched by `id`
+  rather than by position. The packaged demonstration catalog ships one.
+
+### Added
+
+- **`validate-structure` reports every key nothing reads.** The real fix for
+  the four dead keys is not to settle those four: it is that a fifth cannot
+  install itself in silence. The check re-reads `meta.yml`, `lab.yaml` and
+  their translation files from disk, descends into every block the contract
+  describes, and names each unknown key along with the closest key the engine
+  actually reads. It leaves the free-form mappings alone —
+  `runtime.targets[].roles`, `runtime.services[].env`,
+  `infra.providers.<provider>` — whose keys belong to the catalog. The known
+  keys are held against the published JSON Schemas by a test, so the two cannot
+  drift.
+
+  The **parser stays tolerant**: ignoring unknown keys is a v1 guarantee, and
+  it is what lets a v1 tool survive a v1.1 catalog. This is a lint, not the
+  parser.
+
+  Consequence for catalogs as they stand: `linux-dsoxlab-training` reports
+  `runtime.hosts_required` (one lab, redundant with the two targets it already
+  declares), and `terraform-training` reports `sections[].title_en` and
+  `sections[].description_en` (to be moved into a `meta.fr.yml`).
+  `ansible-training` is clean.
+
 ## [0.1.53] - 2026-08-21
 
 ### Changed
