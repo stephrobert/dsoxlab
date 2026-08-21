@@ -32,6 +32,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..i18n import _
+
 
 def template_root() -> Path:
     """Retourne la racine des templates packagés (dsoxlab/templates/)."""
@@ -68,11 +70,13 @@ def terraform_template(provider: str) -> Path:
     """
     path = template_root() / "terraform" / provider
     if not path.is_dir():
-        raise FileNotFoundError(
-            f"Template Terraform absent pour le provider '{provider}'. "
-            f"Providers packagés dans dsoxlab : "
-            f"{sorted(p.name for p in (template_root() / 'terraform').iterdir() if p.is_dir())}"
-        )
+        raise FileNotFoundError(_(
+            "err_template_terraform_missing",
+            provider=provider,
+            available=sorted(
+                p.name for p in (template_root() / "terraform").iterdir() if p.is_dir()
+            ),
+        ))
     return path
 
 
@@ -90,9 +94,12 @@ def cloud_init_template(distro: str) -> Path:
     """
     path = template_root() / "cloud-init" / f"{distro}.yaml.tmpl"
     if not path.is_file():
-        raise FileNotFoundError(
-            f"Template cloud-init absent pour la distribution '{distro}'. "
-            f"Distros packagées : "
-            f"{sorted(p.stem.replace('.yaml', '') for p in (template_root() / 'cloud-init').glob('*.yaml.tmpl'))}"
-        )
+        raise FileNotFoundError(_(
+            "err_template_cloud_init_missing",
+            distro=distro,
+            available=sorted(
+                p.stem.replace(".yaml", "")
+                for p in (template_root() / "cloud-init").glob("*.yaml.tmpl")
+            ),
+        ))
     return path

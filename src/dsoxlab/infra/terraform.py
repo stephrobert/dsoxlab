@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import xdg_state_home
+from ..i18n import _
 from ..models.repo import ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
@@ -279,10 +280,7 @@ def init(
     """
     tf_dir = workdir(repo_meta)
     if not is_available():
-        raise TerraformNotInstalled(
-            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
-            "Installe-le : https://developer.hashicorp.com/terraform/install"
-        )
+        raise TerraformNotInstalled(_("err_terraform_missing"))
 
     cmd = ["terraform", f"-chdir={tf_dir}", "init", "-input=false"]
     if on_event is not None:
@@ -538,10 +536,7 @@ def apply(
         ``ProvisionResult`` avec outputs JSON et map FQDN→IP.
     """
     if not is_available():
-        raise TerraformNotInstalled(
-            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
-            "Installe-le : https://developer.hashicorp.com/terraform/install"
-        )
+        raise TerraformNotInstalled(_("err_terraform_missing"))
 
     tf_dir = workdir(repo_meta)
     write_tfvars(repo_meta)
@@ -685,10 +680,7 @@ def destroy(
     rejouer une seule VM sans toucher au réseau ni aux images de base.
     """
     if not is_available():
-        raise TerraformNotInstalled(
-            "terraform est absent du PATH : il provisionne les machines des labs vm.\n"
-            "Installe-le : https://developer.hashicorp.com/terraform/install"
-        )
+        raise TerraformNotInstalled(_("err_terraform_missing"))
 
     tf_dir = workdir(repo_meta)
     # Re-génère le tfvars : Terraform exige les variables même pour
@@ -758,9 +750,7 @@ def host_targets(provider: str, fqdn: str) -> list[str]:
             f'incus_instance.host["{fqdn}"]',
             f'incus_storage_volume.extra["{fqdn}"]',
         ]
-    raise NotImplementedError(
-        f"--host non implémenté pour le provider '{provider}'"
-    )
+    raise NotImplementedError(_("err_terraform_host_unsupported", provider=provider))
 
 
 def get_outputs(repo_meta: RepoMetadata) -> ProvisionResult | None:

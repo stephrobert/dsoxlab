@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..i18n import _
 from ..models.lab import LabDefinition
 from ..models.runtime import RuntimeType
 from .base import BaseRuntime
@@ -16,10 +17,7 @@ class RuntimeManager:
         runtime = self._build(lab)
         if not runtime.is_available():
             raise RuntimeError(
-                f"Le runtime '{lab.runtime.type.value}' n'est pas "
-                f"disponible sur cette machine. Installe les "
-                f"dépendances (`dsoxlab instructor bootstrap`) ou "
-                f"utilise un lab compatible avec un autre runtime."
+                _("err_runtime_unavailable", runtime=lab.runtime.type.value)
             )
         return runtime
 
@@ -32,4 +30,4 @@ class RuntimeManager:
             return ShellRuntime()
         if rt_type in (RuntimeType.VM, RuntimeType.KVM, RuntimeType.INCUS):
             return VmRuntime()
-        raise ValueError(f"RuntimeType inconnu : {rt_type}")
+        raise ValueError(_("err_runtime_type_unknown", rt_type=rt_type))

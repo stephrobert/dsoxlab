@@ -32,6 +32,7 @@ import os
 from typing import Any
 
 from ..discovery.repo import find_meta_yml, read_repo_metadata
+from ..i18n import _
 from ..infra import ansible as ansible_infra
 from ..infra import snapshot as snapshot_infra
 from ..infra.inventory import build_inventory, read_terraform_outputs
@@ -74,8 +75,7 @@ class VmRuntime(BaseRuntime):
         setup = lab.path / "setup.yaml"
         if not setup.is_file():
             raise FileNotFoundError(
-                f"Le lab {lab.id} doit fournir setup.yaml à la racine "
-                f"(contrat dsoxlab pour runtime: vm). Fichier attendu : {setup}"
+                _("err_vm_setup_missing", lab_id=lab.id, path=setup)
             )
 
         if lab.runtime.snapshot_required:
@@ -94,10 +94,11 @@ class VmRuntime(BaseRuntime):
             on_event=on_event,
         )
         if not result.ok:
-            raise RuntimeError(
-                f"setup.yaml a échoué pour {lab.id} sur target '{target.name}' "
-                f"(rc={result.rc}, status={result.status}). Stats : {result.stats}"
-            )
+            raise RuntimeError(_(
+                "err_vm_setup_failed",
+                lab_id=lab.id, target=target.name, rc=result.rc,
+                status=result.status, stats=result.stats,
+            ))
 
     def stop(self, lab: LabDefinition, target_name: str | None = None) -> None:
         """No-op : les VMs sont persistantes (gérées par dsoxlab destroy)."""
@@ -125,8 +126,7 @@ class VmRuntime(BaseRuntime):
         cleanup = lab.path / "cleanup.yaml"
         if not cleanup.is_file():
             raise FileNotFoundError(
-                f"Le lab {lab.id} doit fournir cleanup.yaml à la racine "
-                f"(contrat dsoxlab pour runtime: vm). Fichier attendu : {cleanup}"
+                _("err_vm_cleanup_missing", lab_id=lab.id, path=cleanup)
             )
 
         result = ansible_infra.run_playbook(
@@ -135,10 +135,11 @@ class VmRuntime(BaseRuntime):
             on_event=on_event,
         )
         if not result.ok:
-            raise RuntimeError(
-                f"cleanup.yaml a échoué pour {lab.id} sur target '{target.name}' "
-                f"(rc={result.rc}, status={result.status})."
-            )
+            raise RuntimeError(_(
+                "err_vm_cleanup_failed",
+                lab_id=lab.id, target=target.name, rc=result.rc,
+                status=result.status,
+            ))
 
     def status(self, lab: LabDefinition, target_name: str | None = None) -> str:
         del lab, target_name
@@ -232,10 +233,7 @@ class VmRuntime(BaseRuntime):
                 ou si le nom résolu ne matche aucune target.
         """
         if not lab.runtime.targets:
-            raise TargetNotResolved(
-                f"Le lab {lab.id} (runtime: vm) doit déclarer au moins "
-                f"une target dans runtime.targets[] de lab.yaml."
-            )
+            raise TargetNotResolved(_("err_vm_no_target", lab_id=lab.id))
 
         name = (
             explicit_name
@@ -246,10 +244,10 @@ class VmRuntime(BaseRuntime):
         target = lab.runtime.target(name)
         if target is None:
             available = ", ".join(t.name for t in lab.runtime.targets)
-            raise TargetNotResolved(
-                f"Target '{name}' inconnue pour le lab {lab.id}. "
-                f"Targets disponibles : {available}"
-            )
+            raise TargetNotResolved(_(
+                "err_vm_target_unknown",
+                name=name, lab_id=lab.id, available=available,
+            ))
         return target
 
     @staticmethod
@@ -270,13 +268,10 @@ class VmRuntime(BaseRuntime):
     def _repo_meta(self, lab: LabDefinition) -> RepoMetadata:
         meta_path = find_meta_yml(lab.path)
         if meta_path is None:
-            raise RuntimeError(
-                f"Pas de meta.yml trouvé en remontant depuis {lab.path}. "
-                f"dsoxlab ne peut pas dériver l'inventory."
-            )
+            raise RuntimeError(_("err_vm_no_meta", path=lab.path))
         meta = read_repo_metadata(meta_path.parent)
         if meta is None:
-            raise RuntimeError(f"meta.yml invalide : {meta_path}")
+            raise RuntimeError(_("err_vm_meta_invalid", path=meta_path))
         return meta
 
     def _inventory(

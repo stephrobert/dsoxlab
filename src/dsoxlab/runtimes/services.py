@@ -28,6 +28,7 @@ import socket
 import time
 from dataclasses import dataclass
 
+from ..i18n import _
 from ..models.runtime import Service
 from ..utils.shell import CommandError, run_command
 
@@ -80,7 +81,7 @@ def _ensure_network(name: str) -> None:
     if not run_command(["docker", "network", "inspect", name],
                        check=False, timeout=15).ok:
         raise ServiceError(
-            f"Impossible de créer le réseau '{name}' :\n{res.stderr.strip()}"
+            _("err_service_network_failed", name=name, detail=res.stderr.strip())
         )
 
 
@@ -185,15 +186,17 @@ def _wait_ready(service: Service, name: str) -> None:
     sans rien exiger de l'image, ``ready_exec`` prouve que le service répond.
     """
     if service.ready_tcp and not _wait_tcp(service.ready_tcp, service.ready_timeout):
-        raise ServiceError(
-            f"Le service '{service.name}' n'a pas ouvert le port "
-            f"{service.ready_tcp} en {service.ready_timeout}s."
-        )
+        raise ServiceError(_(
+            "err_service_port_closed",
+            name=service.name, port=service.ready_tcp,
+            timeout=service.ready_timeout,
+        ))
     if service.ready_exec and not _wait_exec(name, service.ready_exec, service.ready_timeout):
-        raise ServiceError(
-            f"Le service '{service.name}' n'a jamais répondu à « "
-            f"{' '.join(service.ready_exec)} » en {service.ready_timeout}s."
-        )
+        raise ServiceError(_(
+            "err_service_probe_failed",
+            name=service.name, probe=" ".join(service.ready_exec),
+            timeout=service.ready_timeout,
+        ))
 
 
 def _run_post_start(service: Service, name: str) -> None:
@@ -209,10 +212,11 @@ def _run_post_start(service: Service, name: str) -> None:
     for argv in service.post_start:
         res = run_command(["docker", "exec", name, *argv], check=False, timeout=120)
         if not res.ok:
-            raise ServiceError(
-                f"L'initialisation du service '{service.name}' a échoué sur "
-                f"« {' '.join(argv)} » :\n{(res.stderr or res.stdout).strip()}"
-            )
+            raise ServiceError(_(
+                "err_service_post_start_failed",
+                name=service.name, command=" ".join(argv),
+                detail=(res.stderr or res.stdout).strip(),
+            ))
 
 
 def start(service: Service, repo_id: str) -> str:
@@ -267,9 +271,10 @@ def start(service: Service, repo_id: str) -> str:
 
     res = run_command(cmd, check=False, timeout=180)
     if not res.ok:
-        raise ServiceError(
-            f"Le démarrage du service '{service.name}' a échoué :\n{res.stderr.strip()}"
-        )
+        raise ServiceError(_(
+            "err_service_start_failed",
+            name=service.name, detail=res.stderr.strip(),
+        ))
 
     _wait_ready(service, name)
     _run_post_start(service, name)

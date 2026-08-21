@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.53] - 2026-08-21
+
+### Changed
+
+- **The i18n guard now reads the whole package, not just `cli.py`.** The rule
+  "every displayed text goes through `_()`" was already held by a test, which is
+  the right way to hold it. But that test parsed a single file. Everything raised
+  from `infra/`, `runtimes/`, `services/` and `templates/` escaped it, and those
+  are precisely the messages a learner reads when something breaks: an entirely
+  English session answered `terraform est absent du PATH`. The rule had a keeper
+  watching one door out of five.
+
+- **The criterion is written into the test, because it is the hard part.** A
+  guard too loose keeps nothing; too strict, it gets disabled at the first false
+  positive. A literal is interface text when two things are true together. It
+  reaches a human, through one of four sinks: `help=` and `description=`, the
+  `error`/`info`/`warn`/`success` helpers, the text of a `raise` (this CLI
+  renders errors with `error(str(exc))`, so an exception message *is* interface
+  text), and the `.print()`/`.echo()`/`.secho()` output verbs. And it reads as a
+  sentence, defined as at least two words separated by a space, a whitespace-free
+  fragment counting for a single word. That last clause is the whole tuning: it
+  lets `meta.yml`, `challenge/tests`, `lab_starting` and pure layout such as
+  `f"  ✔ {fqdn} ({ip})"` through, while catching anything written to be read.
+
+- **Two exclusions are decided out loud, each held by its own test.** `logger.*`
+  is not an interface sink: the journal is a diagnostic artefact, read beside a
+  Python traceback, and translating it would make two bug reports incomparable
+  depending on the locale of whoever produced them. `models/` is left out because
+  the right pattern already lives there, `UnsupportedSchemaVersion` and
+  `ProviderUnresolved` carrying data while the CLI composes the translated
+  sentence; converting the contract's 24 `ValueError`s to that pattern is a
+  redesign, not an i18n fix.
+
+### Fixed
+
+- **43 hardcoded French sentences no longer leak into an English session.** They
+  are the consequence of the extended guard, not the reason for it: it surfaced
+  all of them at once, in `infra/credentials.py` (13), `runtimes/vm.py` (8),
+  `runtimes/services.py` (5), `infra/inventory.py` (4), `infra/terraform.py` (4),
+  `infra/ansible.py` (3), `runtimes/manager.py` (2), `templates/__init__.py` (2),
+  `infra/snapshot/__init__.py` (1) and `services/lab_service.py` (1). The 38 new
+  keys were added to `i18n/strings/en.py` and `i18n/strings/fr.py` at the same
+  time, and `dsoxlab provision` without terraform on the PATH now answers in the
+  language of the session, which was the symptom that opened the issue.
 ## [0.1.52] - 2026-08-21
 
 ### Fixed

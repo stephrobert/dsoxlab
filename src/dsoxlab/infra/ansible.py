@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..i18n import _
+
 logger = logging.getLogger(__name__)
 
 
@@ -134,21 +136,15 @@ def run_playbook(
     try:
         import ansible_runner  # sonde d'import : la valeur ne sert pas
     except ImportError:
-        raise AnsibleNotInstalled(
-            "ansible-runner n'est pas installé. Lance : "
-            "uv tool install --force --with ansible-runner dsoxlab "
-            "ou : pipx inject dsoxlab ansible-runner"
-        ) from None
+        raise AnsibleNotInstalled(_("err_ansible_runner_missing")) from None
 
     if not has_ansible_playbook():
-        raise AnsibleNotInstalled(
-            "ansible-playbook est absent du PATH : un lab vm ne peut pas jouer "
-            "son setup.yaml sans lui. ansible-runner pilote ansible-core mais "
-            "ne l'installe pas. Lance : uv tool install ansible-core"
-        )
+        raise AnsibleNotInstalled(_("err_ansible_playbook_missing"))
 
     if not playbook_path.is_file():
-        raise FileNotFoundError(f"Playbook absent : {playbook_path}")
+        raise FileNotFoundError(
+            _("err_ansible_playbook_file_missing", path=playbook_path)
+        )
 
     import ansible_runner
 
