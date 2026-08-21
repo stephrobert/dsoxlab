@@ -873,6 +873,53 @@ silent.
         "No cloud-init template for distribution '{distro}'. "
         "Packaged distros: {available}",
 
+    # ── verrou d'écriture par dépôt (issue #81) ─────────────────────────────
+    "lock_busy":
+        "Another dsoxlab command is already working on this repository: "
+        "« {command} » (PID {pid}, running for {age}). Nothing was changed.",
+    "lock_busy_anonymous":
+        "Another dsoxlab command is already working on this repository "
+        "(lock: {path}). Nothing was changed.",
+    "lock_busy_hint":
+        "Wait for it to finish, or stop it. A lock left behind by a process "
+        "that died is released on its own: there is no file to delete by hand.",
+
+    # ── interruption d'une opération longue (issue #82) ─────────────────────
+    "interrupt_notice_first":
+        "Interruption requested. Letting the current step finish so nothing "
+        "is left half-written. Press Ctrl-C again to stop right now.",
+    "interrupt_notice_second":
+        "Second interruption: stopping now.",
+    "interrupt_resume":
+        "Replay to pick up where it stopped: {cmd}",
+    "interrupted_hard":
+        "You interrupted twice, so the operation was killed rather than "
+        "closed: what it left behind may be incomplete.",
+    "interrupted_terraform_init":
+        "Interrupted while downloading the Terraform provider. "
+        "No resource was created.",
+    "interrupted_terraform_apply":
+        "Interrupted: Terraform stopped and saved its state. What it had "
+        "already created is still there, and is known to the state.",
+    "interrupted_terraform_destroy":
+        "Interrupted: Terraform stopped and saved its state. Part of the "
+        "infrastructure is still up.",
+    "interrupted_ansible":
+        "Interrupted: the playbook stopped mid-run. The machine may be "
+        "partially configured; lab playbooks are idempotent.",
+    "interrupted_services":
+        "Interrupted while starting the lab services. A container may be up "
+        "without having been initialised.",
+    "interrupted_hosts_wait":
+        "Interrupted while waiting for the machines to answer over SSH. "
+        "The infrastructure itself is up.",
+    "interrupted_tests":
+        "Interrupted: the tests were stopped. Nothing was recorded, so this "
+        "run costs you no score.",
+    "interrupted_session":
+        "Interrupted: the lab session was closed. Your work is untouched.",
+    "interrupted_unknown":
+        "Interrupted by Ctrl-C.",
     # ── exam_passing_score — the verdict of a mock exam ───────────────────────
     "field_exam_score": "[bold]Pass mark:[/bold]",
     "col_verdict":   "Verdict",

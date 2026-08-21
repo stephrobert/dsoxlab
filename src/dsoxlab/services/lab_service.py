@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from typing import Any
 from ..discovery.repo import find_meta_yml
 from ..discovery.scanner import discover_labs
 from ..i18n import _
+from ..interrupt import Interrupted, Stage
 from ..models.hint import HintFile
 from ..models.lab import LabDefinition
 from ..runtimes.base import EventCallback, SessionSpec
@@ -409,18 +411,29 @@ def check_lab(
         return CheckResult(ok=False, output=str(exc), passed=0, total=0)
 
     assert proc.stdout is not None
-    for brute in proc.stdout:
-        line = brute.rstrip("\n")
-        output_lines.append(line)
-        m = _PYTEST_VERDICT_RE.match(line)
-        if m:
-            on_event({
-                "type": "verdict",
-                "nodeid": m.group("nodeid"),
-                "verdict": m.group("verdict"),
-            })
-        else:
-            on_event({"type": "log", "line": line})
+    try:
+        for brute in proc.stdout:
+            line = brute.rstrip("\n")
+            output_lines.append(line)
+            m = _PYTEST_VERDICT_RE.match(line)
+            if m:
+                on_event({
+                    "type": "verdict",
+                    "nodeid": m.group("nodeid"),
+                    "verdict": m.group("verdict"),
+                })
+            else:
+                on_event({"type": "log", "line": line})
+    except KeyboardInterrupt:
+        # Sans ce nettoyage, pytest survivait à la commande qui l'avait lancé :
+        # il continue de piloter la VM du lab pendant que l'apprenant croit
+        # avoir tout arrêté, et le processus reste zombie jusqu'à la sortie.
+        proc.kill()
+        with suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=10)
+        # Rien n'est enregistré : une validation interrompue ne vaut pas un
+        # 0/100 dans l'historique de l'apprenant.
+        raise Interrupted(Stage.TESTS) from None
 
     rc = proc.wait(timeout=300)
     output = "\n".join(output_lines)

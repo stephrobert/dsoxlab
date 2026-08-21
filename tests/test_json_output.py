@@ -81,7 +81,7 @@ def test_accents_are_not_escaped(capsys) -> None:
     assert "Préparer les nœuds gérés" in sortie
 
 
-def test_a_failing_check_still_prints_only_json(monkeypatch, capsys) -> None:
+def test_a_failing_check_still_prints_only_json(monkeypatch, capsys, tmp_path) -> None:
     """Un lab en échec ne doit pas préfixer le JSON de sa sortie pytest.
 
     C'est le cas le plus fréquent en usage réel, et le plus facile à manquer :
@@ -90,6 +90,12 @@ def test_a_failing_check_still_prints_only_json(monkeypatch, capsys) -> None:
     """
     from dsoxlab import cli
     from dsoxlab.services.lab_service import CheckResult
+
+    # `_run_check` prend le verrou d'écriture du dépôt, dont le fichier vit
+    # sous XDG_STATE_HOME. Sans cette redirection, ce test déposerait un
+    # répertoire dans le `~/.local/state` de qui lance la suite, pour une
+    # racine (`/repo`) qui n'existe même pas.
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
 
     echec = CheckResult(ok=False, output="=== test session starts ===\nFAILED", passed=1, total=3)
     monkeypatch.setattr(cli, "_run_check_with_progress", lambda *a, **k: echec)

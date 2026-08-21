@@ -36,14 +36,17 @@ import logging
 import os
 import re
 import shutil
+import signal
 import subprocess
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ..config import xdg_state_home
 from ..i18n import _
+from ..interrupt import EVENT_INTERRUPT, Interrupted, Stage, interruptible
 from ..models.repo import ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
@@ -285,9 +288,13 @@ def init(
     cmd = ["terraform", f"-chdir={tf_dir}", "init", "-input=false"]
     if on_event is not None:
         cmd.append("-json")
-        _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
+        _stream_terraform(
+            cmd, env=_provider_env(repo_meta), on_event=on_event,
+            stage=Stage.TERRAFORM_INIT,
+        )
     else:
-        run_command(cmd, timeout=600, env=_provider_env(repo_meta))
+        with interruptible(Stage.TERRAFORM_INIT):
+            run_command(cmd, timeout=600, env=_provider_env(repo_meta))
 
 
 def _state_has_resources(state_file: Path) -> bool:
@@ -565,9 +572,13 @@ def apply(
         cmd += ["-var", f"target_hosts={json.dumps(target_hosts)}"]
     if on_event is not None:
         cmd.append("-json")
-        _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
+        _stream_terraform(
+            cmd, env=_provider_env(repo_meta), on_event=on_event,
+            stage=Stage.TERRAFORM_APPLY,
+        )
     else:
-        run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
+        with interruptible(Stage.TERRAFORM_APPLY):
+            run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
 
     # Un apply ``-target`` n'évalue pas les outputs racine (comportement
     # documenté de Terraform). Sans outputs, l'inventory (conftest de test,
@@ -577,7 +588,8 @@ def apply(
     # un refresh-only pour recalculer le map ``hosts`` sans recréer ni
     # détruire de ressource.
     if targets:
-        run_command(
+        with interruptible(Stage.TERRAFORM_APPLY):
+            run_command(
             [
                 "terraform",
                 f"-chdir={tf_dir}",
@@ -593,11 +605,62 @@ def apply(
     return _read_outputs(tf_dir, env=_provider_env(repo_meta))
 
 
+#: Délai laissé à Terraform pour mourir sur ``SIGTERM`` avant le ``SIGKILL``.
+#: Court : à ce stade l'utilisateur a déjà demandé deux fois l'arrêt.
+_DELAI_SIGKILL_S = 5
+
+def _signaler_interruption(
+    on_event: Callable[[dict[str, Any]], None], rang: int
+) -> None:
+    """Prévient l'appelant qu'un Ctrl-C a été reçu (1er ou 2e)."""
+    try:
+        on_event({"type": EVENT_INTERRUPT, "count": rang})
+    except Exception:  # un affichage ne casse pas un arrêt
+        logger.exception("on_event callback failed")
+
+
+def _arreter_terraform(
+    proc: subprocess.Popen[str],
+    drainer: Callable[[], None],
+    on_event: Callable[[dict[str, Any]], None],
+) -> bool:
+    """Arrête Terraform après un Ctrl-C, en deux temps. True si l'arrêt fut dur.
+
+    Premier temps : ``SIGINT`` au fils, et on continue de **drainer sa sortie**
+    jusqu'à EOF. Terraform, sur ``SIGINT``, termine la ressource en cours,
+    écrit son state et sort : c'est ce qui rend « rejouer la commande » suffisant.
+    Cesser de lire son tube au lieu de le drainer le bloquerait dès 64 Ko écrits,
+    exactement au moment où on lui demande de finir.
+
+    Second temps, si l'utilisateur insiste : ``SIGTERM`` puis ``SIGKILL``. Le
+    state peut alors être partiel, et l'appelant le dit.
+    """
+    _signaler_interruption(on_event, 1)
+    proc.send_signal(signal.SIGINT)
+    try:
+        drainer()
+        proc.wait()
+        return False
+    except KeyboardInterrupt:
+        pass
+
+    _signaler_interruption(on_event, 2)
+    proc.terminate()
+    try:
+        proc.wait(timeout=_DELAI_SIGKILL_S)
+    except (KeyboardInterrupt, subprocess.TimeoutExpired):
+        proc.kill()
+        with suppress(KeyboardInterrupt):
+            proc.wait()
+    return True
+
+
 def _stream_terraform(
     cmd: list[str],
     *,
     env: dict[str, str],
     on_event: Callable[[dict[str, Any]], None],
+    stage: Stage,
 ) -> None:
     """Lance terraform en mode -json et streame chaque event vers on_event.
 
@@ -610,7 +673,17 @@ def _stream_terraform(
     Terraform) sont ignorées par le parseur JSON mais conservées dans
     ``raw_log`` pour reporting d'erreur lisible.
 
-    Lève RuntimeError si rc != 0 (avec diagnostic + stderr brut).
+    **Terraform est lancé dans sa propre session** (``start_new_session``), et
+    c'est ce qui rend l'interruption pilotable. Dans le même groupe de processus,
+    le Ctrl-C du terminal frappait dsoxlab **et** Terraform en même temps :
+    impossible de savoir si le fils avait déjà reçu son signal, donc impossible
+    de lui en envoyer un second sans risquer de déclencher son arrêt *brutal*
+    (le second ``SIGINT`` fait sortir Terraform sans finir la ressource en
+    cours). Isolé, le fils ne reçoit que ce que dsoxlab lui envoie, et la
+    politique d'arrêt devient déterministe, donc testable.
+
+    Lève ``Interrupted`` si l'utilisateur a interrompu, ``RuntimeError`` si
+    rc != 0. Les deux ne se confondent pas : la première n'est pas un échec.
     """
     proc = subprocess.Popen(  # argv construit ici, jamais de shell
         cmd,
@@ -619,13 +692,18 @@ def _stream_terraform(
         text=True,
         bufsize=1,                  # line-buffered
         env=env,
+        start_new_session=True,     # cf. docstring : dsoxlab seul maître du signal
     )
     assert proc.stdout is not None  # nosec : Popen avec PIPE garantit non-None
+    sortie = proc.stdout
 
     last_diagnostic = ""
     raw_log_tail: list[str] = []
-    try:
-        for brute in proc.stdout:
+
+    def _consommer() -> None:
+        """Lit la sortie jusqu'à EOF. Rappelable : reprend là où elle s'arrête."""
+        nonlocal last_diagnostic
+        for brute in sortie:
             line = brute.rstrip("\n")
             if not line.strip():
                 continue
@@ -651,10 +729,13 @@ def _stream_terraform(
                 on_event(event)
             except Exception:  # le callback ne doit pas tuer Terraform
                 logger.exception("on_event callback failed")
-    finally:
-        # Laisse Terraform se terminer proprement même si la boucle a été
-        # interrompue (KeyboardInterrupt, etc.).
+
+    try:
+        _consommer()
         rc = proc.wait()
+    except KeyboardInterrupt:
+        dur = _arreter_terraform(proc, _consommer, on_event)
+        raise Interrupted(stage, hard=dur) from None
 
     if rc != 0:
         msg = last_diagnostic
@@ -700,9 +781,13 @@ def destroy(
         cmd += ["-var", f"target_hosts={json.dumps(target_hosts)}"]
     if on_event is not None:
         cmd.append("-json")
-        _stream_terraform(cmd, env=_provider_env(repo_meta), on_event=on_event)
+        _stream_terraform(
+            cmd, env=_provider_env(repo_meta), on_event=on_event,
+            stage=Stage.TERRAFORM_DESTROY,
+        )
     else:
-        run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
+        with interruptible(Stage.TERRAFORM_DESTROY):
+            run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
 
     # Nettoyage du tfvars généré : seulement si on a tout détruit
     # (sinon on garde le tfvars pour les prochains apply ciblés).

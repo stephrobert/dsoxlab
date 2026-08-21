@@ -6,6 +6,8 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .utils.fichiers import ecrire_atomiquement
+
 logger = logging.getLogger(__name__)
 
 _CONTEXT_FILE = ".dsoxlab-context.json"
@@ -134,12 +136,17 @@ def read_context(root: Path) -> ActiveContext:
 
 
 def _persist(root: Path, ctx: ActiveContext) -> None:
-    """Écrit le contexte sur disque en omettant les champs vides/None."""
+    """Écrit le contexte sur disque en omettant les champs vides/None.
+
+    Écriture atomique : le fichier était tronqué avant d'être réécrit, et une
+    coupure entre les deux le laissait vide ou coupé au milieu. ``read_context``
+    rend alors un contexte vide, par sécurité et **sans un mot** : l'apprenant
+    perdait sa section, sa target et son lab actif sans jamais savoir pourquoi.
+    """
     raw = asdict(ctx)
     # On omet les champs qui sont None ou 0 pour rester lisible
     data = {k: v for k, v in raw.items() if v not in (None, "", 0)}
-    path = get_context_path(root)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    ecrire_atomiquement(get_context_path(root), json.dumps(data, indent=2))
 
 
 def write_context(
