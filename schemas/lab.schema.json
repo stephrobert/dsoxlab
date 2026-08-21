@@ -136,7 +136,7 @@
         "snapshot_required": {
           "type": "boolean",
           "default": false,
-          "description": "Take a snapshot before setup.yaml, so the lab can be rolled back."
+          "description": "Take a disk checkpoint before setup.yaml. Binding, not informational: run FAILS if the checkpoint cannot be taken, reset rolls back to it instead of replaying cleanup.yaml, and clean removes it along with its overlay file. On kvm it is an external snapshot (--disk-only): the disk is captured, the memory is not."
         },
         "session": {
           "type": "string",

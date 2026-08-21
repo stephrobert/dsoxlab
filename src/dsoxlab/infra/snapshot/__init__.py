@@ -7,7 +7,13 @@ interface :
 - ``create(repo_meta, hosts, name) -> None``
 - ``revert(repo_meta, hosts, name) -> None``
 - ``delete(repo_meta, hosts, name) -> None``
+- ``purge(repo_meta, hosts) -> list[str]``
 - ``list_(repo_meta, host) -> list[str]``
+
+``purge`` est l'opération que réclame la destruction d'une infrastructure : un
+snapshot laisse derrière lui un artefact de stockage que l'outil de
+provisionnement ne connaît pas, et qui lui survivrait. Elle rend ce qu'elle a
+retiré, pour que l'appelant puisse le dire.
 
 Si un provider n'est pas encore implémenté,
 ``NotImplementedError`` est levée avec un message explicite.
@@ -26,6 +32,17 @@ from ...i18n import _
 from ...models.repo import RepoMetadata
 
 
+class SnapshotError(RuntimeError):
+    """Levée quand un snapshot existe mais ne peut pas servir de point de reprise.
+
+    Distincte de ``CommandError`` (``virsh`` a échoué) et de ``DomainNotFound``
+    (la machine n'existe pas) : ici l'hyperviseur répond, la machine est là, et
+    c'est **l'état du snapshot** qui interdit l'opération demandée. Les trois
+    appellent des gestes différents, les confondre ferait écrire un message
+    faux.
+    """
+
+
 class SnapshotBackend(Protocol):
     """Contrat à respecter par chaque module ``snapshot/<provider>.py``."""
 
@@ -40,6 +57,10 @@ class SnapshotBackend(Protocol):
     def delete(
         self, repo_meta: RepoMetadata, hosts: list[str], name: str
     ) -> None: ...
+
+    def purge(
+        self, repo_meta: RepoMetadata, hosts: list[str]
+    ) -> list[str]: ...
 
     def list_(
         self, repo_meta: RepoMetadata, host: str
@@ -77,6 +98,15 @@ def revert(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
 def delete(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
     """Supprime le snapshot ``name`` sur chaque host."""
     _backend(repo_meta).delete(repo_meta, hosts, name)
+
+
+def purge(repo_meta: RepoMetadata, hosts: list[str]) -> list[str]:
+    """Retire tout snapshot et tout artefact de stockage laissé sur ces hosts.
+
+    Returns:
+        Les artefacts réellement retirés, pour que l'appelant les nomme.
+    """
+    return _backend(repo_meta).purge(repo_meta, hosts)
 
 
 def list_(repo_meta: RepoMetadata, host: str) -> list[str]:

@@ -9,6 +9,67 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.56] - 2026-08-21
+
+### Corrigé
+
+- **Les snapshots ne fonctionnaient sur aucune VM dsoxlab, et l'échec était
+  muet.** Le template Terraform packagé démarre ses machines en UEFI — les
+  images cloud modernes n'embarquent plus de bootloader BIOS — et libvirt refuse
+  les snapshots **internes** sur un firmware pflash : `internal snapshots of a
+  VM with pflash based firmware are not supported`. C'est exactement ce que
+  demandait `infra/snapshot/kvm.py`. Il prend désormais un snapshot **externe**
+  (`--disk-only --atomic`), vérifié sur un domaine UEFI réel.
+
+- **Le chemin du fichier de recouvrement est passé, plus deviné.** Sur un disque
+  `type='volume'` — la forme que produit le template — libvirt refuse de le
+  déduire lui-même (`cannot generate external snapshot name for disk 'vda'
+  without source`), donc un snapshot externe naïf échouait tout autant que
+  l'interne. `create` passe maintenant un `--diskspec` par disque inscriptible.
+  Le cdrom cloud-init en est exclu : lui en donner un ferait échouer tout le
+  snapshot.
+
+- **`run` échoue désormais quand un point de reprise exigé ne peut pas être
+  pris.** C'est le changement qui compte le plus. `runtimes/vm.py` avalait
+  l'échec dans un `logger.warning`, et aucun `logging.basicConfig` n'existe dans
+  ce paquet : un lab qui déclare `snapshot_required: true` démarrait **sans le
+  filet qu'il réclame**, `run` sortait en 0, et l'apprenant l'apprenait au
+  moment d'en avoir besoin. C'est ce silence qui a laissé la fonctionnalité
+  cassée sans que personne ne le voie. Un lab qui se passe de filet déclare
+  toujours `snapshot_required: false`, qui est le défaut et ce que déclarent
+  aujourd'hui tous les labs de tous les catalogues.
+
+- **Le retour arrière est une autre opération, et il est écrit comme telle.**
+  libvirt refuse `snapshot-revert` sur un snapshot externe (`Invalid target
+  domain state 'disk-snapshot'`). `revert` arrête désormais la machine, vide le
+  fichier de recouvrement par l'API de stockage de libvirt et la redémarre : le
+  chemin du disque ne change pas, donc le XML du domaine n'est jamais réécrit et
+  le point de reprise reste utilisable. Il refuse d'agir quand le point de
+  reprise n'est plus la couche du dessus, plutôt que de jeter le mauvais fichier.
+
+- **`clean` et `destroy` connaissent le fichier de recouvrement.** Un snapshot
+  externe laisse un artefact dont Terraform n'a jamais entendu parler : il n'est
+  dans aucun state, et le volume qu'il recouvre est supprimé sous lui. `clean`
+  retire le point de reprise par `snapshot-delete`, qui refusionne le
+  recouvrement et efface le fichier ; `destroy` purge tous les points de reprise
+  **avant** que Terraform ne passe, parce qu'après l'`undefine` la métadonnée a
+  disparu avec le domaine et le fichier devient introuvable. Même famille de
+  défaut que les domaines orphelins de #107.
+
+### Ajouté
+
+- **`reset` donne enfin un effet observable à `snapshot_required`.** Sur un lab
+  qui le déclare, `dsoxlab reset` ramène la machine à son point de reprise au
+  lieu de rejouer le `cleanup.yaml`, puis rejoue le `setup.yaml`. Les labs qui
+  ne le déclarent pas gardent exactement le comportement précédent.
+
+- **Le contrat dit ce qu'un point de reprise capture, et ce qu'il ne capture
+  pas.** `docs/contract-v1.fr.md`, sa version anglaise et
+  `schemas/lab.schema.json` posent la frontière disque/mémoire : le retour
+  arrière redémarre depuis un état disque cohérent, il ne replace pas la machine
+  dans la seconde d'avant. Un lab dont l'exercice repose sur un processus en
+  cours doit le relancer.
+
 ## [0.1.53] - 2026-08-21
 
 ### Modifié

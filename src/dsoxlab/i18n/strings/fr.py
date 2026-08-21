@@ -179,6 +179,13 @@ STRINGS: dict[str, str] = {
     "ssh_fragment_removed": "Fragment SSH de [bold]{repo}[/bold] retiré : il pointait des machines détruites.",
     "destroy_done":        "Infrastructure détruite.",
     "destroy_failed":      "Destruction échouée : {error}",
+    "snapshot_purge_done":
+        "{count} fichier(s) de recouvrement de snapshot retiré(s) avant la "
+        "destruction : Terraform ne les connaît pas et les aurait laissés.",
+    "snapshot_purge_failed":
+        "Purge des snapshots impossible ({error}). Si cette infrastructure en "
+        "portait, leurs fichiers de recouvrement resteront dans le pool de "
+        "stockage après la destruction.",
     "status_no_hosts":     "Aucun hôte déclaré dans meta.yml.",
     "status_no_key":       "Clé SSH privée introuvable : {path}. Lance 'dsoxlab instructor bootstrap' d'abord.",
     "status_checking":     "Vérification de la connectivité SSH sur {count} hôte(s)…",
@@ -829,6 +836,27 @@ hors ligne, elle se tait.
     "err_snapshot_provider_unsupported":
         "Snapshots non encore implémentés pour le provider « {provider} ». "
         "Voir src/dsoxlab/infra/snapshot/__init__.py pour ajouter un backend.",
+    "err_snapshot_no_disk":
+        "Le snapshot « {snapshot} » du domaine {domain} n'a figé aucun disque : "
+        "il n'y a rien où revenir. Le reprendre avec dsoxlab run.",
+    "err_snapshot_no_base":
+        "Snapshot « {snapshot} » du domaine {domain} : impossible de savoir "
+        "quel disque « {disk} » recouvre. Un retour arrière jetterait le "
+        "mauvais fichier.",
+    "err_snapshot_no_capacity":
+        "libvirt n'indique pas la taille de {path} : un fichier de "
+        "recouvrement ne peut pas être recréé sans elle.",
+    "err_snapshot_not_top_layer":
+        "Le snapshot « {snapshot} » n'est plus la couche du dessus du disque "
+        "« {disk} » de {domain} : le domaine écrit dans {found}, le snapshot a "
+        "créé {expected}. Revenir en arrière ici jetterait des écritures que "
+        "le snapshot n'a jamais couvertes.",
+    "err_vm_snapshot_required":
+        "Le lab {lab_id} déclare snapshot_required: true et le point de "
+        "reprise n'a pas pu être pris sur {host} : {error}\n"
+        "Le lab n'est PAS démarré, car il tournerait sans le filet qu'il "
+        "réclame. Réparer l'hyperviseur, ou déclarer snapshot_required: false "
+        "dans son lab.yaml.",
     "err_runtime_unavailable":
         "Le runtime « {runtime} » n'est pas disponible sur cette machine. "
         "Installe les dépendances (`dsoxlab instructor bootstrap`), ou "

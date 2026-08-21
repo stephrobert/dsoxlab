@@ -169,7 +169,7 @@ publiable.
 | `type` | non | énuméré | `shell` | `shell`, `vm`, et les alias de rétro-compatibilité `kvm` et `incus`. Écrire `vm` dans les nouveaux labs. |
 | `targets` | pour `vm` | liste de mappings | `[]` | Ne doit pas être vide pour `vm`. |
 | `default` | non | chaîne | | Doit correspondre à un `targets[].name`. |
-| `snapshot_required` | non | booléen | `false` | |
+| `snapshot_required` | non | booléen | `false` | Engage l'outil, ne l'informe pas. Voir plus bas. |
 | `session` | non | énuméré | `target` | `target` : session SSH sur l'hôte. `local` : sous-shell local. N'a de sens que pour `vm`. |
 | `workdir` | pour `shell` | chaîne | `challenge/work` | Ne doit pas être vide pour `shell`. Ignoré pour `vm`. |
 | `fixtures` | non | liste de chaînes | `[]` | Chemins relatifs à `<lab>/fixtures/`, préservés sous `workdir`. |
@@ -179,6 +179,40 @@ publiable.
 Une fixture **non déclarée** n'est **pas copiée**, même présente dans
 `fixtures/`. Un chemin absolu, ou qui contient `..`, est refusé : une fixture
 n'écrit jamais hors du workdir.
+
+#### `runtime.snapshot_required`
+
+Ce champ **engage l'outil**. Déclarer `true` change trois commandes :
+
+| Commande | Avec `snapshot_required: true` |
+| --- | --- |
+| `run` | Prend un point de reprise **avant** le `setup.yaml`, et **échoue** s'il n'y arrive pas. Le lab ne démarre pas sans le filet qu'il réclame. |
+| `reset` | Ramène la machine au point de reprise au lieu de rejouer le `cleanup.yaml`, puis rejoue le `setup.yaml`. |
+| `clean` | Retire le point de reprise, et avec lui le fichier de recouvrement qu'il avait créé. |
+
+Un lab qui se passe de filet déclare `false`, ce qui est le défaut et ce que
+déclarent aujourd'hui tous les labs de tous les catalogues.
+
+**Ce qu'un point de reprise dsoxlab capture, et ce qu'il ne capture pas.** Sur
+le provider `kvm`, c'est un **snapshot externe de disque** (`virsh
+snapshot-create-as --disk-only --atomic`), jamais un snapshot interne : le
+template Terraform packagé démarre ses machines en UEFI, et libvirt refuse les
+snapshots internes sur un firmware pflash. Trois conséquences, écrites ici
+plutôt que laissées à découvrir :
+
+- **le disque est capturé, la mémoire ne l'est pas.** Le retour arrière
+  redémarre la machine depuis un état disque cohérent, il ne la replace pas
+  dans la seconde d'avant. Pour un lab c'est le bon compromis, mais un lab dont
+  l'exercice repose sur un processus en cours doit le relancer, pas l'attendre ;
+- **un point de reprise crée un fichier de recouvrement** à côté du disque.
+  `clean` et `destroy` le retirent, rien d'autre : un lab qui prend un point de
+  reprise et n'est jamais nettoyé en laisse un jusqu'à la destruction de
+  l'infrastructure ;
+- **revenir en arrière n'est pas un `virsh snapshot-revert`.** dsoxlab arrête la
+  machine, vide le recouvrement et la redémarre. Le point de reprise survit,
+  donc il resert ; mais il doit rester la couche du dessus du disque, et dsoxlab
+  refuse le retour arrière quand ce n'est plus le cas, plutôt que de jeter le
+  mauvais fichier.
 
 #### `runtime.targets[]`
 
