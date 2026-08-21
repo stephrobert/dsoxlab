@@ -9,6 +9,55 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.53] - 2026-08-21
+
+### Modifié
+
+- **Le garde-fou i18n analyse désormais tout le paquet, plus le seul `cli.py`.**
+  La règle « tout texte affiché passe par `_()` » était déjà tenue par un test,
+  ce qui est la bonne façon de la tenir. Mais ce test n'analysait qu'un fichier.
+  Tout ce que lèvent `infra/`, `runtimes/`, `services/` et `templates/` lui
+  échappait, c'est-à-dire exactement les messages qu'un apprenant lit quand
+  quelque chose casse : une session entièrement anglaise répondait `terraform est
+  absent du PATH`. La règle avait un gardien qui ne regardait qu'une porte sur
+  cinq.
+
+- **Le critère est écrit dans le test, parce que c'est là qu'est la difficulté.**
+  Un garde-fou trop laxiste ne garde rien ; trop strict, il se fait désactiver au
+  premier faux positif. Un littéral est un texte d'interface quand deux choses
+  sont vraies ensemble. Il atteint un humain, par l'un de quatre puits : `help=`
+  et `description=`, les helpers `error`/`info`/`warn`/`success`, le texte d'un
+  `raise` (cette CLI rend ses erreurs par `error(str(exc))`, donc le message
+  d'une exception **est** de l'interface), et les verbes de sortie
+  `.print()`/`.echo()`/`.secho()`. Et il s'écrit comme une phrase, définie ici
+  comme au moins deux mots séparés par une espace, un fragment sans espace
+  comptant pour un seul mot. Cette dernière clause est tout le réglage : elle
+  laisse passer `meta.yml`, `challenge/tests`, `lab_starting` et la mise en forme
+  pure telle que `f"  ✔ {fqdn} ({ip})"`, tout en attrapant ce qui est écrit pour
+  être lu.
+
+- **Deux exclusions sont décidées à voix haute, chacune tenue par son test.**
+  `logger.*` n'est pas un puits d'interface : le journal est un artefact de
+  diagnostic, lu à côté d'une trace Python, et le traduire rendrait deux rapports
+  de bug incomparables selon la langue de qui les produit. `models/` reste hors
+  périmètre parce que le bon patron y vit déjà, `UnsupportedSchemaVersion` et
+  `ProviderUnresolved` portant des données pendant que la CLI compose la phrase
+  traduite ; convertir à ce patron les 24 `ValueError` du contrat est une
+  refonte, pas un correctif d'i18n.
+
+### Corrigé
+
+- **43 phrases françaises en dur ne fuient plus dans une session anglaise.**
+  Elles sont la conséquence du garde-fou étendu, pas sa raison d'être : il les a
+  fait apparaître d'un coup, dans `infra/credentials.py` (13), `runtimes/vm.py`
+  (8), `runtimes/services.py` (5), `infra/inventory.py` (4),
+  `infra/terraform.py` (4), `infra/ansible.py` (3), `runtimes/manager.py` (2),
+  `templates/__init__.py` (2), `infra/snapshot/__init__.py` (1) et
+  `services/lab_service.py` (1). Les 38 clés nouvelles ont été ajoutées
+  simultanément dans `i18n/strings/en.py` et `i18n/strings/fr.py`, et
+  `dsoxlab provision` sans terraform sur le PATH répond maintenant dans la langue
+  de la session, ce qui était le symptôme à l'origine de l'issue.
+
 ## [0.1.51] - 2026-08-21
 
 ### Ajouté
