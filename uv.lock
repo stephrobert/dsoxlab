@@ -304,7 +304,7 @@ wheels = [
 
 [[package]]
 name = "dsoxlab"
-version = "0.1.57"
+version = "0.1.58"
 source = { editable = "." }
 dependencies = [
     { name = "ansible-core", version = "2.19.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
