@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.60"
+version = "0.1.61"
 description = "Turn declarative exercises into reproducible, runnable and verifiable lab environments"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -79,6 +79,10 @@ dev = [
     "mypy>=1.9",
     "ruff>=0.4",
     "types-PyYAML>=6",
+    # Éprouve les schémas publiés sur des documents réels (tests/
+    # test_schemas_sur_documents.py). Volontairement hors runtime : le
+    # moteur a son propre parseur et ne lit jamais ses schémas.
+    "jsonschema>=4.20",
     "pre-commit>=3.5",
 ]
 # Kept out of `dev` on purpose: atheris builds a native libFuzzer extension and

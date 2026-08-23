@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.61] - 2026-08-24
+
+### Added
+
+- **The published schemas are now tested against documents, not just against key
+  names.** The existing check compares, by parsing `models/`, the keys the
+  parser reads with the schema's `properties`: it catches a forgotten or
+  invented key, and nothing of what lives inside one. A wrong `type`, an
+  incomplete `enum`, a `pattern` that is too loose or a bound that is off all
+  went through silently. Those defects never bother dsoxlab, which does not read
+  its own schemas: they bother the catalog author, in their editor and in their
+  CI. A wrong schema carries authority it has not earned, which is the least
+  comfortable position there is.
+
+  The check now runs both ways. The packaged demonstration catalog, the one
+  `dsoxlab demo` drops, is validated file by file; and sixteen faulty documents,
+  **one fault each**, must be rejected, at the exact location of the fault.
+  Every case starts from the valid document, which is what makes the proof
+  solid: if the base passes and the variant fails, it is the fault that was
+  rejected, and nothing else.
+
+### Internal
+
+- `jsonschema` becomes a **development** dependency, never a runtime one: the
+  engine has its own parser and has no business validating through the schema at
+  run time.
+
 ## [0.1.60] - 2026-08-24
 
 ### Fixed
