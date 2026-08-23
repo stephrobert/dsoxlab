@@ -275,22 +275,22 @@ STRINGS: dict[str, str] = {
     "fullhelp_concept": """\
 [bold]What is dsoxlab?[/bold]
 
-dsoxlab is the CLI of the [bold cyan]DevSecOps XL Labs[/bold cyan] platform: a self-contained
-practice platform built to complement the training content at
-[bold]https://blog.stephane-robert.info/docs/[/bold]
+dsoxlab turns [bold]declarative exercises[/bold] into reproducible, runnable and
+verifiable environments.
 
-Each [cyan]lab[/cyan] is a standalone exercise linked to a site guide, covering a
-specific skill: Linux, containers, Kubernetes, IaC, security, CI/CD…
+A [bold]catalog[/bold] is a repository that states what it offers: a root [cyan]meta.yml[/cyan]
+for the topology, one [cyan]lab.yaml[/cyan] per lab for what that lab needs. Nothing
+about a domain lives in the tool, so the same engine serves Linux, Ansible,
+Terraform or Kubernetes labs, and any other catalog that honors the contract.
 
-Labs are organised by [bold]section[/bold] (linux, ansible, terraform, kubernetes…)
-and [bold]level[/bold] (l1 → beginner, l2 → intermediate, lfcs, rhcsa).
+Labs are organised by [bold]section[/bold] and [bold]level[/bold], both named by the catalog itself.
 
-Each lab exposes:
+Each lab declares:
   • an observable [bold]skill[/bold] to acquire,
-  • a [bold]runtime[/bold] (shell, incus container or KVM VM),
-  • [bold]automated tests[/bold] to validate your solution,
+  • a [bold]runtime[/bold] ([bold]shell[/bold] on your machine, or a [bold]vm[/bold] provisioned for you),
+  • [bold]automated tests[/bold] that read the state of the system, not the commands typed,
   • [bold]hints[/bold] if you are stuck (with a score penalty),
-  • a [bold]direct link[/bold] to the corresponding site guide.""",
+  • a [bold]link[/bold] to the guide that goes with it.""",
 
     "fullhelp_workflow": """\
 [bold]Typical workflow[/bold]

@@ -14,18 +14,20 @@
 
 **Autre langue :** [English](./README.md)
 
-`dsoxlab` est un **framework CLI neutre vis-à-vis du domaine** qui pilote des
-labs pédagogiques répartis dans **plusieurs dépôts**. Chaque dépôt déclare son
-catalogue via un fichier `meta.yml` à la racine et un `lab.yaml` par lab.
+`dsoxlab` transforme des **exercices déclaratifs en environnements
+reproductibles, exécutables et vérifiables**. Un catalogue déclare ce qu'il
+propose via un `meta.yml` à la racine et un `lab.yaml` par lab ; le moteur
+provisionne ce que le lab demande, l'ouvre, et prouve le résultat par des tests
+qui lisent l'**état du système** plutôt que les commandes tapées.
 
-Le framework sert aussi bien des labs Linux, Ansible, Kubernetes que Terraform,
-tout ce qui respecte le contrat déclaratif. Il provisionne l'environnement,
-exécute une validation au niveau du système (`pytest` + `pytest-testinfra`),
-score la progression et conserve l'historique en local. Rien de spécifique à un
-domaine ne vit dans le moteur.
+Rien de spécifique à un domaine ne vit dans le moteur : il sert aussi bien des
+labs Linux, Ansible, Kubernetes que Terraform, et tout autre catalogue qui
+respecte le contrat déclaratif. Il score aussi la progression et conserve
+l'historique en local, par catalogue.
 
-> Compagnon des tutoriels de
-> [blog.stephane-robert.info](https://blog.stephane-robert.info).
+> Né pour accompagner les tutoriels de
+> [blog.stephane-robert.info](https://blog.stephane-robert.info), et utilisable
+> sans eux.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/stephrobert/dsoxlab/main/docs/demo.gif" alt="dsoxlab en action : list-labs et show" width="820">

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.59] - 2026-08-23
+
+### Changed
+
+- **The project description said what the tool does for its author.** "A
+  domain-agnostic CLI framework driving labs spread across multiple
+  repositories" was accurate when it was written. What changed since is not a
+  feature but the nature of the tool: the declarative contract, interchangeable
+  runtimes, validation and diagnostics make it an engine someone else can use
+  for their own exercises. All four places (`pyproject.toml`, the GitHub
+  description, both READMEs and `fullhelp`) now carry the same sentence: dsoxlab
+  turns declarative exercises into **reproducible, runnable and verifiable**
+  environments.
+
+- **`fullhelp` advertised runtimes that no longer exist.** It promised an "incus
+  container or KVM VM" where the contract only exposes two types, `shell` and
+  `vm`: Incus is a backend of `vm`, picked by the catalog's `meta.yml`, not a
+  runtime a learner declares. It also tied every lab to a guide on one specific
+  site, and listed levels (`l1`, `lfcs`, `rhcsa`) that belong to one particular
+  catalog, when it is the catalog that names its own sections and levels.
+
 ## [0.1.58] - 2026-08-23
 
 ### Fixed
