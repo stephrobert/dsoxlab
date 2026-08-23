@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.63] - 2026-08-24
+
+- **The documentation described a product that does not exist.** Three claims
+  of the "Persistence" section of both READMEs were false, and they were the
+  ones a reader looking for their scores would follow: a database at
+  `~/.local/share/dsoxlab/progress.db`, a user configuration file at
+  `~/.config/dsoxlab/config.yaml`, and `XDG_DATA_HOME` / `XDG_CONFIG_HOME` as
+  the way to move them. The database is `<catalog>/.dsoxlab.db`, one per
+  catalog; no configuration file is read anywhere. Four more claims went the
+  same way: progress "following the XDG spec", `incus` and `kvm` presented as
+  runtimes (there are two, `shell` and `vm`, and the backend is the catalog's
+  choice), an architecture map naming `IncusRuntime` and `KvmRuntime` classes
+  that do not exist, and a `runtime.host` field in the flagship `lab.yaml`
+  example that no code reads.
+
+- The `--lab-home` help said "root of the linux-training repo", naming one
+  catalog as if it were the only one, in both languages. It now says "the lab
+  catalog".
+
+### Added
+
+- **A control that forbids the drift from starting again.** The documented file
+  locations are now confronted with the code the same way the command table
+  already was: `scripts/generer-doc.py` derives the real locations **by calling
+  the functions the CLI calls**, on a throwaway `HOME`, then reports any path a
+  page cites that matches none of them. Proven by mutation, and by six tests in
+  `tests/test_documentation_synchrone.py`. A path may be cited as *not*
+  existing, but only by the page whose subject that is, and a test checks that
+  such a path really is absent from the code.
+
+### Changed
+
+- **Documentation split by audience**, each page naming its reader in its first
+  lines: [the learner](docs/learner.md), [the catalog
+  author](docs/catalog-author.md), [the trainer](docs/trainer.md), plus two
+  references shared by the three ([where dsoxlab writes](docs/files.md) and
+  [the commands](docs/commands.md), still generated from the CLI). Both READMEs
+  keep their role as the entry point and now fit in a thirty-second read. No
+  site generator is introduced: that decision belongs to the repository owner.
+
+- `Documentation` in `pyproject.toml` points at the tool's documentation instead
+  of the generic index of a blog. The architecture map moved to
+  `CONTRIBUTING.md`, corrected, where the contributors it addresses will find
+  it.
+
+Closes #86.
+
 ## [0.1.62] - 2026-08-24
 
 ### Fixed

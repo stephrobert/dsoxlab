@@ -1,29 +1,44 @@
 #!/usr/bin/env python3
-"""Génère depuis la CLI ce que la documentation ne doit plus recopier.
+"""Confronte la documentation au code, sur ce que le code peut affirmer.
 
-Une table de commandes écrite à la main dérive, et personne ne s'en aperçoit :
-celle du README annonçait encore `dsoxlab clean` exécutant un `cleanup.sh`,
-alors que le zéro-bash est un invariant du contrat depuis longtemps, et il y
-manquait `demo` et `support`. Rien ne lit la documentation en même temps que le
+Deux dérives, la même cause : rien ne lit la documentation en même temps que le
 code.
 
-Le principe : la section vit entre deux marqueurs, elle est produite par
-l'application elle-même, et un mode `--verifier` la compare à ce qu'elle devrait
-être. La CI refuse alors une documentation périmée, exactement comme elle
-refuserait un test rouge.
+1. **La table des commandes.** Écrite à la main, celle du README annonçait
+   encore `dsoxlab clean` exécutant un `cleanup.sh`, alors que le zéro-bash est
+   un invariant du contrat depuis longtemps, et il y manquait `demo` et
+   `support`. Elle est désormais produite par l'application elle-même, entre
+   deux marqueurs.
+
+2. **Les emplacements de fichiers.** La section « Persistence » des deux README
+   annonçait `~/.local/share/dsoxlab/progress.db`, `~/.config/dsoxlab/config.yaml`
+   et deux variables XDG que rien ne lit : trois affirmations fausses dans le
+   document que lit quiconque cherche où sont ses notes (issue #86). Les
+   emplacements de référence sont donc obtenus **en appelant le code**, dans un
+   sous-processus dont le `HOME` est jetable, puis en relevant ce qui a
+   réellement été créé.
+
+Un mode `--verifier` compare sans réécrire : la CI refuse une documentation
+périmée, exactement comme elle refuserait un test rouge. La table se régénère,
+les chemins non : un chemin faux se corrige à la main, puisque seul l'auteur
+sait ce qu'il voulait dire.
 
 Usage :
     python3 scripts/generer-doc.py             # réécrit les sections générées
-    python3 scripts/generer-doc.py --verifier   # sort 1 si une section a dérivé
+    python3 scripts/generer-doc.py --verifier   # sort 1 si la doc a dérivé
 """
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 RACINE = Path(__file__).resolve().parent.parent
 
@@ -32,8 +47,8 @@ FIN = "<!-- END COMMANDES -->"
 
 #: Fichier de documentation et langue dans laquelle le remplir.
 CIBLES = {
-    "README.md": "en",
-    "README.fr.md": "fr",
+    "docs/commands.md": "en",
+    "docs/commands.fr.md": "fr",
 }
 
 TITRES = {
@@ -94,6 +109,331 @@ def remplacer(document: Path, contenu: str) -> str | None:
     return avant + contenu + apres
 
 
+# ── les chemins cités par la documentation existent-ils ? ─────────────────────
+
+#: Valeur injectée à la place de l'identifiant du catalogue et du provider. Elle
+#: devient un joker dans les motifs de référence, puisque la documentation, elle,
+#: écrit `<catalog-id>`.
+SENTINELLE = "catalogue-sentinelle"
+
+#: Chemins que la documentation cite **pour dire qu'ils n'existent pas**, et les
+#: seules pages qui ont le droit de les citer. L'exemption est nominative : une
+#: dispense globale rouvrirait la porte qu'elle prétend fermer, puisque n'importe
+#: quelle page pourrait alors réannoncer `progress.db` comme un emplacement réel.
+#:
+#: `absents_devenus_reels()` tient l'autre bout : le jour où l'un d'eux devient
+#: réel (la découverte multi-catalogues de #78, par exemple), la page qui
+#: l'annonce absent devient fausse à son tour, et le contrôle le dit.
+CHEMINS_ABSENTS = {
+    "~/.config/dsoxlab": {"docs/files.md", "docs/files.fr.md"},
+    "~/.config/dsoxlab/config.yaml": {"docs/files.md", "docs/files.fr.md"},
+    "~/.local/share/dsoxlab/progress.db": {"docs/files.md", "docs/files.fr.md"},
+    # Écrit jusqu'en 0.1.61, plus depuis : les pages le disent pour qui en
+    # aurait un qui traîne d'une ancienne installation.
+    "~/.local/bin/dsoxlab": {"docs/files.md", "docs/files.fr.md"},
+}
+
+#: Programme joué dans un sous-processus : il appelle les fonctions que la CLI
+#: appelle, sur un `HOME` jetable, et rend les emplacements obtenus **plus** ce
+#: qui a été créé sur le disque. Les deux sont nécessaires : certaines fonctions
+#: rendent un chemin sans le créer (le fragment `~/.ssh/config.d`), et le
+#: provisioning crée des répertoires que personne ne rend (`cloud-init/`).
+_CHEMINS_REELS = r"""
+import json
+import os
+import tempfile
+from pathlib import Path
+
+from dsoxlab import config, locking, logging_setup
+from dsoxlab.discovery.repo import read_repo_metadata
+from dsoxlab.infra import inventory, terraform
+from dsoxlab.services import demo, update_check
+from dsoxlab.sessions import store
+from dsoxlab.templates import template_root
+
+SENTINELLE = "__SENTINELLE__"
+
+maison = Path(os.environ["HOME"])
+rendus = set()
+noms = set()
+
+providers = sorted(
+    p.name for p in (template_root() / "terraform").iterdir() if p.is_dir()
+)
+
+with tempfile.TemporaryDirectory() as tmp:
+    racine = Path(tmp)
+    (racine / "ssh").mkdir()
+    (racine / "ssh" / "id_ed25519.pub").write_text("ssh-ed25519 AAAA sentinelle\n")
+
+    # Un provider à la fois : chacun a son work-dir, et la documentation a le
+    # droit de nommer celui qu'elle veut.
+    for provider in providers:
+        (racine / "meta.yml").write_text(
+            "repo:\n"
+            "  id: " + SENTINELLE + "\n"
+            "  category: domaine\n"
+            "infra:\n"
+            "  provider: " + provider + "\n"
+            "  network: reseau\n"
+            "  cidr: 10.10.10.0/24\n"
+            "  hosts:\n"
+            "    - name: hote.lab\n"
+            "      distro: alma10\n",
+            encoding="utf-8",
+        )
+        meta = read_repo_metadata(racine)
+        rendus.update(str(c) for c in (
+            terraform.workdir(meta),
+            terraform.write_tfvars(meta),
+            inventory.inventory_path(meta),
+            inventory.ssh_config_path(meta),
+            inventory.user_ssh_config_path(meta),
+        ))
+
+    avant = {p.name for p in racine.iterdir()}
+    store.record_hint(racine, "lab-sentinelle", 0, 5)
+    config.set_active_lab(racine, "lab-sentinelle")
+    noms = {p.name for p in racine.iterdir()} - avant
+
+    rendus.update(str(c) for c in (
+        logging_setup.chemin_journal(),
+        locking.lock_path(racine),
+        demo.destination(),
+        update_check.cache_path(),
+    ))
+
+rendus.update(str(p) for p in maison.rglob("*"))
+print(json.dumps({
+    "depot": sorted(noms),
+    "maison": sorted(
+        "~/" + str(Path(c).relative_to(maison))
+        for c in rendus
+        if str(c).startswith(str(maison) + os.sep)
+    ),
+}))
+"""
+
+#: `Path.home() / "a" / "b"` dans les sources : les emplacements que le code
+#: compose sans passer par une fonction qu'on puisse appeler (le wrapper de
+#: `install`, les fichiers d'identifiants des providers).
+_CHAINE_MAISON = re.compile(r'Path\.home\(\)((?:\s*/\s*f?"[^"]*")+)')
+_MORCEAU = re.compile(r'f?"([^"]*)"')
+
+#: Racines XDG dont le code ne construit que la valeur par défaut. Les retenir
+#: comme références ouvertes rendrait acceptable n'importe quoi sous elles,
+#: c'est-à-dire précisément les chemins que ce contrôle existe pour attraper.
+_RACINES_XDG = frozenset({"~/.local/state", "~/.local/share", "~/.cache"})
+
+_BLOC_CODE = re.compile(r"```.*?```", re.DOTALL)
+_CODE_EN_LIGNE = re.compile(r"`([^`\n]+)`")
+_SOUS_MAISON = re.compile(r"~/[A-Za-z0-9._/<>{}-]+")
+_FICHIER_DEPOT = re.compile(r"[A-Za-z0-9._/<>{}-]*\.dsoxlab[A-Za-z0-9._-]*")
+
+
+def documents_documentation() -> list[Path]:
+    """Les pages de documentation, celles qui décrivent le produit d'aujourd'hui.
+
+    Le CHANGELOG en est exclu : il raconte le passé, où un chemin retiré depuis
+    a toute sa place.
+    """
+    pages = sorted(RACINE.glob("*.md")) + sorted((RACINE / "docs").rglob("*.md"))
+    return [p for p in pages if not p.name.startswith("CHANGELOG")]
+
+
+def chemins_reels() -> tuple[set[str], set[str]]:
+    """Les emplacements que le code produit vraiment.
+
+    Rend deux ensembles : les noms de fichiers posés **dans le catalogue**, et
+    les motifs de chemins sous le répertoire personnel.
+    """
+    with tempfile.TemporaryDirectory() as maison:
+        env = dict(
+            os.environ,
+            HOME=maison,
+            PYTHONPATH=str(RACINE / "src"),
+        )
+        # Un XDG_* hérité de la session déplacerait les chemins hors de ce HOME
+        # jetable, et la mesure ne porterait plus sur rien.
+        for variable in ("XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
+            env.pop(variable, None)
+        proc = subprocess.run(
+            [sys.executable, "-c", _CHEMINS_REELS.replace("__SENTINELLE__", SENTINELLE)],
+            capture_output=True, text=True, env=env, cwd=RACINE, check=True,
+        )
+        data = json.loads(proc.stdout)
+    return set(data["depot"]), set(data["maison"])
+
+
+def chemins_du_code() -> set[str]:
+    """Les chemins que les sources composent depuis `Path.home()`."""
+    trouves: set[str] = set()
+    for source in sorted((RACINE / "src").rglob("*.py")):
+        texte = source.read_text(encoding="utf-8")
+        for chaine in _CHAINE_MAISON.findall(texte):
+            segments = [
+                "*" if "{" in morceau else morceau
+                for morceau in _MORCEAU.findall(chaine)
+            ]
+            chemin = "~/" + "/".join(segments)
+            if chemin not in _RACINES_XDG:
+                trouves.add(chemin)
+    return trouves
+
+
+def _nettoyer(brut: str) -> str:
+    """Retire la ponctuation que la prose colle à la fin d'un chemin."""
+    return brut.rstrip("/.,;:)").rstrip("/")
+
+
+def chemins_cites(texte: str) -> tuple[set[str], set[str]]:
+    """Les chemins cités **dans du code** : blocs clôturés et accents graves.
+
+    La prose emploie les mêmes mots sans les citer, et un contrôle qui crie au
+    loup sur de la grammaire finit désactivé, ce qui est pire que son absence.
+    """
+    fragments = _BLOC_CODE.findall(texte)
+    fragments += _CODE_EN_LIGNE.findall(_BLOC_CODE.sub("", texte))
+
+    maison: set[str] = set()
+    depot: set[str] = set()
+    for fragment in fragments:
+        restant = fragment
+        for brut in _SOUS_MAISON.findall(fragment):
+            maison.add(_nettoyer(brut))
+            restant = restant.replace(brut, " ")
+        # Après retrait des chemins sous ~, ce qui reste et porte `.dsoxlab`
+        # est un fichier posé dans le catalogue.
+        for brut in _FICHIER_DEPOT.findall(restant):
+            depot.add(_nettoyer(brut).rsplit("/", 1)[-1])
+    return maison, depot
+
+
+def _segments(chemin: str) -> list[str]:
+    """Un chemin découpé, chaque partie variable devenue un joker."""
+    parties = [p for p in chemin.removeprefix("~/").split("/") if p]
+    return [
+        "*" if ("<" in p or "{" in p or SENTINELLE in p) else p
+        for p in parties
+    ]
+
+
+def _compatibles(cite: str, reference: str) -> bool:
+    return fnmatch.fnmatch(cite, reference) or fnmatch.fnmatch(reference, cite)
+
+
+def _correspond(cite: list[str], reference: list[str], *, ouverte: bool) -> bool:
+    """Le chemin cité désigne-t-il cette référence ?
+
+    Une référence **fermée** vient d'un appel au code : le chemin cité doit en
+    être un préfixe (citer un répertoire de la liste est légitime, inventer un
+    fichier dedans ne l'est pas). Une référence **ouverte** vient d'une lecture
+    des sources, où le code ajoute encore des segments : la comparaison
+    s'arrête alors au plus court.
+    """
+    if not ouverte and len(cite) > len(reference):
+        return False
+    commun = min(len(cite), len(reference))
+    if commun == 0:
+        return False
+    return all(
+        _compatibles(c, r)
+        for c, r in zip(cite[:commun], reference[:commun], strict=True)
+    )
+
+
+class References(NamedTuple):
+    """Ce que le code produit, prêt à être confronté à une page.
+
+    Obtenu une fois (le relevé passe par un sous-processus), puis réutilisé :
+    les tests s'en servent pour éprouver le contrôle sur des textes fabriqués,
+    sans repayer la mesure à chaque cas.
+    """
+
+    noms_depot: set[str]
+    fermees: list[list[str]]
+    ouvertes: list[list[str]]
+    racines: set[str]
+
+
+def references() -> References:
+    """Relève les emplacements réels, par appel du code puis lecture des sources."""
+    noms_depot, fermees = chemins_reels()
+    fermees_seg = [_segments(c) for c in fermees]
+    ouvertes_seg = [_segments(c) for c in chemins_du_code()]
+    return References(
+        noms_depot=noms_depot | {Path(c).name for c in fermees},
+        fermees=fermees_seg,
+        ouvertes=ouvertes_seg,
+        # Un chemin sous ~ n'est contrôlé que si sa première partie est une de
+        # celles que dsoxlab occupe : `~/Projets/mon-catalogue` est un exemple
+        # de répertoire de travail, pas une affirmation sur l'outil.
+        racines={seg[0] for seg in fermees_seg + ouvertes_seg if seg},
+    )
+
+
+def chemins_inconnus(
+    texte: str, refs: References, *, dispenses: frozenset[str] = frozenset()
+) -> list[str]:
+    """Les chemins que ce texte cite et que le code ne produit nulle part."""
+    maison, depot = chemins_cites(texte)
+    inconnus: list[str] = []
+
+    for chemin in sorted(maison):
+        if chemin in dispenses:
+            continue
+        segments = _segments(chemin)
+        if not segments or segments[0] not in refs.racines:
+            continue
+        connu = any(
+            _correspond(segments, ref, ouverte=False) for ref in refs.fermees
+        ) or any(
+            _correspond(segments, ref, ouverte=True) for ref in refs.ouvertes
+        )
+        if not connu:
+            inconnus.append(chemin)
+
+    inconnus += [nom for nom in sorted(depot) if nom not in refs.noms_depot]
+    return inconnus
+
+
+def dispenses_de(document: str) -> frozenset[str]:
+    """Les chemins que cette page a le droit de citer comme inexistants."""
+    return frozenset(
+        chemin for chemin, pages in CHEMINS_ABSENTS.items() if document in pages
+    )
+
+
+def verifier_chemins(refs: References | None = None) -> list[str]:
+    """Rend un message par chemin cité qui ne correspond à rien dans le code."""
+    refs = refs or references()
+    problemes: list[str] = []
+    for document in documents_documentation():
+        relatif = str(document.relative_to(RACINE))
+        inconnus = chemins_inconnus(
+            document.read_text(encoding="utf-8"),
+            refs,
+            dispenses=dispenses_de(relatif),
+        )
+        problemes += [
+            f"  ✘ {relatif} cite « {chemin} », que le code ne produit nulle part"
+            for chemin in inconnus
+        ]
+    return problemes
+
+
+def absents_devenus_reels(refs: References | None = None) -> list[str]:
+    """Les chemins déclarés absents que le code produit désormais."""
+    refs = refs or references()
+    return sorted(
+        chemin
+        for chemin in CHEMINS_ABSENTS
+        if any(
+            _correspond(_segments(chemin), ref, ouverte=False) for ref in refs.fermees
+        )
+    )
+
+
 def main() -> int:
     verifier = "--verifier" in sys.argv
     perimes: list[str] = []
@@ -130,8 +470,34 @@ def main() -> int:
             "\nLa documentation ne décrit plus la CLI. Régénère-la :\n"
             "    python3 scripts/generer-doc.py\n"
         )
-        return 1
-    return 1 if perimes else 0
+
+    # Les chemins ne se régénèrent pas : seul l'auteur sait ce qu'il voulait
+    # écrire. Ils sont donc signalés dans les deux modes.
+    refs = references()
+    problemes = verifier_chemins(refs)
+    for message in problemes:
+        print(message)
+    if problemes:
+        print(
+            "\nUn chemin cité par la documentation ne correspond à aucun\n"
+            "emplacement que le code produit. Corrige la page, ou la liste\n"
+            "CHEMINS_ABSENTS de ce script si le chemin est cité pour dire\n"
+            "qu'il n'existe pas.\n"
+        )
+
+    reels = absents_devenus_reels(refs)
+    for chemin in reels:
+        print(f"  ✘ « {chemin} » est déclaré absent, mais le code le produit désormais")
+    if reels:
+        print(
+            "\nLa documentation qui annonce ces chemins comme inexistants est\n"
+            "devenue fausse. Mets-la à jour, puis retire-les de CHEMINS_ABSENTS.\n"
+        )
+
+    if not problemes and not reels:
+        print("  ✔ les chemins cités existent tous dans le code")
+
+    return 1 if (perimes or problemes or reels) else 0
 
 
 if __name__ == "__main__":

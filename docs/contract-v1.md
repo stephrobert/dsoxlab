@@ -1,5 +1,8 @@
 # The declarative contract, version 1
 
+**Audience:** catalog authors. The workflow around this reference is
+[For the catalog author](./catalog-author.md).
+
 **Language:** [English](./contract-v1.md) · [Français](./contract-v1.fr.md)
 
 `meta.yml` and `lab.yaml` are the public interface of dsoxlab. They are what a

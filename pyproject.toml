@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.62"
+version = "0.1.63"
 description = "Turn declarative exercises into reproducible, runnable and verifiable lab environments"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -61,7 +61,7 @@ dsoxlab = "dsoxlab.cli:main"
 
 [project.urls]
 Homepage = "https://blog.stephane-robert.info/"
-Documentation = "https://blog.stephane-robert.info/docs/"
+Documentation = "https://github.com/stephrobert/dsoxlab/blob/main/docs/README.md"
 Repository = "https://github.com/stephrobert/dsoxlab"
 Issues = "https://github.com/stephrobert/dsoxlab/issues"
 Changelog = "https://github.com/stephrobert/dsoxlab/blob/main/CHANGELOG.md"

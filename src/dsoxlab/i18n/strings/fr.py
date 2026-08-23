@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
 
     # ── Options globales ──────────────────────────────────────────────────────
     "opt_help":       "Affiche ce message et quitte.",
-    "opt_lab_home":   "Racine du dépôt linux-training (défaut : auto-détecté).",
+    "opt_lab_home":   "Racine du catalogue de labs (défaut : détecté automatiquement).",
     "opt_json":           "Sortie JSON, destinée aux programmes (extension d'éditeur, tableau de bord). Aucun autre affichage.",
     "opt_level":      "Filtre par niveau (l1, l2, lfcs, rhcsa)",
     "opt_section":    "Filtre par section (linux, ansible, terraform, docker…)",
@@ -326,7 +326,7 @@ Chaque lab déclare :
 
   [cyan]show <id>[/cyan]            Détail complet d'un lab (compétences, runtime, liens…).
 
-  [cyan]run <id>[/cyan]             Démarre l'environnement du lab (shell, incus ou KVM).
+  [cyan]run <id>[/cyan]             Démarre l'environnement du lab (un shell, ou une vm provisionnée).
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Affiche le cours : une section à la fois si le lab en
                        déclare (course.yaml), sinon le scenario et le README.
@@ -437,11 +437,12 @@ Chaque lab déclare :
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
 
-  [bold]shell[/bold]    Exercices simples dans le shell courant — aucune VM nécessaire.
-  [bold]incus[/bold]    Labs en conteneurs — léger, démarrage rapide.
-  [bold]kvm[/bold]      Machine virtuelle complète — requis pour la persistance, les services, le stockage.
+  [bold]shell[/bold]    Exercices simples dans le shell courant, aucune VM nécessaire.
+  [bold]vm[/bold]       Machine complète, requise pour la persistance, les services, le stockage.
+           Quel backend la sert (KVM/libvirt, Incus, Outscale) est déclaré par le
+           catalogue dans [bold]meta.yml: infra.provider[/bold], pas par le lab.
 
-Utilisez [bold]dsoxlab doctor[/bold] pour vérifier quels runtimes sont disponibles sur votre machine.""",
+Utilisez [bold]dsoxlab doctor[/bold] pour vérifier ce qui est disponible sur votre machine.""",
 
     "fullhelp_language": """\
 [bold]Langue[/bold]

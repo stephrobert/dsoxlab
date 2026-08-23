@@ -5,21 +5,30 @@ main : une commande renommée, retirée ou ajoutée laisse sinon derrière elle 
 documentation qui décrit un outil qui n'existe plus. Personne ne s'en aperçoit,
 parce que rien ne lit la documentation en même temps que le code.
 
-Ce module ferme les deux sens :
+Ce module ferme trois sens :
 
 1. **Toute commande citée dans la documentation existe** dans la CLI.
 2. **Toute commande de la CLI est décrite** dans `fullhelp`, en anglais comme en
    français. C'est la règle que le projet s'était donnée sans pouvoir la tenir :
    « ne jamais laisser le fullhelp décrire une commande qui n'existe plus ».
+3. **Tout emplacement de fichier cité par la documentation existe** dans le
+   code. La section « Persistence » des deux README a annoncé des mois durant
+   une base `~/.local/share/dsoxlab/progress.db` et un
+   `~/.config/dsoxlab/config.yaml` que rien ne lit (issue #86) : les
+   emplacements de référence sont donc relevés **en appelant le code**, jamais
+   recopiés ici.
 
-Il attrape donc aussi bien la commande oubliée que la commande fantôme.
+Il attrape donc aussi bien la commande oubliée que la commande fantôme, et le
+chemin inventé.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -38,6 +47,18 @@ DOCUMENTS = [
     "CONTRIBUTING.md",
     "CONTRIBUTING.fr.md",
     "RELEASING.md",
+    "docs/README.md",
+    "docs/README.fr.md",
+    "docs/learner.md",
+    "docs/learner.fr.md",
+    "docs/catalog-author.md",
+    "docs/catalog-author.fr.md",
+    "docs/trainer.md",
+    "docs/trainer.fr.md",
+    "docs/files.md",
+    "docs/files.fr.md",
+    "docs/commands.md",
+    "docs/commands.fr.md",
     "docs/contract-v1.md",
     "docs/contract-v1.fr.md",
 ]
@@ -149,8 +170,8 @@ def test_le_catalogue_de_demonstration_ne_cite_que_des_commandes_reelles() -> No
     assert not inconnues, f"commandes inexistantes citées : {inconnues}"
 
 
-def test_la_table_des_commandes_du_readme_est_a_jour() -> None:
-    """La table du README est produite par la CLI, et doit le rester.
+def test_la_table_des_commandes_est_a_jour() -> None:
+    """La table de `docs/commands.md` est produite par la CLI, et doit le rester.
 
     Écrite à la main, elle dérivait sans bruit : elle annonçait encore
     `dsoxlab clean` exécutant un `cleanup.sh`, alors que le zéro-bash est un
@@ -234,3 +255,209 @@ def test_les_reglages_kvm_du_contrat_sont_documentes() -> None:
         for document in ("docs/contract-v1.md", "docs/contract-v1.fr.md"):
             texte = (RACINE / document).read_text(encoding="utf-8")
             assert f"`{cle}`" in texte, f"« {cle} » n'est décrit nulle part dans {document}"
+
+
+# ── les emplacements de fichiers cités existent-ils ? ─────────────────────────
+#
+# Le mécanisme vit dans `scripts/generer-doc.py`, avec la table des commandes :
+# c'est le même principe (comparer la documentation à ce que le code FAIT) et
+# le même point d'entrée, celui que joue aussi le hook pre-commit. Ces tests
+# l'appellent directement, pour dire *quoi* est faux plutôt que *qu'un* truc
+# l'est, et pour éprouver le contrôle sur des textes fabriqués.
+
+
+def _generateur() -> Any:
+    """Charge `scripts/generer-doc.py` comme un module (son nom porte un tiret)."""
+    chemin = RACINE / "scripts" / "generer-doc.py"
+    spec = importlib.util.spec_from_file_location("generer_doc", chemin)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def generateur() -> Any:
+    generateur_py = RACINE / "scripts" / "generer-doc.py"
+    if not generateur_py.is_file():
+        pytest.skip("générateur absent de ce dépôt")
+    return _generateur()
+
+
+@pytest.fixture(scope="module")
+def refs(generateur: Any) -> Any:
+    """Les emplacements réels, relevés une seule fois (ils coûtent un processus)."""
+    return generateur.references()
+
+
+def test_les_references_sont_relevees_sur_le_code(generateur: Any, refs: Any) -> None:
+    """Garde-fou : un relevé cassé rendrait tous les contrôles suivants verts à vide.
+
+    Il vaut aussi documentation exécutable des quatre emplacements que le code
+    produit et que la documentation décrit.
+    """
+    assert ".dsoxlab.db" in refs.noms_depot
+    assert ".dsoxlab-context.json" in refs.noms_depot
+
+    fermees = {"/".join(seg) for seg in refs.fermees}
+    for attendu in (
+        "dsoxlab/dsoxlab.log",
+        "dsoxlab/*/dsoxlab.lock",
+        "dsoxlab/*/ssh_config",
+    ):
+        assert any(chemin.endswith(attendu) for chemin in fermees), (
+            f"aucun emplacement réel ne finit par « {attendu} » : {sorted(fermees)}"
+        )
+
+
+def test_aucune_page_ne_cite_un_chemin_inexistant(generateur: Any, refs: Any) -> None:
+    """Le contrôle sur le dépôt réel, avec le nom de la page et du chemin fautif."""
+    problemes = generateur.verifier_chemins(refs)
+    assert not problemes, "\n" + "\n".join(problemes)
+
+
+def test_le_controle_refuse_les_chemins_de_l_issue_86(
+    generateur: Any, refs: Any
+) -> None:
+    """La preuve par mutation : les trois affirmations fausses sont rejetées.
+
+    Elles sont réintroduites ici telles qu'elles étaient écrites dans les deux
+    README. Un contrôle qui n'a jamais rien refusé ne prouve rien.
+    """
+    texte = """
+    - **Scores and hints:** `~/.local/share/dsoxlab/progress.db` (XDG).
+    - **User config:** `~/.config/dsoxlab/config.yaml` (optional).
+    - Session: `<repo>/.dsoxlab-session.json`
+    """
+    inconnus = generateur.chemins_inconnus(texte, refs)
+    assert inconnus == [
+        "~/.config/dsoxlab/config.yaml",
+        "~/.local/share/dsoxlab/progress.db",
+        ".dsoxlab-session.json",
+    ], inconnus
+
+
+def test_la_dispense_ne_vaut_que_pour_la_page_qui_la_porte(
+    generateur: Any, refs: Any
+) -> None:
+    """Une page peut citer un chemin POUR DIRE qu'il n'existe pas. Une seule.
+
+    Sans cette restriction, la dispense rouvrirait la porte qu'elle ferme :
+    n'importe quelle page pourrait réannoncer `progress.db` comme un
+    emplacement réel, et le contrôle se tairait.
+    """
+    texte = "`~/.local/share/dsoxlab/progress.db`"
+
+    dispensee = generateur.dispenses_de("docs/files.md")
+    assert generateur.chemins_inconnus(texte, refs, dispenses=dispensee) == []
+    assert generateur.chemins_inconnus(
+        texte, refs, dispenses=generateur.dispenses_de("README.md")
+    ) == ["~/.local/share/dsoxlab/progress.db"]
+
+
+def test_le_controle_accepte_les_emplacements_reels(generateur: Any, refs: Any) -> None:
+    """L'autre sens : ce que le code produit vraiment doit passer.
+
+    Y compris écrit avec les paramètres que la documentation emploie
+    (`<catalog-id>`, `<provider>`), qui n'existent dans aucun chemin réel.
+    """
+    texte = """
+    `<catalog>/.dsoxlab.db` `<catalog>/.dsoxlab-context.json`
+    `~/.local/state/dsoxlab/dsoxlab.log`
+    `~/.local/state/dsoxlab/<catalog-id>/terraform/<provider>/`
+    `~/.local/state/dsoxlab/<catalog-id>/dsoxlab.lock`
+    `~/.cache/dsoxlab/<catalog-id>/inventory.json`
+    `~/.cache/dsoxlab/<catalog-id>/ssh_config`
+    `~/.cache/dsoxlab/version-check.json`
+    `~/.local/share/dsoxlab/demo/`
+    `~/.ssh/config.d/<catalog-id>.conf`
+    """
+    # `~/.local/bin/dsoxlab` a quitté cette liste en 0.1.62 : `install` ne
+    # l'écrit plus. Il n'est donc plus un emplacement réel, mais un chemin que
+    # les pages citent pour dire qu'il n'existe pas, et c'est la dispense
+    # nominative qui l'autorise. Le contrôle a d'ailleurs signalé la dérive
+    # tout seul, le lendemain de sa pose.
+    assert generateur.chemins_inconnus(texte, refs) == []
+
+
+def test_un_repertoire_de_travail_reste_hors_perimetre(
+    generateur: Any, refs: Any
+) -> None:
+    """Un exemple de chemin utilisateur n'affirme rien sur l'outil.
+
+    `~/Projets/mon-catalogue` est un endroit où l'on a cloné un catalogue, pas
+    un emplacement que dsoxlab produit. Un contrôle qui crie au loup dessus
+    finirait désactivé.
+    """
+    assert generateur.chemins_inconnus("`cd ~/Projets/mon-catalogue`", refs) == []
+
+
+def test_les_chemins_declares_absents_le_sont_toujours(
+    generateur: Any, refs: Any
+) -> None:
+    """L'autre bout de la dispense, et il compte autant.
+
+    Le jour où `~/.config/dsoxlab/config.yaml` deviendra réel (issue #78), la
+    page qui l'annonce inexistant deviendra fausse à son tour. Ce test le dit
+    ce jour-là, au lieu de laisser la dispense couvrir un nouveau mensonge.
+    """
+    devenus_reels = generateur.absents_devenus_reels(refs)
+    assert not devenus_reels, (
+        f"le code produit désormais {devenus_reels} : mets à jour la page qui "
+        "les annonce absents, puis retire-les de CHEMINS_ABSENTS"
+    )
+
+
+def test_toute_page_de_documentation_est_controlee(generateur: Any) -> None:
+    """Une page ajoutée sans être contrôlée est une page qui pourra mentir."""
+    pages = {str(p.relative_to(RACINE)) for p in generateur.documents_documentation()}
+    assert "docs/files.md" in pages and "docs/files.fr.md" in pages
+    assert not any(p.startswith("CHANGELOG") for p in pages), (
+        "le CHANGELOG raconte le passé : un chemin retiré depuis y a sa place"
+    )
+
+
+# ── une page publiée s'adresse à quelqu'un, dans les deux langues ─────────────
+
+
+def _pages_docs() -> list[Path]:
+    return sorted(p for p in (RACINE / "docs").glob("*.md") if not p.name.endswith(".fr.md"))
+
+
+def test_chaque_page_existe_dans_les_deux_langues() -> None:
+    """La parité EN/FR est une promesse du projet, pas une intention.
+
+    Une page traduite d'un seul côté se dégrade en silence : le lecteur français
+    tombe sur l'anglais sans savoir si c'est un oubli ou un choix.
+    """
+    manquantes = [
+        page.name
+        for page in _pages_docs()
+        if not page.with_suffix("").with_suffix(".fr.md").is_file()
+        and not (page.parent / f"{page.stem}.fr.md").is_file()
+    ]
+    assert not manquantes, f"pages sans version française : {manquantes}"
+
+
+@pytest.mark.parametrize("langue", ["", ".fr"])
+def test_chaque_page_nomme_son_public(langue: str) -> None:
+    """« Chaque page nomme son public en tête » (issue #86).
+
+    Une documentation qui répond à l'apprenant, à l'auteur et au formateur dans
+    le même paragraphe ne répond à aucun des trois. Le contrôle ne juge pas la
+    prose : il exige la ligne qui déclare le destinataire, dans les vingt
+    premières lignes.
+    """
+    marqueurs = ("**Audience:**", "**Public :**")
+    sans_public = []
+    for page in _pages_docs():
+        chemin = page if langue == "" else page.parent / f"{page.stem}.fr.md"
+        if not chemin.is_file():
+            continue
+        entete = "\n".join(chemin.read_text(encoding="utf-8").splitlines()[:20])
+        if not any(marqueur in entete for marqueur in marqueurs):
+            sans_public.append(chemin.name)
+    assert not sans_public, (
+        f"pages qui ne nomment pas leur public : {sans_public}\n"
+        "Ajoute une ligne « **Audience:** … » (ou « **Public :** … ») en tête."
+    )

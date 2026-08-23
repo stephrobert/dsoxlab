@@ -1,5 +1,8 @@
 # The mark
 
+**Audience:** anyone who displays the mark — a catalog, a slide deck, an
+article. The name and the logo are not covered by the Apache 2.0 licence.
+
 **Language:** [English](./brand.md) · [Français](./brand.fr.md)
 
 ![dsoxlab](assets/brand/dsoxlab-lockup-light.svg)

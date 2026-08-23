@@ -14,6 +14,7 @@ commit sont rédigés en anglais pour que tout le monde puisse participer.
 
 - [Règles fondamentales](#règles-fondamentales)
 - [Mise en place](#mise-en-place)
+- [Carte de l'architecture](#carte-de-larchitecture)
 - [Contrôles qualité](#contrôles-qualité)
   - [Scanners de workflow](#scanners-de-workflow)
   - [Fuzzer le contrat non fiable](#fuzzer-le-contrat-non-fiable)
@@ -59,6 +60,40 @@ par exemple `linux-training` et `ansible-training`) :
 cd ~/Projets/linux-dsoxlab-training && dsoxlab list-labs
 cd ~/Projets/ansible-training && dsoxlab list-labs
 ```
+
+## Carte de l'architecture
+
+```text
+src/dsoxlab/
+├── cli.py            ← point d'entrée Typer (+ le groupe de commandes i18n)
+├── config.py         ← LAB_HOME, contexte actif, .dsoxlab-context.json
+├── locking.py        ← verrou d'écriture par catalogue (flock), code de sortie 7
+├── logging_setup.py  ← le journal qu'écrit chaque commande, quelle que soit la verbosité
+├── i18n/             ← get_lang(), _(), strings/en.py + strings/fr.py
+├── models/           ← schémas typés du contrat déclaratif
+├── discovery/        ← scan du meta.yml et de tous les lab.yaml du catalogue
+├── services/         ← orchestration métier (lab, progression, guide, doctor…)
+├── sessions/         ← persistance SQLite (results + hint_requests)
+├── runtimes/         ← BaseRuntime, ShellRuntime, VmRuntime, RuntimeManager
+├── infra/            ← Terraform, Ansible, inventaire, snapshots, identifiants
+├── validators/       ← structure, métadonnées et contenu d'un catalogue
+├── reporting/        ← sorties terminal Rich, et le JSON de --json
+├── utils/            ← wrapper subprocess centralisé
+└── templates/        ← Terraform, cloud-init et le catalogue de démonstration
+```
+
+Il existe deux runtimes, et deux seulement : `shell` et `vm`. Les valeurs `kvm`
+et `incus` de `runtime.type` sont des alias historiques traités par
+`VmRuntime` ; quel backend sert réellement une VM vient de
+`meta.yml: infra.provider`.
+
+`infra/inventory.py` est la surface publique qu'un catalogue consomme : son
+`conftest.py` importe `build_inventory`, `read_terraform_outputs` et
+`write_ssh_config` pour construire l'inventaire testinfra sans coder la moindre
+adresse IP.
+
+Le moteur reste indépendant de l'arborescence d'un dépôt : `discovery/`
+fonctionne sur n'importe quel arbre déclaré par le `meta.yml`.
 
 ## Contrôles qualité
 
@@ -198,9 +233,9 @@ Nous utilisons les Conventional Commits avec un scope de module :
 
 Types : `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `ci`. Exemples :
 
-- `feat(discovery): support multi-repo via ~/.config/dsoxlab/config.yaml`
-- `fix(runtimes/kvm): make snapshot revert idempotent when snapshot is absent`
-- `docs(readme): document the incus runtime`
+- `feat(runtimes): declare containerized services in lab.yaml`
+- `fix(runtimes/vm): make snapshot revert idempotent when the snapshot is absent`
+- `docs(contract): document the meta.fr.yml overrides`
 
 Gardez des commits ciblés et un historique lisible. Avant un commit groupé,
 consultez `git log --oneline -5` pour coller au style.
