@@ -9,6 +9,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.64] - 2026-08-24
+
+### Corrigé
+
+- **Un output Terraform mal formé faisait planter la construction de
+  l'inventaire.** `{"hosts": {"value": "10.99.0.11"}}` suffisait : le code
+  prenait la valeur pour un objet et appelait `.items()` dessus, ce qui rendait
+  un `AttributeError` au moment de jouer un lab, sans jamais dire que la cause
+  était un state Terraform périmé. Ce document fait trente-quatre octets et
+  personne ne l'avait écrit à la main : c'est le nouveau harnais de fuzzing qui
+  l'a trouvé, en moins de trente mille exécutions.
+
+### Ajouté
+
+- **Le fuzzing couvre désormais toutes les entrées que le moteur ne produit pas
+  lui-même.** Deux harnais s'ajoutent aux deux existants, et chacun assère un
+  contrat différent, parce que chaque entrée est non fiable pour une raison
+  différente :
+
+  - **`.dsoxlab-context.json`** vit sur le disque de l'apprenant : édité à la
+    main par curiosité, tronqué par un portable refermé au mauvais moment,
+    laissé par une version ancienne. Son harnais n'a **aucune exception de
+    contrat**, et c'est tout son propos : `read_context` promet de rendre un
+    contexte vide plutôt que de lever, parce que perdre le contexte coûte un
+    `dsoxlab use` alors qu'une exception coûte la CLI entière.
+  - **Les outputs Terraform** viennent d'un binaire externe dont la version,
+    les providers et le schéma de sortie bougent sans que dsoxlab le sache. Le
+    harnais vise ce que `build_inventory` **fait** du document, et non le
+    `json.loads` qui le précède : celui-là est déjà protégé, et le fuzzer n'y
+    mesurerait que la bibliothèque standard.
+
+  Le commentaire du job de CI énumère les entrées couvertes et dit, pour
+  chacune, pourquoi elle n'est pas fiable.
+
 ## [0.1.63] - 2026-08-24
 
 - **La documentation décrivait un produit qui n'existe pas.** Trois

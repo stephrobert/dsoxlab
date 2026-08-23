@@ -1,0 +1,1 @@
+{"hosts": {"value": {"un.lab": "10.99.0.11", "deux.lab": "10.99.0.12"}, "type": ["object", {"un.lab": "string", "deux.lab": "string"}]}}

@@ -20,10 +20,18 @@ repos:
     hooks:
       - id: trailing-whitespace
         exclude: '(^LICENSE$|\.md$)'
+      # `fuzz/corpus/` est hors du périmètre de l'hygiène, et pas par
+      # commodité : ce sont des graines DÉLIBÉRÉMENT malformées, qui existent
+      # pour être données à un fuzzer. Un JSON tronqué au milieu d'une chaîne
+      # reproduit un portable refermé pendant l'écriture ; le « réparer » ou le
+      # refuser retire au corpus le cas qu'il porte. Le contrat des documents,
+      # lui, est tenu par les harnais eux-mêmes, pas par ces hooks.
       - id: end-of-file-fixer
-        exclude: '^LICENSE$'
+        exclude: '(^LICENSE$|^fuzz/corpus/)'
       - id: check-yaml
+        exclude: '^fuzz/corpus/'
       - id: check-json
+        exclude: '^fuzz/corpus/'
       - id: check-toml
       - id: check-merge-conflict
       - id: check-case-conflict
