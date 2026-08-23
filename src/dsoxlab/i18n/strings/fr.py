@@ -90,7 +90,7 @@ STRINGS: dict[str, str] = {
         "Détaille ce que fait le moteur, sur la sortie d'erreur. Répétable : -v pour les informations, -vv pour le détail complet.",
     "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
-    "cmd_install_help":   "Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell.",
+    "cmd_install_help":   "Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion.",
     "cmd_demo_help":
         "Installe un catalogue de démonstration et joue un premier lab, sans "
         "rien cloner ni provisionner.",
@@ -405,8 +405,13 @@ Chaque lab déclare :
                        Terraform. Sort en code non nul s'il en reste une.
     [dim]--yes[/dim]                 Ne demande pas confirmation, machines orphelines comprises.
 
-  [cyan]install[/cyan]              Installe dsoxlab dans [bold]~/.local/bin[/bold] + auto-complétion shell.
-                       Supporte bash et zsh. Rechargez le shell après exécution.
+  [cyan]completion install[/cyan]   Installe l'auto-complétion du shell (bash, zsh).
+                       Rechargez ensuite votre shell : [bold]exec $SHELL[/bold]
+  [cyan]completion show[/cyan]      Imprime le script sur la sortie standard, sans rien écrire.
+    [dim]--shell <nom>[/dim]       zsh, bash ou fish. Par défaut, le shell courant.
+
+  [cyan]install[/cyan]              [bold]Déprécié[/bold] depuis 0.1.62, retiré en 0.3.0.
+                       Fait ce que fait [bold]completion install[/bold], et le signale.
 
   [cyan]support[/cyan]              Rapport de diagnostic à coller dans une issue :
                        versions, outils, catalogue, dernières traces. Anonymisé
@@ -1076,4 +1081,27 @@ hors ligne, elle se tait.
     # ── #132 : un « 0 lab » muet oblige à chercher ailleurs ──
     "detail_labs_ecart":
         "{ecart} des {presents} fichiers lab.yaml présents sur le disque n'ont pas pu être chargés. « dsoxlab list-labs » les nomme et dit pourquoi.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_help":
+        "Installe ou imprime le script d'auto-complétion du shell.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_install_help":
+        "Installe l'auto-complétion pour le shell courant (zsh, bash).",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_show_help":
+        "Imprime le script de complétion sur la sortie standard, sans rien écrire.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "opt_completion_shell":
+        "Shell visé (zsh, bash, fish). Par défaut, le shell courant.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "install_deprecie":
+        "« dsoxlab install » est déprécié depuis 0.1.62 et sera retiré en 0.3.0. "
+        "Utilise « dsoxlab completion install », qui fait la même chose sous "
+        "un nom qui le dit. Le wrapper de ~/.local/bin n'est plus écrit : "
+        "uv tool install et pipx y posent déjà le leur.",
 }

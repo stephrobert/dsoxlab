@@ -313,6 +313,8 @@ scripts and test files are present.
 | `dsoxlab challenge` | Display the challenge mission for this lab (challenge/README.md). |
 | `dsoxlab check` | Run tests, calculate score (hints deducted) and record result. |
 | `dsoxlab clean` | Remove all resources created by the lab. |
+| `dsoxlab completion install` | Install completion for the current shell (zsh, bash). |
+| `dsoxlab completion show` | Print the completion script on stdout, writing nothing. |
 | `dsoxlab course` | Display a course section, or the table of contents if no section is given. |
 | `dsoxlab demo` | Install a demonstration catalog and play a first lab, with nothing to clone and nothing to provision. |
 | `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy), including machines left outside the state. |
@@ -320,7 +322,7 @@ scripts and test files are present.
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
 | `dsoxlab guide` | Open the lab's online guide in your web browser. |
 | `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
-| `dsoxlab install` | Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion. |
+| `dsoxlab install` | Deprecated: use `dsoxlab completion install`. Installs shell completion. |
 | `dsoxlab instructor bootstrap` | Generate the lab SSH key (if missing) and check that terraform/ansible-runner are installed. |
 | `dsoxlab list-labs` | List all available labs (filtered by active context if set). |
 | `dsoxlab next` | Recommend the next lab or challenge to complete in the active context. |

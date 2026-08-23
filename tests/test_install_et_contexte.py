@@ -8,8 +8,6 @@ qui ne complète pas, un lanceur qui ne lance pas, une CLI qui refuse de démarr
 from __future__ import annotations
 
 import json
-import stat
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -65,89 +63,145 @@ def test_le_fichier_zsh_porte_le_nom_que_zsh_cherche(
     assert not (tmp_path / ".zfunc" / "_dsoxl").exists()
 
 
-# ── le wrapper cassait sur un chemin contenant une espace ─────────────────────
+# ── le wrapper n'est plus écrit du tout ───────────────────────────────────────
 
-def _ecrire_faux_binaire(chemin: Path) -> None:
-    """Un exécutable qui prouve, en s'exécutant, qu'il a bien été appelé."""
-    chemin.parent.mkdir(parents=True, exist_ok=True)
-    chemin.write_text('#!/bin/sh\necho "APPELE:$*"\n', encoding="utf-8")
-    chemin.chmod(chemin.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-
-
-def test_le_wrapper_fonctionne_avec_une_espace_dans_le_chemin(
+def test_install_n_ecrit_plus_de_wrapper(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Le seul test qui prouve quelque chose ici : on EXÉCUTE le wrapper.
+    """Deux défauts vécus tenaient à ce fichier, et le retirer les clôt.
 
-    Sans quoting, `exec /home/moi/My Tools/dsoxlab "$@"` se découpe en deux
-    arguments et le shell répond « not found ». Vérifier le contenu du fichier
-    ne l'aurait pas montré.
+    `dsoxlab install` posait un `exec` dans `~/.local/bin`, exactement où
+    `uv tool install` et `pipx` posent leur lanceur. Le remplacer ne faisait que
+    défaire ce que leur prochaine mise à jour remettrait, et le danger était pire
+    qu'un écrasement : `write_text()` sur un lien symbolique écrit dans **la
+    cible**, donc on remplaçait le binaire réel de uv par un script pointant sur
+    lui-même. Il a fallu une mutation pour le voir (#68).
+
+    Un chemin contenant une espace cassait par ailleurs le `exec`, faute de
+    quoting, et le shell répondait « not found ».
+
+    Les deux disparaissent en n'écrivant plus rien, et c'est ce que ce test
+    vérifie. Il remplace les deux tests d'exécution du wrapper, devenus sans
+    objet : garder un test sur un fichier qui n'existe plus le rendrait vert
+    sans rien mesurer.
     """
-    binaire = tmp_path / "My Tools" / "dsoxlab-reel"
-    _ecrire_faux_binaire(binaire)
-
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/bin/bash")
     monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
-    monkeypatch.setattr(cli.sys, "argv", [str(binaire)])
 
     resultat = runner.invoke(cli.app, ["install"])
     assert resultat.exit_code == 0, resultat.output
 
-    wrapper = tmp_path / ".local" / "bin" / "dsoxlab"
-    assert wrapper.is_file()
-
-    # check=False : si le wrapper ne s'exécute pas, l'assertion doit pouvoir
-    # afficher son contenu — c'est ce qui rend le diagnostic possible.
-    joue = subprocess.run(
-        [str(wrapper), "check", "un-lab"], capture_output=True, text=True, check=False,
-    )
-    assert joue.returncode == 0, (
-        f"le wrapper ne s'exécute pas : {joue.stderr.strip()}\n"
-        f"contenu : {wrapper.read_text(encoding='utf-8')!r}"
-    )
-    assert "APPELE:check un-lab" in joue.stdout, (
-        "les arguments doivent parvenir au binaire réel"
-    )
+    assert not (tmp_path / ".local" / "bin" / "dsoxlab").exists()
+    # La complétion, elle, est bien posée : la commande n'est pas devenue vide.
+    assert (tmp_path / ".bash_completion.d" / "dsoxlab").is_file()
 
 
-def test_un_lanceur_existant_n_est_pas_ecrase(
+def test_install_annonce_sa_depreciation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`uv tool install` pose son lanceur exactement là, et c'est un lien.
+    """Le nom promettait d'installer l'outil, déjà installé.
 
-    Le danger est plus grave qu'un simple écrasement, et il a fallu une
-    mutation pour le voir : `write_text()` sur un lien symbolique écrit dans
-    **la cible**. Sans garde, on ne remplace donc pas le lien, on remplace le
-    binaire réel de uv par un script `exec` qui pointe sur lui-même. Le lien
-    survit, `resolve()` ne bouge pas, et la commande boucle à l'infini.
-
-    Ce test compare donc le CONTENU du binaire réel, seule chose qui change.
+    Il reste un cycle de version, mais il doit dire par quoi il est remplacé :
+    une dépréciation muette ne déplace personne.
     """
-    reel = tmp_path / "outils" / "dsoxlab"
-    _ecrire_faux_binaire(reel)
-    contenu_avant = reel.read_text(encoding="utf-8")
-
-    lanceur = tmp_path / ".local" / "bin" / "dsoxlab"
-    lanceur.parent.mkdir(parents=True, exist_ok=True)
-    lanceur.symlink_to(reel)
-
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/bin/bash")
     monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
-    monkeypatch.setattr(cli.sys, "argv", [str(lanceur)])
 
     resultat = runner.invoke(cli.app, ["install"])
-    assert resultat.exit_code == 0, resultat.output
 
-    assert lanceur.is_symlink(), "le lien de uv/pipx doit rester un lien"
-    assert reel.read_text(encoding="utf-8") == contenu_avant, (
-        "le binaire réel a été réécrit à travers le lien : il s'exec désormais "
-        "lui-même, donc il boucle"
-    )
-    assert "exec" not in reel.read_text(encoding="utf-8").split("\n")[1], (
-        "le binaire ne doit pas être devenu un wrapper vers lui-même"
-    )
+    assert resultat.exit_code == 0, resultat.output
+    sortie = " ".join(resultat.output.split())
+    assert "completion install" in sortie, sortie
+    assert "0.3.0" in sortie, "la version de retrait doit être annoncée"
+
+
+def test_completion_install_fait_le_meme_travail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le nouveau nom doit poser exactement ce que l'ancien posait."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("SHELL", "/usr/bin/zsh")
+    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+
+    resultat = runner.invoke(cli.app, ["completion", "install"])
+
+    assert resultat.exit_code == 0, resultat.output
+    assert (tmp_path / ".zfunc" / "_dsoxlab").is_file()
+
+
+def test_completion_show_n_ecrit_rien_sur_le_disque(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`show` sert à rediriger : il ne doit poser aucun script ni toucher un rc.
+
+    Le contrôle ne peut pas être « le HOME reste vide » : toute commande dsoxlab
+    ouvre son journal au démarrage et crée donc `~/.local/state/dsoxlab/`, ce qui
+    n'a rien à voir avec `show`. On vise les fichiers que `show` pourrait écrire
+    et ne doit pas écrire.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+
+    resultat = runner.invoke(cli.app, ["completion", "show", "--shell", "zsh"])
+
+    assert resultat.exit_code == 0, resultat.output
+    assert "#compdef dsoxlab" in resultat.output
+    assert not (tmp_path / ".zfunc").exists(), "aucun script de complétion posé"
+    assert not (tmp_path / ".bash_completion.d").exists()
+    assert not (tmp_path / ".zshrc").exists(), "aucun rc touché"
+    assert not (tmp_path / ".bashrc").exists()
+
+
+def test_completion_show_refuse_un_shell_inconnu() -> None:
+    """Le contre-cas : sans lui, `show` rendrait un script vide en silence."""
+    resultat = runner.invoke(cli.app, ["completion", "show", "--shell", "csh"])
+
+    assert resultat.exit_code == 2, resultat.output
+
+
+# ── le premier Tab d'une session ne proposait rien ────────────────────────────
+
+def test_le_script_zsh_repond_des_la_premiere_tabulation() -> None:
+    """Reproduit dans un zsh réel : tabulation 1 muette, tabulation 2 correcte.
+
+    zsh autoload le fichier `#compdef` au PREMIER Tab et attend qu'il produise
+    les propositions de cette invocation-là. Le script amont se contente de
+    définir la fonction puis de l'enregistrer pour la suite. L'appel final est
+    donc la correction, et il est **après** l'enregistrement : les deux chemins,
+    première tabulation et suivantes, doivent marcher.
+
+    Ce test ne remplace pas la vérification sous pseudo-terminal, qui est la
+    seule à traverser la couche en cause ; il empêche que la ligne disparaisse
+    d'un coup d'éditeur, ce qu'aucun test unitaire de complétion ne verrait.
+    """
+    script = cli._script_completion("zsh")
+
+    assert script.rstrip().endswith('_dsoxlab_completion "$@"'), script
+    assert script.index("compdef _dsoxlab_completion") < script.index(
+        '_dsoxlab_completion "$@"'
+    ), "l'appel doit suivre l'enregistrement"
+    # La raison part dans le fichier installé : sans elle, la ligne ressemble à
+    # une scorie, et le défaut revient.
+    assert "typer" in script.lower()
+
+
+def test_les_autres_shells_restent_ceux_de_typer() -> None:
+    """La divergence ne vaut que pour zsh, et il faut que ça reste vrai.
+
+    bash source son script au démarrage, fish le charge par fichier de
+    complétion : ni l'un ni l'autre ne passe par l'autoload en cause. Y ajouter
+    la ligne n'aurait aucun effet utile et nous éloignerait de l'amont sans
+    raison.
+    """
+    from typer.completion import get_completion_script
+
+    for shell in ("bash", "fish"):
+        attendu = get_completion_script(
+            prog_name=cli._PROG_NAME, complete_var=cli._COMPLETE_VAR, shell=shell
+        )
+        assert cli._script_completion(shell) == attendu
 
 
 # ── un fichier d'état corrompu ne doit pas emporter la CLI ────────────────────

@@ -90,7 +90,7 @@ STRINGS: dict[str, str] = {
         "Say what the engine is doing, on standard error. Repeatable: -v for information, -vv for full detail.",
     "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
-    "cmd_install_help":   "Install the dsoxlab wrapper in ~/.local/bin and shell auto-completion.",
+    "cmd_install_help":   "Deprecated: use `dsoxlab completion install`. Installs shell completion.",
     "cmd_demo_help":
         "Install a demonstration catalog and play a first lab, with nothing to "
         "clone and nothing to provision.",
@@ -402,8 +402,13 @@ Each lab declares:
                        Exits non-zero if any of them remains.
     [dim]--yes[/dim]                 Do not ask for confirmation, orphan machines included.
 
-  [cyan]install[/cyan]              Install dsoxlab in [bold]~/.local/bin[/bold] + shell auto-completion.
-                       Supports bash and zsh. Reload your shell after running.
+  [cyan]completion install[/cyan]   Install shell auto-completion (bash, zsh).
+                       Reload your shell afterwards: [bold]exec $SHELL[/bold]
+  [cyan]completion show[/cyan]      Print the script on stdout, writing nothing.
+    [dim]--shell <name>[/dim]      zsh, bash or fish. Default: the current shell.
+
+  [cyan]install[/cyan]              [bold]Deprecated[/bold] since 0.1.62, removed in 0.3.0.
+                       Does what [bold]completion install[/bold] does, and warns.
 
   [cyan]support[/cyan]              Diagnostic report to paste into an issue:
                        versions, tools, catalog, latest traces. Anonymised by
@@ -1061,4 +1066,27 @@ silent.
     # ── #132 : un « 0 lab » muet oblige à chercher ailleurs ──
     "detail_labs_ecart":
         "{ecart} of the {presents} lab.yaml files on disk could not be loaded. `dsoxlab list-labs` names them and says why.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_help":
+        "Install or print the shell completion script.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_install_help":
+        "Install completion for the current shell (zsh, bash).",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "cmd_completion_show_help":
+        "Print the completion script on stdout, writing nothing.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "opt_completion_shell":
+        "Shell to generate for (zsh, bash, fish). Default: the current shell.",
+
+    # ── #90 / #134 : la complétion sous un nom qui la nomme ──
+    "install_deprecie":
+        "`dsoxlab install` is deprecated since 0.1.62 and will be removed in "
+        "0.3.0. Use `dsoxlab completion install`, which does the same thing "
+        "under a name that says it. The wrapper in ~/.local/bin is no longer "
+        "written: `uv tool install` and `pipx` already put theirs there.",
 }
