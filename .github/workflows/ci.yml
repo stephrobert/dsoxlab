@@ -418,17 +418,30 @@ jobs:
       - name: Run every hook (push stage)
         run: uv run pre-commit run --all-files --hook-stage pre-push --show-diff-on-failure --color always
 
-  # Short fuzzing regression over the untrusted-YAML contract. lab.yaml and
-  # meta.yml come from lab-provider repositories, so they are this engine's
-  # main untrusted input; discovery/scanner.py only rattrape (KeyError,
-  # ValueError, YAMLError), and anything else crashes the CLI on an unrelated
-  # command. These harnesses assert that contract.
+  # Short fuzzing regression over every input the engine does NOT produce
+  # itself. Each one is untrusted for a different reason, and the reason is what
+  # decides the contract each harness asserts:
+  #
+  #   lab.yaml, meta.yml       written by a lab-provider repository.
+  #                            discovery/scanner.py only catches KeyError,
+  #                            ValueError and YAMLError; anything else crashes
+  #                            the CLI on an unrelated command.
+  #   .dsoxlab-context.json    written by `use`, but living on the learner's
+  #                            disk: hand-edited, truncated by a laptop closed
+  #                            mid-write, left over by an older version.
+  #                            read_context must NEVER raise, so that harness
+  #                            has no contract exception at all.
+  #   terraform outputs        produced by an external binary whose version,
+  #                            providers and output schema all move without
+  #                            dsoxlab knowing. The harness targets what
+  #                            build_inventory does with the decoded document,
+  #                            not the json.loads that precedes it.
   #
   # This is a regression gate, not a fuzzing campaign: a short seeded run keeps
   # the harnesses alive and catches the obvious breakages. Deep runs are done
   # locally with a persistent corpus.
   fuzz:
-    name: Fuzz the untrusted-YAML contract (short run)
+    name: Fuzz every untrusted input (short run)
     needs: [zizmor, actionlint, poutine]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -470,6 +483,23 @@ jobs:
           uv run --group fuzz python fuzz/fuzz_meta_yaml.py \
             "${RUNNER_TEMP}/fuzz-meta" fuzz/corpus/meta_yml/ \
             -dict=fuzz/dict/yaml_contract.dict \
+            -atheris_runs=20000 -max_len=4096
+
+      # Pas de -dict ici : yaml_contract.dict porte des mots-clés du contrat
+      # YAML, sans rapport avec un document JSON. Un dictionnaire hors sujet
+      # coûte du budget sans guider la mutation.
+      - name: Fuzz the local session context
+        run: |
+          mkdir -p "${RUNNER_TEMP}/fuzz-context"
+          uv run --group fuzz python fuzz/fuzz_context_json.py \
+            "${RUNNER_TEMP}/fuzz-context" fuzz/corpus/context_json/ \
+            -atheris_runs=20000 -max_len=4096
+
+      - name: Fuzz the Terraform outputs the inventory is built from
+        run: |
+          mkdir -p "${RUNNER_TEMP}/fuzz-tfout"
+          uv run --group fuzz python fuzz/fuzz_terraform_outputs.py \
+            "${RUNNER_TEMP}/fuzz-tfout" fuzz/corpus/terraform_outputs/ \
             -atheris_runs=20000 -max_len=4096
 
       # A crash writes a `crash-*` reproducer next to the harness. Keep it: it

@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.64] - 2026-08-24
+
+### Fixed
+
+- **A malformed Terraform output crashed the inventory build.**
+  `{"hosts": {"value": "10.99.0.11"}}` was enough: the code took the value for a
+  mapping and called `.items()` on it, producing an `AttributeError` at the very
+  moment someone runs a lab, and never saying that the cause was a stale
+  Terraform state. That document is thirty-four bytes and nobody had written it
+  by hand: the new fuzz harness found it in under thirty thousand runs.
+
+### Added
+
+- **Fuzzing now covers every input the engine does not produce itself.** Two
+  harnesses join the two existing ones, and each asserts a different contract,
+  because each input is untrusted for a different reason:
+
+  - **`.dsoxlab-context.json`** lives on the learner's disk: hand-edited out of
+    curiosity, truncated by a laptop closed mid-write, left behind by an older
+    version. Its harness has **no contract exception at all**, and that is the
+    whole point: `read_context` promises to return an empty context rather than
+    raise, because losing the context costs one `dsoxlab use` where an exception
+    costs the entire CLI.
+  - **Terraform outputs** come from an external binary whose version, providers
+    and output schema all move without dsoxlab knowing. The harness targets what
+    `build_inventory` **does** with the document, not the `json.loads` before it:
+    that one is already guarded, and fuzzing it would only measure the standard
+    library.
+
+  The CI job's header comment now lists the covered inputs and says, for each,
+  why it is considered untrusted.
+
 ## [0.1.63] - 2026-08-24
 
 - **The documentation described a product that does not exist.** Three claims

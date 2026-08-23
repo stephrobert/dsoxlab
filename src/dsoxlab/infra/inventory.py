@@ -85,9 +85,16 @@ def build_inventory(
         # ou directement {"fqdn1": "ip1"} selon que c'est `terraform output -json`.
         raw = terraform_outputs.get("hosts")
         if isinstance(raw, dict):
-            tf_hosts = {
-                k: str(v) for k, v in (raw.get("value", raw)).items()
-            }
+            # `raw.get("value", raw)` peut rendre autre chose qu'un mapping :
+            # un output d'une autre version de Terraform, un provider qui a
+            # renommé sa sortie, un state édité à la main. `.items()` levait
+            # alors un AttributeError, c'est-à-dire un traceback au moment de
+            # jouer un lab, sans dire que la cause est un state périmé.
+            # Trouvé par fuzz/fuzz_terraform_outputs.py sur
+            # `{"hosts": {"value": "10.99.0.11"}}`.
+            valeurs = raw.get("value", raw)
+            if isinstance(valeurs, dict):
+                tf_hosts = {k: str(v) for k, v in valeurs.items()}
 
     # Bastion : extrait via bastion_info() pour bénéficier de la
     # priorité meta.yml > output Terraform sur le user (cf.
