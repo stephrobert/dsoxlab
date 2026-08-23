@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.61] - 2026-08-24
+
+### Ajouté
+
+- **Les schémas publiés sont désormais éprouvés sur des documents, pas seulement
+  sur des noms de clés.** Le contrôle existant compare, par analyse syntaxique
+  de `models/`, les clés que le parseur lit aux `properties` du schéma : il
+  attrape une clé oubliée ou inventée, et rien de ce qui se trouve à
+  l'intérieur. Un `type` faux, un `enum` incomplet, un `pattern` trop lâche ou
+  une borne à côté passaient donc sans un mot. Ces défauts-là ne dérangent
+  jamais dsoxlab, qui ne lit pas ses propres schémas : ils dérangent l'auteur de
+  catalogue, dans son éditeur et dans sa CI. Un schéma faux fait autorité à
+  tort, ce qui est la position la moins confortable possible.
+
+  Le contrôle va maintenant dans les deux sens. Le catalogue de démonstration
+  packagé, celui que `dsoxlab demo` dépose, est validé fichier par fichier ; et
+  seize documents fautifs, **une faute chacun**, doivent être refusés, à
+  l'endroit exact de la faute. Chaque cas part du document valide, ce qui rend
+  la preuve solide : si la base passe et que la variante échoue, c'est bien la
+  faute qui a été refusée, et pas autre chose.
+
+### Interne
+
+- `jsonschema` entre en dépendance de **développement**, jamais de runtime : le
+  moteur a son propre parseur et n'a pas à valider par le schéma à l'exécution.
+
 ## [0.1.60] - 2026-08-24
 
 ### Corrigé
