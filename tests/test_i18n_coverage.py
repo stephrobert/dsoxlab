@@ -60,19 +60,29 @@ au formatage paresseux (``logger.info("x %s", v)``) que la famille de règles
 doit être *cohérent* — il mélange aujourd'hui le français et l'anglais, ce qui
 est un vrai défaut — mais cohérent n'est pas traduit, et c'est un autre lot.
 
-**``models/`` est hors périmètre, sciemment.** Le bon patron y est déjà écrit :
-``UnsupportedSchemaVersion`` et ``ProviderUnresolved`` portent des **données**
-(``source``, ``found``, ``supported``, ``candidates``) et laissent la CLI
-composer la phrase traduite. Les coercions du contrat (``models/_contract.py``,
-``models/lab.py``, ``models/repo.py``, ``models/schema_version.py``) portent
-encore la dette inverse : 24 ``ValueError`` dont le texte français est rendu tel
-quel par ``error(str(exc))``. Les passer par ``_()`` serait traduire dans le
-modèle, c'est-à-dire graver le mauvais patron ; les convertir en exceptions
-porteuses de données est le bon geste, mais c'est une refonte du contrat, pas un
-correctif d'i18n. La dette est nommée ici plutôt que masquée par un test qui
-l'ignore en silence. Même raison pour ``validators/content.py`` et
-``validators/metadata.py``, dont les messages vivent dans des champs de
-dataclasses qu'aucun puits ci-dessus ne voit.
+**``models/`` est dans le périmètre depuis #139**, et la dette qui l'en tenait
+dehors est soldée. Les 24 ``ValueError`` du contrat ont été triées sur une seule
+question : *ce message atteint-il un humain qui lit l'interface ?*
+
+* **oui pour un ``meta.yml``** : ``discovery/repo.py`` laisse remonter l'erreur
+  et ``cli.py`` l'affiche. Ces raises lèvent une ``ContractError``, qui porte
+  ``source``, ``field``, une **clé i18n** et ses paramètres, comme
+  ``UnsupportedSchemaVersion`` et ``ProviderUnresolved`` le faisaient déjà. La
+  phrase se compose dans la CLI ; le modèle reste agnostique de la langue ;
+* **non pour un ``lab.yaml``** : ``discovery/scanner.py`` est son seul lecteur,
+  il écarte le lab et journalise la raison. Ces raises lèvent une
+  ``LabYamlError``, dont le texte reste technique, car traduire ce qui ne
+  s'affiche jamais serait du travail perdu et du bruit dans les tables. Le
+  garde-fou la connaît par son nom (voir :data:`JOURNAL_SEULEMENT`), et c'est ce
+  qui rend le tri **vérifiable** : le jour où l'un de ces messages doit
+  s'afficher, il change de classe et le garde-fou réclame sa clé.
+
+**Les validators sont surveillés par un cinquième puits.** Leurs messages ne
+passaient par aucun des quatre autres : ils vivaient dans un champ ``message``
+de dataclasse, que ``validate-structure`` affichait tel quel. Ils portent
+désormais une clé, et toute phrase écrite en dur dans la construction d'une
+``ContentIssue`` / ``MetadataIssue`` / ``StructureIssue`` / ``ContractIssue``
+est signalée ici.
 
 **``templates/demo/`` est du contenu pédagogique**, pas le code de l'outil : le
 lab de démonstration packagé s'adresse à l'apprenant dans le fichier même qu'il
@@ -94,7 +104,10 @@ _RACINE = Path(dsoxlab.__file__).parent
 #: Répertoires écartés du garde-fou, avec la raison — voir le docstring.
 #: Toute entrée ajoutée ici doit y être justifiée : c'est une porte qu'on
 #: choisit de ne pas surveiller, pas un détail de configuration.
-_HORS_PERIMETRE = ("models/", "templates/demo/")
+#:
+#: ``models/`` en est sorti en 0.1.59 : ses erreurs d'interface portent
+#: désormais une clé, et celles qui n'en sont pas se nomment.
+_HORS_PERIMETRE = ("templates/demo/",)
 
 
 def _sources() -> list[Path]:
@@ -117,6 +130,18 @@ SORTIE_FUNCS = {"print", "echo", "secho"}
 #: `typer.Exit` et `SystemExit` portent un code de sortie, jamais un message :
 #: les inclure ferait crier le garde-fou sur chaque sortie propre de la CLI.
 CONTROLE_DE_FLUX = {"Exit", "SystemExit"}
+
+#: Les exceptions dont le texte ne va **qu'au journal**. `LabYamlError` est
+#: levée par la lecture d'un `lab.yaml`, dont `discovery/scanner.py` est le seul
+#: appelant : il écarte le lab et journalise la raison, que rien n'affiche.
+#: Cette liste est le pendant vérifiable du tri de #139 : une classe y entre
+#: seulement si aucun chemin de code ne rend son message à l'écran.
+JOURNAL_SEULEMENT = {"LabYamlError"}
+
+#: Les anomalies que `validate-structure` affiche. Elles portent une clé i18n
+#: et des paramètres ; une phrase écrite en dur dans leur construction
+#: s'afficherait dans une seule langue, ce qui est précisément le défaut de #139.
+ISSUE_CLASSES = {"ContentIssue", "MetadataIssue", "StructureIssue", "ContractIssue"}
 
 #: Balises Rich (`[bold]`, `[/green]`…) : de la mise en forme, pas du texte.
 _RICH_TAG = re.compile(r"\[/?[a-z0-9 #]+\]", re.IGNORECASE)
@@ -224,7 +249,7 @@ def _coupables(module: str, tree: ast.Module) -> list[str]:
         # ── Puits 3 : le texte d'une exception, rendu par `error(str(exc))` ───
         if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
             nom = _nom_appele(node.exc.func)
-            if nom not in CONTROLE_DE_FLUX:
+            if nom not in CONTROLE_DE_FLUX and nom not in JOURNAL_SEULEMENT:
                 arguments = list(node.exc.args) + [kw.value for kw in node.exc.keywords]
                 for argument in arguments:
                     if not _is_i18n_call(argument):
@@ -239,6 +264,16 @@ def _coupables(module: str, tree: ast.Module) -> list[str]:
             and not _is_i18n_call(node.args[0])
         ):
             _retenir(node.args[0], f".{node.func.attr}()")
+
+        # ── Puits 5 : les anomalies que `validate-structure` affiche ──────────
+        if isinstance(node, ast.Call) and _nom_appele(node.func) in ISSUE_CLASSES:
+            for argument in list(node.args) + [kw.value for kw in node.keywords]:
+                _retenir(argument, _nom_appele(node.func))
+                # Le message d'un validator vit souvent dans `params={...}` :
+                # une phrase glissée en valeur s'afficherait telle quelle.
+                if isinstance(argument, ast.Dict):
+                    for valeur in argument.values:
+                        _retenir(valeur, _nom_appele(node.func))
 
     return trouves
 
@@ -339,6 +374,35 @@ def test_il_ignore_les_sorties_de_controle_de_flux() -> None:
     """`typer.Exit(1)` n'est pas un message, et n'a pas à être traduit."""
     assert not _analyse('raise typer.Exit(1)')
     assert not _analyse('raise SystemExit(1)')
+
+
+def test_il_mord_sur_une_anomalie_de_validator() -> None:
+    """Le défaut de #139 : une phrase française dans un champ de dataclasse."""
+    assert _analyse('StructureIssue(path=p, message="Fichier manquant : lab.yaml")')
+    assert _analyse('MetadataIssue("doc_url", "URL invalide, schéma attendu")')
+    assert _analyse('ContentIssue(path=f, params={"x": "solution en clair, chiffre-la"})')
+    assert not _analyse('StructureIssue(path=p, key="struct_missing_file")')
+    assert not _analyse(
+        'ContentIssue(path=f, key="content_broken_links", params={"links": cibles})'
+    )
+
+
+def test_une_erreur_de_contrat_affichee_doit_porter_sa_cle() -> None:
+    """`models/` est dans le périmètre : une phrase levée là s'afficherait."""
+    assert _analyse('raise ContractError(source, "infra", "reçu un mapping vide")')
+    assert not _analyse(
+        'raise ContractError(source, "infra.hosts", "contract_field_not_mapping_list")'
+    )
+
+
+def test_une_erreur_qui_ne_va_qu_au_journal_reste_libre() -> None:
+    """Le pendant du tri : ce que personne n'affiche n'a pas à être traduit.
+
+    Le jour où l'un de ces messages doit s'afficher, il change de classe pour
+    `ContractError`, et le test ci-dessus le réclame.
+    """
+    assert not _analyse('raise LabYamlError(f"{p}: runtime.targets[0] doit contenir un name")')
+    assert _analyse('raise ValueError(f"{p}: runtime.targets[0] doit contenir un name")')
 
 
 def test_le_journal_reste_hors_du_perimetre() -> None:

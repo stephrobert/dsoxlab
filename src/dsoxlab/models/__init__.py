@@ -1,5 +1,6 @@
 """Package models."""
 
+from ._contract import ContractError, LabYamlError
 from .course import CourseManifest, CourseSection
 from .lab import LabDefinition, ValidationConfig
 from .repo import (
@@ -20,11 +21,13 @@ from .schema_version import (
 __all__ = [
     "DEFAULT_SCHEMA_VERSION",
     "SUPPORTED_SCHEMA_VERSION",
+    "ContractError",
     "CourseManifest",
     "CourseSection",
     "HostDefinition",
     "InfraDefinition",
     "LabDefinition",
+    "LabYamlError",
     "ProviderUnresolved",
     "RepoMetadata",
     "RuntimeConfig",

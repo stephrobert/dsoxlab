@@ -17,6 +17,9 @@ vivent ici pour que tout dépôt en bénéficie sans les recopier.
 
 Rien ici n'est spécifique à un domaine : on ne lit que le contrat déclaratif et
 l'arborescence.
+
+Et rien n'y compose de phrase : chaque anomalie porte une clé i18n et ses
+paramètres, que ``validate-structure`` rend dans la langue de l'auteur.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from ..models.lab import LabDefinition
@@ -52,8 +56,19 @@ _ENTETES = {"User-Agent": "dsoxlab-doc-url-check/1.0"}
 
 @dataclass
 class ContentIssue:
+    """Une anomalie de contenu, prête à être traduite.
+
+    Même patron que :class:`~dsoxlab.validators.contract.ContractIssue` : une
+    **clé** et des paramètres, jamais une phrase. La sortie de
+    ``validate-structure`` est de l'interface, donc elle suit ``DSOXLAB_LANG``.
+    """
+
     path: Path
-    message: str
+    key: str
+    """Clé i18n du message, présente dans ``strings/en.py`` ET ``strings/fr.py``."""
+
+    params: dict[str, Any] = field(default_factory=dict)
+    """Paramètres de substitution du message."""
 
 
 @dataclass
@@ -91,10 +106,8 @@ def validate_internal_links(lab: LabDefinition) -> ContentReport:
         if casses:
             report.issues.append(ContentIssue(
                 path=fichier,
-                message=(
-                    f"{len(casses)} lien(s) relatif(s) mort(s) : "
-                    + ", ".join(casses)
-                ),
+                key="content_broken_links",
+                params={"count": len(casses), "links": ", ".join(casses)},
             ))
     return report
 
@@ -118,33 +131,45 @@ def validate_solutions_encrypted(
             with fichier.open("r", encoding="utf-8", errors="ignore") as flux:
                 premiere = flux.readline()
         except OSError as exc:
-            report.issues.append(ContentIssue(fichier, f"illisible : {exc}"))
+            report.issues.append(ContentIssue(
+                path=fichier,
+                key="content_solution_unreadable",
+                params={"error": exc},
+            ))
             continue
         if not premiere.startswith(_ENTETE_VAULT):
             report.issues.append(ContentIssue(
-                path=fichier,
-                message=(
-                    "solution en clair : chiffre-la avec "
-                    "« ansible-vault encrypt », sinon git la garde pour "
-                    "toujours et le lab est gâché"
-                ),
+                path=fichier, key="content_solution_plaintext"
             ))
     return report
 
 
-def check_doc_url(lab: LabDefinition, *, timeout: float = _TIMEOUT_HTTP) -> str | None:
-    """Vérifie que le `doc_url` du lab répond. Rend le motif d'échec, ou None.
+def check_doc_url(
+    lab: LabDefinition, *, timeout: float = _TIMEOUT_HTTP
+) -> ContentIssue | None:
+    """Vérifie que le `doc_url` du lab répond. Rend l'anomalie, ou None.
 
     Séparé des autres contrôles parce qu'il sort sur le réseau : il n'a rien à
     faire dans une validation par défaut, qui doit rester rapide et jouable
     hors ligne.
+
+    Rend une :class:`ContentIssue` plutôt qu'un motif rédigé : le motif était
+    la dernière phrase française que ce module composait lui-même, et elle
+    s'affichait telle quelle sous ``DSOXLAB_LANG=en``.
     """
     url = lab.doc_url
     if not url:
         return None
+    chemin = lab.path / "lab.yaml"
     schema = urlparse(url).scheme
+    if not schema:
+        # Deux clés plutôt qu'un « (aucun) » glissé dans le paramètre : ce
+        # mot-là serait la seule chose non traduite de la phrase.
+        return ContentIssue(path=chemin, key="content_doc_url_no_scheme")
     if schema not in ("http", "https"):
-        return f"schéma inattendu : {schema or '(aucun)'}"
+        return ContentIssue(
+            path=chemin, key="content_doc_url_scheme", params={"scheme": schema}
+        )
     requete = urllib.request.Request(  # noqa: S310 - schéma vérifié
         url, method="HEAD", headers=_ENTETES
     )
@@ -160,12 +185,26 @@ def check_doc_url(lab: LabDefinition, *, timeout: float = _TIMEOUT_HTTP) -> str 
                 with urllib.request.urlopen(repli, timeout=timeout) as reponse:  # noqa: S310
                     code = reponse.status
             except (urllib.error.URLError, OSError) as exc2:
-                return f"injoignable : {exc2}"
+                return ContentIssue(
+                    path=chemin,
+                    key="content_doc_url_unreachable",
+                    params={"error": exc2},
+                )
         else:
-            return f"HTTP {exc.code}"
+            return ContentIssue(
+                path=chemin,
+                key="content_doc_url_status",
+                params={"code": exc.code},
+            )
     except (urllib.error.URLError, OSError) as exc:
-        return f"injoignable : {exc}"
-    return None if 200 <= code < 400 else f"HTTP {code}"
+        return ContentIssue(
+            path=chemin, key="content_doc_url_unreachable", params={"error": exc}
+        )
+    if 200 <= code < 400:
+        return None
+    return ContentIssue(
+        path=chemin, key="content_doc_url_status", params={"code": code}
+    )
 
 
 #: `### Tâche 3 — … (20 pts)` : un titre de tâche qui annonce ses points.
@@ -221,11 +260,8 @@ def validate_scoring(lab: LabDefinition) -> ContentReport:
     if nb_tests and nb_tests != len(points):
         report.issues.append(ContentIssue(
             path=enonce,
-            message=(
-                f"{len(points)} tâche(s) notée(s) pour {nb_tests} test(s) : "
-                "le score se calcule par test, donc le barème affiché ne "
-                "correspond pas à la note obtenue"
-            ),
+            key="content_scoring_tasks_vs_tests",
+            params={"tasks": len(points), "tests": nb_tests},
         ))
 
     annonce = _FORMAT_ANNONCE.search(texte)
@@ -234,18 +270,14 @@ def validate_scoring(lab: LabDefinition) -> ContentReport:
         if sum(points) != total_annonce:
             report.issues.append(ContentIssue(
                 path=enonce,
-                message=(
-                    f"les tâches totalisent {sum(points)} points, "
-                    f"l'en-tête en annonce {total_annonce}"
-                ),
+                key="content_scoring_points_mismatch",
+                params={"total": sum(points), "announced": total_annonce},
             ))
         if len(points) != nb_annonce:
             report.issues.append(ContentIssue(
                 path=enonce,
-                message=(
-                    f"{len(points)} tâche(s) notée(s), "
-                    f"l'en-tête en annonce {nb_annonce}"
-                ),
+                key="content_scoring_count_mismatch",
+                params={"count": len(points), "announced": nb_annonce},
             ))
     return report
 
@@ -264,7 +296,8 @@ def validate_language_parity(lab: LabDefinition) -> ContentReport:
         if not anglais.is_file():
             report.issues.append(ContentIssue(
                 path=francais,
-                message=f"pas d'équivalent anglais ({anglais.name})",
+                key="content_missing_english",
+                params={"name": anglais.name},
             ))
     return report
 
@@ -283,18 +316,14 @@ def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
         if cible.host and cible.host not in host_names:
             report.issues.append(ContentIssue(
                 path=lab.path / "lab.yaml",
-                message=(
-                    f"target « {cible.name} » vise l'hôte « {cible.host} », "
-                    "absent de infra.hosts du meta.yml"
-                ),
+                key="content_target_host_unknown",
+                params={"target": cible.name, "host": cible.host},
             ))
         for role, hote in (cible.roles or {}).items():
             if hote not in host_names:
                 report.issues.append(ContentIssue(
                     path=lab.path / "lab.yaml",
-                    message=(
-                        f"le rôle « {role} » vise « {hote} », "
-                        "absent de infra.hosts du meta.yml"
-                    ),
+                    key="content_role_host_unknown",
+                    params={"role": role, "host": hote},
                 ))
     return report

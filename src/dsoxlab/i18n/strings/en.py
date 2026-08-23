@@ -558,6 +558,93 @@ silent.
         "Checking doc_url for {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Metadata issues:[/bold red]",
 
+    # ── validate-structure: what each validator found ────────────────────────
+    # Les validators ne composent aucune phrase : ils portent une clé et ses
+    # paramètres, et le texte se dit ici, dans la langue de l'auteur.
+    "struct_missing_file": "Missing file: {name}",
+    "struct_missing_dir":  "Missing directory: {name}/",
+    "struct_vm_targets_empty":
+        "runtime.type is 'vm' but runtime.targets[] is empty. Declare at least "
+        "one target, with its name and its host.",
+    "struct_default_unknown":
+        "runtime.default='{default}' matches no runtime.targets[].name. "
+        "Available: {available}",
+    "struct_session_unknown":
+        "runtime.session='{session}' is unknown. Accepted values: 'target' (SSH "
+        "session on targets[].host, the default) or 'local' (sub-shell on the "
+        "learner's machine, for a lab driven from the repository).",
+    "struct_shell_workdir_empty":
+        "runtime.type is 'shell' but runtime.workdir is empty. Declare the work "
+        "directory (e.g. workdir: challenge/work).",
+    "struct_forbidden_cleanup_sh_vm":
+        "cleanup.sh is not allowed for runtime: vm. Use cleanup.yaml.",
+    "struct_forbidden_cleanup_sh_shell":
+        "cleanup.sh is not allowed for runtime: shell. Declare fixtures in lab.yaml.",
+    "struct_forbidden_kvm_sh":
+        "runtime/kvm.sh is not allowed. Use setup.yaml.",
+    "struct_forbidden_incus_sh":
+        "runtime/incus.sh is not allowed. Use setup.yaml.",
+    "struct_forbidden_shell_sh":
+        "runtime/shell.sh is not allowed. Preparation is declared through "
+        "runtime.workdir and runtime.fixtures.",
+    "struct_forbidden_makefile":
+        "A Makefile is not allowed in a lab: dsoxlab drives everything.",
+
+    "metadata_field_empty": "the '{field}' field is empty",
+    "metadata_list_empty":  "the '{field}' list is empty",
+    "metadata_doc_url_scheme": "invalid URL (http/https scheme expected): {url}",
+    "metadata_lab_type_invalid":
+        "Invalid value '{value}'. Expected one of: {expected}",
+    "metadata_exam_score_invalid":
+        "Invalid value '{value}'. Expected a percentage of the lab scale, "
+        "between 1 and 100 (omit the field for a lab that is not an exam).",
+
+    "content_broken_links": "{count} dead relative link(s): {links}",
+    "content_solution_unreadable": "unreadable: {error}",
+    "content_solution_plaintext":
+        "solution in plain text: encrypt it with 'ansible-vault encrypt', "
+        "otherwise git keeps it forever and the lab is spoiled",
+    "content_scoring_tasks_vs_tests":
+        "{tasks} scored task(s) for {tests} test(s): the score is computed per "
+        "test, so the scale on display is not the mark that comes out",
+    "content_scoring_points_mismatch":
+        "the tasks add up to {total} points, the header announces {announced}",
+    "content_scoring_count_mismatch":
+        "{count} scored task(s), the header announces {announced}",
+    "content_missing_english": "no English counterpart ({name})",
+    "content_target_host_unknown":
+        "target '{target}' aims at host '{host}', missing from infra.hosts in meta.yml",
+    "content_role_host_unknown":
+        "role '{role}' aims at '{host}', missing from infra.hosts in meta.yml",
+    "content_doc_url_no_scheme": "no URL scheme",
+    "content_doc_url_scheme": "unexpected scheme: {scheme}",
+    "content_doc_url_unreachable": "unreachable: {error}",
+    "content_doc_url_status": "HTTP {code}",
+
+    # ── contract fields the engine cannot read (models/) ─────────────────────
+    # Levées par la lecture d'un meta.yml, qui s'affiche. La CLI encadre ces
+    # phrases du chemin du fichier ; elles n'ont donc pas à le porter.
+    "contract_field_not_int":
+        "'{field}' must be an integer (got: {got}).",
+    "contract_field_not_list":
+        "'{field}' must be a list (got: {got}).",
+    "contract_field_not_mapping":
+        "'{field}' must be a mapping (got: {got}).",
+    "contract_field_not_mapping_list":
+        "'{field}' must be a list of mappings (got: {got}).",
+    "contract_root_not_mapping":
+        "the document must be a YAML mapping (got: {got}).",
+    "contract_repo_required":
+        "'repo.id' and 'repo.category' are required (dsoxlab contract).",
+    "contract_provider_empty_list":
+        "'infra.provider' is an empty list. Declare at least one provider "
+        "(e.g. 'kvm').",
+    "contract_provider_bad_type":
+        "'infra.provider' must be a string or a list of strings, not {got}.",
+    "contract_provider_not_declared":
+        "DSOXLAB_PROVIDER='{provider}' is not among the providers this meta.yml "
+        "declares: {candidates}",
+
     # ── contract version (schema_version) ─────────────────────────────────────
     "contract_issues_header": "\n[bold red]Contract version:[/bold red]",
     "schema_version_invalid":

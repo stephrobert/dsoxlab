@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from ._contract import (
+    LabYamlError,
     as_argv,
     as_argv_list,
     as_int,
@@ -91,6 +92,13 @@ class LabDefinition:
         If ``lang`` != "en" and a ``lab.<lang>.yaml`` file exists in the same
         directory, translatable fields (title, description) are overridden by
         that file.
+
+        Raises:
+            LabYamlError: le fichier sort du contrat. Le message n'est
+                **jamais affiché** : ``discovery/scanner.py`` est le seul
+                appelant, il écarte le lab et journalise la raison. Il reste
+                donc technique et non traduit, à la différence de ce que lève
+                la lecture d'un ``meta.yml``. Voir :class:`._contract.LabYamlError`.
         """
         with lab_yaml.open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
@@ -101,7 +109,7 @@ class LabDefinition:
         # ValueError, YAMLError) que discovery/scanner.py rattrape : le lab
         # ferait planter la CLI au lieu d'être ignoré avec un warning.
         if not isinstance(data, dict):
-            raise ValueError(
+            raise LabYamlError(
                 f"{lab_yaml}: le document doit être un mapping YAML "
                 f"(reçu : {type(data).__name__})."
             )
@@ -135,7 +143,7 @@ class LabDefinition:
         targets: list[Target] = []
         for idx, t in enumerate(targets_raw):
             if "name" not in t or "host" not in t:
-                raise ValueError(
+                raise LabYamlError(
                     f"{lab_yaml}: runtime.targets[{idx}] doit contenir "
                     f"'name' et 'host'."
                 )
@@ -154,7 +162,7 @@ class LabDefinition:
         services: list[Service] = []
         for idx, s in enumerate(services_raw):
             if "name" not in s or "image" not in s:
-                raise ValueError(
+                raise LabYamlError(
                     f"{lab_yaml}: runtime.services[{idx}] doit contenir "
                     f"'name' et 'image'."
                 )

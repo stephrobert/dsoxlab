@@ -274,7 +274,7 @@ def print_structure_reports(reports: list[StructureReport]) -> None:
         else:
             branch = tree.add(f"[red]✘[/red] {report.lab_id}")
             for issue in report.issues:
-                branch.add(f"[red]{issue.message}[/red]")
+                branch.add(f"[red]{_(issue.key, **issue.params)}[/red]")
     console.print(tree)
 
 

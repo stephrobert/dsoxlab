@@ -13,6 +13,24 @@ Ces helpers ramènent donc chaque champ mal typé dans le contrat. Ils sont
 partagés par ``models/lab.py`` et ``models/repo.py`` : mêmes pièges, mêmes
 garde-fous, une seule implémentation. Les cas couverts ont été trouvés par les
 harnais de ``fuzz/``.
+
+Deux classes d'erreur, et un seul critère pour choisir
+=====================================================
+
+La question n'est pas de quel fichier vient le champ, mais **qui lit le
+message** :
+
+- un champ de ``meta.yml`` remonte jusqu'à ``cli.py``, qui l'affiche. Ces
+  erreurs sont des :class:`ContractError` : elles portent une clé i18n et ses
+  paramètres, et la CLI compose la phrase traduite ;
+- un champ de ``lab.yaml`` est rattrapé par ``discovery/scanner.py``, qui
+  écarte le lab et journalise la raison. Rien ne l'affiche : ce sont des
+  :class:`LabYamlError`, dont le texte reste technique.
+
+Les coercions partagées (:func:`as_int`, :func:`as_str_list`,
+:func:`as_mapping`, :func:`as_mapping_list`) servent les deux fichiers, donc
+elles lèvent la première. :func:`as_argv` et :func:`as_argv_list` ne servent
+qu'à ``runtime.services`` d'un ``lab.yaml``, donc la seconde.
 """
 
 from __future__ import annotations
@@ -20,6 +38,52 @@ from __future__ import annotations
 import shlex
 from pathlib import Path
 from typing import Any
+
+
+class ContractError(ValueError):
+    """Un champ du contrat mal typé, dont le message **atteint l'utilisateur**.
+
+    Même patron que :class:`~dsoxlab.models.schema_version.UnsupportedSchemaVersion`
+    et :class:`~dsoxlab.models.repo.ProviderUnresolved` : l'exception porte des
+    **données** (``source``, ``field``, ``key``, ``params``) et jamais une
+    phrase. La CLI compose le message traduit ; traduire ici mettrait de la
+    langue dans le modèle, c'est-à-dire graver le mauvais patron.
+
+    Le chemin qui l'affiche : ``meta.yml`` → ``discovery/repo.py``, qui laisse
+    remonter → ``cli.py: _read_repo()``, qui rend ``_(exc.key, **exc.params)``.
+
+    Le ``str()``, lui, reste en jetons techniques : c'est ce que voit le
+    journal, et deux rapports de bug doivent rester comparables quelle que soit
+    la locale de qui les produit.
+    """
+
+    def __init__(self, source: Path, field: str, key: str, **params: Any) -> None:
+        self.source = source
+        self.field = field
+        self.key = key
+        #: ``field`` en fait partie : les messages le nomment presque tous, et
+        #: ``str.format`` ignore sans broncher un paramètre qu'un texte n'emploie pas.
+        self.params: dict[str, Any] = {"field": field, **params}
+        detail = " ".join(f"{nom}={valeur!r}" for nom, valeur in params.items())
+        super().__init__(f"{source}: {field}: {key} {detail}".rstrip())
+
+
+class LabYamlError(ValueError):
+    """Un ``lab.yaml`` illisible. Ce message **ne s'affiche jamais**.
+
+    ``discovery/scanner.py`` est le seul appelant de
+    ``LabDefinition.from_yaml`` : il rattrape ``(KeyError, ValueError,
+    yaml.YAMLError)``, écarte le lab, et range la raison au journal et dans
+    ``CatalogScan.illisibles``. Ni l'un ni l'autre n'est de l'interface, d'où
+    un texte technique laissé tel quel : le traduire serait du travail perdu et
+    du bruit dans les fichiers de traduction.
+
+    La classe existe pour que ce fait soit **vérifiable** plutôt que promis. Le
+    garde-fou i18n (``tests/test_i18n_coverage.py``) la connaît par son nom et
+    laisse passer les phrases qu'elle porte. Le jour où l'un de ces messages
+    devra s'afficher, il changera de classe pour :class:`ContractError`, et le
+    garde-fou réclamera sa clé.
+    """
 
 
 def as_int(value: object, default: int, field_name: str, source: Path) -> int:
@@ -35,20 +99,18 @@ def as_int(value: object, default: int, field_name: str, source: Path) -> int:
     if value is None:
         return default
     if isinstance(value, bool):
-        raise ValueError(
-            f"{source}: '{field_name}' doit être un entier (reçu un booléen : {value!r})."
-        )
+        raise ContractError(source, field_name, "contract_field_not_int", got=repr(value))
     if isinstance(value, (int, float)):
         return int(value)
     if isinstance(value, str):
         try:
             return int(value.strip())
         except ValueError:
-            raise ValueError(
-                f"{source}: '{field_name}' doit être un entier (reçu : {value!r})."
+            raise ContractError(
+                source, field_name, "contract_field_not_int", got=repr(value)
             ) from None
-    raise ValueError(
-        f"{source}: '{field_name}' doit être un entier (reçu : {type(value).__name__})."
+    raise ContractError(
+        source, field_name, "contract_field_not_int", got=type(value).__name__
     )
 
 
@@ -61,9 +123,8 @@ def as_str_list(value: object, field_name: str, source: Path) -> list[str]:
     if value is None:
         return []
     if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
-        raise ValueError(
-            f"{source}: '{field_name}' doit être une liste "
-            f"(reçu : {type(value).__name__})."
+        raise ContractError(
+            source, field_name, "contract_field_not_list", got=type(value).__name__
         )
     return [str(item) for item in value]
 
@@ -77,9 +138,8 @@ def as_mapping(value: object, field_name: str, source: Path, *, default_empty: b
     if value is None and default_empty:
         return {}
     if not isinstance(value, dict):
-        raise ValueError(
-            f"{source}: '{field_name}' doit être un mapping "
-            f"(reçu : {type(value).__name__})."
+        raise ContractError(
+            source, field_name, "contract_field_not_mapping", got=type(value).__name__
         )
     return value
 
@@ -110,11 +170,14 @@ def as_argv_list(value: object, field_name: str, source: Path) -> list[list[str]
     redirection, ni expansion. Une chaîne vide (ou qui ne contient que des
     espaces) est refusée plutôt qu'ignorée : ``docker exec`` sans commande
     échouerait plus loin, avec un message qui ne désignerait pas le lab fautif.
+
+    ``runtime.services`` n'existe que dans un ``lab.yaml`` : ces messages ne
+    vont qu'au journal, d'où :class:`LabYamlError` et un texte non traduit.
     """
     if value is None:
         return []
     if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
-        raise ValueError(
+        raise LabYamlError(
             f"{source}: '{field_name}' doit être une liste de commandes "
             f"(reçu : {type(value).__name__})."
         )
@@ -124,19 +187,19 @@ def as_argv_list(value: object, field_name: str, source: Path) -> list[list[str]
             try:
                 argv = shlex.split(item)
             except ValueError as exc:  # guillemet non fermé
-                raise ValueError(
+                raise LabYamlError(
                     f"{source}: '{field_name}[{idx}]' n'est pas une commande "
                     f"analysable ({exc})."
                 ) from None
         elif isinstance(item, (list, tuple)):
             argv = [str(mot) for mot in item]
         else:
-            raise ValueError(
+            raise LabYamlError(
                 f"{source}: '{field_name}[{idx}]' doit être une chaîne ou une "
                 f"liste d'arguments (reçu : {type(item).__name__})."
             )
         if not argv:
-            raise ValueError(
+            raise LabYamlError(
                 f"{source}: '{field_name}[{idx}]' est une commande vide."
             )
         commandes.append(argv)
@@ -152,16 +215,18 @@ def as_mapping_list(value: object, field_name: str, source: Path) -> list[dict[s
     if value is None:
         return []
     if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
-        raise ValueError(
-            f"{source}: '{field_name}' doit être une liste de mappings "
-            f"(reçu : {type(value).__name__})."
+        raise ContractError(
+            source, field_name, "contract_field_not_mapping_list",
+            got=type(value).__name__,
         )
     items: list[dict[str, Any]] = []
     for idx, item in enumerate(value):
         if not isinstance(item, dict):
-            raise ValueError(
-                f"{source}: '{field_name}[{idx}]' doit être un mapping "
-                f"(reçu : {type(item).__name__})."
+            # Le champ nommé porte son index : « infra.hosts[1] » désigne la
+            # ligne fautive, là où « infra.hosts » enverrait relire toute la liste.
+            raise ContractError(
+                source, f"{field_name}[{idx}]", "contract_field_not_mapping",
+                got=type(item).__name__,
             )
         items.append(item)
     return items

@@ -26,6 +26,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ._contract import ContractError
+
 #: Version la plus récente du contrat d'entrée que ce dsoxlab sait lire. Un
 #: fichier qui en déclare une plus grande n'est pas lu : le moteur ignore ce
 #: que ses champs signifient, et deviner serait pire que refuser.
@@ -81,7 +83,10 @@ def read_schema_version(data: Mapping[str, Any], source: Path) -> int:
 
     Raises:
         UnsupportedSchemaVersion: la version dépasse celle que ce dsoxlab lit.
-        ValueError: la valeur n'est pas un entier YAML, ou est inférieure à 1.
+        ContractError: la valeur n'est pas un entier YAML, ou est inférieure à
+            1. Elle porte la clé i18n et ses paramètres ; c'est la CLI qui dit
+            la phrase, dans la langue de l'apprenant. Reste un ``ValueError``,
+            donc le filet de ``discovery/scanner.py`` ne change pas.
 
     Le champ absent, ou présent mais vide (``schema_version:`` en blanc), vaut
     la v1 : **aucun catalogue existant ne doit casser**, et aucun n'en déclare
@@ -103,15 +108,19 @@ def read_schema_version(data: Mapping[str, Any], source: Path) -> int:
 
     # `bool` avant `int` : True est un int en Python, donc `schema_version: true`
     # passerait pour la version 1 sans ce garde-fou.
+    #
+    # Les deux refus partagent la clé du validator : c'est le même fait pour
+    # l'auteur (« ce n'est pas un numéro de version »), et deux textes pour un
+    # seul fait finissent par diverger.
     if isinstance(brut, bool) or not isinstance(brut, int):
-        raise ValueError(
-            f"{source}: '{SCHEMA_VERSION_FIELD}' doit être un entier YAML "
-            f"(reçu : {type(brut).__name__} {brut!r})."
+        raise ContractError(
+            source, SCHEMA_VERSION_FIELD, "schema_version_invalid",
+            got=repr(brut), supported=SUPPORTED_SCHEMA_VERSION,
         )
     if brut < 1:
-        raise ValueError(
-            f"{source}: '{SCHEMA_VERSION_FIELD}' doit valoir au moins 1 "
-            f"(reçu : {brut})."
+        raise ContractError(
+            source, SCHEMA_VERSION_FIELD, "schema_version_invalid",
+            got=repr(brut), supported=SUPPORTED_SCHEMA_VERSION,
         )
     if brut > SUPPORTED_SCHEMA_VERSION:
         raise UnsupportedSchemaVersion(source, brut)

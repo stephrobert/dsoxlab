@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.60] - 2026-08-24
+
+### Fixed
+
+- **A malformed catalogue spoke French under `DSOXLAB_LANG=en`.** Every message
+  `validate-structure` prints came from a `message` field written by hand in a
+  validator dataclass, and no guard could see it: the four sinks the i18n guard
+  watches (`help=`, the display helpers, `raise`, the Rich output verbs) do not
+  cover a value stored in a dataclass. `ContentIssue`, `MetadataIssue` and
+  `StructureIssue` now carry a **key** and its parameters, exactly like
+  `ContractIssue` already did, and the CLI composes the sentence. 39 keys added
+  in English and French. `check_doc_url()` follows the same rule: it returns a
+  `ContentIssue` instead of a reason it wrote itself.
+
+- **The contract errors of `meta.yml` were French too**, and they reach the
+  screen: `discovery/repo.py` lets them through and `cli.py` renders them. They
+  are raised as `ContractError`, which carries `source`, `field`, an i18n key
+  and its parameters, the pattern `UnsupportedSchemaVersion` and
+  `ProviderUnresolved` already followed. The model stays language-agnostic; the
+  CLI says the sentence and frames it with the file path.
+
+- **A mistyped field in `meta.yml` produced a raw traceback on `list-labs`**,
+  because the scanner reads that file for the section order and nothing caught
+  the error on that path, while the other commands went through `_read_repo`
+  and got a sentence. Both paths now go through the same helper.
+
+### Changed
+
+- The 24 `ValueError` of `models/` were sorted on one question: does this
+  message reach a human reading the interface? 17 do, through `meta.yml`, and
+  follow the pattern. 7 do not: they come from a `lab.yaml`, whose only reader
+  is `discovery/scanner.py`, which drops the lab and logs the reason. Those
+  raise a `LabYamlError` whose text stays technical, because translating what
+  is never displayed is wasted work and noise in the translation tables.
+
+- The i18n guard now covers `models/`, whose blanket exclusion is gone, and
+  gains a fifth sink for the anomalies `validate-structure` displays. It knows
+  `LabYamlError` by name, which is what makes the sort **checkable**: the day
+  one of those messages has to be displayed, it changes class and the guard
+  asks for its key.
+
+Closes #139.
+
 ## [0.1.59] - 2026-08-23
 
 ### Changed

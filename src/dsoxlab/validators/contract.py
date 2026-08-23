@@ -36,8 +36,8 @@ from typing import Any
 
 import yaml
 
+from ..models._contract import ContractError
 from ..models.schema_version import (
-    SUPPORTED_SCHEMA_VERSION,
     UnsupportedSchemaVersion,
     read_schema_version,
 )
@@ -120,16 +120,12 @@ def validate_schema_versions(root: Path) -> ContractReport:
                 key="schema_version_too_new",
                 params={"found": exc.found, "supported": exc.supported},
             ))
-        except ValueError:
-            # Le message du modèle est technique et non traduit : on ne le
-            # relaie pas, on nomme la valeur fautive et la CLI dit le reste.
+        except ContractError as exc:
+            # Le modèle porte désormais la clé et les faits : les recopier ici
+            # ferait deux textes pour un seul défaut, qui finiraient par
+            # diverger. Voir `models/_contract.py: ContractError`.
             report.issues.append(ContractIssue(
-                path=chemin,
-                key="schema_version_invalid",
-                params={
-                    "got": repr(data.get("schema_version")),
-                    "supported": SUPPORTED_SCHEMA_VERSION,
-                },
+                path=chemin, key=exc.key, params=exc.params,
             ))
 
     return report

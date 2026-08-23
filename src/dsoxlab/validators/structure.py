@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ..models.lab import LabDefinition
 from ..models.runtime import RuntimeType
@@ -25,8 +26,21 @@ from ..models.runtime import RuntimeType
 
 @dataclass
 class StructureIssue:
+    """Une anomalie de structure, prête à être traduite.
+
+    Porte une **clé** et ses paramètres, jamais une phrase : ce rapport est
+    affiché par ``validate-structure``, donc son texte suit ``DSOXLAB_LANG``.
+    Les messages écrits ici en dur s'affichaient en français sous
+    ``DSOXLAB_LANG=en``, c'est-à-dire au moment précis où un auteur découvre
+    le contrat.
+    """
+
     path: Path
-    message: str
+    key: str
+    """Clé i18n du message, présente dans ``strings/en.py`` ET ``strings/fr.py``."""
+
+    params: dict[str, Any] = field(default_factory=dict)
+    """Paramètres de substitution du message."""
 
 
 @dataclass
@@ -62,14 +76,7 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
         # pouvoir choisir une target)
         if not lab.runtime.targets:
             report.issues.append(
-                StructureIssue(
-                    path=base / "lab.yaml",
-                    message=(
-                        "runtime.type est 'vm' mais runtime.targets[] "
-                        "est vide. Déclare au moins une target avec "
-                        "{name, host}."
-                    ),
-                )
+                StructureIssue(path=base / "lab.yaml", key="struct_vm_targets_empty")
             )
         # Si default défini, doit matcher un name de target
         if lab.runtime.default:
@@ -78,11 +85,11 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
                 report.issues.append(
                     StructureIssue(
                         path=base / "lab.yaml",
-                        message=(
-                            f"runtime.default='{lab.runtime.default}' "
-                            f"ne matche aucun runtime.targets[].name. "
-                            f"Disponibles : {target_names}"
-                        ),
+                        key="struct_default_unknown",
+                        params={
+                            "default": lab.runtime.default,
+                            "available": ", ".join(target_names),
+                        },
                     )
                 )
         # runtime.session : énuméré. Une valeur libre passerait silencieusement
@@ -91,24 +98,16 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
             report.issues.append(
                 StructureIssue(
                     path=base / "lab.yaml",
-                    message=(
-                        f"runtime.session='{lab.runtime.session}' inconnu. "
-                        "Valeurs acceptées : 'target' (session SSH sur "
-                        "targets[].host, défaut) ou 'local' (sous-shell sur le "
-                        "poste, pour un lab piloté depuis le dépôt)."
-                    ),
+                    key="struct_session_unknown",
+                    params={"session": lab.runtime.session},
                 )
             )
         # Présence interdite de scripts bash legacy (signal de migration
         # incomplète vers le tout-déclaratif).
-        _forbid_file(base / "cleanup.sh", report,
-                     "cleanup.sh interdit pour runtime: vm — utilise cleanup.yaml.")
-        _forbid_file(base / "runtime" / "kvm.sh", report,
-                     "runtime/kvm.sh interdit — utilise setup.yaml.")
-        _forbid_file(base / "runtime" / "incus.sh", report,
-                     "runtime/incus.sh interdit — utilise setup.yaml.")
-        _forbid_file(base / "Makefile", report,
-                     "Makefile interdit dans un lab — dsoxlab pilote tout.")
+        _forbid_file(base / "cleanup.sh", report, "struct_forbidden_cleanup_sh_vm")
+        _forbid_file(base / "runtime" / "kvm.sh", report, "struct_forbidden_kvm_sh")
+        _forbid_file(base / "runtime" / "incus.sh", report, "struct_forbidden_incus_sh")
+        _forbid_file(base / "Makefile", report, "struct_forbidden_makefile")
 
     elif rt_type == RuntimeType.SHELL:
         # Runtime shell : tout déclaratif via lab.yaml, aucun script
@@ -116,24 +115,12 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
         # défaut "challenge/work" mais on le valide explicite).
         if not lab.runtime.workdir:
             report.issues.append(
-                StructureIssue(
-                    path=base / "lab.yaml",
-                    message=(
-                        "runtime.type est 'shell' mais runtime.workdir "
-                        "est vide. Déclare le répertoire de travail "
-                        "(ex. workdir: challenge/work)."
-                    ),
-                )
+                StructureIssue(path=base / "lab.yaml", key="struct_shell_workdir_empty")
             )
         # Idem : signaler les scripts bash résiduels.
-        _forbid_file(base / "cleanup.sh", report,
-                     "cleanup.sh interdit pour runtime: shell — déclare "
-                     "fixtures dans lab.yaml.")
-        _forbid_file(base / "runtime" / "shell.sh", report,
-                     "runtime/shell.sh interdit — la préparation est "
-                     "déclarée via runtime.workdir + runtime.fixtures.")
-        _forbid_file(base / "Makefile", report,
-                     "Makefile interdit dans un lab — dsoxlab pilote tout.")
+        _forbid_file(base / "cleanup.sh", report, "struct_forbidden_cleanup_sh_shell")
+        _forbid_file(base / "runtime" / "shell.sh", report, "struct_forbidden_shell_sh")
+        _forbid_file(base / "Makefile", report, "struct_forbidden_makefile")
 
     return report
 
@@ -141,18 +128,26 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
 def _require_file(path: Path, report: StructureReport) -> None:
     if not path.is_file():
         report.issues.append(
-            StructureIssue(path=path, message=f"Fichier manquant : {path.name}")
+            StructureIssue(
+                path=path, key="struct_missing_file", params={"name": path.name}
+            )
         )
 
 
 def _require_dir(path: Path, report: StructureReport) -> None:
     if not path.is_dir():
         report.issues.append(
-            StructureIssue(path=path, message=f"Répertoire manquant : {path.name}/")
+            StructureIssue(
+                path=path, key="struct_missing_dir", params={"name": path.name}
+            )
         )
 
 
-def _forbid_file(path: Path, report: StructureReport, message: str) -> None:
-    """Inverse de _require_file : signale la présence d'un fichier interdit."""
+def _forbid_file(path: Path, report: StructureReport, key: str) -> None:
+    """Inverse de _require_file : signale la présence d'un fichier interdit.
+
+    Prend une **clé**, pas une phrase : chaque fichier interdit a son message,
+    et c'est la couche d'affichage qui le dit dans la langue de l'auteur.
+    """
     if path.exists():
-        report.issues.append(StructureIssue(path=path, message=message))
+        report.issues.append(StructureIssue(path=path, key=key))

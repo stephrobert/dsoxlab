@@ -4,6 +4,10 @@ Un lien mort, un guide disparu, une solution en clair : rien de tout cela
 n'empêche un lab de s'exécuter. C'est précisément pourquoi ces défauts
 survivaient. Ces tests vérifient donc surtout que le contrôle *échoue* quand il
 le doit, et qu'il reste muet là où il n'a rien à dire.
+
+Depuis #139, ils vérifient **la clé et les faits**, jamais la phrase : celle-ci
+appartient aux tables de traduction, et l'y chercher ferait échouer la suite au
+premier mot reformulé.
 """
 
 from __future__ import annotations
@@ -40,7 +44,8 @@ class TestLiensInternes:
         )
         rapport = content.validate_internal_links(_lab(tmp_path))
         assert not rapport.ok
-        assert "../autre/lab.md" in rapport.issues[0].message
+        assert rapport.issues[0].key == "content_broken_links"
+        assert "../autre/lab.md" in rapport.issues[0].params["links"]
 
     def test_un_lien_valide_ne_dit_rien(self, tmp_path: Path) -> None:
         (tmp_path / "cible.md").write_text("cible", encoding="utf-8")
@@ -74,7 +79,7 @@ class TestSolutionsChiffrees:
         (sol / "solution.yaml").write_text("- name: en clair\n", encoding="utf-8")
         rapport = content.validate_solutions_encrypted(_lab(tmp_path), sol)
         assert not rapport.ok
-        assert "en clair" in rapport.issues[0].message
+        assert rapport.issues[0].key == "content_solution_plaintext"
 
     def test_une_solution_chiffree_passe(self, tmp_path: Path) -> None:
         sol = tmp_path / "solution"
@@ -109,7 +114,10 @@ class TestDocUrl:
             raise urllib.error.HTTPError("u", 404, "Not Found", {}, None)  # type: ignore[arg-type]
 
         monkeypatch.setattr(content.urllib.request, "urlopen", _404)
-        assert content.check_doc_url(_lab(tmp_path)) == "HTTP 404"
+        souci = content.check_doc_url(_lab(tmp_path))
+        assert souci is not None
+        assert souci.key == "content_doc_url_status"
+        assert souci.params["code"] == 404
 
     def test_head_refuse_mais_get_repond(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -132,12 +140,19 @@ class TestDocUrl:
             raise urllib.error.URLError("network is unreachable")
 
         monkeypatch.setattr(content.urllib.request, "urlopen", _boum)
-        motif = content.check_doc_url(_lab(tmp_path))
-        assert motif is not None and "injoignable" in motif
+        souci = content.check_doc_url(_lab(tmp_path))
+        assert souci is not None and souci.key == "content_doc_url_unreachable"
 
     def test_schema_inattendu(self, tmp_path: Path) -> None:
-        motif = content.check_doc_url(_lab(tmp_path, doc_url="ftp://exemple/guide"))
-        assert motif is not None and "ftp" in motif
+        souci = content.check_doc_url(_lab(tmp_path, doc_url="ftp://exemple/guide"))
+        assert souci is not None
+        assert souci.key == "content_doc_url_scheme"
+        assert souci.params["scheme"] == "ftp"
+
+    def test_sans_schema_du_tout(self, tmp_path: Path) -> None:
+        """Une clé à part : « (aucun) » serait le seul mot non traduit."""
+        souci = content.check_doc_url(_lab(tmp_path, doc_url="exemple.test/guide"))
+        assert souci is not None and souci.key == "content_doc_url_no_scheme"
 
     def test_sans_doc_url(self, tmp_path: Path) -> None:
         assert content.check_doc_url(_lab(tmp_path, doc_url="")) is None
@@ -182,7 +197,8 @@ class TestBareme:
     def test_un_test_de_plus_est_signale(self, tmp_path: Path) -> None:
         rapport = content.validate_scoring(self._lab_note(tmp_path, taches=5, tests=6))
         assert not rapport.ok
-        assert "5 tâche(s) notée(s) pour 6 test(s)" in rapport.issues[0].message
+        assert rapport.issues[0].key == "content_scoring_tasks_vs_tests"
+        assert rapport.issues[0].params == {"tasks": 5, "tests": 6}
 
     def test_un_pour_un_passe(self, tmp_path: Path) -> None:
         assert content.validate_scoring(self._lab_note(tmp_path, taches=5, tests=5)).ok
@@ -220,7 +236,8 @@ class TestPariteLangues:
         (tmp_path / "README.fr.md").write_text("cours", encoding="utf-8")
         rapport = content.validate_language_parity(_lab(tmp_path))
         assert not rapport.ok
-        assert "README.md" in rapport.issues[0].message
+        assert rapport.issues[0].key == "content_missing_english"
+        assert rapport.issues[0].params["name"] == "README.md"
 
     def test_les_deux_langues_presentes(self, tmp_path: Path) -> None:
         (tmp_path / "README.fr.md").write_text("cours", encoding="utf-8")
@@ -242,7 +259,8 @@ class TestCibles:
             self._lab_vm(tmp_path, "absent.lab"), {"present.lab"}
         )
         assert not rapport.ok
-        assert "absent.lab" in rapport.issues[0].message
+        assert rapport.issues[0].key == "content_target_host_unknown"
+        assert rapport.issues[0].params["host"] == "absent.lab"
 
     def test_hote_connu(self, tmp_path: Path) -> None:
         assert content.validate_targets(
