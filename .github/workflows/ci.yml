@@ -149,7 +149,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        # 3.14 n'est pas une anticipation : Fedora et Ubuntu 26.04 le
+        # packagent déjà, et l'environnement de développement de ce dépôt
+        # tourne dessus. La matrice mesurait donc trois versions dont
+        # aucune n'était celle qui sert tous les jours.
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     env:
       # Passed through the environment (not template-expanded into run blocks)
       # so no context value is ever interpolated into shell code.
@@ -237,6 +241,124 @@ jobs:
       # up by accident and the contribution gate keeps its measured duration.
       - name: End-to-end suite (build the wheel, install it, drive the binary)
         run: uv run pytest tests_e2e
+
+  # The wheel every distribution job installs — built ONCE, on purpose.
+  #
+  # Letting each distribution build its own would make five artifacts and prove
+  # nothing about the one PyPI serves. It would also hide a packaging bug behind
+  # a build that happens to work on that particular system. One artifact, five
+  # systems: any difference in the outcome then belongs to the system.
+  roue:
+    name: Build the wheel (once, for every distribution)
+    needs: [zizmor, actionlint, poutine]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: "0.11.26"
+          enable-cache: true
+
+      - name: Build the wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Publish it for the distribution jobs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: roue-parcours
+          path: dist/*.whl
+          retention-days: 1
+          if-no-files-found: error
+
+  # Distribution gate — the users of dsoxlab do not have different Python
+  # versions, they have different DISTRIBUTIONS.
+  #
+  # That is where the product breaks, because what it drives (ssh, terraform,
+  # libvirt, docker, sudo) is packaged differently there, in different versions,
+  # under different paths. A matrix that only varies Python on a single Ubuntu
+  # measures none of it.
+  #
+  # `UV_PYTHON_DOWNLOADS=never` (set by the script) is what gives this job its
+  # meaning: uv installs its own standalone CPython by default, identical
+  # everywhere, and the matrix would then measure GitHub's network rather than
+  # the systems. Pinned off, the wheel installs on the Python the distribution
+  # ships — the only way to learn that one of them ships a Python too old.
+  #
+  # The scenario is the E2E suite itself, not a copy of it: one scenario, five
+  # systems. `fail-fast: false` because "Fedora is red" and "Arch is red" are
+  # two different pieces of news, and stopping at the first hides the second.
+  distributions:
+    name: Parcours on ${{ matrix.nom }}
+    needs: [roue]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nom: Debian 13
+            image: debian:13
+            amorcage: apt-get update -qq && apt-get install -y -qq python3 python3-venv python3-pip >/dev/null
+          - nom: Ubuntu 24.04 LTS
+            image: ubuntu:24.04
+            amorcage: apt-get update -qq && apt-get install -y -qq python3 python3-venv python3-pip >/dev/null
+          - nom: Ubuntu 26.04 LTS
+            image: ubuntu:26.04
+            amorcage: apt-get update -qq && apt-get install -y -qq python3 python3-venv python3-pip >/dev/null
+          - nom: Fedora
+            image: fedora:latest
+            amorcage: dnf install -y -q python3 python3-pip >/dev/null
+          # `-Syu`, never `-Sy`: a partial upgrade pulls a python built against
+          # a newer glibc than the image ships, and every import of a C module
+          # then fails on `GLIBC_2.44 not found`. Seen while writing this job.
+          - nom: Arch Linux
+            image: archlinux:latest
+            amorcage: pacman -Syu --noconfirm --quiet python python-pip >/dev/null
+    env:
+      # Passed through the environment (not template-expanded into run blocks)
+      # so no context value is ever interpolated into shell code.
+      IMAGE: ${{ matrix.image }}
+      AMORCAGE: ${{ matrix.amorcage }}
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch the wheel built once
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: roue-parcours
+          path: dist
+
+      # The repository is mounted READ-ONLY inside the container: a newcomer's
+      # parcours never writes into the tool's own sources, and if it ever needs
+      # to, that is a defect this mount makes visible.
+      - name: Parcours end to end
+        run: |
+          roue=$(find dist -name '*.whl' | head -1)
+          python3 scripts/parcours-distribution.py \
+            --image "$IMAGE" --bootstrap "$AMORCAGE" --wheel "$roue"
 
   # Parity gate — run EVERY pre-commit hook (commit AND push stages) exactly as
   # a contributor's local pre-commit would, from this project's locked env. The
