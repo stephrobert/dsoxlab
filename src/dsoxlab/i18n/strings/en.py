@@ -964,4 +964,10 @@ silent.
     "unknown_key_suggest":
         "'{field}' is not part of the contract, and dsoxlab ignores it. "
         "The closest key it does read at that level is '{suggestion}'.",
+
+    # ── #138 : un exécutable absent se nomme, il ne se plante pas ──
+    "err_executable_introuvable":
+        '"{nom}" is not installed, or not on your PATH. dsoxlab needs it for this command; install it, then try again.',
+    "err_fichier_introuvable":
+        'File not found: "{nom}".',
 }

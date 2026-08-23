@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dsoxlab"
-version = "0.1.56"
+version = "0.1.57"
 description = "DevSecOps XL Labs — a domain-agnostic CLI framework to drive hands-on learning labs across multiple repositories"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,7 +32,6 @@ dependencies = [
     "typer>=0.12",
     "rich>=13",
     "pyyaml>=6",
-    "click>=8",
     # ansible-runner pilote ansible-core programmatiquement (API officielle
     # Red Hat utilisée par AAP et ansible-navigator).
     #

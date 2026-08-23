@@ -975,4 +975,10 @@ hors ligne, elle se tait.
         "« {field} » ne fait pas partie du contrat, et dsoxlab l'ignore. "
         "La clé la plus proche qu'il lit vraiment, à ce niveau, est "
         "« {suggestion} ».",
+
+    # ── #138 : un exécutable absent se nomme, il ne se plante pas ──
+    "err_executable_introuvable":
+        "« {nom} » n'est pas installé, ou n'est pas dans ton PATH. dsoxlab en a besoin pour cette commande : installe-le, puis relance.",
+    "err_fichier_introuvable":
+        'Fichier introuvable : « {nom} ».',
 }
