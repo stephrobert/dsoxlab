@@ -59,6 +59,7 @@ from .interrupt import (
 from .locking import EXIT_LOCKED, RepoLock, RepoLocked
 from .logging_setup import configurer as configurer_journal
 from .models import (
+    ContractError,
     CourseManifest,
     LabDefinition,
     ProviderUnresolved,
@@ -241,6 +242,27 @@ def _contrat_trop_recent(exc: UnsupportedSchemaVersion) -> NoReturn:
     raise typer.Exit(1)
 
 
+def _phrase_contrat(exc: ContractError) -> str:
+    """La phrase d'un champ du contrat que le moteur ne sait pas lire.
+
+    Le modèle porte les faits (``source``, ``field``) et la **clé** ; la phrase
+    se compose ici, dans la langue de l'apprenant. Le chemin du fichier encadre
+    le message plutôt que d'entrer dans chaque traduction : il est le même pour
+    toutes, et le répéter dans les tables les ferait diverger.
+
+    Un seul endroit la compose, parce que deux appelants la disent :
+    :func:`_contrat_illisible`, qui sort en ``typer.Exit``, et le filet de
+    :func:`main`, qui sort en ``SystemExit``.
+    """
+    return f"{exc.source}: {_(exc.key, **exc.params)}"
+
+
+def _contrat_illisible(exc: ContractError) -> NoReturn:
+    """Rend l'erreur de contrat et sort, pour les commandes qui lisent le catalogue."""
+    error(_phrase_contrat(exc))
+    raise typer.Exit(1)
+
+
 def _read_repo(root: Path) -> RepoMetadata | None:
     """Wrapper de ``read_repo_metadata`` qui formate proprement les
     erreurs de résolution de provider (ValueError) en message CLI +
@@ -250,10 +272,15 @@ def _read_repo(root: Path) -> RepoMetadata | None:
 
     try:
         return read_repo_metadata(root)
-    # AVANT ValueError, dont elle hérite : `str(exc)` rendrait un message
-    # technique et non traduit là où la cause mérite une phrase.
+    # AVANT ValueError, dont elles héritent toutes deux : `str(exc)` rendrait
+    # un message technique et non traduit là où la cause mérite une phrase.
     except UnsupportedSchemaVersion as exc:
         _contrat_trop_recent(exc)
+    # Le meta.yml est le seul fichier du contrat dont les erreurs de lecture
+    # s'affichent : le modèle porte la clé et les faits, la phrase se compose
+    # dans `_contrat_illisible`.
+    except ContractError as exc:
+        _contrat_illisible(exc)
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1) from None
@@ -276,6 +303,11 @@ def _catalogue(root: Path, lang: str, *, quiet: bool = False) -> list[LabDefinit
         scan = scan_catalog(root, lang=lang)
     except UnsupportedSchemaVersion as exc:
         _contrat_trop_recent(exc)
+    # Le scanner relit le meta.yml pour l'ordre des sections : un champ mal
+    # typé y remontait donc en traceback, sur `list-labs` comme sur `progress`,
+    # alors que `_read_repo` disait déjà la phrase sur les autres commandes.
+    except ContractError as exc:
+        _contrat_illisible(exc)
     if not quiet:
         for ecarte in scan.unsupported:
             warn(_(
@@ -1539,6 +1571,7 @@ def validate_structure_cmd(
     from .discovery.repo import read_repo_metadata
     from .discovery.scanner import discover_labs
     from .validators.content import (
+        ContentIssue,
         check_doc_url,
         validate_internal_links,
         validate_language_parity,
@@ -1605,7 +1638,7 @@ def validate_structure_cmd(
     except Exception:  # noqa: BLE001 - meta.yml illisible : les autres contrôles restent utiles
         host_names = set()
 
-    content_issues: list[tuple[str, Path, str]] = []
+    content_issues: list[tuple[str, Path, ContentIssue]] = []
     for lab in labs:
         rapports = [
             validate_internal_links(lab),
@@ -1626,35 +1659,40 @@ def validate_structure_cmd(
             )
         for rapport in rapports:
             for souci in rapport.issues:
-                content_issues.append((lab.id, souci.path, souci.message))
+                content_issues.append((lab.id, souci.path, souci))
 
     if content_issues:
         console.print(_("content_issues_header"))
-        for lab_id, chemin, message in content_issues:
-            try:
-                affiche = chemin.relative_to(root)
-            except ValueError:
-                affiche = chemin
-            console.print(f"  [red]✘[/red] {lab_id} — {affiche}: {message}")
+        for lab_id, chemin, souci in content_issues:
+            console.print(
+                f"  [red]✘[/red] {lab_id} — {_rendu(chemin)}: "
+                f"{_(souci.key, **souci.params)}"
+            )
 
-    url_issues: list[tuple[str, str]] = []
+    url_issues: list[tuple[str, str, ContentIssue]] = []
     if check_urls:
         info(_("checking_doc_urls", count=len(labs)))
         for lab in labs:
-            motif = check_doc_url(lab)
-            if motif is not None:
-                url_issues.append((lab.id, f"{lab.doc_url} — {motif}"))
+            injoignable = check_doc_url(lab)
+            if injoignable is not None:
+                url_issues.append((lab.id, lab.doc_url, injoignable))
         if url_issues:
             console.print(_("doc_url_issues_header"))
-            for lab_id, detail in url_issues:
-                console.print(f"  [red]✘[/red] {lab_id} — {detail}")
+            for lab_id, url, raison in url_issues:
+                console.print(
+                    f"  [red]✘[/red] {lab_id} — {url} — "
+                    f"{_(raison.key, **raison.params)}"
+                )
 
     issues = [r for r in metadata_reports if not r.ok]
     if issues:
         console.print(_("metadata_issues_header"))
         for report in issues:
             for issue in report.issues:
-                console.print(f"  [red]✘[/red] {report.lab_id} — {issue.field}: {issue.message}")
+                console.print(
+                    f"  [red]✘[/red] {report.lab_id} — {issue.field}: "
+                    f"{_(issue.key, **issue.params)}"
+                )
 
     all_ok = (
         contract.ok
@@ -2877,4 +2915,9 @@ def main() -> None:
             "schema_version_meta_too_new",
             path=exc.source, found=exc.found, supported=exc.supported,
         ))
+        raise SystemExit(1) from None
+    # Filet de dernier recours, comme au-dessus : une commande qui lirait un
+    # meta.yml par un autre chemin doit rendre la phrase, pas un traceback.
+    except ContractError as exc:
+        error(_phrase_contrat(exc))
         raise SystemExit(1) from None

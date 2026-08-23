@@ -9,6 +9,53 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.60] - 2026-08-24
+
+### Corrigé
+
+- **Un catalogue mal formé parlait français sous `DSOXLAB_LANG=en`.** Chaque
+  message affiché par `validate-structure` venait d'un champ `message` écrit à
+  la main dans une dataclass de validator, qu'aucun garde-fou ne pouvait voir :
+  les quatre puits que surveille le garde-fou i18n (`help=`, les helpers
+  d'affichage, `raise`, les verbes de sortie de Rich) ne couvrent pas une valeur
+  rangée dans une dataclass. `ContentIssue`, `MetadataIssue` et `StructureIssue`
+  portent désormais une **clé** et ses paramètres, exactement comme
+  `ContractIssue` le faisait déjà, et c'est la CLI qui compose la phrase. 39
+  clés ajoutées en anglais et en français. `check_doc_url()` suit la même
+  règle : il rend une `ContentIssue` au lieu d'un motif qu'il rédigeait.
+
+- **Les erreurs de contrat du `meta.yml` étaient françaises elles aussi**, et
+  celles-là atteignent l'écran : `discovery/repo.py` les laisse remonter et
+  `cli.py` les affiche. Elles sont levées en `ContractError`, qui porte
+  `source`, `field`, une clé i18n et ses paramètres, le patron que
+  `UnsupportedSchemaVersion` et `ProviderUnresolved` suivaient déjà. Le modèle
+  reste agnostique de la langue ; la CLI dit la phrase et l'encadre du chemin
+  du fichier.
+
+- **Un champ mal typé du `meta.yml` rendait un traceback brut sur
+  `list-labs`**, parce que le scanner relit ce fichier pour l'ordre des
+  sections et que rien n'attrapait l'erreur sur ce chemin, là où les autres
+  commandes passaient par `_read_repo` et obtenaient une phrase. Les deux
+  chemins passent désormais par le même helper.
+
+### Changé
+
+- Les 24 `ValueError` de `models/` ont été triées sur une seule question : ce
+  message atteint-il un humain qui lit l'interface ? 17 oui, par le `meta.yml`,
+  et suivent le patron. 7 non : elles viennent d'un `lab.yaml`, dont le seul
+  lecteur est `discovery/scanner.py`, qui écarte le lab et journalise la
+  raison. Celles-là lèvent une `LabYamlError` dont le texte reste technique,
+  parce que traduire ce qui ne s'affiche jamais est du travail perdu et du
+  bruit dans les tables de traduction.
+
+- Le garde-fou i18n couvre désormais `models/`, dont l'exclusion en bloc
+  disparaît, et gagne un cinquième puits pour les anomalies que
+  `validate-structure` affiche. Il connaît `LabYamlError` par son nom, ce qui
+  rend le tri **vérifiable** : le jour où l'un de ces messages doit s'afficher,
+  il change de classe et le garde-fou réclame sa clé.
+
+Closes #139.
+
 ## [0.1.59] - 2026-08-23
 
 ### Modifié

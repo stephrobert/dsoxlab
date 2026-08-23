@@ -42,7 +42,13 @@ from typing import Any
 
 import yaml
 
-from ._contract import as_int, as_mapping, as_mapping_list, as_str_list
+from ._contract import (
+    ContractError,
+    as_int,
+    as_mapping,
+    as_mapping_list,
+    as_str_list,
+)
 from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
 
 #: Champs qu'un ``meta.<lang>.yml`` peut surcharger, et eux seuls.
@@ -114,9 +120,9 @@ def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, A
     if value is None:
         return {}
     if not isinstance(value, dict):
-        raise ValueError(
-            f"{meta_path}: 'infra.providers' doit être un mapping "
-            f"(reçu : {type(value).__name__})."
+        raise ContractError(
+            meta_path, "infra.providers", "contract_field_not_mapping",
+            got=type(value).__name__,
         )
     overrides: dict[str, dict[str, Any]] = {}
     for name, cfg in value.items():
@@ -125,9 +131,9 @@ def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, A
         elif isinstance(cfg, dict):
             overrides[str(name)] = dict(cfg)
         else:
-            raise ValueError(
-                f"{meta_path}: 'infra.providers.{name}' doit être un mapping "
-                f"(reçu : {type(cfg).__name__})."
+            raise ContractError(
+                meta_path, f"infra.providers.{name}", "contract_field_not_mapping",
+                got=type(cfg).__name__,
             )
     return overrides
 
@@ -192,23 +198,22 @@ def _resolve_provider(
     elif isinstance(raw_provider, list):
         candidates = [str(p).strip() for p in raw_provider if str(p).strip()]
         if not candidates:
-            raise ValueError(
-                f"{meta_path}: infra.provider est une liste vide. "
-                "Déclare au moins un provider (ex. 'kvm')."
+            raise ContractError(
+                meta_path, "infra.provider", "contract_provider_empty_list"
             )
         default_solo = candidates[0] if len(candidates) == 1 else ""
     else:
-        raise ValueError(
-            f"{meta_path}: infra.provider doit être une string ou une "
-            f"liste de strings, pas {type(raw_provider).__name__}."
+        raise ContractError(
+            meta_path, "infra.provider", "contract_provider_bad_type",
+            got=type(raw_provider).__name__,
         )
 
     env = os.environ.get("DSOXLAB_PROVIDER", "").strip()
     if env:
         if candidates and env not in candidates:
-            raise ValueError(
-                f"DSOXLAB_PROVIDER='{env}' n'est pas dans les providers "
-                f"déclarés par {meta_path}: {candidates}"
+            raise ContractError(
+                meta_path, "infra.provider", "contract_provider_not_declared",
+                provider=env, candidates=", ".join(candidates),
             )
         return env, candidates
 
@@ -380,7 +385,11 @@ class RepoMetadata:
                 ``meta.<lang>.yml`` existe à côté, ses titres et
                 descriptions surchargent ceux du ``meta.yml``.
 
-        Lève ``ValueError`` si ``repo.id``/``repo.category`` manquent.
+        Lève :class:`~dsoxlab.models._contract.ContractError` si
+        ``repo.id``/``repo.category`` manquent, ou si un champ du ``meta.yml``
+        n'a pas le type que le contrat attend. C'est un ``ValueError``, et il
+        porte une clé i18n : ce fichier-ci s'affiche, donc la CLI compose la
+        phrase dans la langue de l'apprenant.
 
         Une résolution de provider ambiguë (plusieurs candidats, aucun
         choix actif) **ne lève pas** : ``infra.provider`` reste vide et
@@ -394,9 +403,9 @@ class RepoMetadata:
         # (ni un bloc `repo:` qui ne serait pas un mapping) : l'accès `.get`
         # lèverait alors AttributeError au lieu du ValueError attendu par la CLI.
         if not isinstance(data, dict):
-            raise ValueError(
-                f"{meta_path}: le document doit être un mapping YAML "
-                f"(reçu : {type(data).__name__})."
+            raise ContractError(
+                meta_path, "meta.yml", "contract_root_not_mapping",
+                got=type(data).__name__,
             )
 
         # AVANT `repo.id` : un meta.yml v2 pourrait très bien ne plus déclarer
@@ -411,15 +420,12 @@ class RepoMetadata:
 
         repo = data.get("repo") or {}
         if not isinstance(repo, dict):
-            raise ValueError(
-                f"{meta_path}: le bloc 'repo' doit être un mapping "
-                f"(reçu : {type(repo).__name__})."
+            raise ContractError(
+                meta_path, "repo", "contract_field_not_mapping",
+                got=type(repo).__name__,
             )
         if not repo.get("id") or not repo.get("category"):
-            raise ValueError(
-                f"{meta_path}: les champs 'repo.id' et 'repo.category' "
-                "sont requis (contrat dsoxlab)."
-            )
+            raise ContractError(meta_path, "repo", "contract_repo_required")
 
         infra_data = as_mapping(data.get("infra"), "infra", meta_path)
         hosts_data = as_mapping_list(infra_data.get("hosts"), "infra.hosts", meta_path)

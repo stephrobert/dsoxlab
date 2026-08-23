@@ -1,8 +1,16 @@
-"""Lab metadata validation."""
+"""Lab metadata validation.
+
+Comme les autres validators, ce module ne compose **aucune phrase** : chaque
+anomalie porte une clé i18n et ses paramètres, que ``validate-structure`` rend
+dans la langue de l'auteur. Les messages écrits ici en dur sortaient en
+français quel que soit ``DSOXLAB_LANG``.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import dataclasses
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 from ..models.lab import LabDefinition
@@ -13,13 +21,19 @@ _VALID_LAB_TYPES = {"lab", "challenge", "capstone"}
 @dataclass
 class MetadataIssue:
     field: str
-    message: str
+    key: str
+    """Clé i18n du message, présente dans ``strings/en.py`` ET ``strings/fr.py``."""
+
+    # `dataclasses.field`, en toutes lettres : la dataclass porte un attribut
+    # nommé `field`, et le nom court désignerait alors le champ, pas la fonction.
+    params: dict[str, Any] = dataclasses.field(default_factory=dict)
+    """Paramètres de substitution du message."""
 
 
 @dataclass
 class MetadataReport:
     lab_id: str
-    issues: list[MetadataIssue] = field(default_factory=list)
+    issues: list[MetadataIssue] = dataclasses.field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -30,29 +44,39 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
     """Check required fields and their consistency."""
     report = MetadataReport(lab_id=lab.id)
 
-    if not lab.id:
-        report.issues.append(MetadataIssue("id", "Le champ 'id' est vide"))
-    if not lab.title:
-        report.issues.append(MetadataIssue("title", "Le champ 'title' est vide"))
-    if not lab.level:
-        report.issues.append(MetadataIssue("level", "Le champ 'level' est vide"))
-    if not lab.skills:
-        report.issues.append(MetadataIssue("skills", "La liste 'skills' est vide"))
-    if not lab.distros:
-        report.issues.append(MetadataIssue("distros", "La liste 'distros' est vide"))
-    if not lab.doc_url:
-        report.issues.append(MetadataIssue("doc_url", "Le champ 'doc_url' est vide"))
-    else:
+    for champ, valeur in (
+        ("id", lab.id),
+        ("title", lab.title),
+        ("level", lab.level),
+        ("doc_url", lab.doc_url),
+    ):
+        if not valeur:
+            report.issues.append(
+                MetadataIssue(champ, "metadata_field_empty", {"field": champ})
+            )
+    for champ, liste in (("skills", lab.skills), ("distros", lab.distros)):
+        if not liste:
+            report.issues.append(
+                MetadataIssue(champ, "metadata_list_empty", {"field": champ})
+            )
+
+    if lab.doc_url:
         parsed = urlparse(lab.doc_url)
         if parsed.scheme not in ("http", "https"):
             report.issues.append(
-                MetadataIssue("doc_url", f"URL invalide (scheme attendu http/https) : {lab.doc_url}")
+                MetadataIssue(
+                    "doc_url", "metadata_doc_url_scheme", {"url": lab.doc_url}
+                )
             )
     if lab.lab_type not in _VALID_LAB_TYPES:
         report.issues.append(
             MetadataIssue(
                 "lab_type",
-                f"Invalid value '{lab.lab_type}'. Expected one of: {', '.join(sorted(_VALID_LAB_TYPES))}",
+                "metadata_lab_type_invalid",
+                {
+                    "value": lab.lab_type,
+                    "expected": ", ".join(sorted(_VALID_LAB_TYPES)),
+                },
             )
         )
     # Le seuil est un POURCENTAGE du barème. Hors de 1..100, il ne veut rien
@@ -63,9 +87,8 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
         report.issues.append(
             MetadataIssue(
                 "exam_passing_score",
-                f"Invalid value '{lab.exam_passing_score}'. Expected a percentage "
-                f"of the lab scale, between 1 and 100 (omit the field for a lab "
-                f"that is not an exam).",
+                "metadata_exam_score_invalid",
+                {"value": lab.exam_passing_score},
             )
         )
 
