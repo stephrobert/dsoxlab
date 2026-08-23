@@ -81,11 +81,11 @@ repos:
       # que le zéro-bash interdit, et il y manquait deux commandes. Elle est
       # désormais produite par la CLI, et ce hook refuse une version périmée.
       - id: doc-a-jour
-        name: la documentation décrit la CLI réelle
+        name: la documentation décrit la CLI et les chemins réels
         entry: python3 scripts/generer-doc.py --verifier
         language: system
         pass_filenames: false
-        files: '^(src/dsoxlab/(cli\.py|i18n/)|README(\.fr)?\.md|scripts/generer-doc\.py)'
+        files: '^(src/dsoxlab/.*\.py|docs/.*\.md|[A-Z]+(\.fr)?\.md|scripts/generer-doc\.py)$'
 
       # Full test suite runs on push (kept off the per-commit path for speed).
       - id: pytest

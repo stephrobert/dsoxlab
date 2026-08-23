@@ -9,6 +9,56 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.63] - 2026-08-24
+
+- **La documentation décrivait un produit qui n'existe pas.** Trois
+  affirmations de la section « Persistence » des deux README étaient fausses, et
+  c'étaient celles que suit un lecteur cherchant ses notes : une base
+  `~/.local/share/dsoxlab/progress.db`, un fichier de configuration utilisateur
+  `~/.config/dsoxlab/config.yaml`, et `XDG_DATA_HOME` / `XDG_CONFIG_HOME` pour
+  les déplacer. La base est `<catalogue>/.dsoxlab.db`, une par catalogue, et
+  aucun fichier de configuration n'est lu nulle part. Quatre autres
+  affirmations ont suivi le même chemin : une progression « conforme à la
+  spécification XDG », `incus` et `kvm` présentés comme des runtimes (il y en a
+  deux, `shell` et `vm`, et le backend est le choix du catalogue), une carte
+  d'architecture nommant des classes `IncusRuntime` et `KvmRuntime` qui
+  n'existent pas, et un champ `runtime.host` dans l'exemple de `lab.yaml` le
+  plus en vue, qu'aucun code ne lit.
+
+- L'aide de `--lab-home` annonçait « racine du dépôt linux-training », nommant
+  un catalogue comme s'il était le seul, dans les deux langues. Elle dit
+  désormais « le catalogue de labs ».
+
+### Ajouté
+
+- **Un contrôle qui interdit à la dérive de recommencer.** Les emplacements de
+  fichiers documentés sont désormais confrontés au code comme l'était déjà la
+  table des commandes : `scripts/generer-doc.py` relève les emplacements réels
+  **en appelant les fonctions que la CLI appelle**, sur un `HOME` jetable, puis
+  signale tout chemin qu'une page cite et qui ne correspond à aucun d'eux.
+  Prouvé par mutation, et par six tests dans
+  `tests/test_documentation_synchrone.py`. Un chemin peut être cité pour dire
+  qu'il **n'**existe **pas**, mais par la seule page dont c'est le sujet, et un
+  test vérifie qu'il est bien absent du code.
+
+### Modifié
+
+- **Documentation découpée par public**, chaque page nommant son lecteur dès ses
+  premières lignes : [l'apprenant](docs/learner.fr.md), [l'auteur de
+  catalogue](docs/catalog-author.fr.md), [le formateur](docs/trainer.fr.md),
+  plus deux références communes aux trois ([où dsoxlab écrit](docs/files.fr.md)
+  et [les commandes](docs/commands.fr.md), toujours produites par la CLI). Les
+  deux README gardent leur rôle de porte d'entrée et se lisent maintenant en
+  trente secondes. Aucun générateur de site n'est introduit : cette décision
+  appartient au propriétaire du dépôt.
+
+- `Documentation` dans `pyproject.toml` pointe sur la documentation de l'outil
+  plutôt que sur l'index générique d'un blog. La carte de l'architecture a
+  déménagé dans `CONTRIBUTING.fr.md`, corrigée, là où les contributeurs à qui
+  elle s'adresse la trouveront.
+
+Closes #86.
+
 ## [0.1.62] - 2026-08-24
 
 ### Corrigé

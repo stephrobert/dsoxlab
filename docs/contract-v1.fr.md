@@ -1,5 +1,8 @@
 # Le contrat déclaratif, version 1
 
+**Public :** les auteurs de catalogue. Le mode d'emploi autour de cette
+référence est [Pour l'auteur de catalogue](./catalog-author.fr.md).
+
 **Langue :** [English](./contract-v1.md) · [Français](./contract-v1.fr.md)
 
 `meta.yml` et `lab.yaml` sont l'interface publique de dsoxlab. C'est ce

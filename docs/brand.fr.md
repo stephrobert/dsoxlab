@@ -1,5 +1,9 @@
 # La marque
 
+**Public :** quiconque affiche la marque, dans un catalogue, un support de
+cours ou un article. Le nom et le logo ne sont pas couverts par la licence
+Apache 2.0.
+
 **Langue :** [English](./brand.md) · [Français](./brand.fr.md)
 
 ![dsoxlab](assets/brand/dsoxlab-lockup-light.svg)

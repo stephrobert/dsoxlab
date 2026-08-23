@@ -14,6 +14,7 @@ in English so everyone can take part.
 
 - [Ground rules](#ground-rules)
 - [Development setup](#development-setup)
+- [Architecture map](#architecture-map)
 - [Quality gates](#quality-gates)
   - [Workflow scanners](#workflow-scanners)
   - [Fuzzing the untrusted contract](#fuzzing-the-untrusted-contract)
@@ -59,6 +60,38 @@ carries no domain-specific logic:
 cd ~/Projets/linux-dsoxlab-training && dsoxlab list-labs
 cd ~/Projets/ansible-training && dsoxlab list-labs
 ```
+
+## Architecture map
+
+```text
+src/dsoxlab/
+├── cli.py            ← Typer entry point (+ the i18n command group)
+├── config.py         ← LAB_HOME, active context, .dsoxlab-context.json
+├── locking.py        ← per-catalog write lock (flock), exit code 7
+├── logging_setup.py  ← the log every command writes, whatever the verbosity
+├── i18n/             ← get_lang(), _(), strings/en.py + strings/fr.py
+├── models/           ← typed schemas of the declarative contract
+├── discovery/        ← scan meta.yml + every lab.yaml of the current catalog
+├── services/         ← business orchestration (lab, progress, guide, doctor…)
+├── sessions/         ← SQLite persistence (results + hint_requests)
+├── runtimes/         ← BaseRuntime, ShellRuntime, VmRuntime, RuntimeManager
+├── infra/            ← Terraform, Ansible, inventory, snapshots, credentials
+├── validators/       ← structure, metadata and content of a catalog
+├── reporting/        ← Rich terminal output, and the JSON of --json
+├── utils/            ← centralized subprocess wrapper
+└── templates/        ← Terraform, cloud-init and the demonstration catalog
+```
+
+Two runtimes exist, and only two: `shell` and `vm`. The `kvm` and `incus`
+values of `runtime.type` are legacy aliases handled by `VmRuntime`; which
+backend actually serves a VM comes from `meta.yml: infra.provider`.
+
+`infra/inventory.py` is the public surface a catalog consumes: its `conftest.py`
+imports `build_inventory`, `read_terraform_outputs` and `write_ssh_config` to
+build the testinfra inventory without hardcoding a single IP address.
+
+The engine stays independent of any single repository layout: `discovery/`
+works on whatever tree the `meta.yml` declares.
 
 ## Quality gates
 
@@ -197,9 +230,9 @@ We use Conventional Commits with a module scope:
 
 Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `ci`. Examples:
 
-- `feat(discovery): support multi-repo via ~/.config/dsoxlab/config.yaml`
-- `fix(runtimes/kvm): make snapshot revert idempotent when snapshot is absent`
-- `docs(readme): document the incus runtime`
+- `feat(runtimes): declare containerized services in lab.yaml`
+- `fix(runtimes/vm): make snapshot revert idempotent when the snapshot is absent`
+- `docs(contract): document the meta.fr.yml overrides`
 
 Keep commits focused and the history readable. Before a grouped commit, check
 `git log --oneline -5` to match the style.

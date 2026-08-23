@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
 
     # ── Global options ────────────────────────────────────────────────────────
     "opt_help":     "Show this message and exit.",
-    "opt_lab_home": "Root of the linux-training repo (default: auto-detected).",
+    "opt_lab_home": "Root of the lab catalog (default: auto-detected).",
     "opt_json":           "JSON output, meant for programs (editor extension, dashboard). Nothing else is printed.",
     "opt_level":    "Filter by level (l1, l2, lfcs, rhcsa)",
     "opt_section":  "Filter by section (linux, ansible, terraform, docker…)",
@@ -321,7 +321,7 @@ Each lab declares:
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
 
-  [cyan]run <id>[/cyan]             Start the lab environment (shell, incus or KVM).
+  [cyan]run <id>[/cyan]             Start the lab environment (a shell, or a provisioned vm).
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
                        declares them (course.yaml), otherwise scenario + README.
@@ -435,10 +435,11 @@ Each lab declares:
 [bold]Runtimes[/bold]
 
   [bold]shell[/bold]   Simple exercises in the current shell — no VM required.
-  [bold]incus[/bold]   Container-based labs — lightweight, fast to start.
-  [bold]kvm[/bold]     Full virtual machine — required for persistence, services, storage.
+  [bold]vm[/bold]      Full machine — required for persistence, services, storage.
+          Which backend serves it (KVM/libvirt, Incus, Outscale) is declared by
+          the catalog in [bold]meta.yml: infra.provider[/bold], not by the lab.
 
-Use [bold]dsoxlab doctor[/bold] to check which runtimes are available on your machine.""",
+Use [bold]dsoxlab doctor[/bold] to check what is available on your machine.""",
 
     "fullhelp_language": """\
 [bold]Language[/bold]
