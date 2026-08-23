@@ -279,22 +279,23 @@ STRINGS: dict[str, str] = {
     "fullhelp_concept": """\
 [bold]Qu'est-ce que dsoxlab ?[/bold]
 
-dsoxlab est la CLI de la plateforme [bold cyan]DevSecOps XL Labs[/bold cyan] : une plateforme de
-formation pratique auto-portée, conçue pour accompagner les formations du site
-[bold]https://blog.stephane-robert.info/docs/[/bold]
+dsoxlab transforme des [bold]exercices déclaratifs[/bold] en environnements
+reproductibles, exécutables et vérifiables.
 
-Chaque [cyan]lab[/cyan] est un exercice autonome lié à un guide du site, portant sur une
-compétence précise : Linux, conteneurs, Kubernetes, IaC, sécurité, CI/CD…
+Un [bold]catalogue[/bold] est un dépôt qui déclare ce qu'il propose : un [cyan]meta.yml[/cyan] à la
+racine pour la topologie, un [cyan]lab.yaml[/cyan] par lab pour ce dont ce lab a besoin.
+Rien de spécifique à un domaine ne vit dans l'outil : le même moteur sert des
+labs Linux, Ansible, Terraform ou Kubernetes, et tout autre catalogue qui
+respecte le contrat.
 
-Les labs sont organisés par [bold]section[/bold] (linux, ansible, terraform, kubernetes…)
-et par [bold]niveau[/bold] (l1 → débutant, l2 → intermédiaire, lfcs, rhcsa).
+Les labs sont organisés par [bold]section[/bold] et par [bold]niveau[/bold], que le catalogue nomme lui-même.
 
-Chaque lab expose :
+Chaque lab déclare :
   • une [bold]compétence observable[/bold] à acquérir,
-  • un [bold]runtime[/bold] (shell, conteneur incus ou VM KVM),
-  • des [bold]tests automatiques[/bold] pour valider votre réponse,
+  • un [bold]runtime[/bold] ([bold]shell[/bold] sur votre poste, ou une [bold]vm[/bold] provisionnée pour vous),
+  • des [bold]tests automatiques[/bold] qui lisent l'état du système, pas les commandes tapées,
   • des [bold]indices[/bold] en cas de blocage (avec pénalité sur le score),
-  • un [bold]lien direct[/bold] vers le guide du site correspondant.""",
+  • un [bold]lien[/bold] vers le guide qui l'accompagne.""",
 
     "fullhelp_workflow": """\
 [bold]Workflow typique[/bold]

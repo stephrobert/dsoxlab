@@ -9,6 +9,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.59] - 2026-08-23
+
+### Modifié
+
+- **La description du projet disait ce que l'outil fait pour son auteur.**
+  « Un framework CLI neutre vis-à-vis du domaine qui pilote des labs répartis
+  dans plusieurs dépôts » était juste quand elle a été écrite. Ce qui a changé
+  depuis n'est pas une fonctionnalité, c'est la nature de l'outil : le contrat
+  déclaratif, les runtimes interchangeables, la validation et les diagnostics en
+  font un moteur que quelqu'un d'autre peut employer pour ses propres exercices.
+  Les quatre emplacements (`pyproject.toml`, la description GitHub, les deux
+  README et `fullhelp`) portent désormais la même phrase : dsoxlab transforme des
+  exercices déclaratifs en environnements **reproductibles, exécutables et
+  vérifiables**.
+
+- **`fullhelp` annonçait des runtimes qui n'existent plus.** Il promettait un
+  « conteneur incus ou VM KVM » là où le contrat n'expose que deux types,
+  `shell` et `vm` : Incus est un backend de `vm`, choisi par le `meta.yml` du
+  catalogue, pas un runtime que l'apprenant déclare. Il liait aussi chaque lab à
+  un guide d'un site précis, et énumérait des niveaux (`l1`, `lfcs`, `rhcsa`)
+  qui appartiennent à un catalogue particulier, alors que c'est le catalogue qui
+  nomme ses sections et ses niveaux.
+
 ## [0.1.58] - 2026-08-23
 
 ### Corrigé
