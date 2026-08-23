@@ -970,4 +970,8 @@ silent.
         '"{nom}" is not installed, or not on your PATH. dsoxlab needs it for this command; install it, then try again.',
     "err_fichier_introuvable":
         'File not found: "{nom}".',
+
+    # ── #132 : un « 0 lab » muet oblige à chercher ailleurs ──
+    "detail_labs_ecart":
+        "{ecart} of the {presents} lab.yaml files on disk could not be loaded. `dsoxlab list-labs` names them and says why.",
 }

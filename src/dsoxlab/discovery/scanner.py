@@ -53,10 +53,48 @@ class CatalogScan:
     labs: list[LabDefinition] = field(default_factory=list)
 
     unsupported: list[UnsupportedSchemaVersion] = field(default_factory=list)
+
+    #: Les `lab.yaml` que le parseur a refusés, et la raison. Ils n'allaient
+    #: qu'au journal, que rien n'affiche : un lab disparaissait alors sans
+    #: laisser de trace lisible, ce dont le CLAUDE.md fait son piège n°4.
+    illisibles: list[tuple[Path, str]] = field(default_factory=list)
+
+    #: Combien de `lab.yaml` ont été **rencontrés**, chargés ou non. C'est le
+    #: scanner qui compte, parce que lui seul sait où il cherche : sous `labs/`
+    #: mais aussi dans les `tp-*/` des anciens dépôts. Un appelant qui
+    #: recompterait de son côté finirait par diverger de cette règle.
+    fichiers_vus: int = 0
     """Les ``lab.yaml`` écartés parce qu'ils déclarent une version du contrat
     postérieure à celle que ce dsoxlab lit. Le reste du catalogue est servi
     normalement : un lab venu du futur ne doit pas rendre les 283 autres
     injouables, sans quoi aucun auteur ne pourrait jamais en publier un."""
+
+
+def _chemins_candidats(root: Path) -> list[Path]:
+    """Les fichiers où un `lab.yaml` peut se trouver, sous ``root``.
+
+    Extrait du balayage pour que :func:`compter_fichiers_labs` applique
+    exactement la même règle. Deux définitions de « où sont les labs » finiraient
+    par diverger, et c'est arrivé dès le premier essai : un comptage limité à
+    ``labs/`` ignorait les ``tp-*/`` des anciens dépôts.
+    """
+    chemins: list[Path] = []
+    if (root / "labs").exists():
+        chemins += list((root / "labs").glob("**/*.yaml"))
+    # Compat : tp-* à la racine (anciens dépôts)
+    chemins += list(root.glob("tp-*/lab.yaml"))
+    return chemins
+
+
+def compter_fichiers_labs(root: Path) -> int:
+    """Combien de `lab.yaml` existent sous ``root``, lisibles ou non.
+
+    Comparé au nombre de labs réellement chargés, l'écart désigne d'un coup les
+    trois façons dont un lab devient invisible : un ``schema_version`` trop
+    récent, un fichier qui lève au parsing, ou un lab déclaré au ``meta.yml``
+    mais absent du disque.
+    """
+    return sum(1 for p in _chemins_candidats(root) if p.name == "lab.yaml")
 
 
 def scan_catalog(
@@ -86,15 +124,10 @@ def scan_catalog(
 
     scan = CatalogScan()
 
-    search_paths: list[Path] = []
-    if (root / "labs").exists():
-        search_paths += list((root / "labs").glob("**/*.yaml"))
-    # Compat : tp-* à la racine (anciens dépôts)
-    search_paths += list(root.glob("tp-*/lab.yaml"))
-
-    for yaml_path in search_paths:
+    for yaml_path in _chemins_candidats(root):
         if yaml_path.name != "lab.yaml":
             continue
+        scan.fichiers_vus += 1
         try:
             lab = LabDefinition.from_yaml(yaml_path, lang=lang)
             _assign_section(lab, yaml_path, root, repo_meta)
@@ -116,6 +149,7 @@ def scan_catalog(
             scan.unsupported.append(exc)
         except (KeyError, ValueError, yaml.YAMLError) as exc:
             logger.warning("lab.yaml ignoré (%s) : %s", yaml_path, exc)
+            scan.illisibles.append((yaml_path, f"{type(exc).__name__}: {exc}"))
 
     scan.labs = _sort_labs(scan.labs, root, repo_meta)
     return scan

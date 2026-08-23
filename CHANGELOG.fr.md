@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.58] - 2026-08-23
+
+### Corrigé
+
+- **`doctor` affichait « 0 lab » sans dire pourquoi.** `list-labs` explique très
+  bien, lui : il nomme le fichier, la version en cause et la commande qui
+  répare. `doctor` se contentait d'un rouge muet, alors que c'est lui qu'on
+  lance quand quelque chose cloche, et lui qu'on colle dans un rapport de bug.
+  Le contrôle compare désormais les `lab.yaml` **présents sur le disque** aux
+  labs réellement chargés, et nomme l'écart. Cet écart couvre d'un coup les
+  trois façons dont un lab devient invisible, sans avoir à deviner laquelle
+  s'applique : un `schema_version` trop récent, un fichier qui lève au parsing,
+  ou un lab déclaré au `meta.yml` mais absent du disque.
+
+- **Un `lab.yaml` qui lève au parsing n'allait qu'au journal**, que rien
+  n'affiche : il disparaissait sans laisser de trace exploitable, ce dont le
+  `CLAUDE.md` fait son piège n°4. `CatalogScan` retient désormais le chemin et
+  la raison.
+
+### Interne
+
+- La règle de recherche des `lab.yaml` est extraite dans le scanner et exposée
+  par `compter_fichiers_labs()`. Un premier jet la dupliquait dans `doctor`, et
+  les deux définitions divergeaient dès l'écriture : le comptage ignorait les
+  `tp-*/` que le scanner accepte pour les anciens dépôts.
+
 ## [0.1.57] - 2026-08-23
 
 ### Corrigé

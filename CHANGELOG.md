@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.58] - 2026-08-23
+
+### Fixed
+
+- **`doctor` reported "0 labs" without saying why.** `list-labs` explains it
+  well: it names the file, the offending version and the command that fixes it.
+  `doctor` showed a silent red, although it is the command people run when
+  something is wrong, and the one they paste into a bug report. The check now
+  compares the `lab.yaml` files **present on disk** with the labs actually
+  loaded, and names the gap. That gap covers all three ways a lab becomes
+  invisible at once, with no need to guess which one applies: a `schema_version`
+  that is too new, a file that raises while parsing, or a lab declared in
+  `meta.yml` but missing from disk.
+
+- **A `lab.yaml` that raises while parsing only went to the log**, which nothing
+  displays: it vanished without a usable trace — trap #4 in the repository's
+  `CLAUDE.md`. `CatalogScan` now keeps the path and the reason.
+
+### Internal
+
+- The `lab.yaml` search rule is extracted into the scanner and exposed through
+  `compter_fichiers_labs()`. A first attempt duplicated it inside `doctor`, and
+  the two definitions diverged as they were written: the count ignored the
+  `tp-*/` layout the scanner accepts for older repositories.
+
 ## [0.1.57] - 2026-08-23
 
 ### Fixed

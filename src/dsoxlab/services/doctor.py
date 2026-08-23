@@ -33,6 +33,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..discovery.scanner import compter_fichiers_labs
 from ..i18n import _
 from ..infra import ansible as ansible_infra
 from ..models import LabDefinition, RepoMetadata
@@ -477,11 +478,24 @@ def _check_iso_tool() -> Check:
     )
 
 
-def _check_labs(root: Path, labs: list[LabDefinition]) -> Check:
-    return Check(
-        _("check_labs"), len(labs) > 0,
-        _("detail_labs_count", count=len(labs), root=root),
-    )
+def _check_labs(root: Path, labs: list[LabDefinition], vus: int) -> Check:
+    """Le compte des labs, et **ce qui manque** quand il ne colle pas.
+
+    Un « 0 lab » muet oblige l'utilisateur à retrouver seul une information que
+    `list-labs` possède déjà. Trois causes rendent un lab invisible : un
+    `schema_version` trop récent, un `lab.yaml` qui lève au parsing, ou un lab
+    déclaré dans le `meta.yml` mais absent du disque. Plutôt que de deviner
+    laquelle s'applique, on compare les fichiers présents aux labs chargés :
+    l'écart les couvre toutes les trois.
+    """
+    ecart = vus - len(labs)
+    detail = _("detail_labs_count", count=len(labs), root=root)
+    if ecart > 0:
+        detail += " " + _("detail_labs_ecart", ecart=ecart, presents=vus)
+    # Seul un écart POSITIF dit quelque chose : des fichiers présents que le
+    # moteur n'a pas su charger. L'inverse ne peut pas venir d'un catalogue réel,
+    # et vaut zéro information.
+    return Check(_("check_labs"), len(labs) > 0 and ecart <= 0, detail)
 
 
 def _check_lab_home(root: Path) -> Check:
@@ -582,6 +596,6 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         elif active == "incus" and hypervisors["incus"].ok:
             report.required.append(_check_iso_tool())
 
-    report.required.append(_check_labs(root, labs))
+    report.required.append(_check_labs(root, labs, compter_fichiers_labs(root)))
     report.required.append(_check_lab_home(root))
     return report

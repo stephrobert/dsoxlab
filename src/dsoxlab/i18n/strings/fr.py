@@ -981,4 +981,8 @@ hors ligne, elle se tait.
         "« {nom} » n'est pas installé, ou n'est pas dans ton PATH. dsoxlab en a besoin pour cette commande : installe-le, puis relance.",
     "err_fichier_introuvable":
         'Fichier introuvable : « {nom} ».',
+
+    # ── #132 : un « 0 lab » muet oblige à chercher ailleurs ──
+    "detail_labs_ecart":
+        "{ecart} des {presents} fichiers lab.yaml présents sur le disque n'ont pas pu être chargés. « dsoxlab list-labs » les nomme et dit pourquoi.",
 }
