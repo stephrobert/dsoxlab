@@ -161,6 +161,23 @@ class _I18nGroup(TyperGroup):
             return super().invoke(ctx)
         except KeyboardInterrupt:
             raise Interrupted(Stage.UNKNOWN) from None
+        except FileNotFoundError as exc:
+            # Un binaire absent remontait jusqu'à l'interpréteur, et une trace
+            # Python dit « l'outil est cassé » alors qu'il manque le plus
+            # souvent un paquet que l'apprenant peut poser lui-même. Toutes les
+            # autres erreurs attendues sont déjà converties en message + code ;
+            # celle-ci ne l'était pas, faute d'un endroit qui la voie passer.
+            manquant = exc.filename or str(exc)
+            # Un nom sans séparateur a été cherché dans le PATH : c'est la
+            # définition d'un exécutable introuvable, et 127 est le code que le
+            # shell rend dans ce cas. Un chemin, lui, désigne un fichier.
+            est_executable = "/" not in str(manquant)
+            error(_(
+                "err_executable_introuvable" if est_executable
+                else "err_fichier_introuvable",
+                nom=manquant,
+            ))
+            raise typer.Exit(127 if est_executable else 2) from None
 
 
 app = typer.Typer(

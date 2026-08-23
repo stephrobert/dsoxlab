@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.57] - 2026-08-23
+
+### Fixed
+
+- **A missing executable produced a Python traceback.** The CLI carefully turns
+  `CommandError`, `DomainNotFound`, `UnsupportedSchemaVersion` and the contract
+  errors into a translated message plus an exit code; `FileNotFoundError` went
+  straight through to the interpreter. A traceback says "the tool is broken"
+  when what is usually missing is a binary the learner can install themselves.
+  The net sits in `_I18nGroup.invoke`, alongside the Ctrl-C one: the only point
+  that covers all twenty-four commands without instrumenting any of them. A name
+  with no separator was looked up in `PATH`, so it is an executable and the exit
+  code is **127**, the one the shell uses for "command not found"; a path is a
+  file and yields **2**.
+
+### Changed
+
+- **`click` is no longer a declared dependency.** Its last importer went away in
+  0.1.50 with the completion migration to `autocompletion=`, and typer 0.27 no
+  longer depends on click: it vendors it. The dependency was installed for
+  nothing. Verified after removal: `click` disappears from `uv.lock` entirely,
+  all 544 unit tests and 16 end-to-end tests pass, and the installed wheel still
+  drives the three catalogues.
+
 ## [0.1.56] - 2026-08-21
 
 ### Fixed

@@ -9,6 +9,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.57] - 2026-08-23
+
+### Corrigé
+
+- **Un exécutable absent rendait une trace Python.** La CLI convertit
+  soigneusement `CommandError`, `DomainNotFound`, `UnsupportedSchemaVersion` et
+  les erreurs du contrat en message traduit suivi d'un code de sortie ;
+  `FileNotFoundError`, lui, traversait tout et remontait à l'interpréteur. Or
+  une trace dit « l'outil est cassé » alors qu'il manque le plus souvent un
+  binaire que l'apprenant peut poser lui-même. Le filet est posé dans
+  `_I18nGroup.invoke`, au même endroit que celui du Ctrl-C : c'est le seul point
+  qui couvre les vingt-quatre commandes sans en instrumenter aucune. Un nom sans
+  séparateur a été cherché dans le `PATH`, donc c'est un exécutable et le code
+  rendu est **127**, celui que le shell emploie pour « command not found » ; un
+  chemin désigne un fichier et rend **2**.
+
+### Changé
+
+- **`click` n'est plus une dépendance déclarée.** Son dernier importeur a
+  disparu en 0.1.50 avec la migration de la complétion vers `autocompletion=`,
+  et typer 0.27 ne dépend plus de click : il le vendore. La dépendance était
+  donc installée pour rien. Vérifié après retrait : `click` disparaît
+  complètement de `uv.lock`, les 544 tests et les 16 tests de bout en bout
+  passent, et la roue installée pilote toujours les trois catalogues.
+
 ## [0.1.56] - 2026-08-21
 
 ### Corrigé
