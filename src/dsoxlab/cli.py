@@ -24,7 +24,6 @@ from __future__ import annotations
 import atexit
 import logging
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -200,6 +199,17 @@ instructor_app = typer.Typer(
     cls=_I18nGroup,
 )
 app.add_typer(instructor_app, name="instructor")
+
+# ── Sous-application 'completion' ─────────────────────────────────────────────
+
+completion_app = typer.Typer(
+    name="completion",
+    help=_("cmd_completion_help"),
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+    cls=_I18nGroup,
+)
+app.add_typer(completion_app, name="completion")
 
 # ── Option globale lab-home ───────────────────────────────────────────────────
 
@@ -585,35 +595,38 @@ _PROG_NAME = "dsoxlab"
 _COMPLETE_VAR = f"_{_PROG_NAME.replace('-', '_').upper()}_COMPLETE"
 
 
-@app.command("install", help=_("cmd_install_help"))
-def install() -> None:
-    """Install the dsoxlab wrapper in ~/.local/bin and shell completion."""
+#: Ce que dsoxlab ajoute au script que typer génère pour zsh, et pourquoi.
+#:
+#: Le commentaire part DANS le fichier installé, à dessein : sans lui, la ligne
+#: ressemble à une scorie qu'un lecteur pressé retirerait, et le défaut
+#: reviendrait sans que personne ne comprenne pourquoi.
+_ZSH_PREMIER_TAB = """
+# ── ajouté par dsoxlab, et pas par typer ──────────────────────────────────────
+# zsh autoload ce fichier au PREMIER Tab, et attend qu'il produise les
+# propositions de cette invocation-là. Le script amont se contente de définir la
+# fonction puis de l'enregistrer pour la suite : la première tabulation ne rend
+# donc rien, et la seconde fonctionne. Un Tab muet se lit comme « la complétion
+# ne marche pas », et personne ne rappuie pour vérifier.
+# Ne pas retirer cette ligne sans rejouer le cas dans un zsh réel.
+_dsoxlab_completion "$@"
+"""
+
+
+def _script_completion(shell: str) -> str:
+    """Le script de complétion pour ``shell``, corrigé pour zsh (#134)."""
     from typer.completion import get_completion_script
 
-    # ── 1. Wrapper script in ~/.local/bin ─────────────────────────────────────
-    local_bin = Path.home() / ".local" / "bin"
-    local_bin.mkdir(parents=True, exist_ok=True)
+    script = get_completion_script(
+        prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell=shell
+    )
+    # bash source son script au démarrage du shell, fish le charge par fichier
+    # de complétion : ni l'un ni l'autre ne passe par l'autoload qui pose
+    # problème. La divergence ne vaut donc que pour zsh.
+    return script + _ZSH_PREMIER_TAB if shell == "zsh" else script
 
-    venv_binary = Path(sys.argv[0]).resolve()
-    wrapper = local_bin / "dsoxlab"
 
-    # Ne pas écraser un lanceur qui mène déjà à ce binaire. `uv tool install` et
-    # `pipx` en posent un exactement ici : le remplacer par un script shell ne
-    # fait que défaire ce que leur prochaine mise à jour remettra. Surtout, si ce
-    # lanceur EST le fichier qu'on vient de résoudre (cas d'un vrai fichier
-    # plutôt que d'un lien), le wrapper s'exécuterait lui-même, en boucle.
-    if wrapper.exists() and wrapper.resolve() == venv_binary:
-        info(_("install_wrapper_deja", path=str(wrapper)))
-    else:
-        # shlex.quote : un chemin d'installation contenant une espace
-        # (« /home/moi/My Tools/… ») produisait un `exec` découpé en plusieurs
-        # arguments, donc un wrapper qui échouait sur « not found ».
-        cible = shlex.quote(str(venv_binary))
-        wrapper.write_text(f'#!/bin/sh\nexec {cible} "$@"\n')
-        wrapper.chmod(0o755)
-        success(_("install_wrapper", path=str(wrapper), source=str(venv_binary)))
-
-    # ── 2. Shell completion ────────────────────────────────────────────────────
+def _installer_completion() -> None:
+    """Pose le script de complétion du shell courant, et raccorde son rc."""
     shell_name = Path(os.environ.get("SHELL", "bash")).name
 
     if shell_name == "zsh":
@@ -622,10 +635,7 @@ def install() -> None:
         # Le nom du fichier compte : zsh autoload la fonction `_dsoxlab` pour
         # compléter `dsoxlab`, et cherche donc un fichier de ce nom exact.
         comp_file = zfunc_dir / f"_{_PROG_NAME}"
-        script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("zsh"), pas un subprocess shell=True
-            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="zsh"
-        )
-        comp_file.write_text(script)
+        comp_file.write_text(_script_completion("zsh"))
         success(_("install_completion", path=str(comp_file)))
 
         zshrc = Path.home() / ".zshrc"
@@ -644,10 +654,7 @@ def install() -> None:
         bash_comp_dir = Path.home() / ".bash_completion.d"
         bash_comp_dir.mkdir(exist_ok=True)
         comp_file = bash_comp_dir / "dsoxlab"
-        script = get_completion_script(  # noqa: S604 — `shell` = nom du shell Typer ("bash"), pas un subprocess shell=True
-            prog_name=_PROG_NAME, complete_var=_COMPLETE_VAR, shell="bash"
-        )
-        comp_file.write_text(script)
+        comp_file.write_text(_script_completion("bash"))
         success(_("install_completion", path=str(comp_file)))
 
         bashrc = Path.home() / ".bashrc"
@@ -660,7 +667,39 @@ def install() -> None:
 
     else:
         info(_("install_completion_unsupported", shell=shell_name))
-        info(_("install_reload"))
+    info(_("install_reload"))
+
+
+@completion_app.command("install", help=_("cmd_completion_install_help"))
+def completion_install() -> None:
+    _installer_completion()
+
+
+@completion_app.command("show", help=_("cmd_completion_show_help"))
+def completion_show(
+    shell: Annotated[str | None, typer.Option("--shell", help=_("opt_completion_shell"))] = None,
+) -> None:
+    """Imprime le script, sans rien écrire : à rediriger où l'on veut."""
+    nom = shell or Path(os.environ.get("SHELL", "bash")).name
+    if nom not in ("zsh", "bash", "fish"):
+        error(_("install_completion_unsupported", shell=nom))
+        raise typer.Exit(2)
+    # `print` et non `info` : c'est une sortie destinée à être redirigée, elle
+    # ne doit porter ni couleur ni encadrement.
+    print(_script_completion(nom))
+
+
+@app.command("install", help=_("cmd_install_help"))
+def install() -> None:
+    """Déprécié depuis 0.1.62, retiré en 0.3.0 : voir `completion install`.
+
+    Le nom promettait d'installer l'outil, déjà installé. La commande posait en
+    plus un wrapper dans ``~/.local/bin``, exactement où ``uv tool install`` et
+    ``pipx`` posent le leur : le remplacer ne faisait que défaire ce que leur
+    prochaine mise à jour remettrait. Il n'est donc plus écrit du tout.
+    """
+    warn(_("install_deprecie"))
+    _installer_completion()
 
 
 # ── use ──────────────────────────────────────────────────────────────────────

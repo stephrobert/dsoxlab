@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.62] - 2026-08-24
+
+### Fixed
+
+- **The first `Tab` of a session proposed nothing**, the second one worked. zsh
+  loads the `#compdef` file on the first tab and expects it to produce the
+  completions **for that very invocation**; the script typer generates only
+  defines the function and registers it for later. A silent `Tab` reads as
+  "completion does not work", and nobody presses a second time to check a
+  feature they believe is missing: the cost is a silent give-up, not an
+  annoyance. The installed script now calls its function after registering it,
+  and the reason for that divergence from upstream is written **inside the file
+  it drops**, so nobody removes it later without knowing why it is there.
+  Reproduced and verified in a real zsh under a pseudo-terminal, before and
+  after: calling the completion mechanism directly does not cross the layer at
+  fault.
+
+### Added
+
+- **`dsoxlab completion install` and `dsoxlab completion show`.** The first
+  installs shell completion, the second prints the script without writing
+  anything, for those who would rather place it themselves.
+
+### Deprecated
+
+- **`dsoxlab install` is deprecated and will be removed in 0.3.0.** It was the
+  first command name a user saw in the help, and it promised to install the
+  tool, which is already installed. It still does what `completion install`
+  does, and says so.
+
+  It **no longer writes a wrapper** in `~/.local/bin`. Two real defects came
+  from that file: a path containing a space broke the `exec` for lack of
+  quoting, and above all `write_text()` on a symlink writes into **the target**,
+  so uv's real binary was replaced by a script pointing at itself. `uv tool
+  install` and `pipx` already put their launcher exactly there: replacing it
+  only undid what their next update would restore.
+
 ## [0.1.61] - 2026-08-24
 
 ### Added

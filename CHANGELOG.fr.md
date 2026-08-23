@@ -9,6 +9,44 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.62] - 2026-08-24
+
+### Corrigé
+
+- **Le premier `Tab` d'une session ne proposait rien**, le second fonctionnait.
+  zsh charge le fichier `#compdef` à la première tabulation et attend qu'il
+  produise les propositions **de cette invocation-là** ; le script que typer
+  génère se contente de définir la fonction, puis de l'enregistrer pour la
+  suite. Un `Tab` muet se lit comme « la complétion ne marche pas », et personne
+  ne rappuie une seconde fois pour vérifier une fonctionnalité qu'il croit
+  absente : le coût est un abandon silencieux, pas une gêne. Le script installé
+  appelle désormais sa fonction après l'avoir enregistrée, et la raison de cette
+  divergence avec l'amont est écrite **dans le fichier posé**, pour que personne
+  ne la retire un jour sans savoir pourquoi elle existe. Reproduit et vérifié
+  dans un zsh réel sous pseudo-terminal, avant et après : un appel direct au
+  mécanisme de complétion ne traverse pas la couche en cause.
+
+### Ajouté
+
+- **`dsoxlab completion install` et `dsoxlab completion show`.** Le premier
+  installe l'auto-complétion, le second imprime le script sans rien écrire, pour
+  qui veut le poser lui-même.
+
+### Déprécié
+
+- **`dsoxlab install` est déprécié, et sera retiré en 0.3.0.** C'était le premier
+  nom de commande que voyait un utilisateur dans l'aide, et il promettait
+  d'installer l'outil, déjà installé. Il continue de faire ce que fait
+  `completion install`, en le signalant.
+
+  Il **n'écrit plus de wrapper** dans `~/.local/bin`. Deux défauts vécus tenaient
+  à ce fichier : un chemin contenant une espace cassait le `exec` faute de
+  quoting, et surtout `write_text()` sur un lien symbolique écrit dans **la
+  cible**, donc le binaire réel d'`uv` était remplacé par un script pointant sur
+  lui-même. `uv tool install` et `pipx` posent déjà leur lanceur exactement là :
+  le remplacer ne faisait que défaire ce que leur prochaine mise à jour
+  remettrait.
+
 ## [0.1.61] - 2026-08-24
 
 ### Ajouté

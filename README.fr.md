@@ -272,6 +272,8 @@ test référencés sont présents.
 | `dsoxlab challenge` | Affiche la mission du challenge (challenge/README.md). |
 | `dsoxlab check` | Exécute les tests, calcule le score (hints déduits) et enregistre le résultat. |
 | `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
+| `dsoxlab completion install` | Installe l'auto-complétion pour le shell courant (zsh, bash). |
+| `dsoxlab completion show` | Imprime le script de complétion sur la sortie standard, sans rien écrire. |
 | `dsoxlab course` | Affiche une section du cours, ou le sommaire si aucune section n'est précisée. |
 | `dsoxlab demo` | Installe un catalogue de démonstration et joue un premier lab, sans rien cloner ni provisionner. |
 | `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises. |
@@ -279,7 +281,7 @@ test référencés sont présents.
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
 | `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
-| `dsoxlab install` | Installe le wrapper dsoxlab dans ~/.local/bin et l'auto-complétion shell. |
+| `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |
 | `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |
 | `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
 | `dsoxlab next` | Recommande le prochain lab ou challenge à compléter dans le contexte actif. |
