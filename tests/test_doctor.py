@@ -68,8 +68,8 @@ def stub_hypervisors(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         doctor, "_hypervisor_checks",
         lambda: {
-            "kvm": doctor.Check(_("check_kvm"), False, "not found", fix="apt install"),
-            "incus": doctor.Check(_("check_incus"), True, "daemon ok"),
+            "kvm": doctor._check("kvm", False, "not found", fix="apt install"),
+            "incus": doctor._check("incus", True, "daemon ok"),
         },
     )
 
@@ -86,11 +86,11 @@ def _outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setattr(
         doctor, "_check_terraform",
-        lambda: doctor.Check(_("check_terraform"), True, "Terraform v1.0.0"),
+        lambda: doctor._check("terraform", True, "Terraform v1.0.0"),
     )
     monkeypatch.setattr(
         doctor, "_check_ansible",
-        lambda: doctor.Check(_("check_ansible"), True, "ok"),
+        lambda: doctor._check("ansible", True, "ok"),
     )
 
 
@@ -190,9 +190,9 @@ def test_unresolved_provider_is_a_decision_not_a_failure(
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
 
-    provider = next(c for c in report.required if c.label == _("check_provider"))
+    provider = next(c for c in report.required if c.key == "provider")
     assert not provider.ok
-    assert provider.status_key == "status_choose"
+    assert provider.state == doctor.STATE_CHOICE_REQUIRED
     assert provider.fix is None
     assert "use --provider kvm" in (provider.hint or "")
     assert not report.fixable()

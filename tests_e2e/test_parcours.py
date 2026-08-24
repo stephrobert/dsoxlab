@@ -183,3 +183,53 @@ def test_le_catalogue_package_passe_son_validateur(poste: Poste, catalogue: Path
     resultat = poste.lance("validate-structure", cwd=catalogue)
 
     assert resultat.returncode == 0, resultat.stdout[-2000:]
+
+
+# ── toute l'interface machine, par le binaire installé ───────────────────────
+
+def test_chaque_document_se_lit_sans_reste(poste: Poste, catalogue: Path) -> None:
+    """Les cinq documents ajoutés, lus par un vrai sous-processus.
+
+    La suite unitaire capture des flux dans le même interpréteur ; celle-ci lit
+    ce qu'un tube reçoit vraiment. C'est la seule qui verrait un avis parti sur
+    la sortie standard depuis une bibliothèque, ou un `print` de dépendance.
+    """
+    poste.lance("use", "demo", cwd=catalogue)
+
+    for commande in (
+        ["show", LAB_DEMO],
+        ["scores"],
+        ["next"],
+        ["doctor"],
+        ["validate-structure"],
+        ["list-labs"],
+        ["progress"],
+    ):
+        resultat = poste.lance(*commande, "--json", cwd=catalogue)
+        assert resultat.returncode == 0, resultat.stderr[-2000:]
+        document = _document(resultat.stdout)
+        assert document["schema"] >= 1, commande
+
+
+def test_le_verdict_ne_depend_pas_de_la_forme(poste: Poste, catalogue: Path) -> None:
+    """`--json` change la forme de la sortie, jamais le code de retour.
+
+    Éprouvé sur `validate-structure`, la seule commande de lecture qui rende un
+    verdict et puisse sortir en 1. Le catalogue est cassé pour l'occasion, puis
+    remis en état, pour que la comparaison porte sur un cas non trivial.
+    """
+    lab = catalogue / "labs" / "demo" / LAB_DEMO
+    scenario = lab / "scenario.md"
+    garde = scenario.read_text(encoding="utf-8")
+    scenario.unlink()
+    try:
+        terminal = poste.lance("validate-structure", cwd=catalogue)
+        machine = poste.lance("validate-structure", "--json", cwd=catalogue)
+    finally:
+        scenario.write_text(garde, encoding="utf-8")
+
+    assert terminal.returncode == 1, terminal.stdout[-2000:]
+    assert machine.returncode == 1, machine.stdout[-2000:]
+    document = _document(machine.stdout)
+    assert document["ok"] is False
+    assert document["counts"]["structure"] >= 1, document

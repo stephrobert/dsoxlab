@@ -21,7 +21,7 @@ from rich.tree import Tree
 from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
-from ..services.doctor import Check, DoctorReport
+from ..services.doctor import STATE_CHOICE_REQUIRED, Check, DoctorReport
 from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
 
@@ -280,6 +280,20 @@ def print_structure_reports(reports: list[StructureReport]) -> None:
 
 # ── doctor ────────────────────────────────────────────────────────────────────
 
+def _libelle_statut(check: Check, *, blocking: bool) -> str:
+    """Le mot qui rend l'état d'un contrôle, dans la langue du lecteur.
+
+    L'état, lui, est un jeton stable porté par le contrôle. Un composant
+    informatif absent n'est pas un échec, et le vocabulaire change donc de
+    tableau ; ce qu'une intégration lit, elle, ne change jamais.
+    """
+    if check.state == STATE_CHOICE_REQUIRED:
+        return _("status_choose")
+    if blocking:
+        return _("status_ok") if check.ok else _("status_ko")
+    return _("status_present") if check.ok else _("status_absent")
+
+
 def _doctor_table(title: str, checks: list[Check], *, blocking: bool) -> Table:
     """Un tableau de checks.
 
@@ -294,12 +308,7 @@ def _doctor_table(title: str, checks: list[Check], *, blocking: bool) -> Table:
     table.add_column(_('col_remediation'))
 
     for check in checks:
-        if check.status_key:
-            status = _(check.status_key)
-        elif blocking:
-            status = _('status_ok') if check.ok else _('status_ko')
-        else:
-            status = _('status_present') if check.ok else _('status_absent')
+        status = _libelle_statut(check, blocking=blocking)
         remediation = "" if check.ok else f"[dim]{check.remediation}[/dim]"
         table.add_row(check.label, status, check.detail, remediation)
     return table
@@ -737,6 +746,7 @@ def print_fullhelp() -> None:
         ("fullhelp_concept",  None),
         ("fullhelp_workflow", None),
         ("fullhelp_commands", None),
+        ("fullhelp_machine",  None),
         ("fullhelp_runtimes", None),
         ("fullhelp_language", None),
         ("fullhelp_scoring",  None),
