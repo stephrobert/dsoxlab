@@ -933,6 +933,14 @@ silent.
     # ── git and docker: two tools nothing declared ──────────────────────────
     "check_git": "git",
     "check_docker": "Docker",
+    "check_egress": "Outbound access",
+    "detail_egress_absent":
+        "no image mirror is reachable ({hosts}): provisioning will download an "
+        "image and cloud-init will install packages, both will fail",
+    "detail_egress_indetermine":
+        "no template declares an image: nothing can be concluded",
+    "reason_egress_sans_vm":
+        "Outbound access is informational: this repository provisions no VM.",
     "detail_git_missing":
         "git is missing: 'dsoxlab catalog add' clones a repository and cannot "
         "work without it",
@@ -1212,6 +1220,11 @@ silent.
     "err_inventory_role_unknown":
         "role '{role}' → '{fqdn}' is not in the list of known hosts: {known} "
         "(host not declared in meta.yml, or not provisioned).",
+    "cloud_init_degrade":
+        "{host}: cloud-init finished with an error (code {code}). The packages "
+        "it installs on first boot may be missing, and labs relying on them "
+        "will fail. Detail:\n{detail}",
+    "cloud_init_sans_detail": "cloud-init said nothing more.",
     "err_host_ready_timeout":
         "{fqdn} is unreachable over SSH after {timeout}s "
         "(cloud-init too slow, or the VM failed to boot).",

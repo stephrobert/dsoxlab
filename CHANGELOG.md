@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.81] - 2026-08-24
+
+### Fixed
+
+- **A cloud-init that finished badly now says so** (issue #178).
+  `wait_for_hosts_ready` ran `cloud-init status --wait >/dev/null 2>&1 || true`:
+  both the state *and* the return code went to the bin. Offline, behind a proxy
+  or on a slow mirror, the fifteen first-boot packages do not install,
+  cloud-init ends up `degraded`, and the host was **still declared ready** —
+  labs then failed on missing commands with nothing linking the two. Not
+  blocking remains the right call: what matters to hand back control is that
+  cloud-init has *finished*. But finishing badly must be said.
+
+### Added
+
+- **`doctor` gains an `egress` check.** Provisioning downloads an image, then
+  cloud-init installs packages: without outbound access both fail. The mirrors
+  it probes are **read from the packaged templates**, never written into the
+  engine, and a single reachable mirror is enough to conclude — what is at
+  stake is outbound access itself, not one mirror's availability. Required on a
+  repository that provisions VMs, informational otherwise.
+
+### Documentation
+
+- **The first-boot package decision is written down**, in
+  `templates/cloud-init/README.md`. Blocking on a `degraded` was rejected —
+  cloud-init reports a global state, so it would treat a missing `tree` like a
+  missing `lvm2`. Pre-baked images are the real answer but a project of their
+  own. Per-lab package declarations would change the frozen v1 contract. What
+  was retained is making the failure visible at the three moments that matter:
+  before, during, and in the message that names the host.
+
+
 ## [0.1.80] - 2026-08-24
 
 ### Added

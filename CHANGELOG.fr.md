@@ -9,6 +9,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.81] - 2026-08-24
+
+### Corrigé
+
+- **Un cloud-init qui a mal fini le dit désormais** (issue #178).
+  `wait_for_hosts_ready` jouait `cloud-init status --wait >/dev/null 2>&1 ||
+  true` : l'état **et** le code de retour partaient tous les deux à la poubelle.
+  Hors ligne, derrière un proxy ou sur un miroir lent, les quinze paquets du
+  premier démarrage ne s'installent pas, cloud-init finit en `degraded`, et
+  l'hôte était **tout de même déclaré prêt** — les labs échouaient ensuite sur
+  des commandes absentes, sans que rien ne relie les deux. Ne pas bloquer reste
+  la bonne décision : ce qui compte pour rendre la main, c'est que cloud-init
+  ait *terminé*. Mais terminer mal doit se dire.
+
+### Ajouté
+
+- **`doctor` gagne un contrôle `egress`.** Le provisionnement télécharge une
+  image, puis cloud-init installe des paquets : sans accès sortant, les deux
+  échouent. Les miroirs sondés sont **lus dans les templates packagés**, jamais
+  écrits dans le moteur, et un seul miroir joignable suffit à conclure — ce qui
+  est en cause est l'accès sortant lui-même, pas la disponibilité d'un miroir.
+  Requis sur un dépôt qui provisionne des VM, informatif sinon.
+
+### Documentation
+
+- **La décision sur les paquets du premier démarrage est écrite**, dans
+  `templates/cloud-init/README.md`. Bloquer sur un `degraded` a été écarté :
+  cloud-init rend un état global, et traiterait donc un `tree` absent comme un
+  `lvm2` absent. Les images pré-cuites sont la vraie réponse, mais un projet à
+  part entière. Déclarer les paquets lab par lab changerait le contrat v1, gelé.
+  Ce qui est retenu, c'est de rendre l'échec visible aux trois moments qui
+  comptent : avant, pendant, et dans le message qui nomme l'hôte.
+
+
 ## [0.1.80] - 2026-08-24
 
 ### Ajouté

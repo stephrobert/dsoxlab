@@ -170,7 +170,7 @@ def test_shell_only_repo_never_shows_a_red_hypervisor(
     report = doctor.collect_checks(tmp_path, _repo())
 
     assert _labels(report.optional) == {_("check_kvm"), _("check_incus"),
-                                       _("check_docker")}
+                                       _("check_docker"), _("check_egress")}
     assert not report.failing()
     assert report.notes
 

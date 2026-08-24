@@ -187,6 +187,11 @@ def provision(
     for message in result.warnings:
         warn(message)
 
+    # Déclaré ici, avant tout branchement : quand il n'y a aucun hôte à
+    # attendre, le bloc plus bas n'est pas entré, et la boucle d'affichage
+    # doit quand même avoir une liste à parcourir.
+    avertissements_cloud_init: list[str] = []
+
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
     # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
     # échoue en « unreachable » car la VM boote encore.
@@ -226,7 +231,11 @@ def provision(
 
             try:
                 with interruptible(Stage.HOSTS_WAIT):
-                    wait_for_hosts_ready(
+                    # Les hôtes sont joignables, mais leur cloud-init a
+                    # peut-être mal fini : sans ces avertissements, les labs
+                    # échoueraient plus tard sur des paquets absents, sans que
+                    # rien ne relie l'échec au provisionnement.
+                    avertissements_cloud_init = wait_for_hosts_ready(
                         repo_meta, ready_hosts, on_attempt=_on_attempt
                     )
             except HostReadyTimeout as exc:
@@ -244,6 +253,12 @@ def provision(
                 # et reprend exactement ici.
                 progress.stop()
                 _interrompu(exc, "dsoxlab provision")
+
+    # Les hôtes répondent, mais leur configuration a peut-être mal fini. Le dire
+    # ici, à l'écran, et non dans un journal : c'est la seule occasion de relier
+    # un paquet absent au provisionnement qui n'a pas pu l'installer.
+    for message in avertissements_cloud_init:
+        warn(message)
 
     # Le fragment SSH, écrit à CHAQUE provision et non seulement quand des
     # machines viennent d'être créées : relancer un provision sur une infra
