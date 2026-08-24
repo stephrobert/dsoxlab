@@ -599,7 +599,7 @@ def test_run_interrompu_sort_en_130_et_dit_comment_reprendre(
     def _setup_interrompu(*args: Any, **kwargs: Any) -> None:
         raise Interrupted(Stage.ANSIBLE)
 
-    monkeypatch.setattr(cli_mod, "run_lab", _setup_interrompu)
+    monkeypatch.setattr(cli_mod.parcours, "run_lab", _setup_interrompu)
     monkeypatch.setenv("DSOXLAB_LANG", "en")
 
     code = _sortie(
@@ -629,7 +629,7 @@ def test_un_ctrl_c_sans_proprietaire_se_dit_quand_meme(
     def _liste_interrompue(*args: Any, **kwargs: Any) -> None:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli_mod, "get_best_scores", _liste_interrompue)
+    monkeypatch.setattr(cli_mod.contexte, "get_best_scores", _liste_interrompue)
     monkeypatch.setenv("DSOXLAB_LANG", "en")
 
     code = _sortie(

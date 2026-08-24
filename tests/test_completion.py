@@ -188,7 +188,7 @@ def test_toute_panne_de_lecture_est_avalee(
     def boum(*_args: object, **_kwargs: object) -> list[object]:
         raise MemoryError("panne qu'aucun appelant n'anticipe")
 
-    monkeypatch.setattr(cli, "get_all_labs", boum)
+    monkeypatch.setattr(cli._commun, "get_all_labs", boum)
 
     assert _tab(catalogue, "dsoxlab run ").strip() == "_files"
 

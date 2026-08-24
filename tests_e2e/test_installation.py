@@ -86,7 +86,14 @@ def test_l_outil_teste_est_bien_la_roue_installee(installation: Installation) ->
     assert installation.venv in installation.binaire.parents
 
     pose = installation.site_packages / "dsoxlab"
-    assert (pose / "cli.py").is_file(), "le paquet n'est pas installé en dur"
+    assert (pose / "cli" / "__init__.py").is_file(), (
+        "le paquet n'est pas installé en dur"
+    )
+    # La CLI est un paquet depuis 0.1.69 : vérifier son seul `__init__.py`
+    # laisserait passer une roue à qui il manquerait les modules de commandes,
+    # c'est-à-dire une CLI installée sans aucune commande.
+    modules = sorted(m.name for m in (pose / "cli").glob("*.py"))
+    assert len(modules) >= 14, f"modules de la CLI manquants dans la roue : {modules}"
     assert (pose / "templates" / "demo" / "meta.yml").is_file(), (
         "les données de la roue ne sont pas arrivées dans site-packages"
     )

@@ -54,7 +54,7 @@ def test_le_fichier_zsh_porte_le_nom_que_zsh_cherche(
     """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/usr/bin/zsh")
-    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli.diagnostic.Path, "home", classmethod(lambda cls: tmp_path))
 
     resultat = runner.invoke(cli.app, ["install"])
     assert resultat.exit_code == 0, resultat.output
@@ -87,7 +87,7 @@ def test_install_n_ecrit_plus_de_wrapper(
     """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/bin/bash")
-    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli.diagnostic.Path, "home", classmethod(lambda cls: tmp_path))
 
     resultat = runner.invoke(cli.app, ["install"])
     assert resultat.exit_code == 0, resultat.output
@@ -107,7 +107,7 @@ def test_install_annonce_sa_depreciation(
     """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/bin/bash")
-    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli.diagnostic.Path, "home", classmethod(lambda cls: tmp_path))
 
     resultat = runner.invoke(cli.app, ["install"])
 
@@ -123,7 +123,7 @@ def test_completion_install_fait_le_meme_travail(
     """Le nouveau nom doit poser exactement ce que l'ancien posait."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHELL", "/usr/bin/zsh")
-    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli.diagnostic.Path, "home", classmethod(lambda cls: tmp_path))
 
     resultat = runner.invoke(cli.app, ["completion", "install"])
 
@@ -142,7 +142,7 @@ def test_completion_show_n_ecrit_rien_sur_le_disque(
     et ne doit pas écrire.
     """
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setattr(cli.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli.diagnostic.Path, "home", classmethod(lambda cls: tmp_path))
 
     resultat = runner.invoke(cli.app, ["completion", "show", "--shell", "zsh"])
 

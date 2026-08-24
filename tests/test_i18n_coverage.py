@@ -309,7 +309,14 @@ def test_le_perimetre_couvre_bien_les_chemins_dinfra(
     """
     couverts = {module for module, _tree in arbres}
     for attendu in (
-        "cli.py",
+        # `cli.py` est devenu un paquet en 0.1.69 : on nomme des modules de
+        # publics différents, pour qu'un découpage futur qui en oublierait un
+        # se voie ici plutôt que de retirer la règle en silence.
+        "cli/__init__.py",
+        "cli/_commun.py",
+        "cli/contexte.py",
+        "cli/progression.py",
+        "cli/diagnostic.py",
         "infra/terraform.py",
         "infra/inventory.py",
         "infra/credentials.py",

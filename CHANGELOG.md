@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.69] - 2026-08-24
+
+### Changed
+
+- **`cli.py` becomes a package, split by audience** (issue #119). It had grown
+  from entry point to catch-all: **3 289 lines** and 34 commands, though the
+  business logic lives elsewhere. Not a design flaw but a trajectory one, each
+  new command adding its options, validation and orchestration. `catalog`,
+  `infra` and `status`, all landed today, made it hard to postpone further.
+
+  Fourteen modules now, none above 400 lines except one (see below):
+  `contexte`, `parcours`, `indices`, `progression` for the learner;
+  `infrastructure`, `destruction`, `etat`; `catalogues`; `auteur`,
+  `instructeur`, `diagnostic`; plus `_socle`, `_commun` and `_barres` for what
+  they share.
+
+  **Nothing moves for anyone outside.** `dsoxlab.cli:main` is still the declared
+  entry point and `from dsoxlab.cli import app` still works. Above all,
+  `dsoxlab --help` lists the same commands **in the same order**: Typer displays
+  them in registration order, so splitting reordered them silently. That order
+  is now an explicit, tested decision rather than a consequence of where someone
+  pasted a decorator.
+
+  The split also revealed that three progress-bar helpers — used by `provision`
+  and `run` — had ended up glued after `destroy`, which is why that block
+  measured 435 lines. They now have their own module.
+
+  `_commun.py` is itself split in three, by the moment each helper acts:
+  resolving a command's context stays in `_commun`, `_amorcage` holds what wraps
+  every invocation (the global callback, the version, the update notice), and
+  `_validation` holds the verdict. Largest file: **380 lines**.
+
+  Two things surfaced while splitting. Three progress-bar helpers — used by
+  `provision` and `run` — had ended up glued after `destroy`, which is why that
+  block measured 435 lines; they now have their own module. And two patches in
+  `test_contrat_honore.py` were **inert**: they set the attribute on the package
+  while `progression.submit` calls its own binding, so those tests ran against
+  the real 0/100 rather than the 40/100 they announce. The address is fixed and
+  documented; both still pass, so nothing was hiding behind them.
+
 ## [0.1.68] - 2026-08-24
 
 ### Added

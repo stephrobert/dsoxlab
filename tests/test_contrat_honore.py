@@ -504,7 +504,12 @@ class TestVerdictAffiche:
         _lab(tmp_path, "mock-exam", extra="exam_passing_score: 70\n")
 
         monkeypatch.setattr(
-            cli,
+            # `_validation` et non `cli` : `progression.submit` importe
+            # `_run_check` par son nom, donc poser l'attribut sur le paquet
+            # ne l'atteint pas. Le patch était inerte avant 0.1.69, et ces
+            # tests passaient sur le vrai résultat (0/100), jamais sur les
+            # 40/100 qu'ils annoncent.
+            cli._validation,
             "_run_check",
             lambda *a, **k: (CheckResult(False, "", 2, 5), 40, 100),
         )
@@ -530,7 +535,7 @@ class TestVerdictAffiche:
         _lab(tmp_path, "lab-a")
 
         monkeypatch.setattr(
-            cli,
+            cli._validation,
             "_run_check",
             lambda *a, **k: (CheckResult(False, "", 2, 5), 40, 100),
         )
