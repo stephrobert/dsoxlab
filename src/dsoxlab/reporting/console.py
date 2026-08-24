@@ -21,6 +21,7 @@ from rich.tree import Tree
 from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
+from ..services.catalog import CatalogueConnu, CatalogueInstalle
 from ..services.doctor import STATE_CHOICE_REQUIRED, Check, DoctorReport
 from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
@@ -312,6 +313,39 @@ def _doctor_table(title: str, checks: list[Check], *, blocking: bool) -> Table:
         remediation = "" if check.ok else f"[dim]{check.remediation}[/dim]"
         table.add_row(check.label, status, check.detail, remediation)
     return table
+
+
+def print_catalogues(
+    connus: list[CatalogueConnu],
+    installes: list[CatalogueInstalle],
+    lang: str,
+) -> None:
+    """Les catalogues connus, puis ceux qui sont installés.
+
+    Deux tableaux plutôt qu'une colonne « installé ? » : les deux listes ne se
+    recouvrent pas nécessairement, un catalogue pouvant être installé depuis une
+    URL absente du manifeste.
+    """
+    if connus:
+        table = Table(title=_("catalog_titre_connus"), show_header=True)
+        table.add_column(_("catalog_col_id"))
+        table.add_column(_("catalog_col_description"))
+        table.add_column(_("catalog_col_depot"), style="dim")
+        for connu in connus:
+            table.add_row(connu.id, connu.description(lang), connu.depot)
+        console.print(table)
+
+    if not installes:
+        console.print(f"[dim]{_('catalog_aucun_installe')}[/dim]")
+        return
+
+    table = Table(title=_("catalog_titre_installes"), show_header=True)
+    table.add_column(_("catalog_col_id"))
+    table.add_column(_("catalog_col_actif"), justify="center")
+    table.add_column(_("catalog_col_chemin"), style="dim")
+    for pose in installes:
+        table.add_row(pose.id, "✔" if pose.actif else "", str(pose.racine))
+    console.print(table)
 
 
 def print_doctor(report: DoctorReport) -> None:

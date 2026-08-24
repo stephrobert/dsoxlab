@@ -220,7 +220,16 @@ def get_lab_home() -> Path:
 
     1. Variable d'environnement ``LAB_HOME`` (chemin explicite).
     2. Remontée depuis le CWD pour trouver ``meta.yml`` (mode framework).
-    3. CWD lui-même (fallback).
+    3. Le catalogue **actif**, celui que ``dsoxlab catalog add`` ou
+       ``catalog use`` a désigné.
+    4. CWD lui-même (fallback).
+
+    L'étape 3 vient **après** le CWD, et jamais avant : quelqu'un qui se place
+    dans un catalogue cloné à la main s'attend à travailler dessus, quel que
+    soit ce qu'il a installé par ailleurs. L'inverse ferait qu'un
+    ``catalog add`` changerait silencieusement ce que fait un ``dsoxlab check``
+    lancé dans un dépôt existant, ce qui est le pire des effets de bord : muet,
+    à distance, et sur la commande qui note le travail.
 
     `dsoxlab` étant installé globalement (ex. ``uv tool install``), il
     fonctionne depuis le CWD où l'apprenant s'est placé : un dépôt
@@ -241,6 +250,14 @@ def get_lab_home() -> Path:
         if parent == current:
             break
         current = parent
+
+    # Le catalogue actif, s'il en existe un. Import local : `services.catalog`
+    # importe ce module, et l'import au sommet serait circulaire.
+    from .services.catalog import racine_active
+
+    active = racine_active()
+    if active is not None:
+        return active
 
     # Fallback : CWD (utile pour les tests ou les dépôts sans meta.yml).
     return cwd

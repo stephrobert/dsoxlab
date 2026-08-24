@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.67] - 2026-08-24
+
+### Added
+
+- **`dsoxlab catalog`: install a catalog, and use it from anywhere** (issue
+  #78). Separating the engine from the catalogs is a sound architectural
+  decision, but it was left entirely to the user: nothing said which catalogs
+  exist, how to install one, or that dsoxlab had to be run from inside the
+  cloned directory. Five subcommands close that gap:
+
+  ```console
+  $ dsoxlab catalog list              # known catalogs, and the installed ones
+  $ dsoxlab catalog add linux         # clone it, and make it active
+  $ cd ~ && dsoxlab list-labs         # works, with no cd into the catalog
+  $ dsoxlab catalog use ansible       # switch the active one
+  $ dsoxlab catalog update [<id>]     # update one, or all of them
+  $ dsoxlab catalog remove <id>       # remove one
+  ```
+
+  **The current directory keeps priority.** The active catalog is consulted
+  *after* walking up from the working directory, never before: someone sitting
+  in a hand-cloned catalog expects to work on that one. The reverse would mean
+  a `catalog add` silently changing what a `dsoxlab check` does inside an
+  existing repository — a side effect that is mute, remote, and on the command
+  that grades the work.
+
+  The registry of known catalogs is a **manifest packaged with the tool**
+  (`templates/catalogues.yml`), not a remote service: a registry is a component
+  to host, monitor and keep available, for a project that today has three
+  catalogs. A versioned manifest also has a merit a service does not — it is
+  reviewable in a pull request, so proposing a third-party catalog becomes an
+  ordinary contribution. Any git URL is accepted too, including one absent from
+  the manifest: the manifest aids discovery, it restricts nothing.
+
+  The engine stays domain-agnostic, and a test enforces it: `services/catalog.py`
+  contains no domain name at all, only ids and URLs read from the manifest or
+  the command line.
+
 ### Fixed
 
 - **The release guard was unreliable in two ways, both observed while shipping

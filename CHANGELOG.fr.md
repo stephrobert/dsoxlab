@@ -9,6 +9,46 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.67] - 2026-08-24
+
+### Ajouté
+
+- **`dsoxlab catalog` : installer un catalogue, et l'utiliser depuis n'importe
+  où** (issue #78). Séparer le moteur des catalogues est une bonne décision
+  d'architecture, mais elle était entièrement à la charge de l'utilisateur :
+  rien ne disait quels catalogues existent, comment en installer un, ni qu'il
+  fallait lancer dsoxlab depuis l'intérieur du répertoire cloné. Cinq
+  sous-commandes comblent l'écart :
+
+  ```console
+  $ dsoxlab catalog list              # les connus, et ceux qui sont installés
+  $ dsoxlab catalog add linux         # le cloner, et le rendre actif
+  $ cd ~ && dsoxlab list-labs         # marche, sans se placer dedans
+  $ dsoxlab catalog use ansible       # changer l'actif
+  $ dsoxlab catalog update [<id>]     # en mettre un à jour, ou tous
+  $ dsoxlab catalog remove <id>       # en retirer un
+  ```
+
+  **Le répertoire courant reste prioritaire.** Le catalogue actif n'est consulté
+  qu'**après** la remontée depuis le répertoire de travail, jamais avant : qui
+  se place dans un catalogue cloné à la main s'attend à travailler dessus.
+  L'inverse ferait qu'un `catalog add` changerait silencieusement ce que fait un
+  `dsoxlab check` lancé dans un dépôt existant : un effet de bord muet, à
+  distance, et sur la commande qui note le travail.
+
+  Le registre des catalogues connus est un **manifeste packagé avec l'outil**
+  (`templates/catalogues.yml`), pas un service distant : un registre est un
+  composant à héberger, surveiller et maintenir disponible, pour un projet qui
+  compte aujourd'hui trois catalogues. Un manifeste versionné a de plus un
+  mérite qu'un service n'a pas — il est révisable en pull request : proposer un
+  catalogue tiers devient une contribution ordinaire. N'importe quelle URL git
+  est acceptée aussi, y compris absente du manifeste : le manifeste facilite la
+  découverte, il ne restreint rien.
+
+  Le moteur reste neutre vis-à-vis des domaines, et un test l'impose :
+  `services/catalog.py` ne contient aucun nom de domaine, seulement des
+  identifiants et des URL venus du manifeste ou de la ligne de commande.
+
 ### Corrigé
 
 - **Le garde-fou de publication n'était pas fiable, de deux façons, toutes deux

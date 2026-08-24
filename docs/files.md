@@ -41,6 +41,8 @@ The private half must never be committed.
 | `~/.cache/dsoxlab/<catalog-id>/ssh_config` | generated OpenSSH config for the lab hosts | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/version-check.json` | last version seen on PyPI, and when | `XDG_CACHE_HOME` |
 | `~/.local/share/dsoxlab/demo/` | demonstration catalog installed by `dsoxlab demo` | `XDG_DATA_HOME` |
+| `~/.local/share/dsoxlab/catalogs/` | catalogs installed by `dsoxlab catalog add`, one subdirectory per id | `XDG_DATA_HOME` |
+| `~/.local/state/dsoxlab/catalogue-actif` | id of the active catalog, the one used without sitting in its directory | `XDG_STATE_HOME` |
 | `~/.ssh/config.d/<catalog-id>.conf` | SSH fragment for the lab hosts, so `ssh`, `scp` and your IDE reach them by name | none |
 
 `<catalog-id>` is `repo.id` from the catalog's `meta.yml`. The lock falls back

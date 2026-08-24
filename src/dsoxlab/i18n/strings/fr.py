@@ -112,6 +112,65 @@ STRINGS: dict[str, str] = {
         "  dsoxlab course {lab}\n"
         "  dsoxlab run {lab}\n"
         "Puis, une fois la mission remplie : dsoxlab check {lab}",
+
+    # ── catalog : découvrir, installer et retrouver un catalogue ────────────
+    "cmd_catalog_help":
+        "Découvre, installe et met à jour les catalogues de labs.",
+    "cmd_catalog_list_help":
+        "Liste les catalogues connus et ceux qui sont installés.",
+    "cmd_catalog_add_help":
+        "Installe un catalogue par son nom ou par l'URL de son dépôt.",
+    "cmd_catalog_update_help":
+        "Met à jour un catalogue installé (tous, si aucun n'est nommé).",
+    "cmd_catalog_remove_help":
+        "Retire un catalogue installé.",
+    "arg_catalog_reference":
+        "Identifiant du manifeste (dsoxlab catalog list), ou URL d'un dépôt git.",
+    "arg_catalog_id":
+        "Identifiant d'un catalogue installé.",
+    "cmd_catalog_use_help":
+        "Choisit le catalogue actif, celui qu'on utilise hors de son répertoire.",
+    "opt_catalog_force":
+        "Réinstaller par-dessus un catalogue déjà présent (le travail y est perdu).",
+    "catalog_titre_connus": "Catalogues connus",
+    "catalog_titre_installes": "Catalogues installés",
+    "catalog_col_id": "Identifiant",
+    "catalog_col_description": "Description",
+    "catalog_col_depot": "Dépôt",
+    "catalog_col_chemin": "Chemin",
+    "catalog_col_actif": "Actif",
+    "catalog_aucun_installe":
+        "Aucun catalogue installé. Installe-en un : dsoxlab catalog add <id>",
+    "catalog_installation": "Installation de {name} depuis {url}…",
+    "catalog_installe":
+        "Catalogue « {name} » installé dans {path}, et rendu actif.",
+    "catalog_installe_suite":
+        "Il est utilisable depuis n'importe quel répertoire :\n"
+        "  dsoxlab list-labs\n"
+        "  dsoxlab next",
+    "catalog_actif_defini": "Catalogue actif : « {name} » ({path})",
+    "catalog_retire": "Catalogue « {name} » retiré ({path}).",
+    "catalog_a_jour": "Catalogue « {name} » à jour.",
+    "catalog_mis_a_jour": "Catalogue « {name} » mis à jour : {detail}",
+    "catalog_inconnu":
+        "Catalogue « {name} » inconnu. Liste-les : dsoxlab catalog list, "
+        "ou donne l'URL de son dépôt.",
+    "catalog_absent":
+        "Aucun catalogue « {name} » installé. Vois : dsoxlab catalog list",
+    "catalog_deja_installe":
+        "Le catalogue « {name} » est déjà installé dans {path}. "
+        "Mets-le à jour (dsoxlab catalog update {name}), ou réinstalle-le "
+        "avec --force, ce qui perd la progression et le travail qui s'y trouvent.",
+    "catalog_clone_echec":
+        "Le clone de {url} a échoué :\n{detail}",
+    "catalog_sans_meta":
+        "Le dépôt {url} ne porte pas de meta.yml à sa racine : ce n'est pas "
+        "un catalogue dsoxlab.",
+    "catalog_id_invalide":
+        "« {name} » ne peut pas servir d'identifiant de catalogue.",
+    "catalog_update_echec":
+        "La mise à jour de « {name} » a échoué :\n{detail}",
+
     "cmd_support_help":
         "Produit un rapport de diagnostic anonymisé, à coller dans une issue.",
     "opt_support_log_lines":
@@ -394,6 +453,17 @@ Chaque lab déclare :
   [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
                        jouable immédiatement, sans rien cloner ni provisionner.
     [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
+
+  [cyan]catalog list[/cyan]         Les catalogues connus, et ceux qui sont installés.
+    [dim]--json[/dim]               Document machine plutôt que tableaux.
+  [cyan]catalog add <id|url>[/cyan] Installe un catalogue et le rend actif. L'identifiant
+                       vient du manifeste packagé ; une URL git quelconque est
+                       acceptée aussi, le manifeste ne restreint rien.
+    [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
+  [cyan]catalog use <id>[/cyan]     Choisit le catalogue actif, celui qu'on utilise sans
+                       avoir à se placer dans son répertoire.
+  [cyan]catalog update [id][/cyan]  Met à jour un catalogue installé, ou tous.
+  [cyan]catalog remove <id>[/cyan]  Retire un catalogue installé.
 
   [cyan]provision[/cyan]            Monte l'infrastructure des labs vm (terraform apply).
                        Refuse de démarrer quand des machines laissées par un
