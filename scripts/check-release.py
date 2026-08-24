@@ -276,6 +276,86 @@ _SANS_GH = (
 )
 
 
+#: Versions décrites au CHANGELOG qui ne seront jamais sur PyPI, et pourquoi.
+#:
+#: L'exemption est nominative, comme celle des chemins absents de
+#: `generer-doc.py` : une dispense globale rouvrirait la porte que ce contrôle
+#: existe pour fermer, puisque n'importe quelle version enjambée passerait
+#: ensuite inaperçue.
+VERSIONS_JAMAIS_PUBLIEES = {
+    "0.1.25": (
+        "le tag v0.1.25 a été posé sur un commit portant déjà le bump 0.1.26 : "
+        "PyPI n'a jamais reçu de 0.1.25, et tout ce qu'elle annonçait est dans "
+        "la 0.1.26. Voir la note en tête de cette section du CHANGELOG."
+    ),
+}
+
+
+def _verifier_versions_annoncees(r: Rapport, version_courante: str) -> None:
+    """Toute version décrite au CHANGELOG est-elle installable ?
+
+    Le contrôle qui manquait, et le défaut s'est produit deux fois le
+    2026-08-24 : la 0.1.64 puis la 0.1.68 ont été fusionnées sur main, décrites
+    au CHANGELOG, et jamais taguées. Personne ne l'a vu, parce que rien ne
+    regardait en arrière : les autres contrôles disent si le PROCHAIN tag peut
+    être posé, aucun ne demandait si le précédent l'avait été.
+
+    Une version enjambée ne se rattrape pas : la suivante prend sa place, et ce
+    que la première annonçait n'est jamais parti chez personne.
+
+    Le contrôle porte sur l'index PyPI et non sur les tags git, parce que c'est
+    la question qui compte — la 0.1.26 est installable alors qu'aucun tag ne la
+    porte, ayant été publiée sous celui de la 0.1.25.
+    """
+    chemin = RACINE / "CHANGELOG.md"
+    try:
+        contenu = chemin.read_text(encoding="utf-8")
+    except OSError:
+        r.note("CHANGELOG.md illisible", "Contrôle des versions annoncées sauté.")
+        return
+
+    annoncees = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", contenu, re.MULTILINE)
+    if not annoncees:
+        # Garde-fou : une liste vide vaudrait feu vert sans rien avoir mesuré.
+        r.ko(
+            "Aucune version trouvée dans CHANGELOG.md",
+            "Le contrôle des versions annoncées ne mesure plus rien : "
+            "vérifie le format des titres de section.",
+        )
+        return
+
+    index = _index_simple()
+    if index is None:
+        r.note("Index PyPI injoignable",
+               "Contrôle des versions annoncées sauté.")
+        return
+
+    # La version courante est celle qu'on s'apprête à publier : normal qu'elle
+    # manque encore.
+    absentes = [v for v in annoncees
+                if v != version_courante
+                and v not in VERSIONS_JAMAIS_PUBLIEES
+                and f"dsoxlab-{v}" not in index]
+    if absentes:
+        r.ko(
+            f"{len(absentes)} version(s) annoncée(s) mais jamais publiée(s) : "
+            + ", ".join(absentes[:5]),
+            "Elles sont décrites au CHANGELOG et absentes de PyPI. Tague-les "
+            "avant de continuer, ou dis dans le CHANGELOG pourquoi elles ne "
+            "sont jamais parties.",
+        )
+        return
+    revenues = [v for v in VERSIONS_JAMAIS_PUBLIEES if f"dsoxlab-{v}" in index]
+    if revenues:
+        # L'autre bout de l'exemption : le jour où l'une d'elles est publiée,
+        # la dispense devient fausse et doit disparaître.
+        r.note(
+            f"Exemption caduque : {', '.join(revenues)} est sur PyPI",
+            "Retire-la de VERSIONS_JAMAIS_PUBLIEES dans ce script.",
+        )
+    r.ok(f"Les {len(annoncees)} versions annoncées sont publiées")
+
+
 def _verifier_ci(r: Rapport, *, ci_verifiee: bool = False) -> None:
     # RELEASING demande d'attendre une CI verte : le tag construit depuis ce
     # commit, et PyPI ne se rattrape pas.
@@ -495,6 +575,7 @@ def main() -> int:
     _verifier_changelog(r, version)
     _verifier_lock(r, version)
     _verifier_pypi(r, version)
+    _verifier_versions_annoncees(r, version)
     _verifier_ci(r, ci_verifiee=ci_verifiee)
 
     print()

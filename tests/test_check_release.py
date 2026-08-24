@@ -226,3 +226,118 @@ def test_une_ci_en_echec_reste_un_echec(
         r = cr.Rapport()
         cr._verifier_ci(r, ci_verifiee=drapeau)
         assert r.echecs, f"une CI rouge doit bloquer (ci_verifiee={drapeau})"
+
+
+# ── Les versions annoncées : celles qu'on a enjambées ───────────────────────
+
+def _index(*versions: str) -> str:
+    """Un index simple de PyPI, réduit à ce que le contrôle y cherche."""
+    return "\n".join(f"dsoxlab-{v}-py3-none-any.whl" for v in versions)
+
+
+def test_une_version_annoncee_et_jamais_publiee_bloque(
+    cr: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Le défaut qui s'est produit DEUX fois le 2026-08-24.
+
+    La 0.1.64 puis la 0.1.68 ont été fusionnées sur main, décrites au CHANGELOG,
+    et jamais taguées. Rien ne le disait : les autres contrôles regardent si le
+    PROCHAIN tag peut être posé, aucun ne demandait si le précédent l'avait été.
+    Une version enjambée ne se rattrape pas, la suivante prenant sa place.
+    """
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## [0.1.69] - x\n## [0.1.68] - x\n## [0.1.67] - x\n", encoding="utf-8")
+    monkeypatch.setattr(cr, "RACINE", tmp_path)
+    monkeypatch.setattr(cr, "_index_simple", lambda: _index("0.1.67"))
+
+    r = cr.Rapport()
+    cr._verifier_versions_annoncees(r, "0.1.69")
+
+    assert r.echecs, "une version annoncée et absente de PyPI doit bloquer"
+
+
+def test_la_version_courante_n_est_pas_reprochee(
+    cr: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Celle qu'on s'apprête à publier manque forcément : c'est le cas normal."""
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## [0.1.69] - x\n## [0.1.68] - x\n", encoding="utf-8")
+    monkeypatch.setattr(cr, "RACINE", tmp_path)
+    monkeypatch.setattr(cr, "_index_simple", lambda: _index("0.1.68"))
+
+    r = cr.Rapport()
+    cr._verifier_versions_annoncees(r, "0.1.69")
+
+    assert not r.echecs
+
+
+def test_une_version_exemptee_ne_bloque_pas(
+    cr: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """0.1.25 n'ira jamais sur PyPI, et le CHANGELOG dit pourquoi."""
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## [0.1.26] - x\n## [0.1.25] - x\n", encoding="utf-8")
+    monkeypatch.setattr(cr, "RACINE", tmp_path)
+    monkeypatch.setattr(cr, "_index_simple", lambda: _index("0.1.26"))
+
+    r = cr.Rapport()
+    cr._verifier_versions_annoncees(r, "0.1.27")
+
+    assert not r.echecs
+    assert "0.1.25" in cr.VERSIONS_JAMAIS_PUBLIEES
+
+
+def test_un_changelog_sans_version_est_un_echec(
+    cr: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Le garde-fou du garde-fou : une liste vide vaudrait feu vert à vide."""
+    (tmp_path / "CHANGELOG.md").write_text("# Changelog\n\nrien\n", encoding="utf-8")
+    monkeypatch.setattr(cr, "RACINE", tmp_path)
+    monkeypatch.setattr(cr, "_index_simple", lambda: _index("0.1.68"))
+
+    r = cr.Rapport()
+    cr._verifier_versions_annoncees(r, "0.1.69")
+
+    assert r.echecs, "ne rien mesurer ne doit pas valoir « tout est bon »"
+
+
+def test_index_injoignable_ne_bloque_pas(
+    cr: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Hors ligne, on ne sait pas : on le dit, sans reprocher une absence."""
+    (tmp_path / "CHANGELOG.md").write_text("## [0.1.68] - x\n", encoding="utf-8")
+    monkeypatch.setattr(cr, "RACINE", tmp_path)
+    monkeypatch.setattr(cr, "_index_simple", lambda: None)
+
+    r = cr.Rapport()
+    cr._verifier_versions_annoncees(r, "0.1.69")
+
+    assert not r.echecs
+
+
+def test_les_controles_sont_bien_cables(cr: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un contrôle qui existe mais que personne n'appelle ne garde rien.
+
+    Constaté en éprouvant le précédent : retirer `_verifier_versions_annoncees`
+    de la séquence de `main()` ne faisait rougir aucun test, puisque tous
+    l'appellent directement. Le contrôle aurait cessé de tourner sans un mot.
+    """
+    joues: list[str] = []
+
+    for nom in ("_verifier_arbre", "_verifier_branche", "_verifier_tag",
+                "_verifier_changelog", "_verifier_lock", "_verifier_pypi",
+                "_verifier_versions_annoncees", "_verifier_ci"):
+        monkeypatch.setattr(
+            cr, nom,
+            (lambda n: lambda *a, **k: joues.append(n))(nom),
+        )
+    monkeypatch.setattr(cr, "version_empaquetee", lambda: "0.1.99")
+    monkeypatch.setattr(cr.sys, "argv", ["check-release.py"])
+
+    cr.main()
+
+    manquants = [n for n in ("_verifier_arbre", "_verifier_branche", "_verifier_tag",
+                             "_verifier_changelog", "_verifier_lock", "_verifier_pypi",
+                             "_verifier_versions_annoncees", "_verifier_ci")
+                 if n not in joues]
+    assert not manquants, f"contrôles définis mais jamais appelés : {manquants}"
