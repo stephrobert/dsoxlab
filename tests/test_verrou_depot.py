@@ -369,7 +369,7 @@ def test_run_rend_le_verrou_avant_douvrir_la_session(
         observe["libre"] = True
         sonde.release()
 
-    monkeypatch.setattr("dsoxlab.cli.open_lab_session", _session)
+    monkeypatch.setattr("dsoxlab.cli.parcours.open_lab_session", _session)
 
     resultat = runner.invoke(app, ["run", "premier", "--lab-home", str(racine)])
 

@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.69] - 2026-08-24
+
+### Changed
+
+- **`cli.py` becomes a package, split by audience** (issue #119). It had grown
+  from entry point to catch-all: **3 289 lines** and 34 commands, though the
+  business logic lives elsewhere. Not a design flaw but a trajectory one, each
+  new command adding its options, validation and orchestration. `catalog`,
+  `infra` and `status`, all landed today, made it hard to postpone further.
+
+  Fourteen modules now, none above 400 lines except one (see below):
+  `contexte`, `parcours`, `indices`, `progression` for the learner;
+  `infrastructure`, `destruction`, `etat`; `catalogues`; `auteur`,
+  `instructeur`, `diagnostic`; plus `_socle`, `_commun` and `_barres` for what
+  they share.
+
+  **Nothing moves for anyone outside.** `dsoxlab.cli:main` is still the declared
+  entry point and `from dsoxlab.cli import app` still works. Above all,
+  `dsoxlab --help` lists the same commands **in the same order**: Typer displays
+  them in registration order, so splitting reordered them silently. That order
+  is now an explicit, tested decision rather than a consequence of where someone
+  pasted a decorator.
+
+  The split also revealed that three progress-bar helpers — used by `provision`
+  and `run` — had ended up glued after `destroy`, which is why that block
+  measured 435 lines. They now have their own module.
+
+  Known gap: `_commun.py` stays at **701 lines**, above the 400 the issue asks
+  for. Splitting it was attempted and reverted: it broke the whole package, and
+  the rollback proved the right call. It deserves its own change, with the tests
+  green at every step.
+
 ## [0.1.68] - 2026-08-24
 
 ### Added

@@ -9,6 +9,39 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.69] - 2026-08-24
+
+### Modifié
+
+- **`cli.py` devient un paquet, découpé par public** (issue #119). Il était
+  passé de point d'entrée à fourre-tout : **3 289 lignes** et 34 commandes,
+  alors que la logique métier vit ailleurs. Pas un défaut de conception mais de
+  trajectoire, chaque commande nouvelle y ajoutant ses options, sa validation et
+  son orchestration. `catalog`, `infra` et `status`, livrés le même jour, le
+  rendaient difficile à repousser encore.
+
+  Quatorze modules désormais, aucun au-dessus de 400 lignes sauf un (voir plus
+  bas) : `contexte`, `parcours`, `indices`, `progression` pour l'apprenant ;
+  `infrastructure`, `destruction`, `etat` ; `catalogues` ; `auteur`,
+  `instructeur`, `diagnostic` ; plus `_socle`, `_commun` et `_barres` pour ce
+  qu'ils partagent.
+
+  **Rien ne bouge pour qui est dehors.** `dsoxlab.cli:main` reste le point
+  d'entrée déclaré et `from dsoxlab.cli import app` fonctionne toujours. Surtout,
+  `dsoxlab --help` liste les mêmes commandes **dans le même ordre** : Typer les
+  affiche dans leur ordre d'enregistrement, donc le découpage les réordonnait en
+  silence. Cet ordre est maintenant une décision explicite et testée, plutôt
+  qu'une conséquence de l'endroit où quelqu'un a collé un décorateur.
+
+  Le découpage a par ailleurs montré que trois helpers de barres de progression,
+  utilisés par `provision` et `run`, s'étaient retrouvés collés après `destroy`,
+  ce qui expliquait ses 435 lignes. Ils ont désormais leur module.
+
+  Écart connu : `_commun.py` reste à **701 lignes**, au-dessus des 400 que
+  l'issue demande. Sa scission a été tentée puis annulée : elle cassait tout le
+  paquet, et le retour en arrière s'est avéré le bon geste. Elle mérite sa
+  propre modification, avec les tests verts à chaque étape.
+
 ## [0.1.68] - 2026-08-24
 
 ### Ajouté
