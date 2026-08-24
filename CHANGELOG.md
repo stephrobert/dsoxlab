@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.72] - 2026-08-24
+
+### Fixed
+
+- **An execution that measured nothing was recorded as 0/100, and the lab turned
+  "validated"** (issue #168). When pytest cannot collect — a `conftest.py` that
+  raises on import, an unreachable machine, a missing dependency — the result
+  carries `total == 0`. `compute_score` already refused to guess a score there,
+  but that refusal stopped short of the database.
+
+  The cascade did the damage, and every link was correct on its own:
+  `get_best_scores` saw the lab because it had a row; `status` reported
+  `validated` because a score existed; `next` skipped it because "a graded lab,
+  even at 0, is no longer the next step". The learner believed they had failed
+  an exercise **they never got to play**, and the path moved on without them.
+
+  Nothing is recorded now when nothing was measured, `check` says so instead of
+  showing a 0, and `check --json` carries `recorded` so an integration can tell a
+  real failure from an environment that never ran. The predicate lives in **one
+  place**, read by both the recorder and the machine output, so it cannot drift.
+
+
 ## [0.1.71] - 2026-08-24
 
 ### Added

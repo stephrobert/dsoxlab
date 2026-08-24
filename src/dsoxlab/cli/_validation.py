@@ -217,6 +217,12 @@ def _valider(
         console.print(result.output)
 
     evaluation = evaluate_lab(root, lab, result)
+    if not evaluation.enregistre and not quiet:
+        # Rien n'a été mesuré : le dire, plutôt que d'afficher un 0 que
+        # l'apprenant lirait comme un exercice raté.
+        error(_("check_rien_mesure"))
+        info(_("check_rien_mesure_suite"))
+        return result, evaluation.score, evaluation.max_score
     if quiet:
         # Mode machine : le tableau Rich et le message de confirmation
         # pollueraient le document JSON. Le résultat est tout de même

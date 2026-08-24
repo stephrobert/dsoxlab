@@ -141,6 +141,13 @@ STRINGS: dict[str, str] = {
     "cmd_infra_help": "Commandes d'infrastructure du catalogue.",
 
     # ── new : créer un squelette conforme au contrat ────────────────────────
+    "check_rien_mesure":
+        "Aucun test n'a pu être collecté : rien n'a été mesuré, et rien n'est "
+        "enregistré.",
+    "check_rien_mesure_suite":
+        "Regarde la sortie ci-dessus : un conftest.py qui lève, une machine "
+        "injoignable ou une dépendance absente empêchent pytest de démarrer. "
+        "Ce n'est pas un exercice raté.",
     "cmd_new_help":
         "Crée un catalogue ou un lab conforme au contrat, prêt à remplir.",
     "cmd_new_catalog_help":

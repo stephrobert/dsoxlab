@@ -53,6 +53,14 @@ class ScoreResult:
     hints_used: int
     hints_cost: int
 
+    enregistre: bool = True
+    """L'exécution a-t-elle été inscrite dans l'historique ?
+
+    Faux quand rien n'a pu être mesuré : voir ``evaluate_lab``. L'appelant doit
+    alors dire qu'aucun test n'a été collecté, et surtout ne pas présenter le
+    0 comme une note.
+    """
+
 
 def _parse_counts(output: str) -> tuple[int, int]:
     """Extrait (passed, total) depuis la sortie de pytest.
@@ -111,6 +119,17 @@ def compute_score(passed: int, total: int, max_score: int, hints_cost: int) -> i
     return round((passed / total) * base)
 
 
+def a_mesure(result: CheckResult) -> bool:
+    """L'exécution a-t-elle mesuré quelque chose ?
+
+    Un seul endroit décide, parce que deux lecteurs en dépendent :
+    ``evaluate_lab`` pour savoir s'il enregistre, et la sortie machine pour
+    dire à un programme si la note vaut quelque chose. Dupliquer la règle la
+    ferait diverger le jour où elle change.
+    """
+    return result.total > 0
+
+
 def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreResult:
     """Note un ``CheckResult`` et l'enregistre dans l'historique de l'apprenant.
 
@@ -124,6 +143,24 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
     hints_cost = hints_cost_total(root, lab.id)
     used = hints_used_count(root, lab.id)
     score = compute_score(result.passed, result.total, max_score, hints_cost)
+
+    if not a_mesure(result):
+        # Rien n'a été mesuré : pytest n'a pas pu collecter, faute d'un
+        # conftest qui lève, d'une machine injoignable ou d'une dépendance
+        # absente. Inscrire ce 0 le rendrait indiscernable d'un lab tenté et
+        # raté, et la suite en dépend : `status` afficherait « validé », et
+        # `next` sauterait un lab que l'apprenant n'a jamais pu jouer.
+        #
+        # `compute_score` refusait déjà de deviner un score ; ce refus n'allait
+        # pas jusqu'à la base.
+        return ScoreResult(
+            check=result,
+            score=score,
+            max_score=max_score,
+            hints_used=used,
+            hints_cost=hints_cost,
+            enregistre=False,
+        )
 
     record_result(
         root,
