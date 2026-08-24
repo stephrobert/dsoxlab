@@ -75,8 +75,8 @@ def hyperviseur_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         doctor, "_hypervisor_checks",
         lambda: {
-            "kvm": doctor.Check(_("check_kvm"), True, "libvirt 10.0.0"),
-            "incus": doctor.Check(_("check_incus"), True, "daemon ok"),
+            "kvm": doctor._check("kvm", True, "libvirt 10.0.0"),
+            "incus": doctor._check("incus", True, "daemon ok"),
         },
     )
 
@@ -91,11 +91,11 @@ def outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setattr(
         doctor, "_check_terraform",
-        lambda: doctor.Check(_("check_terraform"), True, "Terraform v1.0.0"),
+        lambda: doctor._check("terraform", True, "Terraform v1.0.0"),
     )
     monkeypatch.setattr(
         doctor, "_check_ansible",
-        lambda: doctor.Check(_("check_ansible"), True, "ok"),
+        lambda: doctor._check("ansible", True, "ok"),
     )
 
 
@@ -227,8 +227,8 @@ def test_les_controles_kvm_se_taisent_si_virsh_manque(
     monkeypatch.setattr(
         doctor, "_hypervisor_checks",
         lambda: {
-            "kvm": doctor.Check(_("check_kvm"), False, "not found", fix="apt install"),
-            "incus": doctor.Check(_("check_incus"), True, "ok"),
+            "kvm": doctor._check("kvm", False, "not found", fix="apt install"),
+            "incus": doctor._check("incus", True, "ok"),
         },
     )
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
@@ -277,7 +277,7 @@ def test_le_pool_verifie_est_celui_que_le_depot_declare(
 
     def _faux_check(pool: str) -> doctor.Check:
         vus.append(pool)
-        return doctor.Check(_("check_libvirt_pool"), True, pool)
+        return doctor._check("libvirt_pool", True, pool)
 
     monkeypatch.setattr(doctor, "_check_libvirt_pool", _faux_check)
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
@@ -295,7 +295,7 @@ def test_sans_declaration_le_pool_verifie_est_default(
     vus: list[str] = []
     monkeypatch.setattr(
         doctor, "_check_libvirt_pool",
-        lambda pool: (vus.append(pool), doctor.Check("p", True, pool))[1],
+        lambda pool: (vus.append(pool), doctor._check("p", True, pool))[1],
     )
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     doctor.collect_checks(tmp_path, _repo(provider="kvm"))
@@ -569,3 +569,29 @@ def test_les_cles_du_pool_inactif_sont_bilingues(cle: str) -> None:
 
     assert cle in EN and cle in FR
     assert EN[cle] != FR[cle], "une traduction identique est probablement oubliée"
+
+
+# ── une sonde muette ne doit pas emporter le diagnostic ──────────────────────
+
+def test_une_sonde_qui_pend_ne_leve_pas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`virsh version` peut pendre : le contrôle le rapporte, il ne plante pas.
+
+    Mesuré en environnement contraint, où la socket libvirt ne répond jamais :
+    la `TimeoutExpired` remontait jusqu'au bout et emportait toute la commande.
+    Depuis que `doctor --json` est une interface, elle emporte aussi le document
+    que l'appelant attendait, et lui rend une trace Python à la place.
+    """
+    import subprocess
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda _nom: "/usr/bin/virsh")
+
+    def _pend(*_a: object, **_k: object) -> object:
+        raise subprocess.TimeoutExpired(cmd=["virsh", "version"], timeout=5)
+
+    monkeypatch.setattr(doctor.subprocess, "run", _pend)
+
+    controle = doctor._check_kvm()
+
+    assert controle.key == "kvm"
+    assert not controle.ok
+    assert controle.fix, "un échec doit nommer le geste qui le corrige"
