@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.78] - 2026-08-24
+
+### Fixed
+
+- **A lab whose container engine is unreachable no longer shows as ready**
+  (issue #179). `_services_degrades` returned an empty list when
+  `docker_available()` was false, so "Docker **was** there and its daemon went
+  down" was indistinguishable from "Docker was never installed". In the first
+  case the lab really is unplayable — `run` already fails on it explicitly with
+  exit code 2 — yet `status` announced `ready`, or even `validated` when a score
+  existed from an earlier session.
+- The two causes are now told apart, because they call for opposite gestures:
+  install a package, versus start a daemon and check the account may talk to it.
+  A lab that declares **no** service still ignores the engine entirely, without
+  even paying for a probe — that was the sound half of the original decision,
+  and it is kept and tested on its own.
+
+
 ## [0.1.77] - 2026-08-24
 
 ### Fixed

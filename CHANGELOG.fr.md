@@ -9,6 +9,24 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.78] - 2026-08-24
+
+### Corrigé
+
+- **Un lab dont le moteur de conteneurs est injoignable ne s'affiche plus
+  « prêt »** (issue #179). `_services_degrades` rendait une liste vide quand
+  `docker_available()` était faux : « Docker **était** là et son démon est
+  tombé » devenait donc indistinguable de « Docker n'a jamais été installé ».
+  Dans le premier cas le lab est bel et bien injouable — `run` y échoue déjà
+  explicitement, code 2 — et pourtant `status` annonçait `ready`, voire
+  `validated` lorsqu'une note existait d'une session précédente.
+- Les deux causes se distinguent désormais, parce qu'elles appellent des gestes
+  opposés : installer un paquet, ou démarrer un démon et vérifier que le compte
+  peut lui parler. Un lab qui ne déclare **aucun** service continue d'ignorer le
+  moteur, sans même payer une sonde — c'était la moitié juste de la décision
+  d'origine, elle est gardée et testée pour elle-même.
+
+
 ## [0.1.77] - 2026-08-24
 
 ### Corrigé

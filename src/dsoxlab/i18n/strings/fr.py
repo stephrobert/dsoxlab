@@ -130,6 +130,12 @@ STRINGS: dict[str, str] = {
     "lab_state_validated": "validé",
     "lab_state_validated_detail": "Note obtenue : {score} / {max}",
     "lab_state_degraded": "dégradé",
+    "lab_state_docker_absent":
+        "docker n'est pas installé : ce lab déclare des services et ne peut "
+        "pas être joué en l'état",
+    "lab_state_docker_muet":
+        "le moteur Docker ne répond pas : ce lab déclare des services et ne "
+        "peut pas être joué tant qu'il ne redémarre pas",
     "lab_state_degraded_detail":
         "Un service déclaré ne tourne plus : {services}. "
         "Relance-le : dsoxlab run <lab>",

@@ -207,16 +207,53 @@ def test_un_service_jamais_demarre_n_est_pas_une_degradation(
     assert lab_state.calculer(_depot(tmp_path), lab, "essai").state != lab_state.DEGRADED
 
 
-def test_docker_absent_ne_degrade_aucun_lab(
+def test_docker_absent_degrade_un_lab_qui_declare_des_services(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Une machine sans Docker n'est pas un lab cassé : on ne sait simplement rien."""
+    """Le renversement de #179, gardé explicite plutôt que discrètement effacé.
+
+    Ce test affirmait l'inverse : « une machine sans Docker n'est pas un lab
+    cassé : on ne sait simplement rien. » L'intention était juste, mais elle
+    couvrait un cas de trop. Un lab qui **déclare** des services et dont le
+    moteur est injoignable est bel et bien injouable — `dsoxlab run` y échoue
+    déjà explicitement en `services_docker_absent`, code 2. Annoncer `ready`
+    contredisait donc la commande suivante.
+
+    Ce que l'intention d'origine protégeait est gardé, et testé juste en
+    dessous : un lab qui ne déclare **aucun** service ignore le moteur, sans
+    même payer une sonde.
+    """
     racine = _depot(tmp_path) / "labs" / "l1-demo"
     racine.mkdir(parents=True, exist_ok=True)
     (racine / "lab.yaml").write_text(
         _BASE
         + "runtime:\n  type: shell\n  workdir: challenge/work\n"
         + "  services:\n    - name: db\n      image: postgres:16\n",
+        encoding="utf-8",
+    )
+    lab = LabDefinition.from_yaml(racine / "lab.yaml")
+
+    from dsoxlab.runtimes import services as svc
+
+    monkeypatch.setattr(svc, "docker_available", lambda: False)
+
+    etat = lab_state.calculer(_depot(tmp_path), lab, "essai")
+    assert etat.state == lab_state.DEGRADED
+    assert etat.detail, "l'état doit dire pourquoi, sinon il ne sert à rien"
+
+
+def test_docker_absent_ne_degrade_pas_un_lab_sans_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """L'intention d'origine, à l'endroit exact où elle vaut.
+
+    Un catalogue entièrement `shell` sans conteneur ne doit pas virer au rouge
+    pour un moteur qu'il n'utilise pas.
+    """
+    racine = _depot(tmp_path) / "labs" / "l1-demo"
+    racine.mkdir(parents=True, exist_ok=True)
+    (racine / "lab.yaml").write_text(
+        _BASE + "runtime:\n  type: shell\n  workdir: challenge/work\n",
         encoding="utf-8",
     )
     lab = LabDefinition.from_yaml(racine / "lab.yaml")
