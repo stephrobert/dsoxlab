@@ -65,6 +65,16 @@ _VM_RUNTIMES = frozenset({RuntimeType.VM, RuntimeType.KVM, RuntimeType.INCUS})
 STATE_OK = "ok"
 STATE_FAILED = "failed"
 STATE_CHOICE_REQUIRED = "choice_required"
+
+#: ``doctor --strict`` : un contrôle requis a échoué, c'est établi.
+EXIT_DOCTOR_REQUIS_KO = 9
+
+#: ``doctor --strict`` : un contrôle requis n'a **pas pu** être mesuré. Ce n'est
+#: pas un échec, et ce n'est surtout pas un succès : un appelant automatisé qui
+#: valide un environnement ne peut rien conclure d'une sonde qui n'a pas
+#: regardé. Le code se distingue du précédent parce que les gestes diffèrent —
+#: réparer, ou refaire la mesure.
+EXIT_DOCTOR_INDETERMINE = 10
 STATE_UNKNOWN = "unknown"
 """La sonde n'a pas pu mesurer : ni vert, ni rouge.
 
@@ -232,6 +242,17 @@ class DoctorReport:
             c for c in self.required
             if not c.ok and c.state != STATE_UNKNOWN
         ]
+
+    def indetermines(self) -> list[Check]:
+        """Les requis dont la sonde n'a rien pu établir.
+
+        Le pendant de :meth:`failing` : celle-ci écarte les ``unknown`` pour ne
+        pas peindre l'affichage en rouge sur ce qu'on ignore, et c'est juste
+        pour un humain qui lit un tableau. Un script, lui, doit distinguer
+        « c'est bon » de « je n'ai pas pu voir », sans quoi il conclut au vert
+        sur une mesure qui n'a pas eu lieu.
+        """
+        return [c for c in self.required if c.state == STATE_UNKNOWN]
 
     def fixable(self) -> list[Check]:
         return [c for c in self.required if not c.ok and c.fix]

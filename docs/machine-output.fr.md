@@ -35,7 +35,8 @@ traduit est posé *à côté*, pour l'affichage. Aucune intégration ne devrait 
 Et une conséquence qui mérite d'être dite à part : **`--json` change la forme de
 la sortie, jamais le verdict ni le code de retour.** Un `check` sur un lab en
 échec sort en 1 avec ou sans lui ; `validate-structure` sort en 1 dès qu'un lab
-échoue ; `doctor` sort en 0 dans les deux modes et met son verdict dans `ok`.
+échoue ; `doctor` sort en 0 dans les deux modes et met son verdict dans `ok`
+(c'est `--strict`, et non `--json`, qui en fait un code de sortie).
 Sur une erreur *dure* : identifiant de lab inconnu, `meta.yml` illisible, la
 sortie standard reste vide, la cause part sur la sortie d'erreur, et le code ne
 bouge pas. Lisez le code de retour d'abord.
@@ -53,7 +54,7 @@ bouge pas. Lisez le code de retour d'abord.
 | `dsoxlab scores` | l'historique des notes et les verdicts d'examen | 0 |
 | `dsoxlab check <id>` | le résultat des tests et la note | 0, ou 1 si le lab échoue (le document est rendu quand même) |
 | `dsoxlab status` | la joignabilité SSH des hôtes déclarés | 0, ou 1 dès qu'un hôte déclaré ne répond pas (le document est rendu quand même) |
-| `dsoxlab doctor` | le diagnostic de l'environnement | 0, toujours : le verdict est dans `ok` |
+| `dsoxlab doctor` | le diagnostic de l'environnement | 0, toujours : le verdict est dans `ok`. Avec `--strict`, 9 (un requis échoue) ou 10 (un requis n'a pas pu être mesuré) |
 | `dsoxlab validate-structure` | chaque anomalie de contrat trouvée | 0, ou 1 dès qu'un lab échoue (le document est rendu quand même) |
 | `dsoxlab support` | le rapport de diagnostic anonymisé | 0 |
 
@@ -394,6 +395,37 @@ une remédiation `manual` n'est jamais exécutée par `--fix`, et une
 `needs_relogin` ou `needs_reboot` réussit alors que son contrôle continue de
 rapporter `failed` jusqu'à la reconnexion ou au redémarrage. C'est un effet
 différé, pas un échec.
+
+### Le code de sortie, et les deux modes
+
+Par défaut, `doctor` sort en **0 quoi qu'il arrive** : le verdict est dans `ok`.
+C'est le bon choix pour un humain — un diagnostic n'est pas un échec — mais il
+rend la commande inutilisable comme portail, un script devant lire le document
+pour savoir si quelque chose manque.
+
+`--strict` traduit le diagnostic en code de sortie. Il ne change **rien**
+d'autre : le tableau et le document restent rendus à l'identique, avant que le
+code ne tombe.
+
+| Mode | Code | Quand |
+| --- | --- | --- |
+| `doctor` | `0` | toujours, y compris quand un requis échoue |
+| `doctor --strict` | `0` | tous les contrôles requis sont `ok` |
+| `doctor --strict` | `9` | au moins un requis est `failed` ou `choice_required` |
+| `doctor --strict` | `10` | aucun échec, mais au moins un requis est `unknown` |
+
+Deux codes plutôt qu'un, parce que les deux situations appellent des gestes
+différents : `9` se répare, `10` se remesure. Un environnement dont une sonde
+n'a pas abouti n'est pas validé pour autant — c'est précisément ce qu'un script
+de construction d'image ne doit pas confondre avec un succès.
+
+`9` l'emporte quand les deux coexistent : une certitude est plus forte qu'une
+ignorance.
+
+`--strict` se combine à `--json`, et l'ordre compte : le document part sur la
+sortie standard **avant** que le code ne soit rendu, exactement comme
+`validate-structure`. Un appelant qui reçoit un code non nul peut donc encore
+lire ce qui n'allait pas.
 
 ## `validate-structure`
 

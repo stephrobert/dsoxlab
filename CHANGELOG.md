@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.79] - 2026-08-24
+
+### Added
+
+- **`doctor --strict` turns the diagnosis into an exit code** (issue #176).
+  `doctor` exited 0 whatever the state of its checks, which is the right call
+  for a human — a diagnosis is not a failure — but made the command unusable as
+  an automated gate: a script had to parse the JSON to learn whether anything
+  was missing.
+
+  Two codes rather than one, because the two situations call for different
+  gestures:
+
+  | Mode | Code | When |
+  | --- | --- | --- |
+  | `doctor` | `0` | always, unchanged |
+  | `doctor --strict` | `9` | a required check failed |
+  | `doctor --strict` | `10` | a required check could not be measured |
+
+  `9` gets repaired, `10` gets measured again. An environment whose probe did
+  not complete is not validated for all that — which is exactly what an image
+  build must not mistake for a success. `9` wins when both coexist: a certainty
+  outweighs an ignorance.
+
+  The default does not move, and `--strict` changes nothing else: the table and
+  the document are still rendered, **before** the code lands, so a caller
+  receiving a non-zero code can still read what went wrong.
+
+
 ## [0.1.78] - 2026-08-24
 
 ### Fixed

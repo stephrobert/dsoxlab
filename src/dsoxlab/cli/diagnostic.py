@@ -46,6 +46,11 @@ from ..services import (
     FixKind,
     collect_checks,
 )
+from ..services.doctor import (
+    EXIT_DOCTOR_INDETERMINE,
+    EXIT_DOCTOR_REQUIS_KO,
+    DoctorReport,
+)
 from ..utils.shell import CommandError, run_command
 from ._commun import (
     LabHomeOption,
@@ -183,11 +188,31 @@ def install() -> None:
 
 # ── doctor ────────────────────────────────────────────────────────────────────
 
+def _verdict_strict(report: DoctorReport) -> None:
+    """Traduit le diagnostic en code de sortie, pour un appelant automatisé.
+
+    Par défaut ``doctor`` sort en 0 quoi qu'il arrive, et c'est le bon choix
+    pour un humain : un diagnostic n'est pas un échec. Mais il rendait la
+    commande inutilisable comme portail — un script devait analyser le JSON
+    pour savoir si quelque chose manquait.
+
+    Deux codes plutôt qu'un, parce qu'il y a deux situations et qu'elles
+    appellent des gestes différents : réparer ce qui manque, ou refaire une
+    mesure qui n'a pas abouti. L'échec établi l'emporte sur l'indéterminé, la
+    certitude étant l'information la plus forte des deux.
+    """
+    if report.failing():
+        raise typer.Exit(EXIT_DOCTOR_REQUIS_KO)
+    if report.indetermines():
+        raise typer.Exit(EXIT_DOCTOR_INDETERMINE)
+
+
 @app.command("doctor", help=_("cmd_doctor_help"))
 def doctor(
     lab_home: LabHomeOption = None,
     fix: Annotated[bool, typer.Option("--fix", help=_("opt_fix"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+    strict: Annotated[bool, typer.Option("--strict", help=_("opt_doctor_strict"))] = False,
 ) -> None:
     root = _root(lab_home)
 
@@ -218,6 +243,11 @@ def doctor(
         # contrôle échoue, et le verdict se lit dans `ok`. Un `--json` qui
         # inventerait un code non nul ferait diverger les deux modes.
         machine.emit(machine.doctor_dict(report))
+        # Le document est rendu AVANT le verdict : `validate-structure` fait de
+        # même, et un appelant qui reçoit un code non nul doit quand même
+        # pouvoir lire ce qui n'allait pas.
+        if strict:
+            _verdict_strict(report)
         return
 
     print_doctor(report)
@@ -228,6 +258,8 @@ def doctor(
         ]
         if not correctifs:
             info(_("fix_nothing"))
+            if strict:
+                _verdict_strict(report)
             return
 
         # Un correctif MANUAL n'est JAMAIS exécuté : le geste appartient à
@@ -245,6 +277,8 @@ def doctor(
         for label, correctif in manuels:
             info(_("fix_manual", label=label, command=correctif.display))
         if not executables:
+            if strict:
+                _verdict_strict(report)
             return
 
         # Pré-conditions sudo : si au moins un correctif passe par sudo, on
@@ -289,6 +323,12 @@ def doctor(
             else:
                 error(_("fix_failure", label=label, code=code))
         info(_("fix_rerun"))
+
+    if strict:
+        # Après des correctifs, l'état de la machine a changé : juger sur le
+        # rapport d'avant dirait faux, et dans le mauvais sens — un `--fix`
+        # réussi sortirait quand même en échec. On remesure.
+        _verdict_strict(collect_checks(root, repo_meta) if fix else report)
 
 
 def _executer_correctif(correctif: Fix) -> int:

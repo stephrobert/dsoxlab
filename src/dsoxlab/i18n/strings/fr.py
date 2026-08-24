@@ -13,6 +13,9 @@ STRINGS: dict[str, str] = {
     "opt_type":       "Filtre par type : lab, challenge ou capstone",
     "opt_bloc":       "Filtre par numéro de bloc (1-8)",
     "opt_top":        "Nombre de résultats affichés",
+    "opt_doctor_strict":
+        "sort en 9 si un contrôle requis échoue, en 10 s'il n'a pas pu être "
+        "mesuré — pour un script, pas pour un humain",
     "opt_fix":        "Tenter la remédiation automatique des composants manquants.",
     "opt_no_pager":   "Tout afficher d'un bloc au lieu de paginer ce qui dépasse l'écran.",
     "opt_use_provider":
@@ -538,6 +541,9 @@ Chaque lab déclare :
                        Les composants informatifs ne sont pas touchés.
     [dim]--json[/dim]               Le diagnostic en document, chaque contrôle portant
                        une clé et un état stables. Pas avec [bold]--fix[/bold].
+    [dim]--strict[/dim]             Traduit le diagnostic en code de sortie, pour un script :
+                       [bold]9[/bold] si un requis échoue, [bold]10[/bold] s'il n'a pas pu être
+                       mesuré. Sans elle, doctor sort toujours en 0.
 
   [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
                        jouable immédiatement, sans rien cloner ni provisionner.

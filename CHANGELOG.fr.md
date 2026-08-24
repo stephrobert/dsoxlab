@@ -9,6 +9,35 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.79] - 2026-08-24
+
+### Ajouté
+
+- **`doctor --strict` traduit le diagnostic en code de sortie** (issue #176).
+  `doctor` sortait en 0 quel que soit l'état de ses contrôles, ce qui est le bon
+  choix pour un humain — un diagnostic n'est pas un échec — mais rendait la
+  commande inutilisable comme portail automatisé : un script devait analyser le
+  JSON pour savoir si quelque chose manquait.
+
+  Deux codes plutôt qu'un, parce que les deux situations appellent des gestes
+  différents :
+
+  | Mode | Code | Quand |
+  | --- | --- | --- |
+  | `doctor` | `0` | toujours, inchangé |
+  | `doctor --strict` | `9` | un contrôle requis a échoué |
+  | `doctor --strict` | `10` | un contrôle requis n'a pas pu être mesuré |
+
+  `9` se répare, `10` se remesure. Un environnement dont une sonde n'a pas
+  abouti n'est pas validé pour autant — c'est précisément ce qu'une construction
+  d'image ne doit pas confondre avec un succès. `9` l'emporte quand les deux
+  coexistent : une certitude est plus forte qu'une ignorance.
+
+  Le comportement par défaut ne bouge pas, et `--strict` ne change rien d'autre :
+  le tableau et le document restent rendus, **avant** que le code ne tombe, pour
+  qu'un appelant recevant un code non nul puisse encore lire ce qui n'allait pas.
+
+
 ## [0.1.78] - 2026-08-24
 
 ### Corrigé
