@@ -463,3 +463,54 @@ def test_chaque_page_nomme_son_public(langue: str) -> None:
         f"pages qui ne nomment pas leur public : {sans_public}\n"
         "Ajoute une ligne « **Audience:** … » (ou « **Public :** … ») en tête."
     )
+
+
+def test_une_page_non_versionnee_ne_fait_pas_foi(
+    generateur: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Un Markdown que git ne suit pas ne décrit pas le produit, donc ne le juge pas.
+
+    Le cas réel : un `CLAUDE.md` d'agent, non versionné, cite
+    `~/.config/dsoxlab/config.yaml` pour dire que ce chemin n'existe pas encore.
+    Le contrôle le lisait comme une page de documentation et rendait la suite
+    **rouge chez le contributeur, verte en intégration continue**, où le fichier
+    n'existe pas. Un écart dans ce sens est le pire : il apprend à ne pas croire
+    la suite, à l'endroit précis où elle est censée faire foi.
+    """
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=30)
+    (tmp_path / "docs").mkdir()
+    versionnee = tmp_path / "README.md"
+    versionnee.write_text("page suivie\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "README.md"],
+                   check=True, timeout=30)
+    libre = tmp_path / "CLAUDE.md"
+    libre.write_text("cite `~/.config/dsoxlab/config.yaml`\n", encoding="utf-8")
+
+    monkeypatch.setattr(generateur, "RACINE", tmp_path)
+    pages = generateur.documents_documentation()
+
+    assert versionnee in pages, "une page suivie par git doit rester contrôlée"
+    assert libre not in pages, (
+        "un Markdown non versionné ne doit pas être lu comme de la documentation"
+    )
+
+
+def test_hors_depot_git_toutes_les_pages_comptent(
+    generateur: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Sans git, le contrôle retombe sur tout ce qu'il trouve plutôt que sur rien.
+
+    Une archive extraite, un export sans `.git` : filtrer sur `git ls-files` y
+    rendrait la liste vide, donc le contrôle vert à vide, ce qui est exactement
+    l'échec silencieux que ce fichier existe pour empêcher.
+    """
+    (tmp_path / "docs").mkdir()
+    page = tmp_path / "README.md"
+    page.write_text("hors dépôt\n", encoding="utf-8")
+
+    monkeypatch.setattr(generateur, "RACINE", tmp_path)
+
+    assert generateur._pages_versionnees() is None
+    assert page in generateur.documents_documentation()

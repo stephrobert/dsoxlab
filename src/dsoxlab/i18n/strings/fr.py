@@ -1013,6 +1013,10 @@ hors ligne, elle se tait.
         "Le démarrage du service « {name} » a échoué :\n{detail}",
     "err_service_post_start_failed":
         "L'initialisation du service « {name} » a échoué sur « {command} » :\n{detail}",
+    "err_service_container_stopped":
+        "Le service « {name} » ne tourne plus, son initialisation ne peut pas "
+        "être jouée.\nConteneur {container}, sorti avec le code {code}.\n"
+        "Dernières lignes :\n{logs}",
     "err_vm_setup_missing":
         "Le lab {lab_id} doit fournir setup.yaml à la racine (contrat dsoxlab "
         "pour runtime: vm). Fichier attendu : {path}",

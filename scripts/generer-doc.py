@@ -231,14 +231,45 @@ _SOUS_MAISON = re.compile(r"~/[A-Za-z0-9._/<>{}-]+")
 _FICHIER_DEPOT = re.compile(r"[A-Za-z0-9._/<>{}-]*\.dsoxlab[A-Za-z0-9._-]*")
 
 
+def _pages_versionnees() -> set[Path] | None:
+    """Les Markdown que git suit, ou None si la question n'a pas de sens ici.
+
+    None quand le dépôt n'est pas un dépôt git, ou que git est absent : le
+    contrôle retombe alors sur tout ce qu'il trouve, ce qui est le comportement
+    d'origine.
+    """
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(RACINE), "ls-files", "-z", "--", "*.md"],
+            capture_output=True, text=True, check=False, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if res.returncode != 0:
+        return None
+    return {RACINE / nom for nom in res.stdout.split("\0") if nom}
+
+
 def documents_documentation() -> list[Path]:
     """Les pages de documentation, celles qui décrivent le produit d'aujourd'hui.
 
     Le CHANGELOG en est exclu : il raconte le passé, où un chemin retiré depuis
     a toute sa place.
+
+    Les fichiers **non versionnés** en sont exclus aussi, et pour la même raison
+    de fond : ils ne décrivent pas le produit. Un `CLAUDE.md` d'agent, un
+    brouillon de notes, tout Markdown que git ne suit pas vit sur une seule
+    machine. Les inclure rendait le contrôle rouge chez le contributeur et vert
+    en intégration continue, où ces fichiers n'existent pas : le pire écart
+    possible pour une porte de contribution, puisqu'il apprend à ne pas croire
+    la suite là où elle est justement censée faire foi.
     """
     pages = sorted(RACINE.glob("*.md")) + sorted((RACINE / "docs").rglob("*.md"))
-    return [p for p in pages if not p.name.startswith("CHANGELOG")]
+    pages = [p for p in pages if not p.name.startswith("CHANGELOG")]
+    versionnees = _pages_versionnees()
+    if versionnees is None:
+        return pages
+    return [p for p in pages if p in versionnees]
 
 
 def chemins_reels() -> tuple[set[str], set[str]]:

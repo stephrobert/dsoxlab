@@ -199,6 +199,21 @@ def _wait_ready(service: Service, name: str) -> None:
         ))
 
 
+def _diagnostic_arret(name: str) -> tuple[str, str]:
+    """Pourquoi ce conteneur n'est plus debout : code de sortie et dernières lignes.
+
+    Docker, lui, répond ``container <64 caractères hexadécimaux> is not
+    running`` : vrai, inexploitable, et cité tel quel il accuse la commande
+    qu'on essayait de jouer plutôt que l'arrêt qui l'empêche.
+    """
+    code = run_command(["docker", "inspect", "-f", "{{.State.ExitCode}}", name],
+                       check=False, timeout=15)
+    logs = run_command(["docker", "logs", "--tail", "10", name],
+                       check=False, timeout=15)
+    sortie = (logs.stdout or logs.stderr).strip()
+    return code.stdout.strip() or "?", sortie or "(aucune)"
+
+
 def _run_post_start(service: Service, name: str) -> None:
     """Joue les commandes d'initialisation DANS le conteneur, une fois prêt.
 
@@ -206,17 +221,34 @@ def _run_post_start(service: Service, name: str) -> None:
     garantit pas un service qui répond, et une initialisation jouée trop tôt
     échoue de façon intermittente — le pire des symptômes à diagnostiquer.
 
+    Un ``docker exec`` exige un conteneur debout. Quand il échoue, on regarde
+    donc **pourquoi avant d'accuser la commande** : si le conteneur s'est
+    arrêté, la réponse de Docker est ``container <64 caractères hexadécimaux>
+    is not running``, et la reprendre telle quelle envoie chercher un défaut
+    dans une commande qui n'a jamais été jouée. La cause utile est le code de
+    sortie et les logs du conteneur.
+
+    Le contrôle n'a lieu qu'en cas d'échec : le chemin nominal ne paie aucun
+    appel supplémentaire, et un conteneur sain n'est jamais interrogé pour rien.
+
     Sans shell (``docker exec`` reçoit l'argv tel quel), donc pas d'expansion ni
     de redirection : ce que le lab déclare est ce qui s'exécute.
     """
     for argv in service.post_start:
         res = run_command(["docker", "exec", name, *argv], check=False, timeout=120)
-        if not res.ok:
+        if res.ok:
+            continue
+        if not _is_running(name):
+            code, logs = _diagnostic_arret(name)
             raise ServiceError(_(
-                "err_service_post_start_failed",
-                name=service.name, command=" ".join(argv),
-                detail=(res.stderr or res.stdout).strip(),
+                "err_service_container_stopped",
+                name=service.name, container=name, code=code, logs=logs,
             ))
+        raise ServiceError(_(
+            "err_service_post_start_failed",
+            name=service.name, command=" ".join(argv),
+            detail=(res.stderr or res.stdout).strip(),
+        ))
 
 
 def start(service: Service, repo_id: str) -> str:

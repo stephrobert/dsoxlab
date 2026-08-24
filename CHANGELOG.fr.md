@@ -9,6 +9,41 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.66] - 2026-08-24
+
+### Corrigé
+
+- **Un conteneur arrêté était rapporté comme une commande d'initialisation en
+  échec.** Quand `post_start` tombait sur un conteneur qui ne tournait plus,
+  Docker répondait `container <64 caractères hexadécimaux> is not running`, et
+  dsoxlab reprenait cette phrase dans « l'initialisation du service « x » a
+  échoué sur « y » ». Deux erreurs à la fois : cela envoyait chercher un défaut
+  dans une commande qui n'avait jamais été jouée, et cela désignait le conteneur
+  par un identifiant que personne n'avait jamais vu. Le message dit maintenant
+  que le conteneur s'est arrêté, donne son **code de sortie** et les **dix
+  dernières lignes de ses logs**, et nomme le conteneur tel qu'il a été déclaré.
+  Le contrôle n'a lieu qu'après l'échec d'un `docker exec` : un service sain
+  n'est jamais interrogé pour rien.
+
+- **Le contrôle de documentation était rouge chez le contributeur et vert en
+  intégration continue.** Il lisait tous les Markdown de la racine, y compris
+  ceux que git ne suit pas. Un `CLAUDE.md` citant `~/.config/dsoxlab/config.yaml`
+  pour dire que ce chemin n'existe pas encore suffisait à faire échouer deux
+  tests en local, là où l'intégration continue, qui n'a pas ce fichier, restait
+  verte. Le contrôle ne retient plus que les fichiers versionnés, et retombe sur
+  tout ce qu'il trouve s'il n'y a pas de dépôt git, pour qu'une archive extraite
+  ne rende pas le contrôle vert en le vidant.
+
+### Modifié
+
+- **Les deux tests d'intégration Docker de `services` déclarent enfin la sonde
+  `ready_exec` que le contrat recommande** (issue #155). Ils enchaînaient un
+  `docker exec` juste après `start()` sans que rien n'ait prouvé que le
+  conteneur pouvait en recevoir un : l'attente implicite tenait à la charge de
+  la machine. Leurs messages d'échec portent aussi l'état du conteneur, son code
+  de sortie et ses logs : un échec intermittent en intégration continue ne
+  laisse aucune autre trace, et un `assert x.ok` nu ne laissait rien à
+  diagnostiquer.
 ## [0.1.65] - 2026-08-24
 
 ### Ajouté
