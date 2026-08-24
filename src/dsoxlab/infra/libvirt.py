@@ -132,12 +132,12 @@ def _prefixe(*, timeout: int = _TIMEOUT) -> list[str]:
     for candidat in ([], ["sudo", "-n"]):
         if _sonder(candidat, timeout=timeout):
             logger.debug(
-                "virsh joignable avec le préfixe %r sur %s", candidat, _uri()
+                "virsh reachable with prefix %r on %s", candidat, _uri()
             )
             _prefixe_retenu = candidat
             return candidat
 
-    logger.debug("virsh injoignable, ni en direct ni par sudo -n")
+    logger.debug("virsh unreachable, neither directly nor through sudo -n")
     _prefixe_retenu = []
     return _prefixe_retenu
 
@@ -232,7 +232,7 @@ def resolve_domain(host_fqdn: str, *, known: list[str] | None = None) -> str:
     candidates = [host_fqdn] if short == host_fqdn else [host_fqdn, short]
     for candidate in candidates:
         if candidate in domains:
-            logger.debug("domaine libvirt résolu : %s → %s", host_fqdn, candidate)
+            logger.debug("libvirt domain resolved: %s -> %s", host_fqdn, candidate)
             return candidate
     raise DomainNotFound(host_fqdn, candidates, domains)
 
@@ -345,7 +345,7 @@ def inspect_host(host_fqdn: str, *, known: list[str] | None = None) -> DomainSta
     except CommandError as exc:
         # Le domaine existe — on vient de le résoudre. Ne pas connaître son état
         # n'autorise pas à le déclarer absent.
-        logger.debug("état indisponible pour %s : %s", domain, exc)
+        logger.debug("state unavailable for %s: %s", domain, exc)
         return DomainStatus(host=host_fqdn, domain=domain)
     adresses = lease_addresses(domain) if etat in RUNNING_STATES else []
     return DomainStatus(host=host_fqdn, domain=domain, state=etat, addresses=adresses)

@@ -188,7 +188,7 @@ class VmRuntime(BaseRuntime):
                 snapshot_infra.delete(repo_meta, [target.host], self._snap_name(lab))
             except Exception as exc:  # noqa: BLE001 — nettoyage best-effort
                 logger.warning(
-                    "Point de reprise %s non retiré : %s", self._snap_name(lab), exc
+                    "Checkpoint %s not removed: %s", self._snap_name(lab), exc
                 )
 
     def status(self, lab: LabDefinition, target_name: str | None = None) -> str:

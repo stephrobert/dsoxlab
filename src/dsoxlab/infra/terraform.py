@@ -334,7 +334,7 @@ def _domains_in_state(state_file: Path) -> set[str] | None:
     try:
         data = json.loads(state_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("tfstate illisible (%s) : %s", state_file, exc)
+        logger.warning("tfstate unreadable (%s): %s", state_file, exc)
         return None
     if not isinstance(data, dict):
         return None
@@ -526,7 +526,7 @@ def _ensure_kvm_dhcp_leases(
         except CommandError as exc:
             res = exc.result
         if res.ok:
-            logger.info("bail DHCP ajouté à chaud: %s -> %s (%s)", host.name, ip, mac)
+            logger.info("DHCP lease added live: %s -> %s (%s)", host.name, ip, mac)
         else:
             # Best-effort ne veut pas dire muet. Sans ce bail, l'hôte n'obtiendra
             # pas son IP et l'attente échouera plus tard sur un « injoignable »
@@ -535,7 +535,7 @@ def _ensure_kvm_dhcp_leases(
             # est un silence.
             erreur = (res.stderr or res.stdout).strip()
             logger.warning(
-                "bail DHCP refusé pour %s (%s) : %s", host.name, mac, erreur,
+                "DHCP lease refused for %s (%s): %s", host.name, mac, erreur,
             )
             avertissements.append(
                 _("provision_lease_refused", host=host.name, mac=mac, error=erreur)
@@ -900,7 +900,7 @@ def _read_outputs(tf_dir: Path, *, env: dict[str, str] | None = None) -> Provisi
         try:
             outputs = json.loads(result.stdout)
         except json.JSONDecodeError:
-            logger.warning("Sortie 'terraform output -json' non parsable.")
+            logger.warning("Output of 'terraform output -json' is not parsable.")
 
     hosts_output = outputs.get("hosts", {}).get("value", {})
     hosts: dict[str, str] = {

@@ -109,7 +109,7 @@ class ShellRuntime(BaseRuntime):
             # l'arborescence s'écrasaient l'un l'autre).
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-            logger.info("fixture %s → %s", src.name, dst)
+            logger.info("fixture %s -> %s", src.name, dst)
 
     def session_spec(self, lab: LabDefinition) -> SessionSpec:
         """Un sous-shell dans ``<workdir>/``.
@@ -152,7 +152,7 @@ class ShellRuntime(BaseRuntime):
         workdir = self._workdir_path(lab)
         if workdir.exists():
             shutil.rmtree(workdir)
-            logger.info("workdir supprimé : %s", workdir)
+            logger.info("workdir removed: %s", workdir)
 
     def status(self, lab: LabDefinition, target_name: str | None = None) -> str:
         del target_name
