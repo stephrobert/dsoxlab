@@ -959,6 +959,17 @@ hors ligne, elle se tait.
         "Pré-authentification ci-dessous (un seul prompt pour toute la cascade) :",
     "fix_sudo_failed": "Pré-authentification sudo échouée : remédiations abandonnées.",
     "fix_success": "{label} : remédiation réussie.",
+    "fix_manual":
+        "{label} : geste manuel, affiché mais jamais exécuté automatiquement "
+        "→ {command}",
+    "fix_needs_relogin":
+        "{label} : corrigé, mais le changement ne prend effet qu'après une "
+        "déconnexion puis une reconnexion. Cette ligne restera rouge d'ici "
+        "là ; ce n'est pas un échec.",
+    "fix_needs_reboot":
+        "{label} : corrigé, mais le changement ne prend effet qu'après un "
+        "redémarrage. Cette ligne restera rouge d'ici là ; ce n'est pas un "
+        "échec.",
     "fix_failure": "{label} : échec de la remédiation (code {code}).",
     "fix_rerun":   "Relancez [bold]dsoxlab doctor[/bold] pour vérifier.",
 

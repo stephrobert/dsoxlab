@@ -1,6 +1,6 @@
 """Package services."""
 
-from .doctor import Check, DoctorReport, collect_checks, uses_vm
+from .doctor import Check, DoctorReport, Fix, FixKind, collect_checks, uses_vm
 from .guide_service import guide_url
 from .lab_service import (
     CheckResult,
@@ -34,6 +34,8 @@ __all__ = [
     "Check",
     "CheckResult",
     "DoctorReport",
+    "Fix",
+    "FixKind",
     "ScoreResult",
     "build_progress",
     "check_lab",

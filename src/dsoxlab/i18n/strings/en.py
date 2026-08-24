@@ -949,6 +949,14 @@ silent.
         "below (a single prompt for the whole run):",
     "fix_sudo_failed": "sudo pre-authentication failed: remediations aborted.",
     "fix_success": "{label}: remediation successful.",
+    "fix_manual":
+        "{label}: manual step, shown but never run automatically → {command}",
+    "fix_needs_relogin":
+        "{label}: fixed, but the change only takes effect after you log out "
+        "and back in. This line will stay red until then; it is not a failure.",
+    "fix_needs_reboot":
+        "{label}: fixed, but the change only takes effect after a reboot. "
+        "This line will stay red until then; it is not a failure.",
     "fix_failure": "{label}: remediation failed (code {code}).",
     "fix_rerun":   "Run [bold]dsoxlab doctor[/bold] again to verify.",
 

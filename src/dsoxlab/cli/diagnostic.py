@@ -42,8 +42,11 @@ from ..reporting import (
     warn,
 )
 from ..services import (
+    Fix,
+    FixKind,
     collect_checks,
 )
+from ..utils.shell import CommandError, run_command
 from ._commun import (
     LabHomeOption,
     _read_repo,
@@ -220,16 +223,35 @@ def doctor(
     print_doctor(report)
 
     if fix:
-        failing = [(c.label, c.fix) for c in report.fixable() if c.fix]
-        if not failing:
+        correctifs = [
+            (c.label, c.fix) for c in report.fixable() if c.fix is not None
+        ]
+        if not correctifs:
             info(_("fix_nothing"))
             return
 
-        # Pr\u00e9-conditions sudo : si au moins un fix d\u00e9marre par "sudo", on
-        # v\u00e9rifie que l'env est compatible avant d'attaquer (TTY pour
-        # taper le password, sudo dispo, et id\u00e9alement on cache le
+        # Un correctif MANUAL n'est JAMAIS exécuté : le geste appartient à
+        # l'humain, `--fix` se contente de le nommer. Tout le reste s'exécute,
+        # y compris les catégories à effet différé : c'est le message d'après
+        # qui change, pas la décision de jouer la commande.
+        manuels = [
+            (label, correctif) for label, correctif in correctifs
+            if correctif.kind is FixKind.MANUAL
+        ]
+        executables = [
+            (label, correctif) for label, correctif in correctifs
+            if correctif.kind is not FixKind.MANUAL
+        ]
+        for label, correctif in manuels:
+            info(_("fix_manual", label=label, command=correctif.display))
+        if not executables:
+            return
+
+        # Pré-conditions sudo : si au moins un correctif passe par sudo, on
+        # vérifie que l'env est compatible avant d'attaquer (TTY pour
+        # taper le password, sudo dispo, et idéalement on cache le
         # password une seule fois pour toute la cascade).
-        sudo_fixes = [c for _, c in failing if c.strip().startswith("sudo ")]
+        sudo_fixes = [c for _label, c in executables if c.requires_sudo]
         if sudo_fixes:
             if not sys.stdin.isatty():
                 error(_("fix_needs_tty"))
@@ -238,10 +260,10 @@ def doctor(
                 error(_("fix_no_sudo"))
                 raise typer.Exit(1)
 
-            # Pr\u00e9-cache les credentials sudo : un seul prompt password
+            # Pré-cache les credentials sudo : un seul prompt password
             # pour toute la cascade. Sans ce sudo -v, l'apprenant
-            # pourrait avoir \u00e0 retaper son password \u00e0 chaque commande
-            # (si sudo timestamp_timeout=0 ou si la cascade d\u00e9passe 5min).
+            # pourrait avoir à retaper son password à chaque commande
+            # (si sudo timestamp_timeout=0 ou si la cascade dépasse 5min).
             info(_("fix_sudo_preauth", count=len(sudo_fixes)))
             # check=False : un mot de passe refusé ou un Ctrl-C sur le prompt
             # sudo est une réponse de l'utilisateur, pas une panne. On la
@@ -251,18 +273,53 @@ def doctor(
                 error(_("fix_sudo_failed"))
                 raise typer.Exit(1)
 
-        info(_("fix_count", count=len(failing)))
-        for label, fix_cmd in failing:
-            info(f"[bold]{label}[/bold] \u2192 {fix_cmd}")
-            # check=False : `--fix` joue une CASCADE. Un correctif en \u00e9chec
-            # doit \u00eatre signal\u00e9 puis laisser tourner les suivants ; lever ici
-            # abandonnerait les r\u00e9parations restantes sur la premi\u00e8re qui rate.
-            result = subprocess.run(fix_cmd, shell=True, text=True, check=False)  # noqa: S602
-            if result.returncode == 0:
+        info(_("fix_count", count=len(executables)))
+        for label, correctif in executables:
+            info(f"[bold]{label}[/bold] → {correctif.display}")
+            code = _executer_correctif(correctif)
+            if code == 0:
                 success(_("fix_success", label=label))
+                # Dire l'effet différé au moment du succès, sans quoi le
+                # prochain `doctor` remontre la même ligne rouge et
+                # l'utilisateur conclut, à tort, que le correctif a échoué.
+                if correctif.kind is FixKind.NEEDS_RELOGIN:
+                    warn(_("fix_needs_relogin", label=label))
+                elif correctif.kind is FixKind.NEEDS_REBOOT:
+                    warn(_("fix_needs_reboot", label=label))
             else:
-                error(_("fix_failure", label=label, code=result.returncode))
+                error(_("fix_failure", label=label, code=code))
         info(_("fix_rerun"))
+
+
+def _executer_correctif(correctif: Fix) -> int:
+    """Joue les commandes d'un correctif, dans l'ordre, sans shell.
+
+    Chaque argv part tel quel à ``run_command`` : aucun token n'est redécoupé
+    en route, un argument portant une espace arrive entier à la commande. La
+    séquence s'arrête au premier échec, dont le code est rendu. ``check=False``
+    parce que `--fix` joue une CASCADE : un correctif en échec doit être
+    signalé puis laisser tourner les suivants ; lever ici abandonnerait les
+    réparations restantes sur la première qui rate.
+
+    La sortie capturée est rejouée sur les flux d'origine : l'utilisateur
+    voit ce qu'apt ou systemctl ont dit, en particulier quand ça a raté.
+    """
+    for commande in correctif.commands:
+        try:
+            resultat = run_command(list(commande), check=False, timeout=900)
+        except CommandError as exc:
+            # Commande introuvable ou délai dépassé : le wrapper l'a déjà
+            # journalisé, on rend un échec franc avec ce qu'on sait.
+            if exc.result.stderr:
+                sys.stderr.write(exc.result.stderr + "\n")
+            return 1
+        if resultat.stdout:
+            sys.stdout.write(resultat.stdout)
+        if resultat.stderr:
+            sys.stderr.write(resultat.stderr)
+        if resultat.returncode != 0:
+            return resultat.returncode
+    return 0
 
 
 # ── provision / destroy / ssh / status ────────────────────────────────────────

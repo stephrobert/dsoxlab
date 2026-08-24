@@ -68,7 +68,10 @@ def stub_hypervisors(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         doctor, "_hypervisor_checks",
         lambda: {
-            "kvm": doctor._check("kvm", False, "not found", fix="apt install"),
+            "kvm": doctor._check(
+                "kvm", False, "not found",
+                fix=doctor.Fix((("apt", "install"),)),
+            ),
             "incus": doctor._check("incus", True, "daemon ok"),
         },
     )
