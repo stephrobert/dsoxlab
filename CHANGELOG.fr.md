@@ -9,6 +9,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Le garde-fou de publication n'était pas fiable, de deux façons, toutes deux
+  constatées en publiant les 0.1.65 et 0.1.66.** Il garde une publication qui ne
+  se défait pas, donc s'y tromper coûte plus cher qu'ailleurs. Rien ne change
+  dans la roue publiée : `scripts/` est de l'outillage de développement, d'où
+  l'absence de bump de version.
+
+  - *Il comptait les fichiers non suivis comme un arbre sale.* Ce dépôt porte en
+    permanence des nœuds `/dev/null` à sa racine (`.bashrc`, `.gitconfig`,
+    `.idea`, `.mcp.json`…), que `git status --porcelain` liste en non suivis. Le
+    contrôle passait donc ou échouait selon que ces montages étaient visibles à
+    cet instant, c'est-à-dire par intermittence, dans l'outil même qui garde une
+    publication définitive. Or un garde-fou qui se déclenche au hasard finit
+    contourné. Seules les modifications de fichiers **suivis** bloquent
+    désormais un tag ; les non suivis sont nommés dans un avertissement, parce
+    qu'un `git add` oublié est un vrai risque qu'aucun script ne peut trancher à
+    la place de qui écrit le code.
+  - *`--publiee <tag>` ignorait le tag qu'on lui donnait* et interrogeait PyPI
+    sur la version empaquetée du moment. Une fois la version suivante fusionnée,
+    `--publiee v0.1.65` annonçait « la version 0.1.66 est absente de PyPI » :
+    un verdict faux, sur une version pourtant bien livrée.
+
+  Le script n'avait aucun test. Il en a cinq, chacun rouge sans sa correction.
+
 ## [0.1.66] - 2026-08-24
 
 ### Corrigé

@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release guard was unreliable in two ways, both observed while shipping
+  0.1.65 and 0.1.66.** It guards a publication that cannot be undone, so being
+  wrong costs more here than elsewhere. Nothing in the published wheel changes:
+  `scripts/` is development tooling, hence no version bump.
+
+  - *It counted untracked files as a dirty tree.* This repository permanently
+    carries `/dev/null` nodes at its root (`.bashrc`, `.gitconfig`, `.idea`,
+    `.mcp.json`…), which `git status --porcelain` lists as untracked. The check
+    therefore passed or failed depending on whether those mounts were visible
+    at that moment — intermittently, inside the very tool that guards a
+    definitive publication, and a guard that fires at random ends up bypassed.
+    Only **tracked** modifications block a tag now; untracked files are named in
+    a warning, because a forgotten `git add` is real but no script can decide it
+    for the author.
+  - *`--publiee <tag>` ignored the tag it was given* and queried PyPI for the
+    currently packaged version. Once the next version was merged, `--publiee
+    v0.1.65` announced "version 0.1.66 is absent from PyPI": a false verdict
+    about a version that had shipped correctly.
+
+  The script had no test at all. It now has five, each failing without its fix.
+
 ## [0.1.66] - 2026-08-24
 
 ### Fixed
