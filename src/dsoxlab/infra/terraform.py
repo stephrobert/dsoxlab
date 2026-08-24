@@ -86,6 +86,13 @@ class ProvisionResult:
     hosts: dict[str, str]
     """Map FQDN → IP extraite de l'output ``hosts``."""
 
+    warnings: list[str] = field(default_factory=list)
+    """Messages déjà traduits que l'appelant doit **afficher**.
+
+    Un bail DHCP refusé n'empêche pas l'apply, mais condamne l'hôte à un
+    « injoignable » ultérieur sans cause visible : le dire seulement au
+    journal, c'est ne le dire à personne."""
+
 
 def is_available() -> bool:
     """Retourne True si la CLI ``terraform`` est dans le PATH."""
@@ -442,7 +449,7 @@ def other_active_providers(repo_meta: RepoMetadata) -> list[str]:
 
 def _ensure_kvm_dhcp_leases(
     repo_meta: RepoMetadata, target_hosts: list[str] | None = None
-) -> None:
+) -> list[str]:
     """Pose à chaud les baux DHCP statiques manquants d'un réseau KVM existant.
 
     Le provider ``dmacvicar/libvirt`` ne sait pas mettre à jour un réseau :
@@ -460,34 +467,46 @@ def _ensure_kvm_dhcp_leases(
     présente ou un ``virsh`` qui échoue ne bloque pas le provision (Terraform
     reste la source de vérité pour la création initiale).
 
+    Les appels passent par :func:`~dsoxlab.infra.libvirt.run_virsh` : un
+    ``sudo virsh`` brut sans ``-n`` pendait sur les machines où sudo demande un
+    mot de passe (la sortie est capturée, le prompt n'a aucun terminal), et
+    échouait toujours sur celles configurées par groupe ``libvirt`` sans droits
+    sudo — le bail n'était jamais posé, et l'hôte mourait plus tard en
+    « injoignable » sans cause visible.
+
     Le calcul MAC/IP DOIT rester aligné sur le template kvm
     (``main.tf`` : préfixe MAC ``52:54:<h0>:<h1>:00`` dérivé de
     ``sha256(repo_id)``, dernier octet ``idx+16`` ; ``ip = cidrhost(cidr,
     idx+11)``), idx étant la position dans ``infra.hosts``.
+
+    Returns:
+        Les avertissements **déjà traduits** à afficher à l'utilisateur : un
+        par bail refusé. Best-effort ne veut pas dire muet.
     """
     infra = repo_meta.infra
     if infra is None or getattr(infra, "provider", None) != "kvm" or not infra.network:
-        return
+        return []
     # check=False : « le réseau n'existe pas encore » est un cas NORMAL, et
     # virsh le dit par un code retour. C'est une branche, pas une panne.
-    dump = subprocess.run(
-        ["sudo", "virsh", "net-dumpxml", infra.network],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if dump.returncode != 0:
-        return  # réseau pas encore créé : Terraform le posera avec ses baux
+    try:
+        dump = libvirt.run_virsh(["net-dumpxml", infra.network], check=False)
+    except CommandError:
+        # virsh absent ou muet : rien à poser à chaud, Terraform dira lui-même
+        # ce qui l'empêche de créer le réseau.
+        return []
+    if not dump.ok:
+        return []  # réseau pas encore créé : Terraform le posera avec ses baux
     existing = {m.lower() for m in re.findall(r"mac='([^']+)'", dump.stdout)}
     try:
         network = ipaddress.ip_network(infra.cidr or "10.10.10.0/24", strict=False)
     except ValueError:
-        return
+        return []
     # Même dérivation que le template kvm (locals.mac_prefix) : deux octets du
     # hash du repo.id isolent les MAC entre dépôts. Doit rester synchronisé.
     digest = hashlib.sha256(repo_meta.id.encode("utf-8")).hexdigest()
     mac_prefix = f"52:54:{digest[0:2]}:{digest[2:4]}:00"
     wanted = set(target_hosts) if target_hosts else None
+    avertissements: list[str] = []
     for idx, host in enumerate(infra.hosts):
         if wanted is not None and host.name not in wanted:
             continue
@@ -498,23 +517,30 @@ def _ensure_kvm_dhcp_leases(
         entry = f"<host mac='{mac}' name='{host.name}' ip='{ip}'/>"
         # check=False : best-effort assumé (voir la docstring), Terraform reste
         # la source de vérité pour la création initiale du réseau.
-        res = subprocess.run(
-            ["sudo", "virsh", "net-update", infra.network,
-             "add-last", "ip-dhcp-host", entry, "--live", "--config"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if res.returncode == 0:
+        try:
+            res = libvirt.run_virsh(
+                ["net-update", infra.network,
+                 "add-last", "ip-dhcp-host", entry, "--live", "--config"],
+                check=False,
+            )
+        except CommandError as exc:
+            res = exc.result
+        if res.ok:
             logger.info("bail DHCP ajouté à chaud: %s -> %s (%s)", host.name, ip, mac)
         else:
             # Best-effort ne veut pas dire muet. Sans ce bail, l'hôte n'obtiendra
             # pas son IP et l'attente échouera plus tard sur un « injoignable »
-            # qui ne dira jamais pourquoi. On continue, mais on le dit.
+            # qui ne dira jamais pourquoi. On continue, mais on le dit — à
+            # l'écran, via l'appelant : un logger.warning que personne ne lit
+            # est un silence.
+            erreur = (res.stderr or res.stdout).strip()
             logger.warning(
-                "bail DHCP refusé pour %s (%s) : %s",
-                host.name, mac, (res.stderr or res.stdout).strip(),
+                "bail DHCP refusé pour %s (%s) : %s", host.name, mac, erreur,
             )
+            avertissements.append(
+                _("provision_lease_refused", host=host.name, mac=mac, error=erreur)
+            )
+    return avertissements
 
 
 def apply(
@@ -552,7 +578,7 @@ def apply(
     # DHCP des hosts ajoutés après sa création, à chaud, sinon leur VM ne
     # recevrait pas son IP statique. No-op au premier provision (réseau absent)
     # et hors kvm. Voir _ensure_kvm_dhcp_leases.
-    _ensure_kvm_dhcp_leases(repo_meta, target_hosts)
+    avertissements = _ensure_kvm_dhcp_leases(repo_meta, target_hosts)
 
     # Note : ``init`` n'est PAS appelé automatiquement ici. La CLI
     # ``dsoxlab provision`` l'appelle séparément (avec spinner) pour
@@ -602,7 +628,9 @@ def apply(
             env=_provider_env(repo_meta),
         )
 
-    return _read_outputs(tf_dir, env=_provider_env(repo_meta))
+    result = _read_outputs(tf_dir, env=_provider_env(repo_meta))
+    result.warnings.extend(avertissements)
+    return result
 
 
 #: Délai laissé à Terraform pour mourir sur ``SIGTERM`` avant le ``SIGKILL``.

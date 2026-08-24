@@ -16,10 +16,19 @@ from pathlib import Path
 import pytest
 
 from dsoxlab.i18n import _
+from dsoxlab.infra import libvirt
 from dsoxlab.models.lab import LabDefinition, ValidationConfig
 from dsoxlab.models.repo import InfraDefinition, RepoMetadata
 from dsoxlab.models.runtime import RuntimeConfig, RuntimeType, Target
 from dsoxlab.services import doctor
+
+
+@pytest.fixture(autouse=True)
+def sans_cache_de_prefixe() -> None:
+    """Les sondes du pool passent par ``run_virsh``, dont le chemin détecté
+    est mémorisé par processus : un test ne doit pas hériter de la détection
+    d'un autre."""
+    libvirt._oublier_prefixe()
 
 
 def _lab(lab_id: str, runtime_type: RuntimeType) -> LabDefinition:
@@ -533,7 +542,12 @@ def test_un_virsh_muet_ne_conclut_pas_a_l_absence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Sonder n'est pas deviner : un virsh injoignable ne prouve pas qu'un pool
-    manque, et le rouge appartient alors au contrôle KVM, pas à celui-ci."""
+    manque, et le rouge appartient alors au contrôle KVM, pas à celui-ci.
+
+    Mais ne pas savoir n'est pas savoir que tout va bien : l'ancien contrôle
+    rendait ``ok=True`` ici, le vert affiché faute d'avoir mesuré (issue #172).
+    L'état est désormais ``unknown`` — hors de ``failing()``, et hors du vert.
+    """
 
     def _run(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise OSError("virsh a disparu entre deux appels")
@@ -541,8 +555,13 @@ def test_un_virsh_muet_ne_conclut_pas_a_l_absence(
     monkeypatch.setattr(doctor.subprocess, "run", _run)
     check = doctor._check_libvirt_pool("default")
 
-    assert check.ok
+    assert not check.ok
+    assert check.state == doctor.STATE_UNKNOWN
     assert check.detail == _("detail_pool_unknown")
+    assert check.fix is None
+
+    rapport = doctor.DoctorReport(required=[check])
+    assert rapport.failing() == [], "unknown ne prouve aucune panne"
 
 
 # ── la remédiation nomme le pool que Terraform a nommé ────────────────────────

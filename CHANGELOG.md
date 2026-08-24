@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.75] - 2026-08-24
+
+### Fixed
+
+- **The libvirt pool check concluded "green" when it could not look** (issue
+  #172). The probe invoked `virsh -c qemu:///system` directly, without the
+  `sudo -n` prefix detection that `infra/libvirt.py` was built for: on any
+  machine where the system URI requires privileges, the probe failed every
+  time, and that failure was reported as `ok` — a permanently green check
+  right where `provision` was about to die on "Pool Not Found". The probe now
+  goes through `run_virsh`, and a probe that cannot measure yields
+  `state: unknown` (introduced in 0.1.73), which never paints the verdict
+  green nor red. `_check_kvm` also queries the **system URI** explicitly: a
+  bare `virsh version` may target the session URI depending on the
+  distribution, and answer perfectly for a user the system URI refuses.
+
+- **Three raw `sudo virsh` calls without `-n` could hang or fail silently**
+  (issue #173). `_ensure_kvm_dhcp_leases` (twice) and `_reset_kvm_domain`
+  captured their output, so a sudo password prompt had no terminal to show on
+  and the call hung; on a machine configured through the `libvirt` group
+  without sudo rights, the DHCP lease was never planted and the failure went
+  to a log nobody reads, the host later dying as "unreachable" with no visible
+  cause. All three calls now go through `run_virsh` (detected path, system
+  URI, never a prompt), and a refused lease is printed **on screen** by
+  `provision`, not just logged. A guard test now rejects any
+  `subprocess.run(["sudo", …])` that captures its output without `-n` in
+  `src/dsoxlab/`, on the model of the anti-`shell=True` guard from 0.1.70.
+
+- `run_command` now converts every `OSError` into a `CommandError` instead of
+  letting a binary that vanishes mid-run crash the caller — a diagnosis must
+  not die while diagnosing.
+
 ## [0.1.74] - 2026-08-24
 
 ### Fixed

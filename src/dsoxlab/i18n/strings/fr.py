@@ -288,6 +288,10 @@ STRINGS: dict[str, str] = {
     "provision_no_ssh_key": "Clé SSH du lab manquante : {path}\nSans elle, le keypair cloud serait vide et les VMs inaccessibles.\nLance d'abord : dsoxlab instructor bootstrap",
     "provision_done":      "Provisionnement terminé — {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
+    "provision_lease_refused":
+        "Bail DHCP refusé pour {host} ({mac}) : {error}\n"
+        "Sans lui, l'hôte n'obtiendra pas son IP et paraîtra plus tard "
+        "injoignable.",
     "provision_provider_conflict": "Impossible de provisionner sur « {current} » : le provider « {others} » a encore une infra de lab active.\nincus et KVM partagent le nom de réseau et le subnet du lab, ils ne peuvent pas tourner en même temps.\nTermine ou détruis l'autre d'abord :\n  DSOXLAB_PROVIDER={other} dsoxlab destroy",
     "provision_waiting_ssh": "Attente que les hôtes soient joignables (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Attente de {host} (SSH + cloud-init), tentative {attempt}…",
@@ -947,7 +951,9 @@ hors ligne, elle se tait.
     "detail_pool_inactive":
         "le pool « {pool} » est défini mais jamais démarré : « provision » "
         "échouera sur « storage pool is not active »",
-    "detail_pool_unknown":   "non vérifiable sans virsh",
+    "detail_pool_unknown":
+        "virsh n'a pas répondu : non vérifié, rien n'est prouvé ni dans un sens "
+        "ni dans l'autre",
     "explain_apparmor_denied":
         "Cause connue : AppArmor refuse les disques des VM. virt-aa-helper ne "
         "sait pas résoudre un disque déclaré par référence de pool, donc aucun "
