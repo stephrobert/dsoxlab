@@ -9,6 +9,48 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.77] - 2026-08-24
+
+### Corrigé
+
+- **`run_command(check=False)` tient enfin sa promesse** (issue #174). Un
+  binaire absent, un délai dépassé ou toute autre `OSError` levait une
+  `CommandError` *quelles que soient les options* : tout appelant qui croyait
+  recevoir un `CommandResult` en toutes circonstances se trompait — et le nom du
+  paramètre l'encourageait à le croire. Deux victimes, mesurées par exécution
+  avant d'être corrigées : `dsoxlab catalog add` sortait en trace Python sur un
+  poste sans git, ce qui est la deuxième commande du parcours d'accueil ; et une
+  sonde qui expirait faisait sauter la boucle de réessai **entière** au lieu
+  d'être comptée comme un échec à réessayer.
+- **Une clé i18n manquante ne parvient plus brute à l'utilisateur.** `_()` rend
+  la clé elle-même quand elle n'est pas définie : une clé posée dans le code
+  mais pas dans les dictionnaires s'affichait donc `catalog_git_absent`. Un
+  garde-fou existait, mais s'arrêtait à `validators/` et `models/` ; il couvre
+  désormais tout appel `_("…")` littéral du paquet, dans les deux langues.
+
+### Ajouté
+
+- **`git` et `docker` sont des contrôles de `doctor`.** Aucun des deux n'est une
+  dépendance Python — `uv tool install` n'apporte ni l'un ni l'autre — et aucun
+  n'était déclaré nulle part. `git` est requis partout, puisque `catalog add`
+  clone. `docker`, lui, suit ce que le catalogue déclare : requis dès qu'un lab
+  déclare `runtime.services`, informatif sinon, pour qu'un dépôt qui ne s'en
+  sert pas n'en voie jamais de rouge.
+- **`CommandResult.failure`** nomme *pourquoi* une commande n'a pas pu tourner
+  (`not_found`, `timeout`, `os_error`), séparément d'un code de retour non nul.
+  Les deux appellent des gestes opposés — lire stderr, ou installer un paquet et
+  réessayer — et un appelant qui ne regardait que `returncode` les confondait.
+
+### Modifié
+
+- **Le tirage d'une image est désormais distinct du démarrage d'un conteneur.**
+  Le premier `docker run` tirait l'image dans son propre budget de 180 secondes :
+  au-delà, la commande échouait sur un message de démarrage qui ne parlait pas du
+  réseau ; en deçà, `run` pendait plusieurs minutes sans dire pourquoi. Le tirage
+  a maintenant son propre délai et s'annonce, et il est sauté si l'image est déjà
+  locale.
+
+
 ## [0.1.76] - 2026-08-24
 
 ### Corrigé

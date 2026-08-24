@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.77] - 2026-08-24
+
+### Fixed
+
+- **`run_command(check=False)` now keeps its promise** (issue #174). A missing
+  binary, an expired timeout or any other `OSError` raised a `CommandError`
+  *whatever the options*, so any caller expecting a `CommandResult` in all
+  circumstances was wrong — and the parameter name encouraged them to expect
+  it. Two victims, measured by running them before being fixed: `dsoxlab
+  catalog add` exited with a Python traceback on a machine without git, which
+  is the second command of the onboarding path; and a probe that timed out
+  aborted the **whole** retry loop instead of counting as one failure to retry.
+- **A missing i18n key no longer reaches the user as a raw key.** `_()` returns
+  the key itself when it is undefined, so a key added to the code but not to
+  the dictionaries printed as `catalog_git_absent`. A guard existed but stopped
+  at `validators/` and `models/`; it now covers every literal `_("…")` in the
+  package, in both languages.
+
+### Added
+
+- **`git` and `docker` are `doctor` checks.** Neither is a Python dependency —
+  `uv tool install` brings neither — and neither was declared anywhere. `git`
+  is required everywhere, since `catalog add` clones. `docker` follows what the
+  catalogue declares: required as soon as one lab declares `runtime.services`,
+  informational otherwise, so a repository that does not use it never sees red
+  for it.
+- **`CommandResult.failure`** names *why* a command could not run
+  (`not_found`, `timeout`, `os_error`), separately from a non-zero return code.
+  The two call for opposite gestures — read stderr, versus install a package or
+  retry — and a caller reading only `returncode` conflated them.
+
+### Changed
+
+- **Pulling an image is now separate from starting a container.** The first
+  `docker run` pulled the image within its own 180-second budget: beyond that
+  the command failed on a startup message that never mentioned the network, and
+  below it `run` hung for minutes without saying why. The pull now has its own
+  budget and announces itself, and is skipped when the image is already local.
+
+
 ## [0.1.76] - 2026-08-24
 
 ### Fixed

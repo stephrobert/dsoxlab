@@ -26,6 +26,7 @@ import json
 import re
 import socket
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..i18n import _
@@ -251,7 +252,38 @@ def _run_post_start(service: Service, name: str) -> None:
         ))
 
 
-def start(service: Service, repo_id: str) -> str:
+#: Le tirage d'une image n'a rien à voir avec le démarrage d'un conteneur :
+#: il traverse le réseau, et une image de plusieurs gigaoctets sur le réseau
+#: partagé d'une salle de formation dépasse largement le délai d'un `run`.
+_DELAI_TIRAGE = 1800
+
+
+def _image_locale(image: str) -> bool:
+    return run_command(["docker", "image", "inspect", image],
+                       check=False, timeout=15).ok
+
+
+def _tirer(image: str, notifier: Callable[[str], None] | None) -> None:
+    """Tire l'image si elle n'est pas déjà là, en le disant.
+
+    Le premier ``docker run`` tirait l'image dans son propre délai. Deux
+    conséquences : au-delà, la commande échouait sur un message de démarrage
+    qui ne parlait pas du réseau ; et en deçà, l'apprenant voyait `run` pendre
+    plusieurs minutes sans savoir que quelque chose se téléchargeait.
+    """
+    if _image_locale(image):
+        return
+    if notifier is not None:
+        notifier(image)
+    res = run_command(["docker", "pull", image], check=False,
+                      timeout=_DELAI_TIRAGE)
+    if not res.ok:
+        raise ServiceError(_("service_pull_echec", image=image,
+                             detail=(res.stderr or res.stdout).strip()))
+
+
+def start(service: Service, repo_id: str, *,
+          notifier: Callable[[str], None] | None = None) -> str:
     """Démarre (ou réutilise) le conteneur d'un service et attend sa disponibilité.
 
     Idempotent : si le conteneur tourne déjà **avec la configuration déclarée**,
@@ -301,6 +333,7 @@ def start(service: Service, repo_id: str) -> str:
     cmd += list(service.run_args)
     cmd.append(service.image)
 
+    _tirer(service.image, notifier)
     res = run_command(cmd, check=False, timeout=180)
     if not res.ok:
         raise ServiceError(_(

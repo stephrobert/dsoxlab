@@ -32,7 +32,7 @@ import yaml
 from ..config import xdg_data_home, xdg_state_home
 from ..i18n import _
 from ..templates import catalogues_manifeste
-from ..utils.shell import run_command
+from ..utils.shell import FAILURE_NOT_FOUND, CommandResult, run_command
 
 #: Un identifiant de catalogue sert de nom de répertoire : on le borne pour
 #: qu'il ne puisse ni remonter l'arborescence, ni porter d'espace.
@@ -126,12 +126,24 @@ def _est_un_catalogue(racine: Path) -> bool:
     return (racine / "meta.yml").is_file()
 
 
+def _git(args: list[str], *, timeout: int) -> CommandResult:
+    """Appelle git, et refuse tôt s'il n'est pas là.
+
+    `git` n'est pas une dépendance Python : il n'est ni installé par
+    ``uv tool install``, ni déclaré nulle part. Sans ce point de passage, son
+    absence remontait en « Commande introuvable », qui dit ce qui s'est passé
+    mais pas quoi faire — sur la deuxième commande que tape un nouvel
+    utilisateur.
+    """
+    res = run_command(["git", *args], check=False, timeout=timeout)
+    if res.failure == FAILURE_NOT_FOUND:
+        raise CatalogueError(_("catalog_git_absent"))
+    return res
+
+
 def _origine(racine: Path) -> str | None:
     """L'URL d'origine d'un catalogue cloné, si git la connaît."""
-    res = run_command(
-        ["git", "-C", str(racine), "remote", "get-url", "origin"],
-        check=False, timeout=15,
-    )
+    res = _git(["-C", str(racine), "remote", "get-url", "origin"], timeout=15)
     return res.stdout.strip() if res.ok and res.stdout.strip() else None
 
 
@@ -239,10 +251,7 @@ def ajouter(reference: str, *, force: bool = False) -> CatalogueInstalle:
         shutil.rmtree(destination)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    res = run_command(
-        ["git", "clone", "--depth", "1", url, str(destination)],
-        check=False, timeout=900,
-    )
+    res = _git(["clone", "--depth", "1", url, str(destination)], timeout=900)
     if not res.ok:
         # Un clone à moitié fait laisserait un répertoire qui n'est pas un
         # catalogue, que `list` montrerait comme installé.
@@ -265,10 +274,7 @@ def mettre_a_jour(identifiant: str) -> str:
     if not _ID_VALIDE.match(identifiant) or not _est_un_catalogue(racine):
         raise CatalogueError(_("catalog_absent", name=identifiant))
 
-    res = run_command(
-        ["git", "-C", str(racine), "pull", "--ff-only"],
-        check=False, timeout=600,
-    )
+    res = _git(["-C", str(racine), "pull", "--ff-only"], timeout=600)
     if not res.ok:
         raise CatalogueError(_("catalog_update_echec",
                                name=identifiant,

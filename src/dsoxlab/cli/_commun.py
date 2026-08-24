@@ -287,7 +287,14 @@ def _ensure_services(lab: LabDefinition, root: Path, *, quiet: bool = False) -> 
         # celui où le Ctrl-C tombe.
         with interruptible(Stage.SERVICES):
             try:
-                svc.start(service, repo_id)
+                svc.start(
+                    service, repo_id,
+                    # Un tirage d'image est long et silencieux : sans ce mot,
+                    # `run` a l'air figé. `quiet` le tait comme le reste du
+                    # progrès, pour ne pas polluer le document JSON.
+                    notifier=None if quiet else
+                    (lambda image: info(_("service_pulling", image=image))),
+                )
             except svc.ServiceError as exc:
                 error(_("service_failed", name=service.name, detail=str(exc)))
                 raise typer.Exit(2) from None
