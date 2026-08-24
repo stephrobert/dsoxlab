@@ -85,7 +85,7 @@ def read_repo_metadata(
         # Erreur de résolution provider : on remonte le message
         # complet à l'utilisateur via stderr (la CLI catch et
         # affiche), au lieu d'un simple warning silencieux.
-        logger.error("meta.yml : %s", exc)
+        logger.error("meta.yml: %s", exc)
         # Re-raise pour que l'erreur de provider ambigu remonte au
         # CLI (qui guidera vers ``dsoxlab use``).
         raise

@@ -128,8 +128,8 @@ def build_inventory(
         ip = tf_hosts.get(host_def.name) or host_def.ip
         if not ip:
             logger.warning(
-                "Host %s sans IP : ni outputs Terraform ni meta.yml ip:. "
-                "Lance d'abord 'dsoxlab provision'.",
+                "Host %s has no IP: neither Terraform outputs nor meta.yml ip:. "
+                "Run 'dsoxlab provision' first.",
                 host_def.name,
             )
             continue
@@ -399,7 +399,7 @@ def _host_ready_timeout(explicite: float | None) -> float:
         valeur = float(brut)
     except ValueError:
         logger.warning(
-            "%s=%r n'est pas un nombre : on garde %.0f s.",
+            "%s=%r is not a number: keeping %.0f s.",
             HOST_READY_TIMEOUT_ENV,
             brut,
             HOST_READY_TIMEOUT_DEFAULT,
@@ -407,7 +407,7 @@ def _host_ready_timeout(explicite: float | None) -> float:
         return HOST_READY_TIMEOUT_DEFAULT
     if valeur <= 0:
         logger.warning(
-            "%s=%r doit être positif : on garde %.0f s.",
+            "%s=%r must be positive: keeping %.0f s.",
             HOST_READY_TIMEOUT_ENV,
             brut,
             HOST_READY_TIMEOUT_DEFAULT,
@@ -440,7 +440,7 @@ def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
     except CommandError:
         return False
     if res.ok:
-        logger.info("reset envoyé à %s (déblocage du premier boot)", fqdn)
+        logger.info("reset sent to %s (unblocking first boot)", fqdn)
         return True
     return False
 
@@ -589,7 +589,7 @@ def wait_for_hosts_ready(
                 check=False,
             )
             if proc.returncode == 0:
-                logger.info("Host %s prêt (tentative %d).", fqdn, attempt)
+                logger.info("Host %s ready (attempt %d).", fqdn, attempt)
                 code, detail = _etat_cloud_init(proc.stdout)
                 if code is not None and code != 0:
                     avertissements.append(_(
@@ -662,7 +662,7 @@ def read_terraform_outputs(repo_meta: RepoMetadata) -> dict[str, Any] | None:
             check=False,
         )
     except Exception as exc:  # noqa: BLE001 — best-effort
-        logger.debug("Lecture outputs Terraform impossible : %s", exc)
+        logger.debug("Cannot read Terraform outputs: %s", exc)
         return None
 
     if not result.ok or not result.stdout.strip():

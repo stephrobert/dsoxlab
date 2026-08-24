@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.83] - 2026-08-24
+
+### Changed
+
+- **The log now speaks one language, and it is English** (issue #140). It mixed
+  French and English, which is not a matter of taste: this is the file
+  `dsoxlab support` collects and that a user pastes into a bug report. Measured
+  before being fixed — **41 French messages against 4 English ones**.
+
+  `logger.*` calls stay **deliberately outside** the i18n guard: a log line is
+  not interface text, it never goes through `_()`, and translating it at
+  runtime would make two bug reports incomparable depending on the locale of
+  whoever produced them. That exclusion justified not *translating* the log,
+  not leaving it incoherent.
+
+  English wins for three reasons: a log line gets searched **word for word**,
+  it gets compared between machines with different locales, and it is read by
+  someone diagnosing — next to the output of terraform, ansible and virsh,
+  which is already English.
+
+  The rule is written where a contributor meets it (the PR template) and held
+  by `test_journal_en_anglais.py`. Without a test it would come undone line by
+  line, which is exactly what happened to the interface before its own guard
+  existed.
+
+
 ## [0.1.82] - 2026-08-24
 
 ### Fixed

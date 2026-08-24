@@ -237,8 +237,8 @@ class RepoLock:
                 # Dégradé assumé et tracé : mieux vaut un outil qui travaille
                 # sans filet qu'un outil qui refuse de démarrer.
                 logger.warning(
-                    "verrou indisponible sur %s (%s) : la commande continue "
-                    "sans protection contre une invocation concurrente",
+                    "lock unavailable on %s (%s): the command proceeds "
+                    "without protection against a concurrent invocation",
                     self.path, exc.strerror,
                 )
                 self._fd = fd
@@ -262,7 +262,7 @@ class RepoLock:
             os.lseek(fd, 0, os.SEEK_SET)
             os.write(fd, charge.encode("utf-8"))
         except OSError:
-            logger.warning("verrou pris, mais son détenteur n'a pas pu être inscrit")
+            logger.warning("lock acquired, but its holder could not be recorded")
 
     def release(self) -> None:
         """Relâche le verrou et efface la trace du détenteur.
@@ -278,7 +278,7 @@ class RepoLock:
             try:
                 os.ftruncate(fd, 0)
             except OSError:
-                logger.debug("troncature du verrou impossible", exc_info=True)
+                logger.debug("cannot truncate the lock file", exc_info=True)
         self._degrade = False
         os.close(fd)
 

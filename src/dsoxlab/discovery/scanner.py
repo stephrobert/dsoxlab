@@ -142,13 +142,13 @@ def scan_catalog(
             # la même chose, dont une en français quel que soit DSOXLAB_LANG. La
             # trace reste dans le fichier de journal, qui garde tout le DEBUG.
             logger.debug(
-                "lab.yaml écarté (%s) : il déclare schema_version %d, "
-                "au-delà de la version %d que ce dsoxlab sait lire.",
+                "lab.yaml skipped (%s): it declares schema_version %d, "
+                "beyond version %d that this dsoxlab can read.",
                 yaml_path, exc.found, exc.supported,
             )
             scan.unsupported.append(exc)
         except (KeyError, ValueError, yaml.YAMLError) as exc:
-            logger.warning("lab.yaml ignoré (%s) : %s", yaml_path, exc)
+            logger.warning("lab.yaml ignored (%s): %s", yaml_path, exc)
             scan.illisibles.append((yaml_path, f"{type(exc).__name__}: {exc}"))
 
     scan.labs = _sort_labs(scan.labs, root, repo_meta)

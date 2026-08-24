@@ -251,7 +251,7 @@ def _delete_volume(pool: str, path: str) -> bool:
     result = run_virsh(["vol-delete", "--pool", pool, nom], check=False, timeout=120)
     if not result.ok:
         logger.warning(
-            "vol-delete sans effet pour %s dans %s : %s",
+            "vol-delete had no effect for %s in %s: %s",
             nom, pool, result.stderr.strip(),
         )
     return result.ok
@@ -298,7 +298,7 @@ def create(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
     for fqdn in hosts:
         domain = resolve_domain(fqdn, known=known)
         if name in _snapshot_names(domain):
-            logger.info("snapshot %s déjà présent sur %s : remplacé", name, domain)
+            logger.info("snapshot %s already present on %s: replaced", name, domain)
             _drop(domain, name)
         args = [
             "snapshot-create-as",
@@ -310,7 +310,7 @@ def create(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
         ]
         for cible, chemin in sorted(_writable_disks(domain).items()):
             args += ["--diskspec", f"{cible},snapshot=external,file={chemin}.{name}"]
-        logger.info("virsh snapshot-create-as %s %s (externe)", domain, name)
+        logger.info("virsh snapshot-create-as %s %s (external)", domain, name)
         run_virsh(args, timeout=300)
 
 
@@ -337,7 +337,7 @@ def revert(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
         if tournait:
             run_virsh(["destroy", domain], timeout=120)
         for couche in couches:
-            logger.info("retour arrière %s:%s → %s", domain, couche.target, couche.base)
+            logger.info("revert %s:%s -> %s", domain, couche.target, couche.base)
             _reset_overlay(couche)
         if tournait:
             run_virsh(["start", domain], timeout=300)
@@ -374,7 +374,7 @@ def delete(repo_meta: RepoMetadata, hosts: list[str], name: str) -> None:
         try:
             domain = resolve_domain(fqdn, known=known)
         except DomainNotFound as exc:
-            logger.warning("snapshot-delete ignoré : %s", exc)
+            logger.warning("snapshot-delete skipped: %s", exc)
             continue
         _drop(domain, name)
 
@@ -395,7 +395,7 @@ def _drop(domain: str, name: str) -> None:
         return
     except CommandError as exc:
         logger.warning(
-            "snapshot-delete a échoué pour %s/%s : %s",
+            "snapshot-delete failed for %s/%s: %s",
             domain, name, exc.result.stderr.strip(),
         )
     result = run_virsh(
@@ -403,12 +403,12 @@ def _drop(domain: str, name: str) -> None:
     )
     if result.ok:
         logger.warning(
-            "snapshot %s/%s oublié sans fusion : le recouvrement reste la "
-            "couche vive du disque", domain, name,
+            "snapshot %s/%s dropped without merge: the overlay remains the "
+            "live disk layer", domain, name,
         )
     else:
         logger.warning(
-            "snapshot %s/%s non supprimé : %s", domain, name, result.stderr.strip()
+            "snapshot %s/%s not deleted: %s", domain, name, result.stderr.strip()
         )
 
 
@@ -434,7 +434,7 @@ def purge(repo_meta: RepoMetadata, hosts: list[str]) -> list[str]:
     try:
         known = list_domains()
     except CommandError as exc:
-        logger.warning("purge des snapshots impossible : %s", exc)
+        logger.warning("cannot purge snapshots: %s", exc)
         return retires
 
     for fqdn in hosts:
@@ -446,7 +446,7 @@ def purge(repo_meta: RepoMetadata, hosts: list[str]) -> list[str]:
             try:
                 couches = _snapshot_layers(domain, name)
             except (SnapshotError, CommandError) as exc:
-                logger.warning("snapshot %s/%s illisible : %s", domain, name, exc)
+                logger.warning("snapshot %s/%s unreadable: %s", domain, name, exc)
                 couches = []
             run_virsh(
                 ["snapshot-delete", domain, name, "--metadata"],

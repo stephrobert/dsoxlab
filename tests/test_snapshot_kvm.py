@@ -746,7 +746,8 @@ def test_un_libvirt_ancien_retombe_sur_l_oubli_de_la_metadonnee(
     assert kvm.list_(meta, "web1.lab") == []
     assert "travail-de-l-apprenant" in faux.contenu("web1.lab")
     assert faux.domaines["web1.lab"]["disques"]["vda"] in faux.fichiers()
-    assert "sans fusion" in caplog.text
+    # Le journal est en anglais depuis #140 : l'assertion suit la règle.
+    assert "without merge" in caplog.text
 
 
 def test_delete_tolere_un_domaine_absent_mais_le_journalise(

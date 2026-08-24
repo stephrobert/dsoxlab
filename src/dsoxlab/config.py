@@ -113,14 +113,14 @@ def read_context(root: Path) -> ActiveContext:
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         # UnicodeDecodeError descend de ValueError, pas d'OSError : un fichier
         # d'octets arbitraires passait donc à travers l'ancien filet.
-        logger.warning("Contexte illisible, ignoré : %s", path)
+        logger.warning("Unreadable context, ignored: %s", path)
         return ActiveContext()
 
     # La racine du document peut être n'importe quel type JSON. Sur une liste
     # ou une chaîne, `.get()` n'existe pas et lève un AttributeError que rien
     # n'attrapait.
     if not isinstance(data, dict):
-        logger.warning("Contexte non conforme (racine %s), ignoré : %s",
+        logger.warning("Malformed context (root %s), ignored: %s",
                        type(data).__name__, path)
         return ActiveContext()
 

@@ -57,8 +57,12 @@ chemins, et il se lit à côté d'une trace Python. Le traduire rendrait deux
 rapports de bug incomparables selon la locale de qui les produit, et se heurte
 au formatage paresseux (``logger.info("x %s", v)``) que la famille de règles
 ``G`` impose ici : ``_()`` formate à l'appel, ``logging`` au rendu. Le journal
-doit être *cohérent* — il mélange aujourd'hui le français et l'anglais, ce qui
-est un vrai défaut — mais cohérent n'est pas traduit, et c'est un autre lot.
+doit être *cohérent* sans être traduit, et il l'est depuis #140 : **il s'écrit
+en anglais**, règle tenue par ``test_journal_en_anglais.py``. Un message de
+journal se cherche mot pour mot dans un moteur de recherche, se compare entre
+deux machines aux locales différentes, et voisine déjà avec les sorties de
+terraform, ansible et virsh. Il reste hors du périmètre de CE garde-fou : ce
+n'est pas de l'interface, et il ne passe pas par ``_()``.
 
 **``models/`` est dans le périmètre depuis #139**, et la dette qui l'en tenait
 dehors est soldée. Les 24 ``ValueError`` du contrat ont été triées sur une seule

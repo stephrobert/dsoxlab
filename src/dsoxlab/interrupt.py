@@ -155,12 +155,12 @@ class SignalRelay:
     def _handler(self, signum: int, frame: FrameType | None) -> None:
         del frame
         self.count += 1
-        logger.info("signal %d reçu (%d fois)", signum, self.count)
+        logger.info("signal %d received (%d times)", signum, self.count)
         if self._on_notice is not None:
             try:
                 self._on_notice(self.count)
             except Exception:  # un affichage ne casse pas un arrêt
-                logger.exception("notification d'interruption en échec")
+                logger.exception("interrupt notification failed")
         if self.count >= 2:
             # Le premier signal a demandé l'annulation ; le second dit que
             # l'utilisateur n'attend plus. On repasse par le chemin normal de

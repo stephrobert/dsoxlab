@@ -47,6 +47,11 @@ box reads as "forgotten", an explicit `N/A` reads as "considered".
       EN **and** FR — `fullhelp` must never describe a command that no longer
       exists
 - [ ] Checked with `DSOXLAB_LANG=en` and `DSOXLAB_LANG=fr`
+- [ ] Any new `logger.*` message is written **in English**. The log is not
+      interface text — it never goes through `_()` — but it is the file
+      `dsoxlab support` collects: it gets searched word for word, and compared
+      between machines with different locales. `test_journal_en_anglais.py`
+      enforces this.
 
 ### When `.github/workflows/` is touched — otherwise N/A
 

@@ -202,7 +202,7 @@ def infra_status(
         try:
             return libvirt.inspect_host(fqdn, known=domaines_connus)
         except CommandError as exc:
-            logger.debug("état libvirt indisponible pour %s : %s", fqdn, exc)
+            logger.debug("libvirt state unavailable for %s: %s", fqdn, exc)
             return None
 
     ok_count = 0

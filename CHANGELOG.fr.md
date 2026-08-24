@@ -9,6 +9,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.83] - 2026-08-24
+
+### Modifié
+
+- **Le journal parle désormais une seule langue, et c'est l'anglais**
+  (issue #140). Il mélangeait le français et l'anglais, ce qui n'est pas une
+  question de goût : c'est le fichier que `dsoxlab support` collecte et qu'un
+  utilisateur colle dans un rapport de bug. Mesuré avant d'être corrigé —
+  **41 messages français contre 4 anglais**.
+
+  Les appels `logger.*` restent **délibérément hors** du garde-fou i18n : un
+  message de journal n'est pas un texte d'interface, il ne passe par `_()` nulle
+  part, et le traduire à l'exécution rendrait deux rapports de bug incomparables
+  selon la locale de qui les produit. Cette exclusion justifiait de ne pas le
+  *traduire*, pas de le laisser incohérent.
+
+  L'anglais l'emporte pour trois raisons : un message de journal se cherche
+  **mot pour mot** dans un moteur de recherche, il se compare entre deux
+  machines aux locales différentes, et il est lu par quelqu'un qui diagnostique
+  — à côté des sorties de terraform, ansible et virsh, qui sont déjà anglaises.
+
+  La règle est écrite là où un contributeur la rencontre (le gabarit de PR) et
+  tenue par `test_journal_en_anglais.py`. Sans test, elle se redéferait ligne
+  par ligne, ce qui est exactement ce qui est arrivé à l'interface avant que son
+  propre garde-fou n'existe.
+
+
 ## [0.1.82] - 2026-08-24
 
 ### Corrigé
