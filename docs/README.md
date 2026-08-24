@@ -27,6 +27,7 @@ thirty seconds; these pages say how it works.
 | [The v1 contract](./contract-v1.md) | `meta.yml` and `lab.yaml`, field by field, with what version 1 guarantees |
 | [Command reference](./commands.md) | Every command, generated from the CLI itself |
 | [Where dsoxlab writes](./files.md) | Every file dsoxlab creates, and the environment variables it reads |
+| [The machine output](./machine-output.md) | What `--json` prints, field by field, and what may be built on it |
 | [The mark](./brand.md) | Name, logo and their usage terms |
 
 Contributors have [CONTRIBUTING.md](../CONTRIBUTING.md): setup, quality gates,

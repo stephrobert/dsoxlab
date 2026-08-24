@@ -860,6 +860,7 @@ def list_labs(
 def show(
     lab_id: Annotated[str, typer.Argument(help=_("cmd_show_arg"), autocompletion=_complete_lab_id)],
     lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
@@ -869,10 +870,25 @@ def show(
         error(str(exc))
         raise typer.Exit(1) from None
 
+    # Le drapeau et non une comparaison de chaînes : `status` est un jeton
+    # (`ready` / `stopped`) sauf dans ce cas-là, où c'est une phrase traduite.
+    # Le mode machine doit distinguer les deux sans lire du français.
+    indisponible = False
     try:
         status = lab_status(lab)
     except RuntimeError:
         status = _("runtime_unavailable")
+        indisponible = True
+
+    if as_json:
+        # `best_score` doit dire la vérité : le laisser à `null` sur un lab
+        # déjà noté se lirait « jamais tenté ».
+        scores = get_best_scores(root, [lab.id])
+        machine.emit({
+            "lab": machine.lab_dict(lab, scores.get(lab.id)),
+            "status": None if indisponible else status,
+        })
+        return
 
     print_lab_detail(lab, status=status)
 
@@ -1430,6 +1446,7 @@ def scores(
     section: Annotated[str | None, typer.Option("--section", "-s", help=_("opt_section"))] = None,
     lab_id: Annotated[str | None, typer.Option("--lab", "-l", help=_("opt_filter_lab"))] = None,
     top: Annotated[int, typer.Option("--top", help=_("opt_top"))] = 20,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
@@ -1440,9 +1457,15 @@ def scores(
     affiches = {r["lab_id"] for r in results}
     seuils = {
         lab.id: lab.exam_passing_score
-        for lab in _catalogue(root, _lang(root))
+        for lab in _catalogue(root, _lang(root), quiet=as_json)
         if lab.exam_passing_score and lab.id in affiches
     }
+    if as_json:
+        machine.emit({
+            "results": [machine.score_dict(r, seuils.get(r["lab_id"])) for r in results],
+            "count": len(results),
+        })
+        return
     print_scores_table(results, seuils)
 
 
@@ -1493,16 +1516,20 @@ def progress(
 @app.command("next", help=_("cmd_next_help"))
 def next_lab(
     lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
     lang = _lang(root)
 
+    # Erreur dure, en `--json` comme ailleurs : sans contexte il n'y a rien à
+    # décrire. La cause part sur stderr, la sortie standard reste vide, et le
+    # code de retour ne change pas.
     if not ctx.section:
         error(_("next_no_context"))
         raise typer.Exit(1)
 
-    labs = _catalogue(root, lang)
+    labs = _catalogue(root, lang, quiet=as_json)
     if ctx.section:
         labs = [lab for lab in labs if lab.section == ctx.section]
     if ctx.level:
@@ -1511,6 +1538,18 @@ def next_lab(
     scores_data = get_best_scores(root, [lab.id for lab in labs])
 
     upcoming = next_pending_lab(labs, scores_data)
+    if as_json:
+        # `next` et `all_done` disent deux choses différentes : un contexte
+        # sans lab du tout rendrait aussi `next: null`, et l'appelant fêterait
+        # une section terminée qui est en fait vide.
+        machine.emit({
+            "context": {"section": ctx.section, "level": ctx.level or None},
+            "next": None if upcoming is None
+            else machine.lab_dict(upcoming, scores_data.get(upcoming.id)),
+            "all_done": upcoming is None and bool(labs),
+            "remaining": sum(1 for lab in labs if lab.id not in scores_data),
+        })
+        return
     if upcoming is None:
         success(_("next_all_done"))
         return
@@ -1600,12 +1639,30 @@ def clean(
 
 # ── validate-structure ────────────────────────────────────────────────────────
 
+#: Les familles de contrôle de ``validate-structure``, dans l'ordre où elles
+#: sont jouées. Elles figurent **toutes** dans ``counts``, à zéro s'il le faut :
+#: un tableau de bord qui n'aurait pas la clé ne saurait pas si la famille est
+#: saine ou si cette version de l'outil ne la connaît pas.
+_FAMILLES_ANOMALIES = (
+    "contract", "unknown_key", "structure", "content", "doc_url", "metadata",
+)
+
+
+def _compter(anomalies: list[dict[str, Any]]) -> dict[str, int]:
+    """Le nombre d'anomalies par famille, toutes familles présentes."""
+    compte = dict.fromkeys(_FAMILLES_ANOMALIES, 0)
+    for anomalie in anomalies:
+        compte[str(anomalie["kind"])] += 1
+    return compte
+
+
 @app.command("validate-structure", help=_("cmd_validate_help"))
 def validate_structure_cmd(
     lab_home: LabHomeOption = None,
     check_urls: Annotated[bool, typer.Option(
         "--check-urls", help=_("opt_check_urls"),
     )] = False,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     from .discovery.repo import read_repo_metadata
     from .discovery.scanner import discover_labs
@@ -1628,42 +1685,74 @@ def validate_structure_cmd(
         except ValueError:
             return chemin
 
+    # Le document machine se construit au fil des contrôles, dans le même ordre
+    # que l'affichage : une seule passe, deux rendus, et donc aucun risque que
+    # l'un rapporte une anomalie que l'autre tait.
+    documents: list[dict[str, Any]] = []
+
+    def _rendre(entete: str, lignes: list[str]) -> None:
+        """Affiche un groupe d'anomalies, sauf en mode machine."""
+        if as_json or not lignes:
+            return
+        console.print(_(entete))
+        for ligne in lignes:
+            console.print(ligne)
+
     # D'ABORD, et à la source : un `schema_version` illisible ou trop récent
     # empêche le fichier d'être découvert, donc TOUS les contrôles suivants
     # l'ignoreraient — c'est le trou connu du validator, qui n'itère que sur ce
     # qui a déjà été chargé. Ce contrôle-ci relit les fichiers du disque.
     contract = validate_schema_versions(root)
-    if not contract.ok:
-        console.print(_("contract_issues_header"))
-        for anomalie in contract.issues:
-            console.print(
-                f"  [red]✘[/red] {_rendu(anomalie.path)}: "
-                f"{_(anomalie.key, **anomalie.params)}"
-            )
-        # Le meta.yml décrit tout le catalogue : illisible, il rend chaque
-        # contrôle suivant douteux, et la découverte lèverait de toute façon.
-        # Un lab isolé, lui, n'empêche pas de valider les 283 autres.
-        if contract.meta_is_unreadable:
-            error(_("labs_have_issues"))
+    documents += [
+        machine.issue_dict("contract", a.key, a.params, path=a.path)
+        for a in contract.issues
+    ]
+    _rendre("contract_issues_header", [
+        f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
+        for a in contract.issues
+    ])
+    # Le meta.yml décrit tout le catalogue : illisible, il rend chaque
+    # contrôle suivant douteux, et la découverte lèverait de toute façon.
+    # Un lab isolé, lui, n'empêche pas de valider les 283 autres.
+    if not contract.ok and contract.meta_is_unreadable:
+        if as_json:
+            # Même forme de document que la sortie complète : un appelant ne
+            # doit pas avoir deux structures à gérer selon l'endroit où la
+            # validation s'est arrêtée.
+            machine.emit({
+                "ok": False,
+                "labs_checked": 0,
+                "doc_urls_checked": False,
+                "issues": documents,
+                "counts": _compter(documents),
+            })
             raise typer.Exit(1)
+        error(_("labs_have_issues"))
+        raise typer.Exit(1)
 
     # Ensuite, toujours à la source : les clés que le moteur n'ira jamais lire.
     # Le parseur les ignore et continuera de le faire — c'est une garantie de
     # la v1 — mais « toléré » n'est pas « voulu » : onze labs d'examen ont posé
     # un seuil de réussite que personne ne lisait, sans que rien ne le dise.
     unknown = validate_unknown_keys(root)
-    if not unknown.ok:
-        console.print(_("unknown_keys_header"))
-        for anomalie in unknown.issues:
-            console.print(
-                f"  [red]✘[/red] {_rendu(anomalie.path)}: "
-                f"{_(anomalie.key, **anomalie.params)}"
-            )
+    documents += [
+        machine.issue_dict("unknown_key", a.key, a.params, path=a.path)
+        for a in unknown.issues
+    ]
+    _rendre("unknown_keys_header", [
+        f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
+        for a in unknown.issues
+    ])
 
     structure_reports = validate_all_structure(root)
     metadata_reports = validate_all_metadata(root)
 
-    print_structure_reports(structure_reports)
+    documents += [
+        machine.issue_dict("structure", i.key, i.params, lab=r.lab_id, path=i.path)
+        for r in structure_reports for i in r.issues
+    ]
+    if not as_json:
+        print_structure_reports(structure_reports)
 
     # Contrôles de contenu : locaux, donc jouables hors ligne et par défaut.
     # Un lien mort ou une solution en clair ne casse aucun test fonctionnel,
@@ -1700,38 +1789,47 @@ def validate_structure_cmd(
             for souci in rapport.issues:
                 content_issues.append((lab.id, souci.path, souci))
 
-    if content_issues:
-        console.print(_("content_issues_header"))
-        for lab_id, chemin, souci in content_issues:
-            console.print(
-                f"  [red]✘[/red] {lab_id} — {_rendu(chemin)}: "
-                f"{_(souci.key, **souci.params)}"
-            )
+    documents += [
+        machine.issue_dict("content", s.key, s.params, lab=lab_id, path=chemin)
+        for lab_id, chemin, s in content_issues
+    ]
+    _rendre("content_issues_header", [
+        f"  [red]✘[/red] {lab_id} — {_rendu(chemin)}: {_(s.key, **s.params)}"
+        for lab_id, chemin, s in content_issues
+    ])
 
     url_issues: list[tuple[str, str, ContentIssue]] = []
     if check_urls:
-        info(_("checking_doc_urls", count=len(labs)))
+        # Sur stdout : tue en mode machine, où un « ℹ » suffit à rendre le
+        # document illisible.
+        if not as_json:
+            info(_("checking_doc_urls", count=len(labs)))
         for lab in labs:
             injoignable = check_doc_url(lab)
             if injoignable is not None:
                 url_issues.append((lab.id, lab.doc_url, injoignable))
-        if url_issues:
-            console.print(_("doc_url_issues_header"))
-            for lab_id, url, raison in url_issues:
-                console.print(
-                    f"  [red]✘[/red] {lab_id} — {url} — "
-                    f"{_(raison.key, **raison.params)}"
-                )
+        documents += [
+            # L'URL entre dans les paramètres : c'est le fait que l'appelant
+            # veut, et il n'a pas à relire le catalogue pour l'obtenir.
+            machine.issue_dict(
+                "doc_url", r.key, {**r.params, "url": url}, lab=lab_id, path=r.path,
+            )
+            for lab_id, url, r in url_issues
+        ]
+        _rendre("doc_url_issues_header", [
+            f"  [red]✘[/red] {lab_id} — {url} — {_(r.key, **r.params)}"
+            for lab_id, url, r in url_issues
+        ])
 
     issues = [r for r in metadata_reports if not r.ok]
-    if issues:
-        console.print(_("metadata_issues_header"))
-        for report in issues:
-            for issue in report.issues:
-                console.print(
-                    f"  [red]✘[/red] {report.lab_id} — {issue.field}: "
-                    f"{_(issue.key, **issue.params)}"
-                )
+    documents += [
+        machine.issue_dict("metadata", i.key, i.params, lab=r.lab_id, field=i.field)
+        for r in issues for i in r.issues
+    ]
+    _rendre("metadata_issues_header", [
+        f"  [red]✘[/red] {r.lab_id} — {i.field}: {_(i.key, **i.params)}"
+        for r in issues for i in r.issues
+    ])
 
     all_ok = (
         contract.ok
@@ -1741,6 +1839,23 @@ def validate_structure_cmd(
         and not content_issues
         and not url_issues
     )
+    if as_json:
+        machine.emit({
+            "ok": all_ok,
+            "labs_checked": len(labs),
+            # `--check-urls` est le seul contrôle réseau, et le seul qui ne
+            # tourne pas par défaut : sans ce champ, un appelant ne peut pas
+            # distinguer « aucune URL morte » de « les URL n'ont pas été
+            # regardées ».
+            "doc_urls_checked": check_urls,
+            "issues": documents,
+            "counts": _compter(documents),
+        })
+        # Le verdict et le code de retour sont ceux du mode terminal : seule la
+        # forme de la sortie change.
+        if not all_ok:
+            raise typer.Exit(1)
+        return
     if all_ok:
         success(_("all_labs_valid"))
     else:
@@ -1754,8 +1869,18 @@ def validate_structure_cmd(
 def doctor(
     lab_home: LabHomeOption = None,
     fix: Annotated[bool, typer.Option("--fix", help=_("opt_fix"))] = False,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
+
+    # `--fix` joue des commandes système (`apt`, `systemctl`, `usermod`) dont la
+    # sortie va sur la sortie standard, qu'aucune option ne détourne. Les deux
+    # options ensemble produiraient donc un document précédé de la sortie d'apt,
+    # c'est-à-dire un flux qu'aucun appelant ne peut lire. On le dit plutôt que
+    # de rendre du JSON cassé.
+    if as_json and fix:
+        error(_("doctor_json_sans_fix"))
+        raise typer.Exit(1)
 
     # Le meta.yml décide de ce qui est bloquant ici : un dépôt sans lab `vm`
     # n'a besoin d'aucun hyperviseur, et un dépôt qui a choisi son provider
@@ -1769,6 +1894,13 @@ def doctor(
         # le socle commun plutôt que de sortir sans rien dire d'autre.
         repo_meta = None
     report = collect_checks(root, repo_meta)
+
+    if as_json:
+        # Le code de retour ne change pas : `doctor` sort en 0 même quand un
+        # contrôle échoue, et le verdict se lit dans `ok`. Un `--json` qui
+        # inventerait un code non nul ferait diverger les deux modes.
+        machine.emit(machine.doctor_dict(report))
+        return
 
     print_doctor(report)
 

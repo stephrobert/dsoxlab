@@ -323,8 +323,10 @@ Chaque lab déclare :
     [dim]--level   / -l[/dim]       Filtre par niveau.
     [dim]--type    / -t[/dim]       Filtre par type : [bold]lab[/bold], [bold]challenge[/bold] ou [bold]capstone[/bold].
     [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc (1–8).
+    [dim]--json[/dim]               Le catalogue, en document machine.
 
   [cyan]show <id>[/cyan]            Détail complet d'un lab (compétences, runtime, liens…).
+    [dim]--json[/dim]               Le lab et l'état de son runtime, en document.
 
   [cyan]run <id>[/cyan]             Démarre l'environnement du lab (un shell, ou une vm provisionnée).
 
@@ -352,6 +354,7 @@ Chaque lab déclare :
 
   [cyan]check[/cyan] [dim][<id>][/dim]         Joue les tests, calcule le score, sauvegarde dans l'historique.
                        Score = 100 − (indices utilisés × coût par indice).
+    [dim]--json[/dim]               Le résultat en document. Même code de retour.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]submit[/cyan] [dim][<id>][/dim]        Soumission finale : joue les tests, sauvegarde le score, puis tapez [bold]exit[/bold] pour terminer la session.
@@ -360,13 +363,16 @@ Chaque lab déclare :
                        [yellow]verdict reçu / recalé[/yellow] face à ce seuil.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
   [cyan]progress[/cyan]             Résumé de progression par bloc (labs faits, score, challenge, capstone).
+    [dim]--json[/dim]               La même progression, en document.
 
   [cyan]next[/cyan]                 Recommande le prochain lab à compléter dans le contexte actif.
+    [dim]--json[/dim]               La suggestion et ce qui reste, en document.
   [cyan]scores[/cyan]               Affiche l'historique des scores. Une colonne [bold]Verdict[/bold] apparaît
                        si le catalogue porte au moins un lab à seuil d'examen.
     [dim]--section / -s[/dim]       Filtre par section.
     [dim]--lab     / -l[/dim]       Filtre par lab.
     [dim]--top     / -n[/dim]       Limite le nombre de résultats.
+    [dim]--json[/dim]               L'historique et chaque verdict d'examen, en document.
 
   [cyan]reset <id>[/cyan]           Nettoie et redémarre le lab depuis zéro.
 
@@ -374,12 +380,16 @@ Chaque lab déclare :
     [dim]--yes / -y[/dim]           Passe la confirmation.
 
   [cyan]validate-structure[/cyan]   Vérifie tous les fichiers lab.yaml et l'arborescence.
+    [dim]--json[/dim]               Chaque anomalie avec la clé de sa règle, en document.
+                       Même code de retour : 1 dès qu'un lab échoue.
 
   [cyan]doctor[/cyan]               Diagnostique l'environnement. Le tableau [bold]Requis[/bold] liste ce qui
                        bloque ce dépôt-ci ; un hyperviseur inutile ici reste
                        [bold]Informatif[/bold] et ne s'affiche jamais en erreur.
     [dim]--fix[/dim]                Applique la remédiation des composants requis manquants.
                        Les composants informatifs ne sont pas touchés.
+    [dim]--json[/dim]               Le diagnostic en document, chaque contrôle portant
+                       une clé et un état stables. Pas avec [bold]--fix[/bold].
 
   [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
                        jouable immédiatement, sans rien cloner ni provisionner.
@@ -396,6 +406,7 @@ Chaque lab déclare :
                        machines est interrogeable, l'hyperviseur est [bold]interrogé[/bold] :
                        un domaine absent, un domaine arrêté et un domaine qui
                        boote appellent trois gestes différents.
+    [dim]--json[/dim]               La joignabilité des hôtes, en document.
 
   [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
 
@@ -433,6 +444,31 @@ Chaque lab déclare :
   [bold]~/.local/state/dsoxlab/dsoxlab.log[/bold], sans avoir à repasser la commande.
   Il ne va jamais sur la sortie standard : [bold]--json[/bold] reste lisible par
   un programme, même en mode verbeux.""",
+
+    "fullhelp_machine": """\
+[bold]Sortie machine[/bold]
+
+  [bold]--json[/bold] transforme une commande en un document destiné à un programme :
+  extension d'éditeur, tableau de bord, script de suivi. Dix commandes la prennent :
+  [bold]list-labs[/bold], [bold]show[/bold], [bold]progress[/bold], [bold]next[/bold], [bold]scores[/bold], [bold]check[/bold], [bold]status[/bold],
+  [bold]doctor[/bold], [bold]validate-structure[/bold] et [bold]support[/bold].
+
+  La sortie standard ne porte alors que le document, et [bold]rien d'autre[/bold]. Les
+  messages d'ambiance, les astuces et l'avis de mise à jour partent tous sur la
+  sortie d'erreur : un tube reçoit du JSON propre.
+
+  Chaque document porte un numéro de [bold]schema[/bold]. Un champ ajouté le laisse tel
+  quel ; un champ qui change de sens l'incrémente.
+
+  Un verdict se lit dans une [bold]clé[/bold] stable et un [bold]état[/bold] en jeton, jamais dans le
+  libellé traduit posé à côté : aucune intégration ne doit avoir à analyser du
+  français ou de l'anglais pour savoir si c'est vert ou rouge.
+
+  [bold]--json[/bold] change la forme de la sortie, jamais le verdict ni le code de
+  retour. Sur une erreur dure (lab inconnu, meta.yml illisible), la sortie
+  standard reste vide, la cause part sur la sortie d'erreur, et le code ne bouge pas.
+
+  Champ par champ : [bold]docs/machine-output.fr.md[/bold].""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
@@ -757,6 +793,11 @@ hors ligne, elle se tait.
 
     # ── doctor — remédiation ──────────────────────────────────────────────────
     "fix_nothing": "Aucune remédiation nécessaire.",
+    "doctor_json_sans_fix":
+        "--json et --fix ne vont pas ensemble : les commandes de remédiation "
+        "écrivent sur la sortie standard, et le document en deviendrait "
+        "illisible. Lancez `dsoxlab doctor --json` pour lire le diagnostic, "
+        "puis `dsoxlab doctor --fix` pour agir dessus.",
     "fix_count":   "{count} composant(s) à corriger…",
     "fix_needs_tty":
         "Au moins une remédiation exige sudo, mais ce shell n'est pas "

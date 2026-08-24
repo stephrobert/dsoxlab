@@ -44,6 +44,59 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   de sortie et ses logs : un échec intermittent en intégration continue ne
   laisse aucune autre trace, et un `assert x.ok` nu ne laissait rien à
   diagnostiquer.
+## [0.1.65] - 2026-08-24
+
+### Ajouté
+
+- **`--json` couvre désormais toutes les commandes dont la sortie a une
+  structure.** `show`, `scores`, `next`, `doctor` et `validate-structure`
+  rejoignent `list-labs`, `progress`, `check`, `status` et `support` : dix
+  commandes, un document chacune, toutes passant par `machine.emit()` et
+  portant donc `schema`. Une intégration ne pouvait lire qu'un quart de ce que
+  l'outil sait ; pour le reste, elle devait analyser des tableaux Rich dont la
+  largeur dépend du terminal.
+
+- **Un verdict se lit sans le traduire.** `doctor` donne à chaque contrôle une
+  `key` stable (`kvm`, `pytest`, `libvirt_pool`…) et un `state` en jeton (`ok`,
+  `failed`, `choice_required`) ; `validate-structure` donne à chaque anomalie la
+  `key` de la règle qui a parlé, ses `params`, et un `kind` qui nomme la
+  famille. Le libellé traduit est posé à côté, pour l'affichage seulement. La
+  conception paresseuse aurait recopié la phrase affichée dans un champ :
+  d'apparence complète, et inutilisable, puisque aucun consommateur ne peut
+  distinguer le vert du rouge sans analyser du français ou de l'anglais. Un test
+  joue `doctor --json` dans les deux langues et exige des clés et des états
+  identiques là où les libellés diffèrent.
+
+- **[Une page de documentation pour la sortie machine](docs/machine-output.fr.md)
+  ([EN](docs/machine-output.md))** : chaque document champ par champ, les codes
+  de retour, et la règle d'évolution. Un champ ajouté laisse `schema` où il
+  est ; un champ qui change de sens l'incrémente. Le texte traduit et la sortie
+  brute de pytest sont explicitement hors du contrat ; les jetons stables et les
+  codes de retour y sont. Le `fullhelp` a gagné la section correspondante, dans
+  les deux langues.
+
+### Corrigé
+
+- **Un diagnostic qui plantait en diagnostiquant.** `virsh version` et
+  `incus list` sont joués avec un délai de cinq secondes, et la `TimeoutExpired`
+  n'était pas rattrapée : sur un hôte dont la socket libvirt ne répond jamais,
+  elle emportait toute la commande `doctor`. Depuis que `doctor --json` est une
+  interface, elle emportait avec elle le document de l'appelant et lui rendait
+  une trace Python. Une sonde qui ne répond pas est désormais rapportée comme un
+  composant qui ne répond pas, avec le geste qui le corrige.
+
+### Modifié
+
+- `doctor --json --fix` est refusé, et dit pourquoi : les commandes de
+  remédiation écrivent sur la sortie standard, et le document sortirait précédé
+  de la sortie d'apt. On lit le diagnostic d'abord, on agit ensuite.
+
+- `Check` porte son identité (`key`) et en dérive son libellé, au lieu de les
+  écrire tous les deux à chaque appel, où rien n'empêchait qu'ils divergent. Son
+  `status_key` devient un `state`, pour que le mot affiché au terminal et le
+  jeton rendu à un programme viennent de la même source.
+
+Closes #83.
 
 ## [0.1.64] - 2026-08-24
 

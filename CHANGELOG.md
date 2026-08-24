@@ -42,6 +42,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failure messages also carry the container state, its exit code and its logs —
   an intermittent failure in CI leaves no other trace, and `assert x.ok` alone
   left nothing to diagnose.
+## [0.1.65] - 2026-08-24
+
+### Added
+
+- **`--json` now covers every command whose output has a structure.** `show`,
+  `scores`, `next`, `doctor` and `validate-structure` join `list-labs`,
+  `progress`, `check`, `status` and `support`: ten commands, one document each,
+  all going through `machine.emit()` and therefore all carrying `schema`. An
+  integration could read a quarter of what the tool knows; for the rest it had
+  to parse Rich tables whose width follows the terminal.
+
+- **A verdict can be read without translating it.** `doctor` gives every check
+  a stable `key` (`kvm`, `pytest`, `libvirt_pool`…) and a `state` token (`ok`,
+  `failed`, `choice_required`); `validate-structure` gives every issue the
+  `key` of the rule that fired, its `params`, and a `kind` naming the family.
+  The translated label sits beside them, for display only. The lazy design
+  would have copied the displayed sentence into a field: complete-looking, and
+  unusable, since no consumer can tell green from red without parsing French or
+  English. A test runs `doctor --json` in both languages and asserts the keys
+  and states are identical while the labels are not.
+
+- **[A documentation page for the machine output](docs/machine-output.md)
+  ([FR](docs/machine-output.fr.md))**: every document field by field, the exit
+  codes, and the evolution rule. Adding a field keeps `schema`; changing what a
+  field means increments it. Translated text and pytest's raw output are
+  explicitly outside the contract; the stable tokens and the exit codes are
+  inside it. `fullhelp` gained a matching section, in both languages.
+
+### Fixed
+
+- **A diagnostic that crashed while diagnosing.** `virsh version` and
+  `incus list` are run with a five-second timeout, and the `TimeoutExpired` was
+  not caught: on a host whose libvirt socket never answers, it took the whole
+  `doctor` command down. Now that `doctor --json` is an interface, it took the
+  caller's document down with it and handed back a Python traceback. A probe
+  that does not answer is now reported as a component that does not answer,
+  with the gesture that fixes it.
+
+### Changed
+
+- `doctor --json --fix` is refused, and says why: the remediation commands write
+  to standard output, and the document would come out preceded by apt's output.
+  The diagnosis is read first, acted upon second.
+
+- `Check` carries its identity (`key`) and derives its label from it, instead of
+  spelling both out at each call site where nothing prevented them from
+  diverging. Its `status_key` becomes a `state`, so the terminal wording and the
+  machine token come from one source.
+
+Closes #83.
 
 ## [0.1.64] - 2026-08-24
 

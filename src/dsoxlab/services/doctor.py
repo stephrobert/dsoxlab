@@ -50,6 +50,15 @@ _LOCAL_HYPERVISORS = ("kvm", "incus")
 _VM_RUNTIMES = frozenset({RuntimeType.VM, RuntimeType.KVM, RuntimeType.INCUS})
 
 
+#: Les trois états d'un contrôle, en **jetons stables**. Ce sont eux que lit un
+#: programme : un tableau de bord qui devrait comparer « ok » à « présent » puis
+#: à « installed » selon la langue et selon le tableau ne saurait jamais dire si
+#: c'est vert ou rouge. Le libellé traduit accompagne, il ne décide pas.
+STATE_OK = "ok"
+STATE_FAILED = "failed"
+STATE_CHOICE_REQUIRED = "choice_required"
+
+
 @dataclass(frozen=True)
 class Check:
     """Un composant diagnostiqué.
@@ -60,20 +69,58 @@ class Check:
     poser lui-même.
     """
 
+    key: str
+    """Identité stable du contrôle (``kvm``, ``pytest``, ``libvirt_pool``…).
+
+    Elle ne change pas avec la langue, et c'est par elle qu'une intégration
+    désigne un contrôle. Le ``label`` en dérive : ``_("check_<key>")``, une
+    seule source pour les deux, faute de quoi ils divergent."""
+
     label: str
     ok: bool
     detail: str
     fix: str | None = None
     hint: str | None = None
-    status_key: str | None = None
-    """Clé i18n du statut, quand « KO » serait faux. Un provider qui reste
+    forced_state: str | None = None
+    """État imposé, quand « en échec » serait faux. Un provider qui reste
     à choisir bloque bien le provisionnement, mais rien n'est cassé : le
     dire en rouge revient à traiter une décision comme une panne."""
+
+    @property
+    def state(self) -> str:
+        """L'état du contrôle, en jeton stable."""
+        return self.forced_state or (STATE_OK if self.ok else STATE_FAILED)
 
     @property
     def remediation(self) -> str:
         """Ce qu'affiche la colonne « Remédiation »."""
         return self.fix or self.hint or ""
+
+
+def _check(
+    key: str,
+    ok: bool,
+    detail: str,
+    *,
+    fix: str | None = None,
+    hint: str | None = None,
+    forced_state: str | None = None,
+) -> Check:
+    """Un contrôle, dont l'identité stable engendre le libellé traduit.
+
+    Le libellé n'est pas passé : il se déduit de ``key``. Les deux étaient
+    écrits côte à côte à chaque appel, et rien n'aurait empêché un contrôle
+    d'annoncer ``kvm`` à un programme et « Terraform » à un humain.
+    """
+    return Check(
+        key=key,
+        label=_(f"check_{key}"),
+        ok=ok,
+        detail=detail,
+        fix=fix,
+        hint=hint,
+        forced_state=forced_state,
+    )
 
 
 @dataclass
@@ -106,24 +153,46 @@ class DoctorReport:
 # ── checks unitaires ──────────────────────────────────────────────────────────
 
 def _check_python() -> Check:
-    return Check(_("check_python"), True, sys.version.split()[0])
+    return _check("python", True, sys.version.split()[0])
 
 
 def _check_pytest(root: Path) -> Check:
     """Diagnostique pytest par la résolution qu'utilise réellement ``check``."""
     cmd = resolve_pytest_cmd(root)
     if cmd is None:
-        return Check(
-            _("check_pytest"), False, _("detail_pytest_missing"),
+        return _check(
+            "pytest", False, _("detail_pytest_missing"),
             hint="uv tool install --force dsoxlab",
         )
     if cmd[0] == sys.executable:
-        return Check(_("check_pytest"), True, _("detail_pytest_bundled"))
-    return Check(_("check_pytest"), True, _("detail_pytest_via", cmd=" ".join(cmd)))
+        return _check("pytest", True, _("detail_pytest_bundled"))
+    return _check("pytest", True, _("detail_pytest_via", cmd=" ".join(cmd)))
 
 
 def _check_shell() -> Check:
-    return Check(_("check_shell"), True, _("detail_shell_always"))
+    return _check("shell", True, _("detail_shell_always"))
+
+
+def _sonder(
+    commande: list[str], *, delai: float = 5
+) -> subprocess.CompletedProcess[str] | None:
+    """Joue une sonde, ou rend ``None`` si elle ne répond pas.
+
+    Un diagnostic qui plante en diagnostiquant emporte toute la commande, et
+    depuis que ``doctor --json`` est une interface, il emporte aussi le document
+    de l'appelant : une ``TimeoutExpired`` remonte alors en trace Python là où
+    l'appelant attendait du JSON. ``virsh version`` pend jusqu'au délai sur un
+    hôte dont libvirt ne répond plus, et c'est un cas courant, pas un cas d'école.
+
+    ``check=False`` : un code retour non nul EST le diagnostic. C'est l'absence
+    de réponse, elle, qui vaut ``None``.
+    """
+    try:
+        return subprocess.run(
+            commande, capture_output=True, text=True, timeout=delai, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def _check_incus() -> Check:
@@ -134,74 +203,72 @@ def _check_incus() -> Check:
     (« permissions to talk to the incus daemon »).
     """
     if not shutil.which("incus"):
-        return Check(
-            _("check_incus"), False, _("detail_incus_missing"),
+        return _check(
+            "incus", False, _("detail_incus_missing"),
             fix="sudo apt install incus",
         )
 
-    # check=False : le numéro de version n'est qu'un ornement du diagnostic.
-    # Le verdict vient de la sonde suivante, qui, elle, lit son code retour.
-    ver = subprocess.run(
-        ["incus", "--version"], capture_output=True, text=True, timeout=5, check=False,
-    )
-    version = ver.stdout.strip() or "?"
+    # Le numéro de version n'est qu'un ornement du diagnostic. Le verdict vient
+    # de la sonde suivante, qui, elle, lit son code retour.
+    ver = _sonder(["incus", "--version"])
+    version = (ver.stdout.strip() if ver else "") or "?"
 
-    # check=False : un code retour non nul EST le diagnostic, pas un incident.
-    probe = subprocess.run(
-        ["incus", "list"], capture_output=True, text=True, timeout=5, check=False,
-    )
+    probe = _sonder(["incus", "list"])
+    # Muette, elle ne prouve rien sinon que le daemon ne répond pas : c'est le
+    # même geste de réparation que sur un daemon arrêté.
+    if probe is None:
+        return _check(
+            "incus", False, _("detail_incus_daemon_down", version=version),
+            fix="sudo systemctl enable --now incus.service",
+        )
     if probe.returncode == 0:
-        return Check(_("check_incus"), True, _("detail_incus_ok", version=version))
+        return _check("incus", True, _("detail_incus_ok", version=version))
 
     err = (probe.stderr or "").lower()
     if "permission" in err or "socket" in err:
         # Soit daemon inactif, soit user hors du groupe : deux causes,
         # deux remédiations, que l'erreur seule ne distingue pas.
-        # check=False : `is-active` répond par son code retour, c'est sa façon
-        # de dire non. Lever ici transformerait une réponse en panne.
-        daemon_active = subprocess.run(
-            ["systemctl", "is-active", "--quiet", "incus.service"], check=False,
-        ).returncode == 0
+        # `is-active` répond par son code retour, c'est sa façon de dire non.
+        etat = _sonder(["systemctl", "is-active", "--quiet", "incus.service"])
+        daemon_active = etat is not None and etat.returncode == 0
         if not daemon_active:
-            return Check(
-                _("check_incus"), False,
+            return _check(
+                "incus", False,
                 _("detail_incus_daemon_down", version=version),
                 fix="sudo systemctl enable --now incus.service",
             )
-        return Check(
-            _("check_incus"), False,
+        return _check(
+            "incus", False,
             _("detail_incus_no_group", version=version),
             fix=f"sudo usermod -aG incus,incus-admin {os.environ.get('USER', '$USER')}",
         )
     if "no storage pools" in err or "init" in err:
-        return Check(
-            _("check_incus"), False,
+        return _check(
+            "incus", False,
             _("detail_incus_no_init", version=version),
             fix="sudo incus admin init --auto",
         )
 
     tail = (probe.stderr or probe.stdout).strip().splitlines()
-    return Check(_("check_incus"), False, tail[-1] if tail else _("detail_unknown_error"))
+    return _check("incus", False, tail[-1] if tail else _("detail_unknown_error"))
 
 
 def _check_kvm() -> Check:
     if not shutil.which("virsh"):
-        return Check(
-            _("check_kvm"), False, _("detail_kvm_missing"),
+        return _check(
+            "kvm", False, _("detail_kvm_missing"),
             fix="sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
         )
-    # check=False : un virsh qui sort en erreur est justement ce que ce
-    # contrôle cherche à rapporter, le code retour est lu juste en dessous.
-    result = subprocess.run(
-        ["virsh", "version"], capture_output=True, text=True, timeout=5, check=False,
-    )
-    if result.returncode != 0:
-        return Check(
-            _("check_kvm"), False, _("detail_kvm_daemon_err"),
+    # Un virsh qui sort en erreur est justement ce que ce contrôle cherche à
+    # rapporter ; un virsh qui ne répond pas dit la même chose plus fort.
+    result = _sonder(["virsh", "version"])
+    if result is None or result.returncode != 0:
+        return _check(
+            "kvm", False, _("detail_kvm_daemon_err"),
             fix="sudo systemctl start libvirtd",
         )
     first_line = result.stdout.splitlines()[0] if result.stdout else "ok"
-    return Check(_("check_kvm"), True, first_line)
+    return _check("kvm", True, first_line)
 
 
 def _check_terraform() -> Check:
@@ -213,22 +280,17 @@ def _check_terraform() -> Check:
     tournait en rond entre deux commandes qui lui disaient la même chose.
     """
     if shutil.which("terraform") is None:
-        return Check(
-            _("check_terraform"), False, _("detail_terraform_missing"),
+        return _check(
+            "terraform", False, _("detail_terraform_missing"),
             hint="https://developer.hashicorp.com/terraform/install",
         )
     # Le binaire peut être dans le PATH sans être exécutable, ou disparaître
     # entre les deux appels. Un diagnostic qui plante en cherchant à
     # diagnostiquer est le pire des cas : il emporte toute la commande.
-    #
-    # check=False : on veut le code retour pour le RAPPORTER, pas pour lever.
-    try:
-        result = subprocess.run(
-            ["terraform", "version"], capture_output=True, text=True, timeout=5, check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return Check(
-            _("check_terraform"), False, _("detail_terraform_missing"),
+    result = _sonder(["terraform", "version"])
+    if result is None:
+        return _check(
+            "terraform", False, _("detail_terraform_missing"),
             hint="https://developer.hashicorp.com/terraform/install",
         )
     # Un terraform présent mais qui sort en erreur passait pour vert : le code
@@ -236,13 +298,13 @@ def _check_terraform() -> Check:
     # échouait ensuite sur une machine que `doctor` venait de déclarer prête.
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip().splitlines()
-        return Check(
-            _("check_terraform"), False,
+        return _check(
+            "terraform", False,
             detail[-1] if detail else _("detail_terraform_broken"),
             hint="https://developer.hashicorp.com/terraform/install",
         )
     first = result.stdout.splitlines()[0] if result.stdout else "ok"
-    return Check(_("check_terraform"), True, first)
+    return _check("terraform", True, first)
 
 
 def _check_ansible() -> Check:
@@ -254,11 +316,11 @@ def _check_ansible() -> Check:
     ne relie les deux.
     """
     if not ansible_infra.has_ansible_playbook():
-        return Check(
-            _("check_ansible"), False, _("detail_ansible_missing"),
+        return _check(
+            "ansible", False, _("detail_ansible_missing"),
             fix="uv tool install ansible-core",
         )
-    return Check(_("check_ansible"), True, _("detail_ansible_ok"))
+    return _check("ansible", True, _("detail_ansible_ok"))
 
 
 def creer_pool_command(pool: str) -> str:
@@ -290,14 +352,8 @@ def _pools_libvirt(*, definis: bool) -> list[str] | None:
     if definis:
         cmd.append("--all")
     cmd.append("--name")
-    # check=False : le code retour est lu juste en dessous pour décider.
-    try:
-        probe = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=5, check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if probe.returncode != 0:
+    probe = _sonder(cmd)
+    if probe is None or probe.returncode != 0:
         return None
     return probe.stdout.split()
 
@@ -323,18 +379,18 @@ def _check_libvirt_pool(pool: str) -> Check:
     """
     actifs = _pools_libvirt(definis=False)
     if actifs is None:
-        return Check(_("check_libvirt_pool"), True, _("detail_pool_unknown"))
+        return _check("libvirt_pool", True, _("detail_pool_unknown"))
     if pool in actifs:
-        return Check(_("check_libvirt_pool"), True, pool)
+        return _check("libvirt_pool", True, pool)
 
     definis = _pools_libvirt(definis=True)
     if definis is not None and pool in definis:
-        return Check(
-            _("check_libvirt_pool"), False, _("detail_pool_inactive", pool=pool),
+        return _check(
+            "libvirt_pool", False, _("detail_pool_inactive", pool=pool),
             fix=demarrer_pool_command(pool),
         )
-    return Check(
-        _("check_libvirt_pool"), False, _("detail_pool_missing", pool=pool),
+    return _check(
+        "libvirt_pool", False, _("detail_pool_missing", pool=pool),
         fix=creer_pool_command(pool),
     )
 
@@ -471,9 +527,9 @@ def _check_iso_tool() -> Check:
     """
     for outil in ("genisoimage", "mkisofs", "xorrisofs"):
         if shutil.which(outil):
-            return Check(_("check_iso_tool"), True, outil)
-    return Check(
-        _("check_iso_tool"), False, _("detail_iso_tool_missing"),
+            return _check("iso_tool", True, outil)
+    return _check(
+        "iso_tool", False, _("detail_iso_tool_missing"),
         fix="sudo apt install genisoimage",
     )
 
@@ -495,11 +551,11 @@ def _check_labs(root: Path, labs: list[LabDefinition], vus: int) -> Check:
     # Seul un écart POSITIF dit quelque chose : des fichiers présents que le
     # moteur n'a pas su charger. L'inverse ne peut pas venir d'un catalogue réel,
     # et vaut zéro information.
-    return Check(_("check_labs"), len(labs) > 0 and ecart <= 0, detail)
+    return _check("labs", len(labs) > 0 and ecart <= 0, detail)
 
 
 def _check_lab_home(root: Path) -> Check:
-    return Check(_("check_lab_home"), True, str(root))
+    return _check("lab_home", True, str(root))
 
 
 # ── assemblage ────────────────────────────────────────────────────────────────
@@ -540,7 +596,7 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
         report.notes.append(_("doctor_note_no_vm"))
     elif active in hypervisors:
-        report.required.append(Check(_("check_provider"), True, active))
+        report.required.append(_check("provider", True, active))
         report.required.append(hypervisors[active])
         report.optional.extend(
             _sort_hypervisors([n for n in _LOCAL_HYPERVISORS if n != active])
@@ -548,7 +604,7 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         report.notes.append(_("doctor_note_other_providers", provider=active))
     elif active:
         # Provider distant (outscale…) : rien à vérifier localement.
-        report.required.append(Check(_("check_provider"), True, active))
+        report.required.append(_check("provider", True, active))
         report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
         report.notes.append(_("doctor_note_remote_provider", provider=active))
     else:
@@ -562,11 +618,11 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         # qui mentait, en annonçant « non requis ici » et « ces composants ne
         # bloquent rien » au-dessus du composant qui bloque 64 labs sur 84.
         first = candidates[0] if candidates else "kvm"
-        report.required.append(Check(
-            _("check_provider"), False,
+        report.required.append(_check(
+            "provider", False,
             _("detail_provider_unresolved", candidates=", ".join(candidates) or "—"),
             hint=f"dsoxlab use --provider {first}",
-            status_key="status_choose",
+            forced_state=STATE_CHOICE_REQUIRED,
         ))
         report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
         report.optional_title_key = "doctor_choose_title"

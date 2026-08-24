@@ -318,8 +318,10 @@ Each lab declares:
     [dim]--level   / -l[/dim]       Filter by level.
     [dim]--type    / -t[/dim]       Filter by type: [bold]lab[/bold], [bold]challenge[/bold] or [bold]capstone[/bold].
     [dim]--bloc    / -b[/dim]       Filter by bloc number (1–8).
+    [dim]--json[/dim]               The catalog as a machine document.
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
+    [dim]--json[/dim]               The lab and its runtime status, as a document.
 
   [cyan]run <id>[/cyan]             Start the lab environment (a shell, or a provisioned vm).
 
@@ -347,6 +349,7 @@ Each lab declares:
 
   [cyan]check[/cyan] [dim][<id>][/dim]         Run tests, compute score, save to history.
                        Score = 100 − (hints used × cost per hint).
+    [dim]--json[/dim]               The result as a document. Same exit code.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]submit[/cyan] [dim][<id>][/dim]        Final submission: run tests, save score, then type [bold]exit[/bold] to end the session.
@@ -356,14 +359,17 @@ Each lab declares:
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]progress[/cyan]             Bloc-by-bloc progression summary (labs done, score, challenge, capstone).
+    [dim]--json[/dim]               The same progression, as a document.
 
   [cyan]next[/cyan]                 Recommend the next lab to complete in the active context.
+    [dim]--json[/dim]               The suggestion and what remains, as a document.
 
   [cyan]scores[/cyan]               Show score history. A [bold]Verdict[/bold] column appears when the
                        catalog holds at least one lab with an exam pass mark.
     [dim]--section / -s[/dim]       Filter by section.
     [dim]--lab     / -l[/dim]       Filter by lab.
     [dim]--top     / -n[/dim]       Limit number of results.
+    [dim]--json[/dim]               The history and each exam verdict, as a document.
 
   [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch.
 
@@ -371,12 +377,16 @@ Each lab declares:
     [dim]--yes / -y[/dim]           Skip confirmation.
 
   [cyan]validate-structure[/cyan]   Check all lab.yaml files and directory layout.
+    [dim]--json[/dim]               Every issue with its rule key, as a document.
+                       Same exit code: 1 as soon as one lab fails.
 
   [cyan]doctor[/cyan]               Diagnose the environment. The [bold]Required[/bold] table lists what
                        blocks this very repo; a hypervisor useless here stays
                        [bold]Informational[/bold] and never shows up as an error.
     [dim]--fix[/dim]                Remediate the missing required components.
                        Informational components are left alone.
+    [dim]--json[/dim]               The diagnosis as a document, each check carrying a
+                       stable key and state. Not with [bold]--fix[/bold].
 
   [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
                        play right away, with nothing to clone or provision.
@@ -393,6 +403,7 @@ Each lab declares:
                        be queried, the hypervisor is [bold]asked[/bold]: a domain that
                        does not exist, one that is stopped and one that is
                        booting call for three different gestures.
+    [dim]--json[/dim]               Host reachability, as a document.
 
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
 
@@ -430,6 +441,30 @@ Each lab declares:
   either way, so there is no need to replay the command. It never goes to
   standard output: [bold]--json[/bold] stays machine-readable, even in verbose
   mode.""",
+
+    "fullhelp_machine": """\
+[bold]Machine output[/bold]
+
+  [bold]--json[/bold] turns a command into one document meant for a program: an editor
+  extension, a dashboard, a tracking script. Ten commands take it: [bold]list-labs[/bold],
+  [bold]show[/bold], [bold]progress[/bold], [bold]next[/bold], [bold]scores[/bold], [bold]check[/bold], [bold]status[/bold], [bold]doctor[/bold],
+  [bold]validate-structure[/bold] and [bold]support[/bold].
+
+  Standard output then carries the document and [bold]nothing else[/bold]. Notices,
+  tips and the update warning all go to standard error, so a pipe reads clean.
+
+  Every document carries a [bold]schema[/bold] number. Adding a field keeps that number;
+  changing what a field means increments it.
+
+  A verdict is read from a stable [bold]key[/bold] and a [bold]state[/bold] token, never from the
+  translated label beside them: no integration should have to parse English or
+  French to know whether something is green or red.
+
+  [bold]--json[/bold] changes the shape of the output, never the verdict nor the exit
+  code. On a hard error (unknown lab, unreadable meta.yml) standard output stays
+  empty, the reason goes to standard error, and the code is unchanged.
+
+  Field by field: [bold]docs/machine-output.md[/bold].""",
 
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
@@ -748,6 +783,11 @@ silent.
 
     # ── doctor — fix ──────────────────────────────────────────────────────────
     "fix_nothing": "No remediation needed.",
+    "doctor_json_sans_fix":
+        "--json and --fix cannot be combined: the remediation commands write to "
+        "standard output, which would leave the document unreadable. Run "
+        "`dsoxlab doctor --json` to read the diagnosis, then `dsoxlab doctor "
+        "--fix` to act on it.",
     "fix_count":   "{count} component(s) to fix…",
     "fix_needs_tty":
         "At least one remediation requires sudo, but this shell is not "

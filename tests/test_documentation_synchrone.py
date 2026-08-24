@@ -57,6 +57,8 @@ DOCUMENTS = [
     "docs/trainer.fr.md",
     "docs/files.md",
     "docs/files.fr.md",
+    "docs/machine-output.md",
+    "docs/machine-output.fr.md",
     "docs/commands.md",
     "docs/commands.fr.md",
     "docs/contract-v1.md",

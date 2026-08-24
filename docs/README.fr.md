@@ -27,6 +27,7 @@ dit ce que c'est en trente secondes ; ces pages disent comment cela fonctionne.
 | [Le contrat v1](./contract-v1.fr.md) | `meta.yml` et `lab.yaml`, champ par champ, avec ce que la v1 garantit |
 | [Référence des commandes](./commands.fr.md) | Toutes les commandes, produites par la CLI elle-même |
 | [Où dsoxlab écrit](./files.fr.md) | Chaque fichier que dsoxlab crée, et les variables d'environnement qu'il lit |
+| [La sortie machine](./machine-output.fr.md) | Ce que rend `--json`, champ par champ, et ce sur quoi on peut bâtir |
 | [La marque](./brand.fr.md) | Nom, logo et conditions d'usage |
 
 Les contributeurs ont [CONTRIBUTING.fr.md](../CONTRIBUTING.fr.md) : installation,
