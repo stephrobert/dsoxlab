@@ -106,17 +106,32 @@ def version_empaquetee() -> str | None:
 
 
 def _verifier_arbre(r: Rapport) -> None:
-    # Ce contrôle est un garde-fou : « rien à signaler » y vaut feu vert. Un
-    # git en échec rendrait lui aussi une sortie vide, donc un feu vert, sur
-    # une machine où l'on ne sait en réalité rien de l'arbre. On lit le code
-    # retour pour distinguer les deux.
-    sortie = git_resultat("status", "--porcelain")
-    if sortie.returncode != 0:
+    """Ce que le tag figerait, et ce qu'il laisserait derrière lui.
+
+    Deux questions, et une seule bloque. Un fichier **suivi** modifié rend le
+    tag menteur : il figerait un commit qui ne correspond pas à ce qu'on a sous
+    les yeux. Un fichier **non suivi**, lui, n'entre dans aucun commit ; il ne
+    peut que signaler un `git add` oublié, ce qu'aucun script ne sait trancher à
+    la place de qui écrit le code.
+
+    Les confondre coûtait cher ici : l'environnement de ce dépôt monte en
+    permanence des nœuds `/dev/null` à la racine (`.bashrc`, `.gitconfig`,
+    `.idea`, `.mcp.json`…), que `git status --porcelain` liste en non suivis.
+    Le contrôle passait ou échouait selon que ces montages étaient visibles au
+    moment de l'appel, c'est-à-dire par intermittence, dans l'outil même qui
+    garde une publication définitive. Un garde-fou qui se déclenche au hasard
+    finit contourné, et c'est alors tout le contrôle qui ne sert plus.
+    """
+    # Garde-fou : « rien à signaler » vaut feu vert, or un git en échec rend lui
+    # aussi une sortie vide. On lit le code retour pour distinguer les deux.
+    suivis = git_resultat("status", "--porcelain", "--untracked-files=no")
+    if suivis.returncode != 0:
         r.ko(
             "Impossible de lire l'état de l'arbre de travail",
-            f"git status a échoué : {sortie.stderr.strip() or 'sans message'}",
+            f"git status a échoué : {suivis.stderr.strip() or 'sans message'}",
         )
-    elif sortie.stdout.strip():
+        return
+    if suivis.stdout.strip():
         r.ko(
             "L'arbre de travail n'est pas propre",
             "Committe ou remise tes modifications : le tag figerait un état "
@@ -124,6 +139,22 @@ def _verifier_arbre(r: Rapport) -> None:
         )
     else:
         r.ok("Arbre de travail propre")
+
+    tous = git_resultat("status", "--porcelain")
+    if tous.returncode != 0:
+        return
+    non_suivis = [
+        ligne[3:] for ligne in tous.stdout.splitlines() if ligne.startswith("?? ")
+    ]
+    if non_suivis:
+        apercu = ", ".join(sorted(non_suivis)[:6])
+        reste = f" (et {len(non_suivis) - 6} autres)" if len(non_suivis) > 6 else ""
+        r.note(
+            f"{len(non_suivis)} fichier(s) non suivi(s), qui n'iront pas dans le tag",
+            f"{apercu}{reste}\n"
+            "      Si l'un d'eux devait être publié, il manque un git add : "
+            "la version partirait sans lui.",
+        )
 
 
 def _verifier_branche(r: Rapport) -> None:
@@ -406,7 +437,15 @@ def main() -> int:
     tag = arguments[0] if arguments else f"v{version}"
 
     if "--publiee" in sys.argv:
-        return controler_publication(version, tag)
+        # La version à chercher sur PyPI est celle du tag qu'on vérifie, pas
+        # celle qu'on empaquette aujourd'hui. Les deux divergent dès qu'une
+        # autre version a été fusionnée depuis : `--publiee v0.1.65` sur un
+        # dépôt passé à 0.1.66 annonçait « la version 0.1.66 est absente de
+        # PyPI », un verdict faux sur une version pourtant bien livrée. Un
+        # contrôle d'après-publication qui parle d'autre chose que du tag qu'on
+        # lui donne ne contrôle rien.
+        publiee = arguments[0].lstrip("v") if arguments else version
+        return controler_publication(publiee, tag)
 
     print(f"\n{GRAS}Contrôle avant tag {tag}{RAZ}\n")
     r = Rapport()
