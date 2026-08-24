@@ -28,6 +28,7 @@ qui a lancé la commande.
 from __future__ import annotations
 
 import hashlib
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -141,19 +142,44 @@ def oublier_depart(root: Path, lab_id: str) -> None:
         return
 
 
+#: Docker n'est pas installé sur cette machine.
+MOTEUR_ABSENT = "absent"
+#: Le client docker est là, mais le moteur ne répond pas.
+MOTEUR_MUET = "muet"
+
+
+def _moteur_indisponible() -> str | None:
+    """Pourquoi les services ne peuvent pas être observés, ou ``None`` s'ils le peuvent.
+
+    Les deux causes appellent des gestes différents — installer Docker, ou
+    démarrer son démon et vérifier que le compte peut lui parler — donc elles se
+    distinguent. Elles ne se distinguaient pas : un ``docker_available()`` faux
+    valait « rien à signaler », si bien qu'un lab dont le démon venait de tomber
+    s'affichait ``ready``.
+    """
+    from ..runtimes import services as svc
+
+    if shutil.which("docker") is None:
+        return MOTEUR_ABSENT
+    if not svc.docker_available():
+        return MOTEUR_MUET
+    return None
+
+
 def _services_degrades(lab: LabDefinition, repo_id: str) -> list[str]:
     """Les services déclarés qui ne tournent plus.
 
     On n'interroge Docker que si le lab en déclare : un catalogue sans service
     ne doit pas payer un appel, ni virer au rouge parce que Docker est absent
     d'une machine qui n'en a pas besoin.
+
+    Le moteur injoignable est traité **en amont**, par ``calculer`` : ici, on
+    sait déjà qu'il répond, et la liste ne parle que des conteneurs.
     """
     if not lab.runtime.services:
         return []
     from ..runtimes import services as svc
 
-    if not svc.docker_available():
-        return []
     tombes: list[str] = []
     for service in lab.runtime.services:
         etat = svc.status(service, repo_id)
@@ -174,6 +200,22 @@ def calculer(root: Path, lab: LabDefinition, repo_id: str) -> LabState:
     """
     scores = store.get_best_scores(root, [lab.id])
     meilleur, maximum = scores.get(lab.id, (None, None))
+
+    # Un lab qui DÉCLARE des services et dont le moteur ne répond pas est
+    # injouable, quelle que soit la note déjà obtenue : le dire avant de lire
+    # le score évite d'annoncer « validé » sur un lab qu'on ne peut plus jouer.
+    if lab.runtime.services:
+        cause = _moteur_indisponible()
+        if cause is not None:
+            # Deux appels littéraux plutôt qu'une clé calculée : c'est ce qui
+            # permet au garde-fou i18n de vérifier que les deux existent.
+            detail = (_("lab_state_docker_absent") if cause == MOTEUR_ABSENT
+                      else _("lab_state_docker_muet"))
+            return LabState(
+                lab_id=lab.id, state=DEGRADED,
+                label=_("lab_state_degraded"), detail=detail,
+                best_score=meilleur, max_score=maximum,
+            )
 
     tombes = _services_degrades(lab, repo_id)
     if tombes:

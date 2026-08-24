@@ -129,6 +129,12 @@ STRINGS: dict[str, str] = {
     "lab_state_validated": "validated",
     "lab_state_validated_detail": "Score obtained: {score} / {max}",
     "lab_state_degraded": "degraded",
+    "lab_state_docker_absent":
+        "docker is not installed: this lab declares services and cannot be "
+        "played as is",
+    "lab_state_docker_muet":
+        "the Docker engine does not answer: this lab declares services and "
+        "cannot be played until it is back",
     "lab_state_degraded_detail":
         "A declared service is no longer running: {services}. "
         "Restart it with: dsoxlab run <lab>",
