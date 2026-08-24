@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Nothing said that a merged version had never been tagged.** It happened
+  twice on 2026-08-24: 0.1.64, then 0.1.68, were merged into main, described in
+  the CHANGELOG, and never tagged. PyPI stayed one version behind while the
+  repository had moved on. The existing checks all ask whether the *next* tag
+  can be pushed; none asked whether the previous one ever was. A skipped version
+  does not come back: the next one takes its place, and what the first announced
+  never reaches anyone.
+
+  `check-release.py` now verifies that **every version described in the
+  CHANGELOG is served by the PyPI index**, the current one excepted. It checks
+  the index rather than git tags because that is the question that matters:
+  0.1.26 is installable although no tag carries it, having shipped under the
+  0.1.25 tag. That exemption is named and motivated in the script, as the
+  absent-paths list of `generer-doc.py` already does.
+
+  A second test came out of testing the first: removing a check from `main()`'s
+  sequence made no test fail, since they all call the functions directly. A
+  check that exists but nobody calls guards nothing — one test now asserts the
+  eight of them are actually wired.
+
+
 ## [0.1.69] - 2026-08-24
 
 ### Changed

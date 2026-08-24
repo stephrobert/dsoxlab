@@ -9,6 +9,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Rien ne disait qu'une version fusionnée n'avait jamais été taguée.** C'est
+  arrivé deux fois le 2026-08-24 : la 0.1.64, puis la 0.1.68, ont été fusionnées
+  sur main, décrites au CHANGELOG, et jamais taguées. PyPI restait une version
+  en arrière pendant que le dépôt avançait. Les contrôles existants demandent
+  tous si le tag *suivant* peut être posé ; aucun ne demandait si le précédent
+  l'avait été. Une version enjambée ne se rattrape pas : la suivante prend sa
+  place, et ce que la première annonçait ne part jamais chez personne.
+
+  `check-release.py` vérifie désormais que **toute version décrite au CHANGELOG
+  est servie par l'index PyPI**, hormis celle qu'on s'apprête à publier. Il
+  interroge l'index plutôt que les tags git, parce que c'est la question qui
+  compte : la 0.1.26 est installable alors qu'aucun tag ne la porte, ayant été
+  publiée sous celui de la 0.1.25. Cette exemption est nommée et motivée dans le
+  script, comme l'est déjà la liste des chemins absents de `generer-doc.py`.
+
+  Un second test est né du premier : retirer un contrôle de la séquence de
+  `main()` ne faisait rougir aucun test, puisqu'ils appellent tous les fonctions
+  directement. Un contrôle qui existe mais que personne n'appelle ne garde rien
+  — un test vérifie maintenant que les huit sont réellement câblés.
+
+
 ## [0.1.69] - 2026-08-24
 
 ### Modifié
