@@ -32,6 +32,8 @@ from typing import Any
 from ..i18n import _
 from ..models.repo import RepoMetadata
 from ..utils.fichiers import ecrire_atomiquement
+from ..utils.shell import CommandError
+from . import libvirt
 
 logger = logging.getLogger(__name__)
 
@@ -428,12 +430,16 @@ def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
     if infra is None or getattr(infra, "provider", None) != "kvm":
         return False
     # check=False : la fonction rend un booléen « tenté ou non » et son
-    # appelant enchaîne. Un reset refusé (sudo absent, domaine déjà éteint) ne
-    # doit pas casser l'attente : c'est un dépannage opportuniste, pas une étape.
-    res = subprocess.run(
-        ["sudo", "virsh", "reset", fqdn], capture_output=True, text=True, check=False
-    )
-    if res.returncode == 0:
+    # appelant enchaîne. Un reset refusé (droits absents, domaine déjà éteint)
+    # ne doit pas casser l'attente : c'est un dépannage opportuniste, pas une
+    # étape. `run_virsh` porte la détection du préfixe `sudo -n` : un `sudo`
+    # brut pendait sur un prompt sans terminal, et échouait toujours chez qui
+    # joint libvirt par le groupe, sans droits sudo.
+    try:
+        res = libvirt.run_virsh(["reset", fqdn], check=False)
+    except CommandError:
+        return False
+    if res.ok:
         logger.info("reset envoyé à %s (déblocage du premier boot)", fqdn)
         return True
     return False

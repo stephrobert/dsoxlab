@@ -287,6 +287,10 @@ STRINGS: dict[str, str] = {
     "provision_no_ssh_key": "Lab SSH key missing: {path}\nWithout it, cloud keypair would be empty and VMs unreachable.\nRun first: dsoxlab instructor bootstrap",
     "provision_done":      "Provisioning complete — {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
+    "provision_lease_refused":
+        "DHCP lease refused for {host} ({mac}): {error}\n"
+        "Without it, the host will get no IP and will later show up as "
+        "unreachable.",
     "provision_provider_conflict": "Cannot provision on '{current}': provider '{others}' still has active lab infrastructure.\nincus and KVM share the lab's network name and subnet, so they can't run at the same time.\nFinish or tear down the other one first:\n  DSOXLAB_PROVIDER={other} dsoxlab destroy",
     "provision_waiting_ssh": "Waiting for hosts to become reachable (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Waiting for {host} (SSH + cloud-init), attempt {attempt}…",
@@ -936,7 +940,8 @@ silent.
     "detail_pool_inactive":
         "the `{pool}` pool is defined but never started: `provision` will fail "
         "with \"storage pool is not active\"",
-    "detail_pool_unknown":   "cannot be checked without virsh",
+    "detail_pool_unknown":
+        "virsh did not answer: not verified — nothing is proven either way",
     "explain_apparmor_denied":
         "Known cause: AppArmor denies the VM disks. virt-aa-helper cannot "
         "resolve a disk declared by pool reference, so none of them enters the "

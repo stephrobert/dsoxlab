@@ -181,6 +181,12 @@ def provision(
             info(f"  {commande}")
         raise typer.Exit(4) from None
 
+    # Un bail DHCP refusé pendant l'apply se dit ici, à l'écran : confiné au
+    # journal, l'hôte échouerait plus tard en « injoignable » sans que rien ne
+    # relie l'échec à sa cause.
+    for message in result.warnings:
+        warn(message)
+
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
     # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
     # échoue en « unreachable » car la VM boote encore.

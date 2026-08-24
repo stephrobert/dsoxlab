@@ -94,20 +94,20 @@ def _uri() -> str:
     return os.environ.get("LIBVIRT_DEFAULT_URI") or _URI_DEFAUT
 
 
-def _sonder(prefixe: list[str]) -> bool:
+def _sonder(prefixe: list[str], *, timeout: int = _TIMEOUT) -> bool:
     """Ce préfixe permet-il de joindre l'hyperviseur ?"""
     try:
         run_command(
             [*prefixe, "virsh", "--connect", _uri(), "list", "--name"],
             check=True,
-            timeout=_TIMEOUT,
+            timeout=timeout,
         )
     except CommandError:
         return False
     return True
 
 
-def _prefixe() -> list[str]:
+def _prefixe(*, timeout: int = _TIMEOUT) -> list[str]:
     """Rend le préfixe qui joint l'hyperviseur, ``[]`` ou ``["sudo", "-n"]``.
 
     L'ordre n'est pas indifférent. La configuration que recommande libvirt est
@@ -130,7 +130,7 @@ def _prefixe() -> list[str]:
         return _prefixe_retenu
 
     for candidat in ([], ["sudo", "-n"]):
-        if _sonder(candidat):
+        if _sonder(candidat, timeout=timeout):
             logger.debug(
                 "virsh joignable avec le préfixe %r sur %s", candidat, _uri()
             )
@@ -151,9 +151,14 @@ def _oublier_prefixe() -> None:
 def _virsh(
     args: list[str], *, check: bool = True, timeout: int = _TIMEOUT
 ) -> CommandResult:
-    """Invoque ``virsh`` sur l'URI système, sans jamais bloquer sur un mot de passe."""
+    """Invoque ``virsh`` sur l'URI système, sans jamais bloquer sur un mot de passe.
+
+    Le ``timeout`` borne aussi la détection du préfixe : un appelant pressé
+    (``doctor``, qui sonde en quelques secondes) ne doit pas attendre deux
+    fois trente secondes qu'un démon muet refuse de répondre aux sondes.
+    """
     return run_command(
-        [*_prefixe(), "virsh", "--connect", _uri(), *args],
+        [*_prefixe(timeout=min(timeout, _TIMEOUT)), "virsh", "--connect", _uri(), *args],
         check=check,
         timeout=timeout,
     )

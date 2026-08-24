@@ -41,9 +41,11 @@ from pathlib import Path
 from ..discovery.scanner import compter_fichiers_labs
 from ..i18n import _
 from ..infra import ansible as ansible_infra
+from ..infra import libvirt as libvirt_infra
 from ..models import LabDefinition, RepoMetadata
 from ..models.repo import InfraDefinition
 from ..models.runtime import RuntimeType
+from ..utils.shell import CommandError, CommandResult
 from .lab_service import get_all_labs, resolve_pytest_cmd
 
 #: Providers packagés qui reposent sur un hyperviseur **local**, donc
@@ -281,6 +283,22 @@ def _sonder(
         return None
 
 
+def _sonde_virsh(args: list[str], *, delai: int = 5) -> CommandResult | None:
+    """Joue une sonde ``virsh`` sur l'URI système, ou rend ``None`` si impossible.
+
+    Le chemin est celui de :func:`~dsoxlab.infra.libvirt.run_virsh` — même URI,
+    même détection du préfixe ``sudo -n`` — parce qu'un diagnostic qui
+    n'emprunte pas le chemin des commandes qu'il couvre mesure autre chose
+    qu'elles. ``check=False`` : un code retour non nul EST une réponse ; seul
+    l'appel qui ne peut pas aboutir (binaire absent, timeout) vaut ``None``.
+    """
+    try:
+        result = libvirt_infra.run_virsh(args, check=False, timeout=delai)
+    except CommandError:
+        return None
+    return result
+
+
 def _current_user() -> str:
     """L'utilisateur à qui s'adresse un correctif de groupe.
 
@@ -366,13 +384,20 @@ def _check_kvm() -> Check:
         )
     # Un virsh qui sort en erreur est justement ce que ce contrôle cherche à
     # rapporter ; un virsh qui ne répond pas dit la même chose plus fort.
-    result = _sonder(["virsh", "version"])
-    if result is None or result.returncode != 0:
+    #
+    # L'interrogation vise **l'URI système**, celle où ``provision`` crée ses
+    # domaines : ``virsh version`` nu peut viser l'URI session selon la
+    # distribution, et répondre parfaitement à un utilisateur que l'URI système
+    # refuse — deux lignes vertes au-dessus d'un provisionnement mort.
+    # ``run_virsh`` porte le ``--connect qemu:///system`` et la détection du
+    # préfixe ``sudo -n``, exactement comme les commandes qu'il couvre.
+    probe = _sonde_virsh(["version"])
+    if probe is None or not probe.ok:
         return _check(
             "kvm", False, _("detail_kvm_daemon_err"),
             fix=_fix(["sudo", "systemctl", "start", "libvirtd"]),
         )
-    first_line = result.stdout.splitlines()[0] if result.stdout else "ok"
+    first_line = probe.stdout.splitlines()[0] if probe.stdout else "ok"
     return _check("kvm", True, first_line)
 
 
@@ -644,14 +669,20 @@ def _pools_libvirt(*, definis: bool) -> list[str] | None:
 
     Rendre ``None`` quand la sonde n'aboutit pas. ``virsh`` absent ou muet est
     l'affaire du contrôle KVM ; le redire ici empilerait deux rouges pour une
-    seule cause.
+    seule cause. Mais ``None`` n'est pas un vert : le contrôle appelant doit le
+    traduire en :data:`STATE_UNKNOWN`, jamais en « tout va bien ».
+
+    La sonde passe par :func:`~dsoxlab.infra.libvirt.run_virsh` : invoquer
+    ``virsh`` en direct échouait systématiquement sur les machines où l'URI
+    système exige ``sudo``, et l'échec permanent de la sonde peignait le
+    contrôle en vert permanent.
     """
-    cmd = ["virsh", "-c", "qemu:///system", "pool-list"]
+    args = ["pool-list"]
     if definis:
-        cmd.append("--all")
-    cmd.append("--name")
-    probe = _sonder(cmd)
-    if probe is None or probe.returncode != 0:
+        args.append("--all")
+    args.append("--name")
+    probe = _sonde_virsh(args)
+    if probe is None or not probe.ok:
         return None
     return probe.stdout.split()
 
@@ -677,12 +708,26 @@ def _check_libvirt_pool(pool: str) -> Check:
     """
     actifs = _pools_libvirt(definis=False)
     if actifs is None:
-        return _check("libvirt_pool", True, _("detail_pool_unknown"))
+        # La sonde n'a pas pu regarder : ni vert, ni rouge. L'ancien code
+        # rendait ``ok=True`` ici — le vert affiché faute d'avoir mesuré,
+        # exactement le mensonge que STATE_UNKNOWN existe pour interdire.
+        return _check(
+            "libvirt_pool", False, _("detail_pool_unknown"),
+            forced_state=STATE_UNKNOWN,
+        )
     if pool in actifs:
         return _check("libvirt_pool", True, pool)
 
     definis = _pools_libvirt(definis=True)
-    if definis is not None and pool in definis:
+    if definis is None:
+        # Le pool n'est pas actif, mais sans la liste des pools définis on ne
+        # sait pas si le geste est « créer » ou « démarrer » : proposer l'un
+        # des deux au hasard ferait échouer la remédiation sur l'autre cas.
+        return _check(
+            "libvirt_pool", False, _("detail_pool_unknown"),
+            forced_state=STATE_UNKNOWN,
+        )
+    if pool in definis:
         return _check(
             "libvirt_pool", False, _("detail_pool_inactive", pool=pool),
             fix=demarrer_pool_fix(pool),

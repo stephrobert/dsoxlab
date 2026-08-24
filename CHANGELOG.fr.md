@@ -9,6 +9,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.75] - 2026-08-24
+
+### Corrigé
+
+- **Le contrôle du pool libvirt concluait « vert » quand il n'avait pas pu
+  regarder** (issue #172). La sonde invoquait `virsh -c qemu:///system` en
+  direct, sans la détection du préfixe `sudo -n` que `infra/libvirt.py` a
+  construite pour ce cas : sur toute machine où l'URI système exige des
+  droits, la sonde échouait à chaque fois, et cet échec était rendu `ok`, un
+  contrôle vert en permanence précisément là où `provision` allait mourir sur
+  « Pool Not Found ». La sonde passe désormais par `run_virsh`, et une sonde
+  qui ne peut pas mesurer rend `state: unknown` (introduit en 0.1.73), qui ne
+  peint le verdict ni en vert ni en rouge. `_check_kvm` interroge aussi
+  explicitement l'**URI système** : un `virsh version` nu peut viser l'URI
+  session selon la distribution, et répondre parfaitement à un utilisateur que
+  l'URI système refuse.
+
+- **Trois `sudo virsh` bruts sans `-n` pouvaient pendre ou échouer en
+  silence** (issue #173). `_ensure_kvm_dhcp_leases` (deux occurrences) et
+  `_reset_kvm_domain` capturaient leur sortie : un prompt de mot de passe sudo
+  n'avait aucun terminal où s'afficher et l'appel restait pendu ; sur une
+  machine configurée par le groupe `libvirt` sans droits sudo, le bail DHCP
+  n'était jamais posé et l'échec partait dans un journal que personne ne lit,
+  l'hôte mourant plus tard en « injoignable » sans cause visible. Les trois
+  appels passent désormais par `run_virsh` (chemin détecté, URI système,
+  jamais de prompt), et un bail refusé s'affiche **à l'écran** pendant
+  `provision`, pas seulement au journal. Un test garde-fou refuse désormais
+  tout `subprocess.run(["sudo", …])` qui capture sa sortie sans `-n` dans
+  `src/dsoxlab/`, sur le modèle du garde-fou anti-`shell=True` de 0.1.70.
+
+- `run_command` convertit désormais tout `OSError` en `CommandError` au lieu
+  de laisser un binaire qui disparaît en cours de route faire planter
+  l'appelant : un diagnostic ne doit pas mourir en diagnostiquant.
+
 ## [0.1.74] - 2026-08-24
 
 ### Corrigé

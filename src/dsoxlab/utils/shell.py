@@ -79,6 +79,13 @@ def run_command(
         raise CommandError(
             cmd, CommandResult(returncode=-1, stdout="", stderr=f"Commande introuvable: {cmd[0]}")
         ) from exc
+    except OSError as exc:
+        # Un binaire qui disparaît entre deux appels, un exec refusé : l'échec
+        # appartient à la commande, pas à l'appelant. Le laisser remonter en
+        # OSError nu ferait planter un diagnostic en train de diagnostiquer.
+        raise CommandError(
+            cmd, CommandResult(returncode=-1, stdout="", stderr=str(exc))
+        ) from exc
 
     result = CommandResult(
         returncode=proc.returncode,
