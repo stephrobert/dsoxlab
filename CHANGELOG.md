@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-24
+
+This release closes the blind-spot audit: eleven issues whose common thread was
+a single defect — **a check that, unable to measure, concluded that all was
+well**. Two behaviours are deliberately reversed, which is what makes this a
+minor rather than a tenth patch.
+
+### Added
+
+- **`doctor` now checks the Incus storage pool**
+  (linux-dsoxlab-training#54). A user reported that on a failed Incus
+  provisioning, "only the KVM-related fixes are offered". The symptom was right
+  and the obvious hypothesis wrong: `_check_incus` *does* offer `incus admin
+  init` — but only when `incus list` fails saying so. `incus list` **succeeds**
+  on a never-initialised install: it simply returns an empty list. The check
+  passed green, and the Incus branch of `doctor` only added the ISO tool, where
+  the KVM branch has checked its storage pool for a long time. The template
+  creates the network but hard-codes `pool = "default"` without creating it.
+
+### Changed
+
+- The nine changes merged as 0.1.75 → 0.1.83 are gathered under this version.
+  See their entries below for the detail.
+
+
 ## [0.1.83] - 2026-08-24
 
 ### Changed
