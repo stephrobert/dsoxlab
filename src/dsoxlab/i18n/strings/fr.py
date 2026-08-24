@@ -114,6 +114,32 @@ STRINGS: dict[str, str] = {
         "Puis, une fois la mission remplie : dsoxlab check {lab}",
 
     # ── catalog : découvrir, installer et retrouver un catalogue ────────────
+    "cmd_lab_status_help":
+        "Où en est le lab actif : non commencé, prêt, en cours, validé.",
+    "arg_lab_id_optionnel":
+        "Identifiant du lab. Par défaut, le lab actif.",
+    "lab_state_not_started": "non commencé",
+    "lab_state_not_started_detail":
+        "Rien n'est encore préparé. Commence : dsoxlab run {lab}",
+    "lab_state_ready": "prêt",
+    "lab_state_ready_detail": "Environnement préparé, rien n'y a été touché : {path}",
+    "lab_state_in_progress": "en cours",
+    "lab_state_in_progress_detail": "Le travail a commencé dans {path}",
+    "lab_state_in_progress_vm":
+        "Préparé, le travail se fait sur la machine du lab.",
+    "lab_state_validated": "validé",
+    "lab_state_validated_detail": "Note obtenue : {score} / {max}",
+    "lab_state_degraded": "dégradé",
+    "lab_state_degraded_detail":
+        "Un service déclaré ne tourne plus : {services}. "
+        "Relance-le : dsoxlab run <lab>",
+    "status_aucun_lab_actif":
+        "Aucun lab actif dans ce catalogue. Choisis-en un : dsoxlab run <lab>",
+    "status_voir_infra":
+        "Pour l'état de l'infrastructure, c'est désormais : dsoxlab infra status",
+    "status_titre": "État du lab",
+    "cmd_infra_help": "Commandes d'infrastructure du catalogue.",
+
     "cmd_catalog_help":
         "Découvre, installe et met à jour les catalogues de labs.",
     "cmd_catalog_list_help":
@@ -471,11 +497,19 @@ Chaque lab déclare :
                        hyperviseur, et nomme la commande qui les retire.
     [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
 
-  [cyan]status[/cyan]               Vérifie la connectivité SSH des hôtes déclarés, et dit
+  [cyan]status [lab][/cyan]         Où en est le lab actif, ou celui qu'on nomme :
+                       [bold]non commencé[/bold], [bold]prêt[/bold], [bold]en cours[/bold], [bold]validé[/bold], ou [bold]dégradé[/bold]
+                       quand un service déclaré ne tourne plus. Prêt et en cours
+                       se distinguent par le contenu du répertoire de travail,
+                       comparé à ce que [cyan]run[/cyan] y avait posé.
+    [dim]--json[/dim]               L'état sous une clé stable, lisible sans traduire.
+
+  [cyan]infra status[/cyan]         Vérifie la connectivité SSH des hôtes déclarés, et dit
                        pourquoi l'un reste muet. Sur un provider dont l'état des
                        machines est interrogeable, l'hyperviseur est [bold]interrogé[/bold] :
                        un domaine absent, un domaine arrêté et un domaine qui
                        boote appellent trois gestes différents.
+                       [dim]Portait le nom « status » jusqu'en 0.1.67.[/dim]
     [dim]--json[/dim]               La joignabilité des hôtes, en document.
 
   [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.

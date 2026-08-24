@@ -173,10 +173,22 @@ def run_lab(
     target_name: str | None = None,
     *,
     on_event: EventCallback | None = None,
+    root: Path | None = None,
 ) -> None:
-    """Prépare et démarre l'environnement du lab (setup uniquement)."""
+    """Prépare et démarre l'environnement du lab (setup uniquement).
+
+    ``root`` sert à retenir le point de départ du travail, ce qui permet à
+    ``dsoxlab status`` de distinguer plus tard un lab *prêt* d'un lab *en
+    cours*. Il est optionnel pour ne casser aucun appelant, et l'enregistrement
+    n'a lieu qu'**après** un démarrage réussi : marquer un départ qui n'a pas eu
+    lieu ferait dire « en cours » d'un lab que rien n'a préparé.
+    """
     runtime = _manager.get(lab)
     runtime.start(lab, target_name, on_event=on_event)
+    if root is not None:
+        from .lab_state import enregistrer_depart
+
+        enregistrer_depart(root, lab)
 
 
 def open_lab_session(lab: LabDefinition) -> None:

@@ -232,6 +232,51 @@ The command exits 1 when `ok` is false, and still prints the document.
 
 ## `status`
 
+The state of the active lab, or of the one you name.
+
+```json
+{
+  "schema": 1,
+  "lab": "l2-swap-management",
+  "state": "in_progress",
+  "label": "in progress",
+  "detail": "Work started in /path/challenge/work",
+  "best_score": null,
+  "max_score": null
+}
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `lab` | string or null | the lab id; `null` when no lab is active |
+| `state` | string or null | a **stable token**, see the table below |
+| `label` | string | the same state, translated, for eyes |
+| `detail` | string | what was observed, and the gesture that follows |
+| `best_score` / `max_score` | integer or null | the best score obtained, if any |
+
+| `state` | What it means |
+| --- | --- |
+| `not_started` | nothing is prepared for this lab |
+| `ready` | the environment is prepared, and untouched |
+| `in_progress` | work has started |
+| `validated` | a score has been obtained |
+| `degraded` | a declared service no longer runs: the lab cannot be played as is |
+
+`state` and `label` are separate on purpose. An integration filtering on
+"validated" must not depend on the language of whoever ran the command: the
+token does not move, the label follows `DSOXLAB_LANG`.
+
+`ready` and `in_progress` differ only by the contents of the working directory,
+compared with the fingerprint `run` recorded when preparing it. On a `vm` lab
+that work happens on the machine, where no local fingerprint would see it: the
+state is `in_progress` from preparation onward, and `detail` says so rather than
+implying a measurement that did not happen.
+
+## `infra status`
+
+Was named `status` until 0.1.67.
+
+
 ```json
 {
   "schema": 1,

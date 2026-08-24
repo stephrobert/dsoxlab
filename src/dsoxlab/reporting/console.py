@@ -23,6 +23,7 @@ from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
 from ..services.catalog import CatalogueConnu, CatalogueInstalle
 from ..services.doctor import STATE_CHOICE_REQUIRED, Check, DoctorReport
+from ..services.lab_state import LabState
 from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
 
@@ -346,6 +347,26 @@ def print_catalogues(
     for pose in installes:
         table.add_row(pose.id, "✔" if pose.actif else "", str(pose.racine))
     console.print(table)
+
+
+def print_lab_state(etat: LabState) -> None:
+    """L'état d'un lab, en un panneau qui tient à l'écran.
+
+    La couleur suit le verdict et non l'avancement : un lab dégradé appelle un
+    geste immédiat, un lab validé n'en appelle aucun, et les deux intermédiaires
+    disent seulement où on en est.
+    """
+    couleurs = {
+        "not_started": "dim",
+        "ready": "cyan",
+        "in_progress": "yellow",
+        "validated": "green",
+        "degraded": "red",
+    }
+    teinte = couleurs.get(etat.state, "white")
+    corps = f"[bold {teinte}]{etat.label}[/bold {teinte}]\n{etat.detail}"
+    console.print(Panel(corps, title=f"{_('status_titre')} — {etat.lab_id}",
+                        border_style=teinte, expand=False))
 
 
 def print_doctor(report: DoctorReport) -> None:

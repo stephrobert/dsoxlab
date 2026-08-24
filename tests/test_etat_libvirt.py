@@ -700,7 +700,7 @@ def test_status_json_porte_l_etat_de_chaque_domaine(
     )
     ssh_muet("No route to host")
 
-    resultat = runner.invoke(app, ["status", "--json", "--lab-home", str(depot)])
+    resultat = runner.invoke(app, ["infra", "status", "--json", "--lab-home", str(depot)])
 
     doc = json.loads(resultat.stdout)
     par_hote = {h["fqdn"]: h for h in doc["hosts"]}
@@ -730,7 +730,7 @@ def test_status_nomme_la_cause_et_le_geste(
     )
     ssh_muet("No route to host")
 
-    resultat = runner.invoke(app, ["status", "--lab-home", str(depot)])
+    resultat = runner.invoke(app, ["infra", "status", "--lab-home", str(depot)])
 
     sortie = _texte(resultat)
     assert resultat.exit_code == 1
@@ -750,7 +750,7 @@ def test_status_dit_qu_il_n_a_pas_pu_regarder(
     monkeypatch.setattr(libvirt, "run_command", virsh_injoignable)
     ssh_muet("Connection refused")
 
-    resultat = runner.invoke(app, ["status", "--lab-home", str(depot)])
+    resultat = runner.invoke(app, ["infra", "status", "--lab-home", str(depot)])
 
     sortie = _texte(resultat)
     assert resultat.exit_code == 1, "un diagnostic impossible n'est pas un plantage"
@@ -770,7 +770,7 @@ def test_status_le_dit_aussi_quand_le_provider_n_a_pas_d_etat(
     monkeypatch.setenv("DSOXLAB_PROVIDER", "incus")
     ssh_muet("No route to host")
 
-    resultat = runner.invoke(app, ["status", "--lab-home", str(depot)])
+    resultat = runner.invoke(app, ["infra", "status", "--lab-home", str(depot)])
 
     sortie = _texte(resultat)
     assert resultat.exit_code == 1

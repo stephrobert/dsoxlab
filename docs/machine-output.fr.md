@@ -234,6 +234,51 @@ La commande sort en 1 quand `ok` vaut faux, et rend le document quand même.
 
 ## `status`
 
+L'état du lab actif, ou de celui qu'on nomme.
+
+```json
+{
+  "schema": 1,
+  "lab": "l2-swap-management",
+  "state": "in_progress",
+  "label": "en cours",
+  "detail": "Le travail a commencé dans /chemin/challenge/work",
+  "best_score": null,
+  "max_score": null
+}
+```
+
+| Champ | Type | Sens |
+| --- | --- | --- |
+| `lab` | chaîne ou null | l'identifiant du lab ; `null` quand aucun n'est actif |
+| `state` | chaîne ou null | un **jeton stable**, voir la table ci-dessous |
+| `label` | chaîne | le même état, traduit, pour les yeux |
+| `detail` | chaîne | ce qui a été observé, et le geste qui suit |
+| `best_score` / `max_score` | entier ou null | la meilleure note obtenue, s'il y en a une |
+
+| `state` | Ce qu'il veut dire |
+| --- | --- |
+| `not_started` | rien n'est préparé pour ce lab |
+| `ready` | l'environnement est prêt, et rien n'y a été touché |
+| `in_progress` | le travail a commencé |
+| `validated` | une note a été obtenue |
+| `degraded` | un service déclaré ne tourne plus : le lab est injouable en l'état |
+
+`state` et `label` sont séparés à dessein. Une intégration qui filtre sur
+« validé » ne doit pas dépendre de la langue de qui a lancé la commande : le
+jeton ne bouge pas, le libellé suit `DSOXLAB_LANG`.
+
+`ready` et `in_progress` ne diffèrent que par le contenu du répertoire de
+travail, comparé à l'empreinte que `run` a retenue au moment de le préparer.
+Sur un lab `vm`, ce travail se fait sur la machine et aucune empreinte locale ne
+le verrait : l'état y vaut `in_progress` dès la préparation, et le `detail` le
+dit plutôt que de laisser croire à une mesure qui n'a pas eu lieu.
+
+## `infra status`
+
+Portait le nom `status` jusqu'en 0.1.67.
+
+
 ```json
 {
   "schema": 1,
