@@ -362,6 +362,15 @@ class HostReadyTimeout(RuntimeError):
 #: Variable d'environnement qui règle l'attente de disponibilité des hosts.
 HOST_READY_TIMEOUT_ENV = "DSOXLAB_HOST_READY_TIMEOUT"
 
+#: Des hôtes n'ont pas répondu dans le délai imparti.
+#:
+#: `provision` se contentait d'un avertissement, puis annonçait « ✔ N hôtes
+#: provisionnés » et sortait en 0. L'échec était donc invisible à tout script,
+#: et le `run` suivant échouait en « unreachable » sans lien visible avec la
+#: cause. Un code dédié le dit, comme 5 et 6 le font pour les orphelins.
+EXIT_HOTES_INJOIGNABLES = 8
+
+
 #: Défaut, en secondes. Confortable sur un poste dédié, juste sur un hôte
 #: modeste : le boot parallèle de plusieurs VMs y sature le CPU, et un rapport
 #: d'usage a mesuré un host prêt à 181 s, soit une seconde après l'abandon.

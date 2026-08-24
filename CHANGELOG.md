@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.74] - 2026-08-24
+
+### Fixed
+
+- **`provision` announced success after giving up on hosts that never answered**
+  (issue #170). A timeout was a mere warning; the command then printed
+  "✔ N hosts provisioned" and exited 0. The infrastructure existed but was not
+  usable, and the next `run` failed with "unreachable" without any visible link
+  to the cause. Every script testing the return code was blind — including the
+  build of a ready-made image, which will rely on it. A dedicated exit code
+  (`8`) now says it, alongside the ones for orphans.
+
+- **`check --json` was polluted as soon as a lab declared services** (issue
+  #171). `_valider` did not propagate `quiet` to `_ensure_services`, whose
+  progress messages went to stdout: `dsoxlab check --json | jq` failed on any
+  such lab. This was the defect fixed in 0.1.23, back through a side door.
+
+  `quiet` silences **progress only**. Errors keep going to stderr in both modes:
+  a service refusing to start must still be heard, or `--json` would hide the
+  one thing that matters.
+
+
 ## [0.1.73] - 2026-08-24
 
 ### Added

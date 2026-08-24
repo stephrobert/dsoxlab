@@ -140,6 +140,13 @@ STRINGS: dict[str, str] = {
     "cmd_infra_help": "Infrastructure commands for the catalog.",
 
     # ── new: scaffold a contract-compliant skeleton ─────────────────────────
+    "provision_incomplet":
+        "Some hosts did not answer within the allotted time: the "
+        "infrastructure exists, but it is not usable as it stands.",
+    "provision_incomplet_suite":
+        "Run dsoxlab provision again: it resumes without recreating anything. "
+        "If the delay is too short for this machine, raise it: "
+        "DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
     "check_rien_mesure":
         "No test could be collected: nothing was measured, and nothing is "
         "recorded.",
