@@ -139,6 +139,79 @@ jobs:
       - name: Poutine
         run: poutine analyze_local . --fail-on-violation --quiet
 
+  terraform:
+    name: Terraform templates (three providers)
+    needs: [zizmor, actionlint, poutine]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same pattern as poutine above: the vendor's own release archive, with
+      # the checksum it publishes alongside. No third-party action is added to
+      # the supply chain for a binary we only need to run twice.
+      - name: Install terraform (verified release binary)
+        env:
+          TERRAFORM_VERSION: "1.15.4"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          asset="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/checksums.txt" \
+            "${base}/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          (cd "${workdir}" && grep " ${asset}$" checksums.txt | sha256sum -c -)
+          unzip -q "${workdir}/${asset}" -d "${workdir}"
+          sudo install -m 0755 "${workdir}/terraform" /usr/local/bin/terraform
+          terraform version
+
+      # The templates are pinned to `~> 0.9` (kvm) and `~> 0.3` (incus): a minor
+      # provider release can break the schema, and this repository has already
+      # lived through it — the comments in templates/terraform/kvm/main.tf
+      # document the 0.8 → 0.9 break. Nothing in CI could see it: the unit tests
+      # on these templates assert that a file contains a string, not that
+      # Terraform can read it.
+      #
+      # Validation runs IN PLACE, via -chdir. It matters: the outscale template
+      # reaches its cloud-init through `${path.module}/../../cloud-init/`, so
+      # copying the .tf files into an isolated directory reports a bogus failure
+      # on a template that is perfectly valid.
+      #
+      # No tfvars are needed, and that is not an oversight: `validate` checks
+      # the configuration itself and never resolves variable values — only
+      # `plan` would, and `plan` needs a reachable hypervisor.
+      - name: Validate every packaged provider
+        run: |
+          set -uo pipefail
+          broken=""
+          for provider in kvm incus outscale; do
+            dir="src/dsoxlab/templates/terraform/${provider}"
+            echo "::group::${provider}"
+            if terraform -chdir="${dir}" init -backend=false -input=false -no-color \
+              && terraform -chdir="${dir}" validate -no-color; then
+              echo "${provider}: valid"
+            else
+              broken="${broken} ${provider}"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "${broken}" ]; then
+            echo "::error::Invalid Terraform templates:${broken}"
+            exit 1
+          fi
+          echo "All three packaged providers are valid."
+
   quality:
     name: Lint, type-check and test (py${{ matrix.python-version }})
     needs: [zizmor, actionlint, poutine]

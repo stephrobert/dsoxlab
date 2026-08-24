@@ -119,3 +119,39 @@ Compte utilisateur créé : `student` avec sudo NOPASSWD.
 | `proxmox`  | `proxmox/`  | ⏳ planifié | optionnel | ⏳ |
 | `vagrant`  | `vagrant/`  | ⏳ planifié | non | ⏳ |
 | `incus`    | `incus/`    | ⏳ planifié | non | ⏳ |
+
+## Images amont : le mutable est assumé, et voici pourquoi
+
+Les sept URL d'images des templates pointent des chemins **mutables** —
+`latest` chez AlmaLinux, `current` chez Ubuntu et Debian. Aucune somme de
+contrôle n'est épinglée, et c'est une décision, pas un oubli.
+
+**Ce que le mutable coûte.** Une image amont peut changer sous nos pieds : une
+régression de l'éditeur, un cloud-init qui bouge, un paquet retiré. La
+reproductibilité d'un `provision` n'est donc pas garantie dans le temps.
+
+**Ce qu'épingler coûterait, et pourquoi c'est pire ici.** Ubuntu et Debian
+republient leurs images cloud toutes les quelques semaines, correctifs de
+sécurité inclus. Une somme épinglée devrait être relevée à chaque fois ; non
+faite, elle servirait aux apprenants une image de plus en plus périmée, avec ses
+vulnérabilités connues. Le durcissement deviendrait alors le vecteur du
+problème qu'il prétend traiter.
+
+**Ce qui rend le risque acceptable ici :**
+
+- les URL sont en HTTPS, sur les domaines officiels des trois distributions
+  (`cloud-images.ubuntu.com`, `cloud.debian.org`, `repo.almalinux.org`) : la
+  confiance repose sur TLS et sur l'éditeur, comme pour n'importe quel `apt
+  install` ;
+- une VM de lab est **jetable** : elle vit le temps d'un exercice, ne porte
+  aucune donnée, et `destroy` la retire ;
+- elle n'est **pas exposée** : le réseau libvirt est local à la machine de
+  l'apprenant.
+
+**Ce qui change la décision.** Si dsoxlab sert un jour des VM au-delà du
+training — c'est la piste de `ROADMAP-VM-GENERALISTE` — le calcul s'inverse :
+une machine qui dure et qui porte du travail mérite une image épinglée. Le
+geste, alors : relever le `SHA256SUMS` publié par chaque distribution à côté de
+son image, le porter dans un fichier versionné, et le vérifier après
+téléchargement. Ce n'est pas fait aujourd'hui parce que ce n'est pas encore
+justifié, pas parce que ce serait difficile.
