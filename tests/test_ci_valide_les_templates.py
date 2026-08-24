@@ -122,7 +122,15 @@ def test_le_binaire_terraform_est_verifie() -> None:
     script = _script_de_validation()
 
     assert "sha256sum -c" in script, "le binaire téléchargé doit être vérifié"
-    assert "releases.hashicorp.com" in script, "l'archive doit venir de l'éditeur"
+    # Ancré sur l'assignation entière plutôt que sur le seul nom de domaine.
+    # Chercher « releases.hashicorp.com » quelque part dans le script serait
+    # satisfait par « evil.com/releases.hashicorp.com », et c'est exactement le
+    # motif de sanitisation par sous-chaîne que CodeQL signale — à raison, même
+    # si le risque est nul dans un test. Autant écrire l'assertion juste.
+    assert any(
+        ligne.strip().startswith('base="https://releases.hashicorp.com/terraform/')
+        for ligne in script.splitlines()
+    ), "l'archive doit venir de l'éditeur, à une URL non ambiguë"
 
 
 def test_la_version_de_terraform_est_epinglee() -> None:
