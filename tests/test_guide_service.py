@@ -79,7 +79,7 @@ def test_the_page_itself_is_untouched() -> None:
     )
 
 
-def test_source_and_medium_can_be_overridden() -> None:
+def test_source_and_medium_can_both_be_overridden() -> None:
     """A web front-end may want to distinguish itself from the CLI."""
     url = guide_url(_lab(), source="dsoxlab-web", medium="lms")
     assert url is not None

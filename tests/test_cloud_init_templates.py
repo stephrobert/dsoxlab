@@ -44,7 +44,7 @@ def test_every_mapped_distro_has_a_cloud_init(provider: str) -> None:
         assert path.is_file(), f"{provider}: {distro} -> {stem}.yaml.tmpl absent"
 
 
-def test_debian12_supported_on_all_providers() -> None:
+def test_debian12_is_supported_on_all_providers() -> None:
     """debian12 doit être mappé partout, vers le cloud-init debian."""
     for provider in PROVIDERS:
         mapping = _distro_to_template(provider)
