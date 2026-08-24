@@ -908,6 +908,67 @@ def uses_vm(labs: list[LabDefinition]) -> bool:
     return any(lab.runtime.type in _VM_RUNTIMES for lab in labs)
 
 
+def _check_git() -> Check:
+    """``catalog add`` clone : sans git, la deuxième commande du parcours échoue.
+
+    git n'est pas une dépendance Python — ``uv tool install`` ne l'apporte pas —
+    et il ne figurait dans aucun contrôle. Son absence remontait en trace
+    Python sur la commande d'accueil, ce qui est le plus mauvais moment pour
+    montrer une trace à quelqu'un.
+    """
+    if shutil.which("git") is None:
+        return _check(
+            "git", False, _("detail_git_missing"),
+            hint="https://git-scm.com/downloads",
+        )
+    result = _sonder(["git", "--version"])
+    if result is None:
+        # Présent dans le PATH mais muet : ni vert ni rouge, on ne sait pas.
+        return _check("git", False, _("detail_git_muet"), forced_state=STATE_UNKNOWN)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        return _check("git", False, detail[-1] if detail else _("detail_git_muet"),
+                      hint="https://git-scm.com/downloads")
+    return _check("git", True, result.stdout.strip() or "ok")
+
+
+def uses_services(labs: list[LabDefinition]) -> bool:
+    """Ce dépôt a-t-il au moins un lab qui déclare des conteneurs ?
+
+    Lit le contrat, et rien d'autre : le moteur ne sait pas quelles images un
+    catalogue déclare, et n'a pas à le savoir.
+    """
+    return any(lab.runtime.services for lab in labs)
+
+
+def _check_docker() -> Check:
+    """Un lab qui déclare ``runtime.services`` ne démarre pas sans moteur.
+
+    Trois situations, et elles appellent trois gestes différents : le binaire
+    n'est pas là (installer), il est là mais le démon ne répond pas (démarrer
+    le service, ou se mettre dans le groupe), ou la sonde elle-même n'aboutit
+    pas — auquel cas on ne sait pas, et on le dit plutôt que de trancher.
+    """
+    if shutil.which("docker") is None:
+        return _check(
+            "docker", False, _("detail_docker_missing"),
+            hint="https://docs.docker.com/engine/install/",
+        )
+    result = _sonder(["docker", "version", "--format", "{{.Server.Version}}"], delai=15)
+    if result is None:
+        return _check("docker", False, _("detail_docker_muet"), forced_state=STATE_UNKNOWN)
+    if result.returncode != 0:
+        # Le cas courant : le client répond, le démon non. Le message doit
+        # nommer le démon, sinon on cherche un paquet déjà installé.
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        return _check(
+            "docker", False,
+            detail[-1] if detail else _("detail_docker_daemon"),
+            hint="https://docs.docker.com/engine/install/linux-postinstall/",
+        )
+    return _check("docker", True, result.stdout.strip() or "ok")
+
+
 def _hypervisor_checks() -> dict[str, Check]:
     return {"kvm": _check_kvm(), "incus": _check_incus()}
 
@@ -927,6 +988,18 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     labs = get_all_labs(root)
     report = DoctorReport()
     report.required.extend([_check_python(), _check_pytest(root), _check_shell()])
+    # git sert au parcours d'accueil (`catalog add` clone), quel que soit le
+    # domaine du dépôt : il est requis partout.
+    report.required.append(_check_git())
+
+    # docker, lui, dépend de ce que le catalogue déclare — jamais de son
+    # domaine. Un dépôt sans `runtime.services` n'a aucune raison de voir du
+    # rouge pour un moteur qu'il n'utilise pas.
+    if uses_services(labs):
+        report.required.append(_check_docker())
+    else:
+        report.optional.append(_check_docker())
+        report.notes.append(_("reason_docker_no_services"))
 
     needs_vm = uses_vm(labs)
     active = repo_meta.infra.provider if repo_meta else ""

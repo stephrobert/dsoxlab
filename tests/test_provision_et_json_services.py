@@ -58,7 +58,8 @@ def test_le_demarrage_des_services_se_tait_en_mode_machine(
     # `_ensure_services` importe le module dans son corps : c'est donc le module
     # source qu'il faut patcher, pas un attribut de l'appelant.
     monkeypatch.setattr(svc, "docker_available", lambda: True)
-    monkeypatch.setattr(svc, "start", lambda service, repo: "conteneur")
+    monkeypatch.setattr(svc, "start",
+                        lambda service, repo, **kw: "conteneur")
 
     _commun._ensure_services(lab, tmp_path, quiet=True)
 
@@ -81,7 +82,8 @@ def test_le_demarrage_des_services_se_dit_en_mode_normal(
     # `_ensure_services` importe le module dans son corps : c'est donc le module
     # source qu'il faut patcher, pas un attribut de l'appelant.
     monkeypatch.setattr(svc, "docker_available", lambda: True)
-    monkeypatch.setattr(svc, "start", lambda service, repo: "conteneur")
+    monkeypatch.setattr(svc, "start",
+                        lambda service, repo, **kw: "conteneur")
 
     _commun._ensure_services(lab, tmp_path, quiet=False)
 
@@ -103,7 +105,7 @@ def test_un_service_en_echec_se_dit_meme_en_mode_machine(
     lab = _lab_avec_service(tmp_path)
     monkeypatch.setattr(svc, "docker_available", lambda: True)
 
-    def _echoue(service: object, repo: str) -> str:
+    def _echoue(service: object, repo: str, **kw: object) -> str:
         raise svc.ServiceError("le conteneur ne démarre pas")
 
     monkeypatch.setattr(svc, "start", _echoue)

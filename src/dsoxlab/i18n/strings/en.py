@@ -236,6 +236,9 @@ STRINGS: dict[str, str] = {
         "Catalogue '{name}' is already installed in {path}. "
         "Update it (dsoxlab catalog update {name}), or reinstall with --force, "
         "which loses the progress and the work it holds.",
+    "catalog_git_absent":
+        "git is missing: 'catalog add' clones a repository and cannot work "
+        "without it. Install it, then run the command again.",
     "catalog_clone_echec":
         "Cloning {url} failed:\n{detail}",
     "catalog_sans_meta":
@@ -696,6 +699,8 @@ silent.
 
     # ── run ───────────────────────────────────────────────────────────────────
     "services_docker_absent": "This lab needs a containerised service, but Docker is not reachable. Start Docker, then run the command again.",
+    "service_pulling": "Pulling image {image}… (first time, this may take a while)",
+    "service_pull_echec": "pulling image {image} failed: {detail}",
     "service_starting":   "Starting service [bold]{name}[/bold] ({image})…",
     "service_ready":      "Service [bold]{name}[/bold] is ready.",
     "service_failed":     "Service [bold]{name}[/bold] could not start: {detail}",
@@ -914,6 +919,26 @@ silent.
     "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
+    # ── git and docker: two tools nothing declared ──────────────────────────
+    "check_git": "git",
+    "check_docker": "Docker",
+    "detail_git_missing":
+        "git is missing: 'dsoxlab catalog add' clones a repository and cannot "
+        "work without it",
+    "detail_git_muet":
+        "git is present but does not answer: cannot tell whether it works",
+    "detail_docker_missing":
+        "docker is missing: labs declaring runtime.services cannot start",
+    "detail_docker_muet":
+        "docker is present but does not answer: cannot tell whether the engine "
+        "works",
+    "detail_docker_daemon":
+        "the docker client answers but the daemon does not: check that it is "
+        "started and that your account may talk to it",
+    "reason_docker_no_services":
+        "docker is informational: no lab in this repository declares "
+        "runtime.services.",
+
     "detail_terraform_missing":
         "not found: `provision` cannot create the machines",
     "detail_terraform_broken":

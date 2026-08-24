@@ -237,6 +237,9 @@ STRINGS: dict[str, str] = {
         "Le catalogue « {name} » est déjà installé dans {path}. "
         "Mets-le à jour (dsoxlab catalog update {name}), ou réinstalle-le "
         "avec --force, ce qui perd la progression et le travail qui s'y trouvent.",
+    "catalog_git_absent":
+        "git est absent : « catalog add » clone un dépôt et ne peut pas "
+        "fonctionner sans lui. Installe-le, puis relance la commande.",
     "catalog_clone_echec":
         "Le clone de {url} a échoué :\n{detail}",
     "catalog_sans_meta":
@@ -700,6 +703,8 @@ hors ligne, elle se tait.
 
     # ── run ───────────────────────────────────────────────────────────────────
     "services_docker_absent": "Ce lab a besoin d'un service conteneurisé, mais Docker est injoignable. Démarrez Docker, puis relancez la commande.",
+    "service_pulling": "Tirage de l'image {image}… (première fois, cela peut être long)",
+    "service_pull_echec": "le tirage de l'image {image} a échoué : {detail}",
     "service_starting":   "Démarrage du service [bold]{name}[/bold] ({image})…",
     "service_ready":      "Service [bold]{name}[/bold] prêt.",
     "service_failed":     "Le service [bold]{name}[/bold] n'a pas pu démarrer : {detail}",
@@ -923,6 +928,28 @@ hors ligne, elle se tait.
     "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
+    # ── git et docker : deux outils que rien ne déclarait ───────────────────
+    "check_git": "git",
+    "check_docker": "Docker",
+    "detail_git_missing":
+        "git est absent : « dsoxlab catalog add » clone un dépôt et ne peut "
+        "pas fonctionner sans lui",
+    "detail_git_muet":
+        "git est présent mais ne répond pas : impossible de dire s'il "
+        "fonctionne",
+    "detail_docker_missing":
+        "docker est absent : les labs qui déclarent runtime.services ne "
+        "peuvent pas démarrer",
+    "detail_docker_muet":
+        "docker est présent mais ne répond pas : impossible de dire si le "
+        "moteur fonctionne",
+    "detail_docker_daemon":
+        "le client docker répond mais pas le démon : vérifie qu'il est démarré "
+        "et que ton compte peut lui parler",
+    "reason_docker_no_services":
+        "docker est informatif : aucun lab de ce dépôt ne déclare "
+        "runtime.services.",
+
     "detail_terraform_missing":
         "introuvable : « provision » ne peut pas créer les machines",
     "detail_terraform_broken":

@@ -169,7 +169,8 @@ def test_shell_only_repo_never_shows_a_red_hypervisor(
     _labs(monkeypatch, [_lab("a", RuntimeType.SHELL)])
     report = doctor.collect_checks(tmp_path, _repo())
 
-    assert _labels(report.optional) == {_("check_kvm"), _("check_incus")}
+    assert _labels(report.optional) == {_("check_kvm"), _("check_incus"),
+                                       _("check_docker")}
     assert not report.failing()
     assert report.notes
 
@@ -181,7 +182,7 @@ def test_active_provider_is_required_and_the_others_are_not(
     report = doctor.collect_checks(tmp_path, _repo(provider="kvm"))
 
     assert _("check_kvm") in _labels(report.required)
-    assert _labels(report.optional) == {_("check_incus")}
+    assert _labels(report.optional) == {_("check_incus"), _("check_docker")}
     assert [c.label for c in report.failing()] == [_("check_kvm")]
 
 
@@ -192,7 +193,8 @@ def test_remote_provider_requires_no_local_hypervisor(
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     report = doctor.collect_checks(tmp_path, _repo(provider="outscale"))
 
-    assert _labels(report.optional) == {_("check_kvm"), _("check_incus")}
+    assert _labels(report.optional) == {_("check_kvm"), _("check_incus"),
+                                       _("check_docker")}
     assert not report.failing()
 
 

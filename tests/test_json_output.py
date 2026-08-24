@@ -319,7 +319,8 @@ def test_doctor_rend_des_cles_stables(catalogue: Path, sans_hyperviseur: None) -
     assert document["ok"] is True
     # Un catalogue 100 % shell : les hyperviseurs sont informatifs, et le kvm
     # en échec ne doit donc pas peindre le verdict en rouge.
-    assert [c["key"] for c in document["informational"]] == ["kvm", "incus"]
+    assert [c["key"] for c in document["informational"]] == [
+        "docker", "kvm", "incus"]
 
 
 def test_un_correctif_expose_sa_categorie(
