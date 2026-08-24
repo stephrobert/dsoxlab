@@ -200,7 +200,7 @@ def _valider(
     """Joue les tests et enregistre la note. Appelé sous verrou."""
     # Les services conteneurisés (émulateur cloud, base…) doivent être debout
     # avant que pytest ne s'exécute : les tests pilotent l'API qu'ils exposent.
-    _ensure_services(lab, root)
+    _ensure_services(lab, root, quiet=quiet)
 
     if not quiet:
         info(_("validating", lab_id=lab.id))

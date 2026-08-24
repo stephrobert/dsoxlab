@@ -63,6 +63,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | --- | --- |
 | `5` | `provision` a trouvé des machines qu'un provisioning en échec a laissées hors du state Terraform. Le message nomme la commande qui les retire |
 | `6` | `destroy` n'a pas pu retirer ces machines |
+| `8` | `provision` a renoncé à attendre des hôtes qui ne répondaient pas : l'infrastructure existe, mais elle n'est pas utilisable en l'état |
 | `7` | Une autre commande dsoxlab tient déjà le verrou d'écriture de ce catalogue. Le message la nomme |
 | `130` | La commande a été interrompue (Ctrl-C), et dit comment reprendre |
 

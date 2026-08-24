@@ -141,6 +141,13 @@ STRINGS: dict[str, str] = {
     "cmd_infra_help": "Commandes d'infrastructure du catalogue.",
 
     # ── new : créer un squelette conforme au contrat ────────────────────────
+    "provision_incomplet":
+        "Des hôtes n'ont pas répondu dans le délai imparti : "
+        "l'infrastructure existe, mais elle n'est pas utilisable en l'état.",
+    "provision_incomplet_suite":
+        "Relance dsoxlab provision : il reprend sans rien recréer. Si le délai "
+        "est trop court pour cette machine, allonge-le : "
+        "DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
     "check_rien_mesure":
         "Aucun test n'a pu être collecté : rien n'a été mesuré, et rien n'est "
         "enregistré.",

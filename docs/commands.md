@@ -62,6 +62,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | --- | --- |
 | `5` | `provision` found machines a failed provisioning left outside the Terraform state. The message names the command that removes them |
 | `6` | `destroy` could not remove those machines |
+| `8` | `provision` gave up waiting for hosts that never answered: the infrastructure exists, but it is not usable as it stands |
 | `7` | Another dsoxlab command already holds this catalog's write lock. The message names it |
 | `130` | The command was interrupted (Ctrl-C), and says how to resume |
 

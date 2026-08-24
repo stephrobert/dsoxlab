@@ -261,7 +261,7 @@ def _services_repo_id(root: Path) -> str:
     return meta.id if meta else root.name
 
 
-def _ensure_services(lab: LabDefinition, root: Path) -> None:
+def _ensure_services(lab: LabDefinition, root: Path, *, quiet: bool = False) -> None:
     """Démarre les services conteneurisés déclarés par le lab, avant run/check.
 
     Sans service déclaré, ne fait rien. Si Docker est injoignable ou qu'un
@@ -276,7 +276,12 @@ def _ensure_services(lab: LabDefinition, root: Path) -> None:
         raise typer.Exit(2)
     repo_id = _services_repo_id(root)
     for service in lab.runtime.services:
-        info(_("service_starting", name=service.name, image=service.image))
+        if not quiet:
+            # `quiet` ne fait taire que le PROGRÈS. Les erreurs plus bas
+            # partent sur stderr, que le document JSON ne traverse pas :
+            # un service qui refuse de démarrer doit se dire dans les
+            # deux modes.
+            info(_("service_starting", name=service.name, image=service.image))
         # Le démarrage attend les sondes du service, jusqu'à `ready_timeout`
         # secondes : c'est le point d'attente le plus long d'un lab shell, donc
         # celui où le Ctrl-C tombe.
@@ -286,7 +291,8 @@ def _ensure_services(lab: LabDefinition, root: Path) -> None:
             except svc.ServiceError as exc:
                 error(_("service_failed", name=service.name, detail=str(exc)))
                 raise typer.Exit(2) from None
-        success(_("service_ready", name=service.name))
+        if not quiet:
+            success(_("service_ready", name=service.name))
 
 
 def _stop_services(lab: LabDefinition, root: Path) -> None:

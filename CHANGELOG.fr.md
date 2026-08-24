@@ -9,6 +9,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.74] - 2026-08-24
+
+### Corrigé
+
+- **`provision` annonçait un succès après avoir renoncé à attendre des hôtes qui
+  ne répondaient pas** (issue #170). Un délai dépassé n'était qu'un
+  avertissement ; la commande affichait ensuite « ✔ N hôtes provisionnés » et
+  sortait en 0. L'infrastructure existait mais n'était pas utilisable, et le
+  `run` suivant échouait en « unreachable » sans lien visible avec la cause.
+  Tout script qui teste le code de retour était aveugle — y compris la
+  construction d'une image prête à l'emploi, qui devra s'y fier. Un code de
+  sortie dédié (`8`) le dit désormais, aux côtés de ceux des orphelins.
+
+- **`check --json` était pollué dès qu'un lab déclarait des services** (issue
+  #171). `_valider` ne propageait pas `quiet` à `_ensure_services`, dont les
+  messages de progression partaient sur la sortie standard : `dsoxlab check
+  --json | jq` échouait sur tout lab de ce type. C'était le défaut corrigé en
+  0.1.23, revenu par une porte latérale.
+
+  `quiet` ne fait taire que **le progrès**. Les erreurs continuent de partir sur
+  la sortie d'erreur dans les deux modes : un service qui refuse de démarrer
+  doit rester audible, sans quoi `--json` masquerait la seule information qui
+  compte.
+
+
 ## [0.1.73] - 2026-08-24
 
 ### Ajouté

@@ -184,7 +184,13 @@ def provision(
     # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
     # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
     # échoue en « unreachable » car la VM boote encore.
-    from ..infra.inventory import HostReadyTimeout, wait_for_hosts_ready
+    from ..infra.inventory import (
+        EXIT_HOTES_INJOIGNABLES,
+        HostReadyTimeout,
+        wait_for_hosts_ready,
+    )
+
+    attente_depassee = False
 
     ready_hosts = sorted(result.hosts)
     if ready_hosts:
@@ -220,6 +226,12 @@ def provision(
             except HostReadyTimeout as exc:
                 progress.stop()
                 warn(_("provision_ssh_timeout", error=str(exc)))
+                # Retenu pour la fin : le fragment SSH et les autres gestes qui
+                # suivent restent utiles, mais la commande ne doit pas conclure
+                # au succès. Annoncer « ✔ N hôtes provisionnés » puis sortir en
+                # 0 rendait l'échec invisible à tout script — et le `run`
+                # suivant échouait en « unreachable » sans lien avec la cause.
+                attente_depassee = True
             except Interrupted as exc:
                 # L'infrastructure existe déjà : c'est l'attente qui a été
                 # coupée, pas la création. Rejouer `provision` est idempotent
@@ -257,6 +269,11 @@ def provision(
             info(_("ssh_fragment_written", path=fragment))
         else:
             warn(_("ssh_fragment_no_include", path=fragment))
+
+    if attente_depassee:
+        error(_("provision_incomplet"))
+        info(_("provision_incomplet_suite"))
+        raise typer.Exit(EXIT_HOTES_INJOIGNABLES)
 
     success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
