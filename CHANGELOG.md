@@ -11,311 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.84] - 2026-08-24
 
-### Added
-
-- **`doctor` now checks the Incus storage pool**
-  (linux-dsoxlab-training#54). A user reported that on a failed Incus
-  provisioning, "only the KVM-related fixes are offered". The symptom was right
-  and the obvious hypothesis wrong: `_check_incus` *does* offer `incus admin
-  init` — but only when `incus list` fails saying so. `incus list` **succeeds**
-  on a never-initialised install: it simply returns an empty list. The check
-  passed green, and the Incus branch of `doctor` only added the ISO tool, where
-  the KVM branch has checked its storage pool for a long time. The template
-  creates the network but hard-codes `pool = "default"` without creating it.
-
-## [0.1.83] - 2026-08-24
-
-### Changed
-
-- **The log now speaks one language, and it is English** (issue #140). It mixed
-  French and English, which is not a matter of taste: this is the file
-  `dsoxlab support` collects and that a user pastes into a bug report. Measured
-  before being fixed — **41 French messages against 4 English ones**.
-
-  `logger.*` calls stay **deliberately outside** the i18n guard: a log line is
-  not interface text, it never goes through `_()`, and translating it at
-  runtime would make two bug reports incomparable depending on the locale of
-  whoever produced them. That exclusion justified not *translating* the log,
-  not leaving it incoherent.
-
-  English wins for three reasons: a log line gets searched **word for word**,
-  it gets compared between machines with different locales, and it is read by
-  someone diagnosing — next to the output of terraform, ansible and virsh,
-  which is already English.
-
-  The rule is written where a contributor meets it (the PR template) and held
-  by `test_journal_en_anglais.py`. Without a test it would come undone line by
-  line, which is exactly what happened to the interface before its own guard
-  existed.
-
-
-## [0.1.82] - 2026-08-24
-
-### Fixed
-
-- **A real-container test can no longer start without a readiness probe**
-  (issue #155). Two tests of `test_services.py` failed intermittently, always
-  under load, never at rest. Their common trait: they waited for a **real**
-  container. Without a probe, `start` hands back control as soon as `docker
-  run` answers, which says nothing about the service inside — the next step
-  becomes a race, won at rest and lost under load.
-
-  The instability itself no longer reproduces: measured under sustained Docker
-  load, 12 targeted runs and 4 full suites, not one failure. What this adds is
-  a guard against the **regression** of the fix, with exemptions named one by
-  one and motivated — a test whose container dies on purpose cannot carry a
-  probe, and requiring one would turn the guard into an obstacle.
-
-- **`test_post_start_en_echec_reel_leve_service_error` was passing for the
-  wrong reason.** Without a probe, the `ServiceError` it expects could come
-  from the container not yet accepting a `docker exec`, rather than from the
-  failing command it means to prove. It now declares a probe and asserts that
-  the error names the offending command.
-
-
-## [0.1.81] - 2026-08-24
-
-### Fixed
-
-- **A cloud-init that finished badly now says so** (issue #178).
-  `wait_for_hosts_ready` ran `cloud-init status --wait >/dev/null 2>&1 || true`:
-  both the state *and* the return code went to the bin. Offline, behind a proxy
-  or on a slow mirror, the fifteen first-boot packages do not install,
-  cloud-init ends up `degraded`, and the host was **still declared ready** —
-  labs then failed on missing commands with nothing linking the two. Not
-  blocking remains the right call: what matters to hand back control is that
-  cloud-init has *finished*. But finishing badly must be said.
-
-### Added
-
-- **`doctor` gains an `egress` check.** Provisioning downloads an image, then
-  cloud-init installs packages: without outbound access both fail. The mirrors
-  it probes are **read from the packaged templates**, never written into the
-  engine, and a single reachable mirror is enough to conclude — what is at
-  stake is outbound access itself, not one mirror's availability. Required on a
-  repository that provisions VMs, informational otherwise.
-
-### Documentation
-
-- **The first-boot package decision is written down**, in
-  `templates/cloud-init/README.md`. Blocking on a `degraded` was rejected —
-  cloud-init reports a global state, so it would treat a missing `tree` like a
-  missing `lvm2`. Pre-baked images are the real answer but a project of their
-  own. Per-lab package declarations would change the frozen v1 contract. What
-  was retained is making the failure visible at the three moments that matter:
-  before, during, and in the message that names the host.
-
-
-## [0.1.80] - 2026-08-24
-
-### Added
-
-- **CI validates the three packaged Terraform templates** (issue #175). The
-  pipeline covered lint, mypy, unit tests, fuzzing and an e2e suite on the
-  installed wheel — but ran **no `terraform validate` anywhere**, no
-  provisioning, and its e2e suite only plays the demo lab, which is `shell`.
-  The templates are pinned to `~> 0.9` (kvm) and `~> 0.3` (incus): a minor
-  provider release can break the schema, and this repository has already lived
-  through it. The existing unit tests on those templates assert that a file
-  contains a string, not that Terraform can read it, so a template regression
-  was only ever discovered on a learner's machine, in Terraform's own language.
-
-  The job runs `terraform init -backend=false` then `terraform validate` on
-  kvm, incus and outscale, collects every failure rather than stopping at the
-  first, names the offending provider through `::error::`, and fails the build.
-  Terraform comes from the vendor's release archive with its published
-  checksum, following the pattern already used for poutine — no third-party
-  action is added to the supply chain.
-
-### Documentation
-
-- **The upstream-image decision is now written down**, in
-  `templates/terraform/README.md`. The seven image URLs point at mutable
-  `latest` / `current` paths, and that is a choice: pinning a checksum that
-  nobody keeps current would serve learners an increasingly stale image, with
-  its known vulnerabilities — the hardening would become the vector of the
-  problem it claims to address. The reasons it is acceptable here, and the
-  conditions that would reverse it, are spelled out.
-
-
-## [0.1.79] - 2026-08-24
-
-### Added
-
-- **`doctor --strict` turns the diagnosis into an exit code** (issue #176).
-  `doctor` exited 0 whatever the state of its checks, which is the right call
-  for a human — a diagnosis is not a failure — but made the command unusable as
-  an automated gate: a script had to parse the JSON to learn whether anything
-  was missing.
-
-  Two codes rather than one, because the two situations call for different
-  gestures:
-
-  | Mode | Code | When |
-  | --- | --- | --- |
-  | `doctor` | `0` | always, unchanged |
-  | `doctor --strict` | `9` | a required check failed |
-  | `doctor --strict` | `10` | a required check could not be measured |
-
-  `9` gets repaired, `10` gets measured again. An environment whose probe did
-  not complete is not validated for all that — which is exactly what an image
-  build must not mistake for a success. `9` wins when both coexist: a certainty
-  outweighs an ignorance.
-
-  The default does not move, and `--strict` changes nothing else: the table and
-  the document are still rendered, **before** the code lands, so a caller
-  receiving a non-zero code can still read what went wrong.
-
-
-## [0.1.78] - 2026-08-24
-
-### Fixed
-
-- **A lab whose container engine is unreachable no longer shows as ready**
-  (issue #179). `_services_degrades` returned an empty list when
-  `docker_available()` was false, so "Docker **was** there and its daemon went
-  down" was indistinguishable from "Docker was never installed". In the first
-  case the lab really is unplayable — `run` already fails on it explicitly with
-  exit code 2 — yet `status` announced `ready`, or even `validated` when a score
-  existed from an earlier session.
-- The two causes are now told apart, because they call for opposite gestures:
-  install a package, versus start a daemon and check the account may talk to it.
-  A lab that declares **no** service still ignores the engine entirely, without
-  even paying for a probe — that was the sound half of the original decision,
-  and it is kept and tested on its own.
-
-
-## [0.1.77] - 2026-08-24
-
-### Fixed
-
-- **`run_command(check=False)` now keeps its promise** (issue #174). A missing
-  binary, an expired timeout or any other `OSError` raised a `CommandError`
-  *whatever the options*, so any caller expecting a `CommandResult` in all
-  circumstances was wrong — and the parameter name encouraged them to expect
-  it. Two victims, measured by running them before being fixed: `dsoxlab
-  catalog add` exited with a Python traceback on a machine without git, which
-  is the second command of the onboarding path; and a probe that timed out
-  aborted the **whole** retry loop instead of counting as one failure to retry.
-- **A missing i18n key no longer reaches the user as a raw key.** `_()` returns
-  the key itself when it is undefined, so a key added to the code but not to
-  the dictionaries printed as `catalog_git_absent`. A guard existed but stopped
-  at `validators/` and `models/`; it now covers every literal `_("…")` in the
-  package, in both languages.
-
-### Added
-
-- **`git` and `docker` are `doctor` checks.** Neither is a Python dependency —
-  `uv tool install` brings neither — and neither was declared anywhere. `git`
-  is required everywhere, since `catalog add` clones. `docker` follows what the
-  catalogue declares: required as soon as one lab declares `runtime.services`,
-  informational otherwise, so a repository that does not use it never sees red
-  for it.
-- **`CommandResult.failure`** names *why* a command could not run
-  (`not_found`, `timeout`, `os_error`), separately from a non-zero return code.
-  The two call for opposite gestures — read stderr, versus install a package or
-  retry — and a caller reading only `returncode` conflated them.
-
-### Changed
-
-- **Pulling an image is now separate from starting a container.** The first
-  `docker run` pulled the image within its own 180-second budget: beyond that
-  the command failed on a startup message that never mentioned the network, and
-  below it `run` hung for minutes without saying why. The pull now has its own
-  budget and announces itself, and is skipped when the image is already local.
-
-
-## [0.1.76] - 2026-08-24
-
-### Fixed
-
-- **A fixture that cannot be copied no longer leaves an empty work directory in
-  silence** (issue #177). `ShellRuntime` iterates over `runtime.fixtures`, not
-  over the contents of `fixtures/`, so both possible gaps caused the same
-  damage without a word: a fixture *declared but missing from disk* went to a
-  `logger.warning`, and a fixture *present but undeclared* was never read. In
-  both cases `dsoxlab run` created an empty `challenge/work`, exited **0**, and
-  the learner had nothing to do. This is the defect that made **7 labs of
-  `terraform-training` unplayable on 2026-07-28**, all marked done — and it hid
-  all the better because the tooling that checks the solutions copies the whole
-  directory, so the answer key went green while the learner's path was broken.
-
-### Added
-
-- **`validate-structure` now compares `fixtures/` against the declaration**,
-  both ways: declared-but-missing, present-but-undeclared, and a path escaping
-  the workdir. The check runs in the default (offline) set, so a catalogue's CI
-  catches the mistake before a learner does. Hidden files are exempt: a
-  `.gitkeep` versions an empty directory, and flagging it would be a false
-  positive every author would learn to ignore.
-
-### Changed
-
-- **A fixture that cannot be copied now fails `run` instead of being skipped.**
-  This reverses an earlier decision — that a typo in one entry should not
-  deprive the learner of the whole workdir. It is the missing file that
-  deprives them: an authoring mistake is not something they can fix, and an
-  amputated exercise fails `check` for reasons they will look for in their own
-  work. Validation happens before any copy, so it is all or nothing: a
-  half-filled workdir looks like it works. Every offending fixture is named at
-  once, so an author fixes them in one pass rather than one `run` per fixture.
-
-
-## [0.1.75] - 2026-08-24
-
-### Fixed
-
-- **The libvirt pool check concluded "green" when it could not look** (issue
-  #172). The probe invoked `virsh -c qemu:///system` directly, without the
-  `sudo -n` prefix detection that `infra/libvirt.py` was built for: on any
-  machine where the system URI requires privileges, the probe failed every
-  time, and that failure was reported as `ok` — a permanently green check
-  right where `provision` was about to die on "Pool Not Found". The probe now
-  goes through `run_virsh`, and a probe that cannot measure yields
-  `state: unknown` (introduced in 0.1.73), which never paints the verdict
-  green nor red. `_check_kvm` also queries the **system URI** explicitly: a
-  bare `virsh version` may target the session URI depending on the
-  distribution, and answer perfectly for a user the system URI refuses.
-
-- **Three raw `sudo virsh` calls without `-n` could hang or fail silently**
-  (issue #173). `_ensure_kvm_dhcp_leases` (twice) and `_reset_kvm_domain`
-  captured their output, so a sudo password prompt had no terminal to show on
-  and the call hung; on a machine configured through the `libvirt` group
-  without sudo rights, the DHCP lease was never planted and the failure went
-  to a log nobody reads, the host later dying as "unreachable" with no visible
-  cause. All three calls now go through `run_virsh` (detected path, system
-  URI, never a prompt), and a refused lease is printed **on screen** by
-  `provision`, not just logged. A guard test now rejects any
-  `subprocess.run(["sudo", …])` that captures its output without `-n` in
-  `src/dsoxlab/`, on the model of the anti-`shell=True` guard from 0.1.70.
-
-- `run_command` now converts every `OSError` into a `CommandError` instead of
-  letting a binary that vanishes mid-run crash the caller — a diagnosis must
-  not die while diagnosing.
-
-## [0.1.74] - 2026-08-24
-
-### Fixed
-
-- **`provision` announced success after giving up on hosts that never answered**
-  (issue #170). A timeout was a mere warning; the command then printed
-  "✔ N hosts provisioned" and exited 0. The infrastructure existed but was not
-  usable, and the next `run` failed with "unreachable" without any visible link
-  to the cause. Every script testing the return code was blind — including the
-  build of a ready-made image, which will rely on it. A dedicated exit code
-  (`8`) now says it, alongside the ones for orphans.
-
-- **`check --json` was polluted as soon as a lab declared services** (issue
-  #171). `_valider` did not propagate `quiet` to `_ensure_services`, whose
-  progress messages went to stdout: `dsoxlab check --json | jq` failed on any
-  such lab. This was the defect fixed in 0.1.23, back through a side door.
-
-  `quiet` silences **progress only**. Errors keep going to stderr in both modes:
-  a service refusing to start must still be heard, or `--json` would hide the
-  one thing that matters.
-
-
-## [0.1.73] - 2026-08-24
+This release closes the blind-spot audit. Its entries were developed as
+0.1.73 through 0.1.83, merged the same day and published here in one go —
+those numbers were never tagged, so nothing was ever installable under
+them.
 
 ### Added
 
@@ -348,6 +47,251 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reassuring green of an unearned "ok" nor the accusing red of an unproven
   failure. The token is exposed by `doctor --json` and rendered as "? not
   measured"; it never paints the top-level verdict red.
+
+- **`validate-structure` now compares `fixtures/` against the declaration**,
+  both ways: declared-but-missing, present-but-undeclared, and a path escaping
+  the workdir. The check runs in the default (offline) set, so a catalogue's CI
+  catches the mistake before a learner does. Hidden files are exempt: a
+  `.gitkeep` versions an empty directory, and flagging it would be a false
+  positive every author would learn to ignore.
+
+- **`git` and `docker` are `doctor` checks.** Neither is a Python dependency —
+  `uv tool install` brings neither — and neither was declared anywhere. `git`
+  is required everywhere, since `catalog add` clones. `docker` follows what the
+  catalogue declares: required as soon as one lab declares `runtime.services`,
+  informational otherwise, so a repository that does not use it never sees red
+  for it.
+- **`CommandResult.failure`** names *why* a command could not run
+  (`not_found`, `timeout`, `os_error`), separately from a non-zero return code.
+  The two call for opposite gestures — read stderr, versus install a package or
+  retry — and a caller reading only `returncode` conflated them.
+
+- **`doctor --strict` turns the diagnosis into an exit code** (issue #176).
+  `doctor` exited 0 whatever the state of its checks, which is the right call
+  for a human — a diagnosis is not a failure — but made the command unusable as
+  an automated gate: a script had to parse the JSON to learn whether anything
+  was missing.
+
+  Two codes rather than one, because the two situations call for different
+  gestures:
+
+  | Mode | Code | When |
+  | --- | --- | --- |
+  | `doctor` | `0` | always, unchanged |
+  | `doctor --strict` | `9` | a required check failed |
+  | `doctor --strict` | `10` | a required check could not be measured |
+
+  `9` gets repaired, `10` gets measured again. An environment whose probe did
+  not complete is not validated for all that — which is exactly what an image
+  build must not mistake for a success. `9` wins when both coexist: a certainty
+  outweighs an ignorance.
+
+  The default does not move, and `--strict` changes nothing else: the table and
+  the document are still rendered, **before** the code lands, so a caller
+  receiving a non-zero code can still read what went wrong.
+
+- **CI validates the three packaged Terraform templates** (issue #175). The
+  pipeline covered lint, mypy, unit tests, fuzzing and an e2e suite on the
+  installed wheel — but ran **no `terraform validate` anywhere**, no
+  provisioning, and its e2e suite only plays the demo lab, which is `shell`.
+  The templates are pinned to `~> 0.9` (kvm) and `~> 0.3` (incus): a minor
+  provider release can break the schema, and this repository has already lived
+  through it. The existing unit tests on those templates assert that a file
+  contains a string, not that Terraform can read it, so a template regression
+  was only ever discovered on a learner's machine, in Terraform's own language.
+
+  The job runs `terraform init -backend=false` then `terraform validate` on
+  kvm, incus and outscale, collects every failure rather than stopping at the
+  first, names the offending provider through `::error::`, and fails the build.
+  Terraform comes from the vendor's release archive with its published
+  checksum, following the pattern already used for poutine — no third-party
+  action is added to the supply chain.
+
+- **`doctor` gains an `egress` check.** Provisioning downloads an image, then
+  cloud-init installs packages: without outbound access both fail. The mirrors
+  it probes are **read from the packaged templates**, never written into the
+  engine, and a single reachable mirror is enough to conclude — what is at
+  stake is outbound access itself, not one mirror's availability. Required on a
+  repository that provisions VMs, informational otherwise.
+
+- **`doctor` now checks the Incus storage pool**
+  (linux-dsoxlab-training#54). A user reported that on a failed Incus
+  provisioning, "only the KVM-related fixes are offered". The symptom was right
+  and the obvious hypothesis wrong: `_check_incus` *does* offer `incus admin
+  init` — but only when `incus list` fails saying so. `incus list` **succeeds**
+  on a never-initialised install: it simply returns an empty list. The check
+  passed green, and the Incus branch of `doctor` only added the ISO tool, where
+  the KVM branch has checked its storage pool for a long time. The template
+  creates the network but hard-codes `pool = "default"` without creating it.
+
+### Changed
+
+- **A fixture that cannot be copied now fails `run` instead of being skipped.**
+  This reverses an earlier decision — that a typo in one entry should not
+  deprive the learner of the whole workdir. It is the missing file that
+  deprives them: an authoring mistake is not something they can fix, and an
+  amputated exercise fails `check` for reasons they will look for in their own
+  work. Validation happens before any copy, so it is all or nothing: a
+  half-filled workdir looks like it works. Every offending fixture is named at
+  once, so an author fixes them in one pass rather than one `run` per fixture.
+
+- **Pulling an image is now separate from starting a container.** The first
+  `docker run` pulled the image within its own 180-second budget: beyond that
+  the command failed on a startup message that never mentioned the network, and
+  below it `run` hung for minutes without saying why. The pull now has its own
+  budget and announces itself, and is skipped when the image is already local.
+
+- **The log now speaks one language, and it is English** (issue #140). It mixed
+  French and English, which is not a matter of taste: this is the file
+  `dsoxlab support` collects and that a user pastes into a bug report. Measured
+  before being fixed — **41 French messages against 4 English ones**.
+
+  `logger.*` calls stay **deliberately outside** the i18n guard: a log line is
+  not interface text, it never goes through `_()`, and translating it at
+  runtime would make two bug reports incomparable depending on the locale of
+  whoever produced them. That exclusion justified not *translating* the log,
+  not leaving it incoherent.
+
+  English wins for three reasons: a log line gets searched **word for word**,
+  it gets compared between machines with different locales, and it is read by
+  someone diagnosing — next to the output of terraform, ansible and virsh,
+  which is already English.
+
+  The rule is written where a contributor meets it (the PR template) and held
+  by `test_journal_en_anglais.py`. Without a test it would come undone line by
+  line, which is exactly what happened to the interface before its own guard
+  existed.
+
+### Fixed
+
+- **`provision` announced success after giving up on hosts that never answered**
+  (issue #170). A timeout was a mere warning; the command then printed
+  "✔ N hosts provisioned" and exited 0. The infrastructure existed but was not
+  usable, and the next `run` failed with "unreachable" without any visible link
+  to the cause. Every script testing the return code was blind — including the
+  build of a ready-made image, which will rely on it. A dedicated exit code
+  (`8`) now says it, alongside the ones for orphans.
+
+- **`check --json` was polluted as soon as a lab declared services** (issue
+  #171). `_valider` did not propagate `quiet` to `_ensure_services`, whose
+  progress messages went to stdout: `dsoxlab check --json | jq` failed on any
+  such lab. This was the defect fixed in 0.1.23, back through a side door.
+
+  `quiet` silences **progress only**. Errors keep going to stderr in both modes:
+  a service refusing to start must still be heard, or `--json` would hide the
+  one thing that matters.
+
+- **The libvirt pool check concluded "green" when it could not look** (issue
+  #172). The probe invoked `virsh -c qemu:///system` directly, without the
+  `sudo -n` prefix detection that `infra/libvirt.py` was built for: on any
+  machine where the system URI requires privileges, the probe failed every
+  time, and that failure was reported as `ok` — a permanently green check
+  right where `provision` was about to die on "Pool Not Found". The probe now
+  goes through `run_virsh`, and a probe that cannot measure yields
+  `state: unknown` (introduced in 0.1.73), which never paints the verdict
+  green nor red. `_check_kvm` also queries the **system URI** explicitly: a
+  bare `virsh version` may target the session URI depending on the
+  distribution, and answer perfectly for a user the system URI refuses.
+
+- **Three raw `sudo virsh` calls without `-n` could hang or fail silently**
+  (issue #173). `_ensure_kvm_dhcp_leases` (twice) and `_reset_kvm_domain`
+  captured their output, so a sudo password prompt had no terminal to show on
+  and the call hung; on a machine configured through the `libvirt` group
+  without sudo rights, the DHCP lease was never planted and the failure went
+  to a log nobody reads, the host later dying as "unreachable" with no visible
+  cause. All three calls now go through `run_virsh` (detected path, system
+  URI, never a prompt), and a refused lease is printed **on screen** by
+  `provision`, not just logged. A guard test now rejects any
+  `subprocess.run(["sudo", …])` that captures its output without `-n` in
+  `src/dsoxlab/`, on the model of the anti-`shell=True` guard from 0.1.70.
+
+- `run_command` now converts every `OSError` into a `CommandError` instead of
+  letting a binary that vanishes mid-run crash the caller — a diagnosis must
+  not die while diagnosing.
+
+- **A fixture that cannot be copied no longer leaves an empty work directory in
+  silence** (issue #177). `ShellRuntime` iterates over `runtime.fixtures`, not
+  over the contents of `fixtures/`, so both possible gaps caused the same
+  damage without a word: a fixture *declared but missing from disk* went to a
+  `logger.warning`, and a fixture *present but undeclared* was never read. In
+  both cases `dsoxlab run` created an empty `challenge/work`, exited **0**, and
+  the learner had nothing to do. This is the defect that made **7 labs of
+  `terraform-training` unplayable on 2026-07-28**, all marked done — and it hid
+  all the better because the tooling that checks the solutions copies the whole
+  directory, so the answer key went green while the learner's path was broken.
+
+- **`run_command(check=False)` now keeps its promise** (issue #174). A missing
+  binary, an expired timeout or any other `OSError` raised a `CommandError`
+  *whatever the options*, so any caller expecting a `CommandResult` in all
+  circumstances was wrong — and the parameter name encouraged them to expect
+  it. Two victims, measured by running them before being fixed: `dsoxlab
+  catalog add` exited with a Python traceback on a machine without git, which
+  is the second command of the onboarding path; and a probe that timed out
+  aborted the **whole** retry loop instead of counting as one failure to retry.
+- **A missing i18n key no longer reaches the user as a raw key.** `_()` returns
+  the key itself when it is undefined, so a key added to the code but not to
+  the dictionaries printed as `catalog_git_absent`. A guard existed but stopped
+  at `validators/` and `models/`; it now covers every literal `_("…")` in the
+  package, in both languages.
+
+- **A lab whose container engine is unreachable no longer shows as ready**
+  (issue #179). `_services_degrades` returned an empty list when
+  `docker_available()` was false, so "Docker **was** there and its daemon went
+  down" was indistinguishable from "Docker was never installed". In the first
+  case the lab really is unplayable — `run` already fails on it explicitly with
+  exit code 2 — yet `status` announced `ready`, or even `validated` when a score
+  existed from an earlier session.
+- The two causes are now told apart, because they call for opposite gestures:
+  install a package, versus start a daemon and check the account may talk to it.
+  A lab that declares **no** service still ignores the engine entirely, without
+  even paying for a probe — that was the sound half of the original decision,
+  and it is kept and tested on its own.
+
+- **A cloud-init that finished badly now says so** (issue #178).
+  `wait_for_hosts_ready` ran `cloud-init status --wait >/dev/null 2>&1 || true`:
+  both the state *and* the return code went to the bin. Offline, behind a proxy
+  or on a slow mirror, the fifteen first-boot packages do not install,
+  cloud-init ends up `degraded`, and the host was **still declared ready** —
+  labs then failed on missing commands with nothing linking the two. Not
+  blocking remains the right call: what matters to hand back control is that
+  cloud-init has *finished*. But finishing badly must be said.
+
+- **A real-container test can no longer start without a readiness probe**
+  (issue #155). Two tests of `test_services.py` failed intermittently, always
+  under load, never at rest. Their common trait: they waited for a **real**
+  container. Without a probe, `start` hands back control as soon as `docker
+  run` answers, which says nothing about the service inside — the next step
+  becomes a race, won at rest and lost under load.
+
+  The instability itself no longer reproduces: measured under sustained Docker
+  load, 12 targeted runs and 4 full suites, not one failure. What this adds is
+  a guard against the **regression** of the fix, with exemptions named one by
+  one and motivated — a test whose container dies on purpose cannot carry a
+  probe, and requiring one would turn the guard into an obstacle.
+
+- **`test_post_start_en_echec_reel_leve_service_error` was passing for the
+  wrong reason.** Without a probe, the `ServiceError` it expects could come
+  from the container not yet accepting a `docker exec`, rather than from the
+  failing command it means to prove. It now declares a probe and asserts that
+  the error names the offending command.
+
+### Documentation
+
+- **The upstream-image decision is now written down**, in
+  `templates/terraform/README.md`. The seven image URLs point at mutable
+  `latest` / `current` paths, and that is a choice: pinning a checksum that
+  nobody keeps current would serve learners an increasingly stale image, with
+  its known vulnerabilities — the hardening would become the vector of the
+  problem it claims to address. The reasons it is acceptable here, and the
+  conditions that would reverse it, are spelled out.
+
+- **The first-boot package decision is written down**, in
+  `templates/cloud-init/README.md`. Blocking on a `degraded` was rejected —
+  cloud-init reports a global state, so it would treat a missing `tree` like a
+  missing `lvm2`. Pre-baked images are the real answer but a project of their
+  own. Per-lab package declarations would change the frozen v1 contract. What
+  was retained is making the failure visible at the three moments that matter:
+  before, during, and in the message that names the host.
 
 ## [0.1.72] - 2026-08-24
 
