@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release guard gave a green light when it could not measure.** Publishing
+  0.1.67 made it visible: `gh` was unreachable for a moment, the CI check
+  degraded to a note — which blocks nothing — and the script concluded "all
+  good" while the CI was still running. Not knowing whether the CI is green
+  calls for the same decision as knowing it is not: do not tag, since PyPI is
+  final. An unreadable CI state is now a **wait** (exit 2), like a CI still in
+  flight.
+
+  `--ci-verifiee` exists for the case where `gh` is absent or mute: it turns
+  that wait into an assumed note, so the affirmation is a human's and says so.
+  It cannot cover a CI that answered red.
+
+  Two more things surfaced while fixing it: `check=False` covers the return code
+  only, so a `gh` missing from `PATH` raised `FileNotFoundError` and destroyed
+  the whole report — including the seven checks that had answered. And the
+  script still had no test for any of this; it now has five more.
+
+
 ## [0.1.67] - 2026-08-24
 
 ### Added

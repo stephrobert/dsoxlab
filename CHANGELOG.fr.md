@@ -9,6 +9,26 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Le garde-fou de publication donnait son feu vert quand il ne pouvait pas
+  mesurer.** La publication de la 0.1.67 l'a montré : `gh` a été injoignable un
+  instant, le contrôle de CI s'est dégradé en note — qui n'empêche rien — et le
+  script a conclu « Tout est bon » alors que la CI tournait encore. Ne pas
+  savoir si la CI est verte appelle la même décision que savoir qu'elle ne l'est
+  pas : ne pas taguer, PyPI étant définitif. Un état de CI illisible vaut
+  désormais une **attente** (sortie 2), comme une CI encore en cours.
+
+  `--ci-verifiee` existe pour le cas où `gh` est absent ou muet : il transforme
+  cette attente en note assumée, pour que l'affirmation soit celle d'un humain
+  et qu'elle se voie. Il ne peut pas couvrir une CI qui a répondu rouge.
+
+  Deux découvertes en corrigeant : `check=False` ne couvre que le code de
+  retour, donc un `gh` absent du `PATH` levait `FileNotFoundError` et détruisait
+  tout le rapport, y compris les sept contrôles qui avaient répondu. Et le
+  script n'avait toujours aucun test là-dessus ; il en a cinq de plus.
+
+
 ## [0.1.67] - 2026-08-24
 
 ### Ajouté
