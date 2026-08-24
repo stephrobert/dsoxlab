@@ -17,10 +17,16 @@ Usage :
     python3 scripts/check-release.py           # déduit la version du pyproject
     python3 scripts/check-release.py v0.1.28   # vérifie un tag précis
     python3 scripts/check-release.py --publiee # APRÈS le tag : est-ce arrivé ?
+    python3 scripts/check-release.py --ci-verifiee   # CI vue verte à la main
 
 Sortie 0 : le tag peut être posé, la commande exacte est affichée.
 Sortie 1 : au moins un contrôle a échoué, chacun dit quoi corriger.
 Sortie 2 : rien n'est faux, mais il est trop tôt. Relancer plus tard.
+
+``--ci-verifiee`` n'existe que pour le cas où `gh` est absent ou muet. Sans lui,
+une CI dont l'état n'a pas pu être lu vaut « trop tôt » et non « tout est bon » :
+ne pas savoir et savoir que ce n'est pas vert appellent la même décision, celle
+de ne pas taguer.
 """
 
 from __future__ import annotations
@@ -254,23 +260,55 @@ def _verifier_pypi(r: Rapport, version: str) -> None:
         r.ok(f"La version {version} est libre sur PyPI")
 
 
-def _verifier_ci(r: Rapport) -> None:
+#: Ce qu'on répond quand l'état de la CI n'a pas pu être lu.
+#:
+#: « Je ne sais pas si elle est verte » est **indiscernable**, pour la décision
+#: à prendre, de « elle ne l'est pas encore » : dans les deux cas on ne doit pas
+#: taguer, puisque PyPI est définitif. C'était pourtant une simple note, qui
+#: n'empêche rien — le script a donc annoncé « Tout est bon » le 2026-08-24
+#: alors que la CI de la 0.1.67 tournait encore, faute d'avoir pu joindre `gh`.
+#: Un garde-fou qui, ne pouvant mesurer, conclut au vert est exactement l'échec
+#: muet que ce dépôt combat partout ailleurs.
+_SANS_GH = (
+    "Vérifie l'état de la CI à la main, puis relance. Si `gh` n'est pas "
+    "disponible ici, relance avec --ci-verifiee une fois que tu l'as vue verte : "
+    "le drapeau dit que c'est toi qui l'affirmes."
+)
+
+
+def _verifier_ci(r: Rapport, *, ci_verifiee: bool = False) -> None:
     # RELEASING demande d'attendre une CI verte : le tag construit depuis ce
     # commit, et PyPI ne se rattrape pas.
     sha = git("rev-parse", "HEAD")
-    # check=False : `gh` absent ou non authentifié est un cas prévu, traité
-    # deux lignes plus bas en « état de la CI inconnu ».
-    sortie = subprocess.run(
-        ["gh", "run", "list", "--commit", sha, "--json", "conclusion,name,status"],
-        cwd=RACINE, capture_output=True, text=True, check=False,
-    )
+    # `check=False` ne couvre QUE le code de retour : un `gh` absent du PATH
+    # lève FileNotFoundError, et le script mourait alors sur un traceback au
+    # lieu de rendre son rapport. Le commentaire affirmait pourtant que le cas
+    # était prévu — il ne l'était que pour un gh présent mais non authentifié.
+    try:
+        sortie = subprocess.run(
+            ["gh", "run", "list", "--commit", sha, "--json", "conclusion,name,status"],
+            cwd=RACINE, capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        if ci_verifiee:
+            r.note("CI déclarée verte à la main", "gh introuvable ; --ci-verifiee.")
+        else:
+            r.attendre("gh introuvable, état de la CI inconnu", _SANS_GH)
+        return
+
     if sortie.returncode != 0 or not sortie.stdout.strip():
-        r.note("État de la CI inconnu", "gh indisponible : vérifie à la main.")
+        if ci_verifiee:
+            r.note("CI déclarée verte à la main", "gh indisponible ; --ci-verifiee.")
+        else:
+            r.attendre("État de la CI inconnu", _SANS_GH)
         return
     try:
         runs = json.loads(sortie.stdout)
     except ValueError:
-        r.note("État de la CI illisible", "Vérifie à la main.")
+        if ci_verifiee:
+            r.note("CI déclarée verte à la main", "réponse de gh illisible ; --ci-verifiee.")
+        else:
+            r.attendre("État de la CI illisible", _SANS_GH)
         return
     en_cours = [x["name"] for x in runs if x.get("status") != "completed"]
     echoues = [
@@ -433,8 +471,10 @@ def main() -> int:
     if version is None:
         print(f"{ROUGE}pyproject.toml ne déclare aucune version.{RAZ}")
         return 1
-    arguments = [a for a in sys.argv[1:] if a != "--publiee"]
+    drapeaux = {"--publiee", "--ci-verifiee"}
+    arguments = [a for a in sys.argv[1:] if a not in drapeaux]
     tag = arguments[0] if arguments else f"v{version}"
+    ci_verifiee = "--ci-verifiee" in sys.argv
 
     if "--publiee" in sys.argv:
         # La version à chercher sur PyPI est celle du tag qu'on vérifie, pas
@@ -455,7 +495,7 @@ def main() -> int:
     _verifier_changelog(r, version)
     _verifier_lock(r, version)
     _verifier_pypi(r, version)
-    _verifier_ci(r)
+    _verifier_ci(r, ci_verifiee=ci_verifiee)
 
     print()
     if r.echecs:
