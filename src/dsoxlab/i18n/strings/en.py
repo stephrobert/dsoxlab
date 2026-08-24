@@ -919,6 +919,12 @@ silent.
     "check_resources": "RAM / disk resources",
 
     "detail_shell_always":   "always available",
+    "check_incus_pool": "Incus pool",
+    "detail_incus_pool_absent":
+        "pool '{pool}' does not exist: incus was never initialised, and "
+        "'provision' will fail",
+    "detail_incus_pool_muet":
+        "cannot list incus pools: state unknown",
     "detail_incus_missing":  "not found",
     "detail_incus_ok":       "client {version}, daemon ok",
     "detail_incus_daemon_down": "client {version}, daemon inactive",

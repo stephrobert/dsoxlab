@@ -929,6 +929,12 @@ hors ligne, elle se tait.
     "check_resources": "Ressources RAM / disque",
 
     "detail_shell_always":   "toujours disponible",
+    "check_incus_pool": "Pool Incus",
+    "detail_incus_pool_absent":
+        "le pool « {pool} » n'existe pas : incus n'a jamais été initialisé, "
+        "et « provision » échouera",
+    "detail_incus_pool_muet":
+        "impossible de lister les pools incus : état inconnu",
     "detail_incus_missing":  "introuvable",
     "detail_incus_ok":       "client {version}, daemon ok",
     "detail_incus_daemon_down": "client {version}, daemon inactif",

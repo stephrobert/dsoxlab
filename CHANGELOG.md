@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.84] - 2026-08-24
+
+### Added
+
+- **`doctor` now checks the Incus storage pool**
+  (linux-dsoxlab-training#54). A user reported that on a failed Incus
+  provisioning, "only the KVM-related fixes are offered". The symptom was right
+  and the obvious hypothesis wrong: `_check_incus` *does* offer `incus admin
+  init` — but only when `incus list` fails saying so. `incus list` **succeeds**
+  on a never-initialised install: it simply returns an empty list. The check
+  passed green, and the Incus branch of `doctor` only added the ISO tool, where
+  the KVM branch has checked its storage pool for a long time. The template
+  creates the network but hard-codes `pool = "default"` without creating it.
+
 ## [0.1.83] - 2026-08-24
 
 ### Changed

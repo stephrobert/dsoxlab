@@ -882,6 +882,43 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     return None
 
 
+#: Le pool que le template Incus écrit en dur dans ses volumes. Il n'est
+#: **pas** créé par Terraform, contrairement au réseau : `incus admin init` est
+#: le seul geste qui le pose.
+_POOL_INCUS = "default"
+
+
+def _check_incus_pool() -> Check:
+    """Le pool de stockage d'Incus existe-t-il ?
+
+    `incus list` réussit sur une installation jamais initialisée — elle rend
+    simplement une liste vide — si bien que `_check_incus` passait au vert et
+    que rien n'annonçait l'échec de `provision`. Le template crée le réseau
+    mais **suppose** le pool : il l'écrit en dur dans chaque volume.
+
+    C'est le pendant exact de `_check_libvirt_pool`, qui existait déjà côté
+    KVM. Son absence côté Incus est ce qui faisait dire à un utilisateur que
+    « seules les résolutions liées à KVM sont proposées ».
+    """
+    sonde = _sonder(["incus", "storage", "list", "--format", "csv"])
+    if sonde is None or sonde.returncode != 0:
+        # Ne rien pouvoir mesurer n'est ni un pool présent ni un pool absent.
+        return _check("incus_pool", False, _("detail_incus_pool_muet"),
+                      forced_state=STATE_UNKNOWN)
+
+    pools = [
+        ligne.split(",")[0]
+        for ligne in sonde.stdout.splitlines() if ligne.strip()
+    ]
+    if _POOL_INCUS in pools:
+        return _check("incus_pool", True, _POOL_INCUS)
+    return _check(
+        "incus_pool", False,
+        _("detail_incus_pool_absent", pool=_POOL_INCUS),
+        fix=_fix(["sudo", "incus", "admin", "init", "--auto"]),
+    )
+
+
 def _check_iso_tool() -> Check:
     """Incus fabrique le CD-ROM ``agent:config`` sur l'hôte.
 
@@ -1180,6 +1217,9 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
                            or "default")
             report.required.append(_check_libvirt_pool(pool))
         elif active == "incus" and hypervisors["incus"].ok:
+            # Symétrie avec la branche kvm juste au-dessus : elle contrôle son
+            # pool de stockage, celle-ci ne contrôlait que l'outil ISO.
+            report.required.append(_check_incus_pool())
             report.required.append(_check_iso_tool())
 
     report.required.append(_check_labs(root, labs, compter_fichiers_labs(root)))
