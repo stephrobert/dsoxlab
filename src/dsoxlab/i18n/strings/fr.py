@@ -943,6 +943,15 @@ hors ligne, elle se tait.
     # ── git et docker : deux outils que rien ne déclarait ───────────────────
     "check_git": "git",
     "check_docker": "Docker",
+    "check_egress": "Accès sortant",
+    "detail_egress_absent":
+        "aucun miroir d'images n'est joignable ({hosts}) : le provisionnement "
+        "téléchargera une image et cloud-init installera des paquets, les deux "
+        "échoueront",
+    "detail_egress_indetermine":
+        "aucun template ne déclare d'image : impossible de conclure",
+    "reason_egress_sans_vm":
+        "L'accès sortant est informatif : ce dépôt ne provisionne aucune VM.",
     "detail_git_missing":
         "git est absent : « dsoxlab catalog add » clone un dépôt et ne peut "
         "pas fonctionner sans lui",
@@ -1233,6 +1242,11 @@ hors ligne, elle se tait.
     "err_inventory_role_unknown":
         "role « {role} » → « {fqdn} » n'est pas dans la liste des hôtes "
         "connus : {known} (host non déclaré dans meta.yml, ou non provisionné).",
+    "cloud_init_degrade":
+        "{host} : cloud-init a terminé en erreur (code {code}). Les paquets "
+        "qu'il installe au premier démarrage manquent peut-être, et les labs "
+        "qui en dépendent échoueront. Détail :\n{detail}",
+    "cloud_init_sans_detail": "cloud-init n'a rien dit de plus.",
     "err_host_ready_timeout":
         "{fqdn} injoignable en SSH après {timeout}s "
         "(cloud-init trop long, ou VM en échec de démarrage).",

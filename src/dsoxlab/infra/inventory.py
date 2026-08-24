@@ -445,6 +445,46 @@ def _reset_kvm_domain(repo_meta: RepoMetadata, fqdn: str) -> bool:
     return False
 
 
+#: Préfixe de la ligne par laquelle l'hôte distant remonte le code de retour de
+#: ``cloud-init status --wait``. Un marqueur explicite plutôt qu'une position :
+#: la sortie de ``status --long`` change d'une version à l'autre.
+_MARQUEUR_RC = "__dsoxlab_cloudinit_rc="
+
+
+def _etat_cloud_init(sortie: str) -> tuple[int | None, str]:
+    """Le code de retour de cloud-init et ce qu'il a dit, lus dans la sortie SSH.
+
+    Rend ``(None, "")`` quand l'hôte n'a pas de cloud-init : ce n'est pas un
+    défaut, seulement une image qui n'en embarque pas.
+    """
+    code: int | None = None
+    detail: list[str] = []
+    for ligne in sortie.splitlines():
+        if ligne.startswith(_MARQUEUR_RC):
+            valeur = ligne[len(_MARQUEUR_RC):].strip()
+            code = int(valeur) if valeur.isdigit() else None
+            continue
+        if code is not None and ligne.strip():
+            detail.append(ligne.strip())
+    return code, "\n".join(detail[:12])
+
+
+def _commande_cloud_init() -> str:
+    """La commande jouée sur l'hôte pour attendre cloud-init ET lire son état.
+
+    Extraite plutôt qu'inline : ce qu'elle envoie est un contrat — un marqueur
+    de code de retour, et la sortie de ``status --long`` — que les tests
+    éprouvent en l'appelant, sans relire le fichier source.
+    """
+    return (
+        "command -v cloud-init >/dev/null 2>&1 || exit 0\n"
+        "sudo -n cloud-init status --wait >/dev/null 2>&1\n"
+        f"echo \"{_MARQUEUR_RC}$?\"\n"
+        "sudo -n cloud-init status --long 2>&1 || true\n"
+        "exit 0\n"
+    )
+
+
 def wait_for_hosts_ready(
     repo_meta: RepoMetadata,
     hosts: list[str],
@@ -454,7 +494,7 @@ def wait_for_hosts_ready(
     connect_timeout: int = 8,
     reset_after: float = 60.0,
     on_attempt: Callable[[str, int], None] | None = None,
-) -> None:
+) -> list[str]:
     """Attend que chaque host soit réellement utilisable après ``terraform apply``.
 
     Juste après le provisioning, la VM boote encore : ``sshd`` démarre, puis
@@ -474,11 +514,16 @@ def wait_for_hosts_ready(
         connect_timeout: ``ConnectTimeout`` SSH de chaque tentative, en secondes.
         on_attempt: callback ``(fqdn, numéro_tentative)`` pour l'affichage.
 
+    Returns:
+        Les avertissements constatés pendant l'attente — un cloud-init qui a
+        terminé en erreur, notamment. La liste est vide quand tout s'est bien
+        passé ; l'appelant les affiche, il n'a pas à les déduire.
+
     Raises:
         HostReadyTimeout: si un host reste injoignable au-delà de ``timeout``.
     """
     if not hosts:
-        return
+        return []
 
     timeout = _host_ready_timeout(timeout)
 
@@ -486,6 +531,7 @@ def wait_for_hosts_ready(
         repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
     )
     ssh_cfg = write_ssh_config(inventory, repo_meta)
+    avertissements: list[str] = []
 
     # SSH réussit dès que sshd répond ET que le compte ansible existe ; on enchaîne sur
     # `cloud-init status --wait` (best-effort) pour ne rendre la main qu'une fois
@@ -497,10 +543,21 @@ def wait_for_hosts_ready(
     # rc=1. Le `|| true` avalait cet échec et l'attente ne garantissait plus rien :
     # on rendait la main avant la fin de cloud-init, en croyant l'avoir attendue.
     # `-n` (non interactif) évite de bloquer si sudo réclamait un mot de passe.
-    remote_cmd = (
-        "command -v cloud-init >/dev/null 2>&1 "
-        "&& sudo -n cloud-init status --wait >/dev/null 2>&1 || true"
-    )
+    # `--wait` bloque jusqu'à la FIN de cloud-init, et son code de retour dit
+    # comment il a fini. L'ancienne forme jetait les deux (`>/dev/null` et
+    # `|| true`) : un cloud-init `degraded` — une quinzaine de paquets qui
+    # n'ont pas pu s'installer parce qu'il n'y avait pas d'accès sortant —
+    # devenait indistinguable d'un succès. L'hôte était déclaré prêt, puis les
+    # labs échouaient sur des commandes absentes, sans que rien ne relie les
+    # deux.
+    #
+    # Ne pas bloquer reste la bonne décision : ce qui compte pour rendre la
+    # main, c'est que cloud-init ait TERMINÉ. Mais terminer mal doit se dire.
+    #
+    # `sudo -n` est indispensable : sans privilèges, la commande sort en
+    # `PermissionError: /run/cloud-init/cloud.cfg` (mesuré sur AlmaLinux 9).
+    # `-n` évite de bloquer si sudo réclamait un mot de passe.
+    remote_cmd = _commande_cloud_init()
 
     for fqdn in hosts:
         start = time.monotonic()
@@ -533,6 +590,12 @@ def wait_for_hosts_ready(
             )
             if proc.returncode == 0:
                 logger.info("Host %s prêt (tentative %d).", fqdn, attempt)
+                code, detail = _etat_cloud_init(proc.stdout)
+                if code is not None and code != 0:
+                    avertissements.append(_(
+                        "cloud_init_degrade", host=fqdn, code=code,
+                        detail=detail or _("cloud_init_sans_detail"),
+                    ))
                 break
             if time.monotonic() >= deadline:
                 raise HostReadyTimeout(_(
@@ -547,6 +610,8 @@ def wait_for_hosts_ready(
             if not reset_done and time.monotonic() >= reset_deadline:
                 reset_done = _reset_kvm_domain(repo_meta, fqdn) or True
             time.sleep(poll_interval)
+
+    return avertissements
 
 
 def write_inventory_file(
