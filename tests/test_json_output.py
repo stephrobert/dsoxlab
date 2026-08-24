@@ -72,7 +72,7 @@ def test_a_lab_carries_what_an_editor_needs(capsys) -> None:
     assert lab["best_score"] == {"points": 60, "max": 100}
 
 
-def test_a_lab_never_attempted_is_not_a_zero(capsys) -> None:
+def test_a_lab_never_attempted_is_not_a_zero_score(capsys) -> None:
     """Distinguer « jamais tenté » de « tenté et raté » : ce n'est pas pareil."""
     machine.emit({"labs": [machine.lab_dict(_lab(), None)]})
 

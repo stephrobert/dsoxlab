@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A test function name could fail the commit as a leaked secret.** The
+  `trufflehog` hook runs with `--results=verified`, which is the right bar: it
+  blocks on verified secrets only. But its *Lob* detector recognises that
+  service's test keys by their `test_` prefix alone, and a Lob test key is
+  verified **without any network call**. Measured against the hook's exact
+  command: a name of **exactly 40 characters** trips it, 39 and 41 do not.
+
+  Seven test names in this repository already had that shape. None had ever
+  fired, because the hook only reads the diff — they were waiting for the first
+  contributor to touch their file. They are renamed, and a test now refuses that
+  length across `tests/`, `tests_e2e/` and `fuzz/`, so the defect states itself
+  here, in a second and with its reason, instead of at `pre-push` disguised as a
+  secret leak.
+
+  **The detector was not excluded.** Dropping Lob would have fixed the symptom by
+  removing a detection capability, for a service this project does not use today
+  but may use tomorrow. Renaming costs one word and takes nothing away from the
+  scan.
+
+
 - **The release guard was unreliable in two ways, both observed while shipping
   0.1.65 and 0.1.66.** It guards a publication that cannot be undone, so being
   wrong costs more here than elsewhere. Nothing in the published wheel changes:

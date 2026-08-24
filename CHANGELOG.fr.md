@@ -11,6 +11,27 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Un nom de fonction de test pouvait faire échouer le commit pour fuite de
+  secret.** Le hook `trufflehog` tourne avec `--results=verified`, ce qui est la
+  bonne exigence : il ne bloque que sur un secret vérifié. Mais son détecteur
+  *Lob* reconnaît les clés de test de ce service à leur seul préfixe `test_`, et
+  une clé Lob de test est vérifiée **sans appel réseau**. Mesuré contre la
+  commande exacte du hook : un nom de **quarante caractères précisément** le
+  déclenche, 39 et 41 non.
+
+  Sept noms de tests du dépôt portaient déjà cette forme. Aucun n'avait jamais
+  rien déclenché, le hook ne lisant que le diff : ils attendaient le premier
+  contributeur qui toucherait à leur fichier. Ils sont renommés, et un test
+  refuse désormais cette longueur dans `tests/`, `tests_e2e/` et `fuzz/`, pour
+  que le défaut se dise là, en une seconde et avec sa raison, plutôt qu'au
+  `pre-push` sous les traits d'une fuite de secret.
+
+  **Le détecteur n'a pas été exclu.** Retirer Lob aurait réglé le symptôme en
+  retirant une capacité de détection, pour un service que le projet n'utilise pas
+  aujourd'hui mais dont rien ne dit qu'il ne l'utilisera jamais. Renommer coûte
+  un mot et n'enlève rien au scan.
+
+
 - **Le garde-fou de publication n'était pas fiable, de deux façons, toutes deux
   constatées en publiant les 0.1.65 et 0.1.66.** Il garde une publication qui ne
   se défait pas, donc s'y tromper coûte plus cher qu'ailleurs. Rien ne change
