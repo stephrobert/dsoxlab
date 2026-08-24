@@ -51,10 +51,10 @@ from ._commun import (
     _read_repo,
     _require_provider,
     _root,
-    _undefine_command,
     _verrou,
 )
 from ._socle import app
+from ._validation import _undefine_command
 
 logger = logging.getLogger(__name__)
 

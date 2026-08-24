@@ -15,9 +15,11 @@ Le paquet est découpé **par public** :
 - `auteur`, `instructeur`, `diagnostic` : écrire des labs, les encadrer, savoir
   ce qui ne va pas.
 
-Trois modules privés portent ce que tous partagent : `_socle` (l'application
-Typer et ses sous-applications), `_commun` (les helpers et le callback global),
-`_barres` (le rendu des barres de progression d'Ansible et de Terraform).
+Cinq modules privés portent ce que tous partagent : `_socle` (l'application
+Typer et ses sous-applications), `_commun` (les helpers de résolution du
+contexte), `_amorcage` (le callback global, `--version` et l'avis de mise à
+jour), `_validation` (jouer les tests et rendre le verdict), `_barres` (le
+rendu des barres de progression d'Ansible et de Terraform).
 
 **Le point d'entrée public ne change pas.** `dsoxlab.cli:main` reste
 l'`entry point` déclaré, et `from dsoxlab.cli import app` continue de
@@ -35,9 +37,11 @@ from ..reporting.console import error, warn
 from ..services.lab_service import evaluate_lab, get_all_labs, open_lab_session
 from ..sessions.store import get_best_scores
 
-# L'import de ces modules est ce qui ENREGISTRE les commandes sur l'app : sans
-# lui, `dsoxlab --help` serait vide.
+# L'import de ces modules est ce qui ENREGISTRE les commandes sur l'app — et,
+# pour `_amorcage`, le callback global : sans lui, `dsoxlab --help` serait vide
+# et aucune langue ne serait initialisée.
 from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
+    _amorcage,
     auteur,
     catalogues,
     contexte,
@@ -53,8 +57,6 @@ from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
 from ._commun import (
     _complete_lab_id,
     _phrase_contrat,
-    _run_check,
-    _run_check_with_progress,
 )
 from ._socle import (
     _I18nGroup,
@@ -64,6 +66,7 @@ from ._socle import (
     infra_app,
     instructor_app,
 )
+from ._validation import _run_check, _run_check_with_progress
 from .diagnostic import _COMPLETE_VAR, _PROG_NAME, _script_completion
 
 #: L'ordre dans lequel `dsoxlab --help` présente les commandes.

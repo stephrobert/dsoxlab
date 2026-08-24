@@ -112,8 +112,8 @@ def test_a_failing_check_still_prints_only_json(monkeypatch, capsys, tmp_path) -
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
 
     echec = CheckResult(ok=False, output="=== test session starts ===\nFAILED", passed=1, total=3)
-    monkeypatch.setattr(cli._commun, "_run_check_with_progress", lambda *a, **k: echec)
-    monkeypatch.setattr(cli._commun, "evaluate_lab", lambda *a, **k: type("E", (), {"score": 30, "max_score": 100})())
+    monkeypatch.setattr(cli._validation, "_run_check_with_progress", lambda *a, **k: echec)
+    monkeypatch.setattr(cli._validation, "evaluate_lab", lambda *a, **k: type("E", (), {"score": 30, "max_score": 100})())
 
     cli._run_check(Path("/repo"), _lab(), None, quiet=True)
 

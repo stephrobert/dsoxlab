@@ -42,10 +42,10 @@ from ..services import (
 )
 from ._commun import (
     LabHomeOption,
-    _compter,
     _root,
 )
 from ._socle import app
+from ._validation import _compter
 
 logger = logging.getLogger(__name__)
 

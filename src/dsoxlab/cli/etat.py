@@ -46,7 +46,6 @@ from ..services import (
 from ..utils.shell import CommandError
 from ._commun import (
     LabHomeOption,
-    _diagnostic_message,
     _lab,
     _lang,
     _read_repo,
@@ -54,6 +53,7 @@ from ._commun import (
     _root,
 )
 from ._socle import app, infra_app
+from ._validation import _diagnostic_message
 
 logger = logging.getLogger(__name__)
 

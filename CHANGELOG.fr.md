@@ -37,10 +37,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   utilisés par `provision` et `run`, s'étaient retrouvés collés après `destroy`,
   ce qui expliquait ses 435 lignes. Ils ont désormais leur module.
 
-  Écart connu : `_commun.py` reste à **701 lignes**, au-dessus des 400 que
-  l'issue demande. Sa scission a été tentée puis annulée : elle cassait tout le
-  paquet, et le retour en arrière s'est avéré le bon geste. Elle mérite sa
-  propre modification, avec les tests verts à chaque étape.
+  `_commun.py` est lui-même scindé en trois, selon le moment où chaque helper
+  intervient : la résolution du contexte d'une commande reste dans `_commun`,
+  `_amorcage` porte ce qui encadre toute invocation (le callback global, la
+  version, l'avis de mise à jour), et `_validation` porte le verdict. Fichier le
+  plus gros : **380 lignes**.
+
+  Deux choses sont apparues en découpant. Trois helpers de barres de
+  progression, utilisés par `provision` et `run`, s'étaient retrouvés collés
+  après `destroy`, ce qui expliquait ses 435 lignes ; ils ont désormais leur
+  module. Et deux patchs de `test_contrat_honore.py` étaient **inertes** : ils
+  posaient l'attribut sur le paquet quand `progression.submit` appelle sa propre
+  liaison, si bien que ces tests jouaient sur le vrai 0/100 et non sur les
+  40/100 qu'ils annoncent. L'adresse est corrigée et documentée ; les deux
+  passent toujours, donc rien ne se cachait derrière.
 
 ## [0.1.68] - 2026-08-24
 

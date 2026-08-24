@@ -36,10 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `run` — had ended up glued after `destroy`, which is why that block
   measured 435 lines. They now have their own module.
 
-  Known gap: `_commun.py` stays at **701 lines**, above the 400 the issue asks
-  for. Splitting it was attempted and reverted: it broke the whole package, and
-  the rollback proved the right call. It deserves its own change, with the tests
-  green at every step.
+  `_commun.py` is itself split in three, by the moment each helper acts:
+  resolving a command's context stays in `_commun`, `_amorcage` holds what wraps
+  every invocation (the global callback, the version, the update notice), and
+  `_validation` holds the verdict. Largest file: **380 lines**.
+
+  Two things surfaced while splitting. Three progress-bar helpers — used by
+  `provision` and `run` — had ended up glued after `destroy`, which is why that
+  block measured 435 lines; they now have their own module. And two patches in
+  `test_contrat_honore.py` were **inert**: they set the attribute on the package
+  while `progression.submit` calls its own binding, so those tests ran against
+  the real 0/100 rather than the 40/100 they announce. The address is fixed and
+  documented; both still pass, so nothing was hiding behind them.
 
 ## [0.1.68] - 2026-08-24
 

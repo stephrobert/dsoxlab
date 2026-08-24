@@ -66,11 +66,11 @@ from ._commun import (
     _lang,
     _resolve_lab,
     _root,
-    _run_check,
     _stop_services,
     _verrou,
 )
 from ._socle import app
+from ._validation import _run_check
 
 logger = logging.getLogger(__name__)
 
