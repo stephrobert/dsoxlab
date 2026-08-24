@@ -106,10 +106,14 @@ def check_dict(check: Check) -> dict[str, Any]:
         "ok": check.ok,
         "label": check.label,
         "detail": check.detail,
-        # Deux remédiations, deux natures : ``fix`` est une commande que
-        # ``--fix`` exécute telle quelle, ``hint`` une consigne que seul un
-        # humain pose. Les fondre en un champ ferait exécuter une URL.
-        "fix": check.fix,
+        # Deux remédiations, deux natures : ``fix`` est un correctif que
+        # ``--fix`` sait jouer (token par token, sans shell), ``hint`` une
+        # consigne que seul un humain pose. Les fondre en un champ ferait
+        # exécuter une URL. Le correctif est rendu sous sa forme lisible,
+        # accompagnée de sa catégorie : c'est elle qui dit à un appelant si
+        # le geste est automatisable, manuel, ou à effet différé.
+        "fix": None if check.fix is None else check.fix.display,
+        "fix_kind": None if check.fix is None else check.fix.kind.value,
         "hint": check.hint,
     }
 

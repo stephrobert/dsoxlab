@@ -25,12 +25,16 @@ Le module reste agnostique du domaine : il ne connaît que le contrat
 
 from __future__ import annotations
 
+import getpass
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 from ..discovery.scanner import compter_fichiers_labs
@@ -59,14 +63,76 @@ STATE_FAILED = "failed"
 STATE_CHOICE_REQUIRED = "choice_required"
 
 
+class FixKind(StrEnum):
+    """Ce qu'un correctif engage, au-delà de son exécution.
+
+    La catégorie pilote deux décisions de ``--fix`` : exécuter ou seulement
+    afficher (``MANUAL``), et surtout **ce qu'on dit après**. Un ``usermod
+    -aG`` réussi laisse la ligne rouge jusqu'à la reconnexion : sans le dire,
+    l'utilisateur relance ``doctor``, revoit le même rouge, et conclut que le
+    correctif a échoué.
+    """
+
+    AUTOMATIC = "automatic"
+    """Exécuté par ``--fix``, effet immédiat : relancer ``doctor`` suffit."""
+
+    MANUAL = "manual"
+    """Jamais exécuté : ``--fix`` l'affiche, le geste appartient à l'humain."""
+
+    NEEDS_RELOGIN = "needs_relogin"
+    """Exécuté, mais l'effet attend une déconnexion puis une reconnexion."""
+
+    NEEDS_REBOOT = "needs_reboot"
+    """Exécuté, mais l'effet attend un redémarrage de la machine."""
+
+
+@dataclass(frozen=True)
+class Fix:
+    """Un correctif typé : des tokens, jamais une chaîne interprétée.
+
+    ``commands`` est une séquence d'argv joués **dans l'ordre** et **sans
+    shell**, la suite s'arrêtant au premier échec. C'est une séquence et non
+    une commande unique parce que deux correctifs réels sont des chaînes
+    (créer un pool libvirt prend quatre ``virsh``), et qu'une seule liste ne
+    les porterait qu'en réintroduisant un ``&&``, donc un shell.
+
+    ``requires_sudo`` se déduit des tokens plutôt que d'être déclaré : un
+    champ séparé pourrait contredire la commande qu'il décrit.
+    """
+
+    commands: tuple[tuple[str, ...], ...]
+    kind: FixKind = FixKind.AUTOMATIC
+
+    @property
+    def requires_sudo(self) -> bool:
+        """Au moins une des commandes s'exécute par ``sudo``."""
+        return any(cmd and cmd[0] == "sudo" for cmd in self.commands)
+
+    @property
+    def display(self) -> str:
+        """La forme lisible du correctif, pour l'affichage seulement.
+
+        ``shlex.join`` requote ce qui doit l'être : un argument portant une
+        espace se relit tel qu'il s'exécute. Le ``&&`` est une convention de
+        lecture, pas une promesse d'exécution par un shell.
+        """
+        return " && ".join(shlex.join(cmd) for cmd in self.commands)
+
+
+def _fix(*commands: Sequence[str], kind: FixKind = FixKind.AUTOMATIC) -> Fix:
+    """Un correctif, écrit en listes de tokens sans cérémonie de tuples."""
+    return Fix(commands=tuple(tuple(cmd) for cmd in commands), kind=kind)
+
+
 @dataclass(frozen=True)
 class Check:
     """Un composant diagnostiqué.
 
-    ``fix`` est une commande shell que ``--fix`` peut exécuter telle quelle.
-    ``hint`` est une consigne affichée mais **jamais** exécutée : réinstaller
-    l'outil ou choisir un provider sont des gestes que l'apprenant doit
-    poser lui-même.
+    ``fix`` est un correctif typé (:class:`Fix`) que ``--fix`` sait jouer,
+    token par token et sans shell ; sa catégorie dit s'il s'exécute et ce
+    qu'il faut annoncer ensuite. ``hint`` est une consigne affichée mais
+    **jamais** exécutée : une URL d'installation ou un choix de provider
+    sont des gestes que l'apprenant doit poser lui-même.
     """
 
     key: str
@@ -79,7 +145,7 @@ class Check:
     label: str
     ok: bool
     detail: str
-    fix: str | None = None
+    fix: Fix | None = None
     hint: str | None = None
     forced_state: str | None = None
     """État imposé, quand « en échec » serait faux. Un provider qui reste
@@ -94,7 +160,9 @@ class Check:
     @property
     def remediation(self) -> str:
         """Ce qu'affiche la colonne « Remédiation »."""
-        return self.fix or self.hint or ""
+        if self.fix is not None:
+            return self.fix.display
+        return self.hint or ""
 
 
 def _check(
@@ -102,7 +170,7 @@ def _check(
     ok: bool,
     detail: str,
     *,
-    fix: str | None = None,
+    fix: Fix | None = None,
     hint: str | None = None,
     forced_state: str | None = None,
 ) -> Check:
@@ -195,6 +263,16 @@ def _sonder(
         return None
 
 
+def _current_user() -> str:
+    """L'utilisateur à qui s'adresse un correctif de groupe.
+
+    ``$USER`` d'abord, comme le faisait la chaîne shell d'avant ; à défaut,
+    ``getpass.getuser()`` lit la table des comptes. L'ancien repli littéral
+    ``$USER`` n'a plus de sens sans shell pour l'expanser.
+    """
+    return os.environ.get("USER") or getpass.getuser()
+
+
 def _check_incus() -> Check:
     """Binaire + daemon + permissions user + init storage/network.
 
@@ -205,7 +283,7 @@ def _check_incus() -> Check:
     if not shutil.which("incus"):
         return _check(
             "incus", False, _("detail_incus_missing"),
-            fix="sudo apt install incus",
+            fix=_fix(["sudo", "apt", "install", "incus"]),
         )
 
     # Le numéro de version n'est qu'un ornement du diagnostic. Le verdict vient
@@ -219,7 +297,7 @@ def _check_incus() -> Check:
     if probe is None:
         return _check(
             "incus", False, _("detail_incus_daemon_down", version=version),
-            fix="sudo systemctl enable --now incus.service",
+            fix=_fix(["sudo", "systemctl", "enable", "--now", "incus.service"]),
         )
     if probe.returncode == 0:
         return _check("incus", True, _("detail_incus_ok", version=version))
@@ -235,18 +313,24 @@ def _check_incus() -> Check:
             return _check(
                 "incus", False,
                 _("detail_incus_daemon_down", version=version),
-                fix="sudo systemctl enable --now incus.service",
+                fix=_fix(["sudo", "systemctl", "enable", "--now", "incus.service"]),
             )
+        # NEEDS_RELOGIN : l'appartenance à un groupe ne prend effet qu'à la
+        # session suivante. Sans cette catégorie, l'utilisateur relançait
+        # `doctor`, revoyait le rouge, et croyait le correctif en échec.
         return _check(
             "incus", False,
             _("detail_incus_no_group", version=version),
-            fix=f"sudo usermod -aG incus,incus-admin {os.environ.get('USER', '$USER')}",
+            fix=_fix(
+                ["sudo", "usermod", "-aG", "incus,incus-admin", _current_user()],
+                kind=FixKind.NEEDS_RELOGIN,
+            ),
         )
     if "no storage pools" in err or "init" in err:
         return _check(
             "incus", False,
             _("detail_incus_no_init", version=version),
-            fix="sudo incus admin init --auto",
+            fix=_fix(["sudo", "incus", "admin", "init", "--auto"]),
         )
 
     tail = (probe.stderr or probe.stdout).strip().splitlines()
@@ -257,7 +341,10 @@ def _check_kvm() -> Check:
     if not shutil.which("virsh"):
         return _check(
             "kvm", False, _("detail_kvm_missing"),
-            fix="sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
+            fix=_fix([
+                "sudo", "apt", "install",
+                "libvirt-clients", "libvirt-daemon-system", "qemu-kvm",
+            ]),
         )
     # Un virsh qui sort en erreur est justement ce que ce contrôle cherche à
     # rapporter ; un virsh qui ne répond pas dit la même chose plus fort.
@@ -265,7 +352,7 @@ def _check_kvm() -> Check:
     if result is None or result.returncode != 0:
         return _check(
             "kvm", False, _("detail_kvm_daemon_err"),
-            fix="sudo systemctl start libvirtd",
+            fix=_fix(["sudo", "systemctl", "start", "libvirtd"]),
         )
     first_line = result.stdout.splitlines()[0] if result.stdout else "ok"
     return _check("kvm", True, first_line)
@@ -318,27 +405,42 @@ def _check_ansible() -> Check:
     if not ansible_infra.has_ansible_playbook():
         return _check(
             "ansible", False, _("detail_ansible_missing"),
-            fix="uv tool install ansible-core",
+            fix=_fix(["uv", "tool", "install", "ansible-core"]),
         )
     return _check("ansible", True, _("detail_ansible_ok"))
 
 
-def creer_pool_command(pool: str) -> str:
-    """La commande qui crée un pool libvirt de bout en bout.
+def creer_pool_fix(pool: str) -> Fix:
+    """Le correctif qui crée un pool libvirt de bout en bout.
 
     Les quatre étapes comptent : ``pool-define-as`` seul laisse un pool défini
     mais **inactif**, dans lequel Terraform ne peut rien écrire.
     """
-    return (
-        f"sudo virsh pool-define-as {pool} dir --target "
-        f"/var/lib/libvirt/images && sudo virsh pool-build {pool} && "
-        f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
+    return _fix(
+        ["sudo", "virsh", "pool-define-as", pool, "dir",
+         "--target", "/var/lib/libvirt/images"],
+        ["sudo", "virsh", "pool-build", pool],
+        ["sudo", "virsh", "pool-start", pool],
+        ["sudo", "virsh", "pool-autostart", pool],
     )
 
 
+def demarrer_pool_fix(pool: str) -> Fix:
+    """Le correctif qui démarre un pool déjà défini, et le rend permanent."""
+    return _fix(
+        ["sudo", "virsh", "pool-start", pool],
+        ["sudo", "virsh", "pool-autostart", pool],
+    )
+
+
+def creer_pool_command(pool: str) -> str:
+    """La création du pool, en une ligne à copier après un échec de provision."""
+    return creer_pool_fix(pool).display
+
+
 def demarrer_pool_command(pool: str) -> str:
-    """La commande qui démarre un pool déjà défini, et le rend permanent."""
-    return f"sudo virsh pool-start {pool} && sudo virsh pool-autostart {pool}"
+    """Le démarrage du pool, en une ligne à copier après un échec de provision."""
+    return demarrer_pool_fix(pool).display
 
 
 def _pools_libvirt(*, definis: bool) -> list[str] | None:
@@ -387,11 +489,11 @@ def _check_libvirt_pool(pool: str) -> Check:
     if definis is not None and pool in definis:
         return _check(
             "libvirt_pool", False, _("detail_pool_inactive", pool=pool),
-            fix=demarrer_pool_command(pool),
+            fix=demarrer_pool_fix(pool),
         )
     return _check(
         "libvirt_pool", False, _("detail_pool_missing", pool=pool),
-        fix=creer_pool_command(pool),
+        fix=creer_pool_fix(pool),
     )
 
 
@@ -530,7 +632,7 @@ def _check_iso_tool() -> Check:
             return _check("iso_tool", True, outil)
     return _check(
         "iso_tool", False, _("detail_iso_tool_missing"),
-        fix="sudo apt install genisoimage",
+        fix=_fix(["sudo", "apt", "install", "genisoimage"]),
     )
 
 

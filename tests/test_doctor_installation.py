@@ -209,7 +209,10 @@ def test_ansible_est_reparable_automatiquement(
     report = doctor.collect_checks(tmp_path, _repo(provider="kvm"))
 
     par_label = {c.label: c for c in report.required}
-    assert par_label[_("check_ansible")].fix == "uv tool install ansible-core"
+    correctif = par_label[_("check_ansible")].fix
+    assert correctif is not None
+    assert correctif.display == "uv tool install ansible-core"
+    assert correctif.kind is doctor.FixKind.AUTOMATIC
     assert par_label[_("check_terraform")].fix is None
     assert "terraform" in (par_label[_("check_terraform")].hint or "")
 
@@ -455,7 +458,9 @@ def test_un_pool_absent_fait_proposer_sa_creation(
     assert check.detail == _("detail_pool_missing", pool="default")
     assert check.fix is not None
     for etape in ("pool-define-as", "pool-build", "pool-start", "pool-autostart"):
-        assert etape in check.fix, f"« {etape} » manque à la création du pool"
+        assert etape in check.fix.display, (
+            f"« {etape} » manque à la création du pool"
+        )
 
 
 def test_un_pool_defini_mais_arrete_est_dit_tel_quel(
@@ -477,9 +482,9 @@ def test_un_pool_defini_mais_arrete_est_dit_tel_quel(
     assert not check.ok
     assert check.detail == _("detail_pool_inactive", pool="default")
     assert check.fix is not None
-    assert "pool-start" in check.fix
-    assert "pool-autostart" in check.fix
-    assert "pool-define-as" not in check.fix, (
+    assert "pool-start" in check.fix.display
+    assert "pool-autostart" in check.fix.display
+    assert "pool-define-as" not in check.fix.display, (
         "définir un pool qui existe déjà échoue : la remédiation mentirait"
     )
 
@@ -497,8 +502,8 @@ def test_le_pool_du_depot_est_celui_qui_est_sonde(
     assert not check.ok
     assert "labs-pool" in check.detail
     assert check.fix is not None
-    assert "labs-pool" in check.fix
-    assert "default" not in check.fix
+    assert "labs-pool" in check.fix.display
+    assert "default" not in check.fix.display
 
 
 def test_un_virsh_muet_ne_conclut_pas_a_l_absence(

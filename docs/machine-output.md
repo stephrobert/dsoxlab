@@ -328,6 +328,7 @@ A catalog with no `infra:` block is a normal case, not an error: it yields
       "label": "pytest",
       "detail": "bundled with dsoxlab (the one `check` uses)",
       "fix": null,
+      "fix_kind": null,
       "hint": null
     }
   ],
@@ -339,6 +340,7 @@ A catalog with no `infra:` block is a normal case, not an error: it yields
       "label": "virsh/KVM",
       "detail": "virsh not found",
       "fix": "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
+      "fix_kind": "automatic",
       "hint": null
     }
   ],
@@ -362,7 +364,8 @@ Each check:
 | `ok` | bool | the same thing as `state == "ok"`, kept for a plain green/red reading |
 | `label` | string | the component's name, translated — for display only |
 | `detail` | string | what was measured: a version, an error line, a count |
-| `fix` | string or null | a shell command that `dsoxlab doctor --fix` runs as is |
+| `fix` | string or null | the remediation in its readable form; `dsoxlab doctor --fix` plays the same commands token by token, without a shell |
+| `fix_kind` | string or null | the remediation category: `automatic`, `manual` (shown, never run), `needs_relogin` or `needs_reboot` (run, but the check stays red until the session or the machine restarts) |
 | `hint` | string or null | a step only a human should take — an install page, a decision |
 
 `state: choice_required` exists because a decision is not a failure: a catalog
@@ -374,6 +377,11 @@ use must not turn a perfectly healthy machine red.
 
 `fix` and `hint` are kept apart on purpose: one is a command, the other is a
 sentence. Merging them would have an automation run a documentation URL.
+
+`fix_kind` is what an automation must read before acting on `fix`: a `manual`
+remediation is never run by `--fix`, and a `needs_relogin` or `needs_reboot`
+one succeeds while its check keeps reporting `failed` until the session or
+the machine restarts — that is a delayed effect, not a failure.
 
 ## `validate-structure`
 

@@ -217,7 +217,10 @@ def sans_hyperviseur(monkeypatch: pytest.MonkeyPatch) -> None:
         service_doctor,
         "_hypervisor_checks",
         lambda: {
-            "kvm": service_doctor._check("kvm", False, "absent", fix="apt install"),
+            "kvm": service_doctor._check(
+                "kvm", False, "absent",
+                fix=service_doctor.Fix((("apt", "install"),)),
+            ),
             "incus": service_doctor._check("incus", True, "ok"),
         },
     )
@@ -316,6 +319,26 @@ def test_doctor_rend_des_cles_stables(catalogue: Path, sans_hyperviseur: None) -
     # Un catalogue 100 % shell : les hyperviseurs sont informatifs, et le kvm
     # en échec ne doit donc pas peindre le verdict en rouge.
     assert [c["key"] for c in document["informational"]] == ["kvm", "incus"]
+
+
+def test_un_correctif_expose_sa_categorie(
+    catalogue: Path, sans_hyperviseur: None
+) -> None:
+    """`fix` est la forme lisible, `fix_kind` ce qu'une automatisation lit.
+
+    Une remédiation `manual` ne doit jamais être lancée par un appelant, et une
+    `needs_relogin` réussie laisse le contrôle rouge : sans la catégorie, le
+    document ne permet de décider ni l'un ni l'autre.
+    """
+    document = _document("doctor")
+
+    kvm = next(c for c in document["informational"] if c["key"] == "kvm")
+    assert kvm["fix"] == "apt install"
+    assert kvm["fix_kind"] == "automatic"
+    # Un contrôle sans correctif n'invente pas de catégorie.
+    python_check = next(c for c in document["required"] if c["key"] == "python")
+    assert python_check["fix"] is None
+    assert python_check["fix_kind"] is None
 
 
 def test_un_verdict_se_lit_sans_traduire(
