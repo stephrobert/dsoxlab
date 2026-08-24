@@ -9,12 +9,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-## [0.2.0] - 2026-08-24
-
-Cette version clôt l'audit des angles morts : onze issues dont le fil commun
-était un seul défaut — **un contrôle qui, faute de pouvoir mesurer, concluait
-que tout allait bien**. Deux comportements sont délibérément renversés, ce qui
-fait de cette version une mineure plutôt qu'un dixième correctif.
+## [0.1.84] - 2026-08-24
 
 ### Ajouté
 
@@ -28,12 +23,6 @@ fait de cette version une mineure plutôt qu'un dixième correctif.
   contrôle passait au vert, et la branche Incus de `doctor` n'ajoutait que
   l'outil ISO, là où la branche KVM contrôle son pool depuis longtemps. Le
   template crée le réseau mais écrit `pool = "default"` en dur sans le créer.
-
-### Modifié
-
-- Les neuf changements publiés en 0.1.75 → 0.1.83 sont rassemblés sous cette
-  version. Leur détail figure dans les entrées ci-dessous.
-
 
 ## [0.1.83] - 2026-08-24
 
