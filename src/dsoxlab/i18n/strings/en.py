@@ -825,6 +825,17 @@ silent.
         "target '{target}' aims at host '{host}', missing from infra.hosts in meta.yml",
     "content_role_host_unknown":
         "role '{role}' aims at '{host}', missing from infra.hosts in meta.yml",
+    # ── fixtures: the directory and the declaration must agree ──────────────
+    "content_fixture_missing":
+        "fixture declared but missing from fixtures/: '{fixture}' will never "
+        "be copied",
+    "content_fixture_undeclared":
+        "'{fixture}' sits in fixtures/ but is not declared in runtime.fixtures: "
+        "it will not be copied, and the work directory will stay empty",
+    "content_fixture_escapes":
+        "'{fixture}' escapes the workdir: a fixture path is relative to "
+        "fixtures/, with no '..' and no absolute path",
+
     "content_doc_url_no_scheme": "no URL scheme",
     "content_doc_url_scheme": "unexpected scheme: {scheme}",
     "content_doc_url_unreachable": "unreachable: {error}",
@@ -1338,4 +1349,15 @@ silent.
         "0.3.0. Use `dsoxlab completion install`, which does the same thing "
         "under a name that says it. The wrapper in ~/.local/bin is no longer "
         "written: `uv tool install` and `pipx` already put theirs there.",
+
+    # ── fixtures refused at run time (runtimes/shell.py) ────────────────────
+    "fixture_lab_injouable":
+        "Lab '{lab}' cannot start: {count} declared fixture(s) cannot be "
+        "copied. Without them the work directory would be empty, leaving "
+        "nothing to do.",
+    "fixture_introuvable":
+        "'{fixture}' is declared in runtime.fixtures but missing from fixtures/",
+    "fixture_hors_workdir":
+        "'{fixture}' escapes the workdir: a fixture path is relative to "
+        "fixtures/, with no '..' and no absolute path",
 }

@@ -327,3 +327,68 @@ def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
                     params={"role": role, "host": hote},
                 ))
     return report
+
+
+#: Un fichier caché de `fixtures/` n'est pas une fixture pédagogique : un
+#: `.gitkeep` y sert à versionner un répertoire vide, et le signaler comme non
+#: déclaré serait un faux positif que chaque auteur devrait apprendre à ignorer.
+def _fixtures_sur_disque(racine: Path) -> set[str]:
+    if not racine.is_dir():
+        return set()
+    return {
+        str(chemin.relative_to(racine))
+        for chemin in racine.rglob("*")
+        if chemin.is_file() and not any(p.startswith(".") for p in
+                                        chemin.relative_to(racine).parts)
+    }
+
+
+def validate_fixtures(lab: LabDefinition) -> ContentReport:
+    """Le répertoire ``fixtures/`` et la déclaration doivent dire la même chose.
+
+    ``ShellRuntime`` itère sur ``runtime.fixtures``, **pas** sur le contenu du
+    répertoire. Les deux écarts possibles sont donc des défauts, et aucun ne se
+    voyait :
+
+    - **déclarée mais absente du disque** : le fichier ne sera jamais copié ;
+    - **présente mais non déclarée** : l'auteur l'a livrée en croyant qu'elle
+      suffisait, et ``run`` crée un ``challenge/work`` vide.
+
+    Le second est celui qui a rendu 7 labs injouables le 2026-07-28, tous
+    marqués faits — et il se cache d'autant mieux que les outils de vérification
+    des corrigés copient, eux, le répertoire entier : la solution passe au vert
+    pendant que le parcours apprenant est cassé.
+    """
+    report = ContentReport(lab_id=lab.id)
+    if lab.runtime.type.value != "shell":
+        return report
+
+    racine = lab.path / "fixtures"
+    sur_disque = _fixtures_sur_disque(racine)
+    declarees: set[str] = set()
+
+    for rel in lab.runtime.fixtures:
+        chemin = Path(rel)
+        if chemin.is_absolute() or ".." in chemin.parts:
+            # Refusé à l'exécution : une fixture ne sort jamais du workdir.
+            report.issues.append(ContentIssue(
+                path=lab.path / "lab.yaml",
+                key="content_fixture_escapes",
+                params={"fixture": rel},
+            ))
+            continue
+        declarees.add(str(chemin))
+        if not (racine / chemin).is_file():
+            report.issues.append(ContentIssue(
+                path=lab.path / "lab.yaml",
+                key="content_fixture_missing",
+                params={"fixture": rel},
+            ))
+
+    for orpheline in sorted(sur_disque - declarees):
+        report.issues.append(ContentIssue(
+            path=racine / orpheline,
+            key="content_fixture_undeclared",
+            params={"fixture": orpheline},
+        ))
+    return report

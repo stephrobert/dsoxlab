@@ -9,6 +9,47 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.76] - 2026-08-24
+
+### Corrigé
+
+- **Une fixture qui ne peut pas être copiée ne laisse plus un répertoire de
+  travail vide en silence** (issue #177). `ShellRuntime` itère sur
+  `runtime.fixtures`, pas sur le contenu de `fixtures/` : les deux écarts
+  possibles produisaient donc le même dégât, sans un mot. Une fixture *déclarée
+  mais absente du disque* partait en `logger.warning`, une fixture *présente
+  mais non déclarée* n'était jamais lue. Dans les deux cas `dsoxlab run` créait
+  un `challenge/work` vide, sortait en **0**, et l'apprenant n'avait rien à
+  faire. C'est le défaut qui a rendu **7 labs de `terraform-training`
+  injouables le 2026-07-28**, tous marqués faits — et il se cachait d'autant
+  mieux que les outils de vérification des corrigés copient, eux, le répertoire
+  entier : la solution passait au vert pendant que le parcours apprenant était
+  cassé.
+
+### Ajouté
+
+- **`validate-structure` compare désormais `fixtures/` à la déclaration**, dans
+  les deux sens : déclarée mais absente, présente mais non déclarée, et chemin
+  qui sort du workdir. Le contrôle est dans le lot par défaut (hors ligne), si
+  bien que la CI d'un catalogue attrape la faute avant un apprenant. Les
+  fichiers cachés en sont exemptés : un `.gitkeep` sert à versionner un
+  répertoire vide, et le signaler serait un faux positif que chaque auteur
+  apprendrait à ignorer.
+
+### Modifié
+
+- **Une fixture qui ne peut pas être copiée fait maintenant échouer `run`, au
+  lieu d'être ignorée.** C'est le renversement d'une décision antérieure —
+  qu'une faute de frappe dans une entrée ne devait pas priver l'apprenant de
+  tout son workdir. C'est le fichier manquant qui l'en prive : une erreur
+  d'auteur n'est pas quelque chose qu'il peut réparer, et un exercice amputé
+  échoue au `check` pour des raisons qu'il cherchera dans son propre travail.
+  La validation précède toute copie, donc c'est tout ou rien : un workdir à
+  moitié rempli a l'air de marcher. Toutes les fixtures fautives sont nommées
+  d'un coup, pour que l'auteur corrige en une passe plutôt qu'en autant de
+  `run` qu'il a de fixtures.
+
+
 ## [0.1.75] - 2026-08-24
 
 ### Corrigé

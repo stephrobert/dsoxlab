@@ -64,6 +64,7 @@ def validate_structure_cmd(
     from ..validators.content import (
         ContentIssue,
         check_doc_url,
+        validate_fixtures,
         validate_internal_links,
         validate_language_parity,
         validate_scoring,
@@ -165,6 +166,7 @@ def validate_structure_cmd(
     for lab in labs:
         rapports = [
             validate_internal_links(lab),
+            validate_fixtures(lab),
             validate_scoring(lab),
             validate_language_parity(lab),
             validate_targets(lab, host_names),
