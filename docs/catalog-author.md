@@ -88,6 +88,39 @@ fault, it made another choice).
 
 `--check-urls` adds the only network control: each `doc_url` must answer.
 
+### Every key, and what it means
+
+The validator names each anomaly by a stable key. A test keeps this table in
+step with the code: adding a check without documenting it here fails the suite.
+
+| Key | What it means |
+| --- | --- |
+| `struct_missing_file` | a required file is absent |
+| `struct_missing_dir` | `challenge/tests/` is absent |
+| `struct_vm_targets_empty` | a `vm` lab declares no `runtime.targets` |
+| `struct_default_unknown` | `runtime.default` names a target `targets[]` does not define |
+| `struct_shell_workdir_empty` | a `shell` lab declares no `runtime.workdir` |
+| `struct_session_unknown` | `runtime.session` is neither `target` nor `local` |
+| `metadata_field_empty` | a required field is empty |
+| `metadata_list_empty` | `skills` or `distros` is an empty list |
+| `metadata_doc_url_scheme` | `doc_url` is not http(s) |
+| `metadata_lab_type_invalid` | `lab_type` is outside the enumeration |
+| `metadata_exam_score_invalid` | `exam_passing_score` is out of range |
+| `content_broken_links` | a relative link points at nothing |
+| `content_missing_english` | a document is translated on one side only |
+| `content_scoring_points_mismatch` | the tasks total a different number of points than announced |
+| `content_scoring_count_mismatch` | the header announces a different number of graded tasks |
+| `content_scoring_tasks_vs_tests` | graded tasks and tests do not line up |
+| `content_target_host_unknown` | a target's host is absent from `infra.hosts[]` |
+| `content_role_host_unknown` | a `roles` entry names an unknown host |
+| `content_solution_plaintext` | a file under `solution/` is readable in the clear |
+| `content_fixture_missing` | a fixture is declared but absent from `fixtures/` |
+| `content_fixture_undeclared` | a file sits in `fixtures/` without being declared |
+| `content_fixture_escapes` | a fixture path is absolute or contains `..` |
+| `content_doc_url_no_scheme` | `doc_url` carries no URL scheme |
+| `content_doc_url_scheme` | `doc_url` uses a scheme other than http(s) |
+| `schema_version_too_new` | the file declares a `schema_version` this dsoxlab cannot read |
+
 **What it cannot check:** that a lab listed in `meta.yml` exists on disk. The
 validator walks what discovery already loaded. Hence the order above.
 
@@ -112,19 +145,29 @@ blocks; the match compares the path relative to `labs/` against
 lab directory. Preparation is declarative (`lab.yaml`) or Ansible
 (`setup.yaml`).
 
-**5. An undeclared fixture is not copied, and nothing says so.** The shell
+**5. `fixtures/` and `runtime.fixtures` must say the same thing.** The shell
 runtime iterates over `runtime.fixtures`, **not** over the `fixtures/`
-directory. A lab that ships files without listing them opens on an empty work
-directory, and the learner has nothing to work with. Check it by hand:
+directory — so the two can disagree, and both directions used to fail silently.
+Since 0.1.84 neither does:
 
-```bash
-dsoxlab run <id>
-ls <lab>/challenge/work      # must list exactly what fixtures declares
-```
+| Situation | What happens |
+| --- | --- |
+| declared, missing from disk | `run` **fails** (exit 2) and names every offender at once |
+| present on disk, undeclared | `validate-structure` reports it (`content_fixture_undeclared`) |
+| path escaping the workdir | reported, and refused at run time (`content_fixture_escapes`) |
+
+Validation happens **before** any copy, so it is all or nothing: a half-filled
+work directory looks like it works, and the learner then hunts for a mistake
+that is not theirs. This defect made **7 labs unplayable on 2026-07-28**, all
+marked done — it hid all the better because the tooling that checks the answer
+keys copies the whole directory, so the solution went green while the learner's
+path was broken.
+
+Hidden files (`.gitkeep`) are exempt: they version an empty directory, and
+flagging them would be a false positive every author learns to ignore.
 
 The declared path is preserved: `modules/storage/main.tf` lands under
-`<workdir>/modules/storage/main.tf`, intermediate directories included. An
-absolute path, or one containing `..`, is refused with a warning.
+`<workdir>/modules/storage/main.tf`, intermediate directories included.
 
 **6. A key outside the contract is reported, not refused.** Since 0.1.54
 `validate-structure` names any key the engine will never read, along with the

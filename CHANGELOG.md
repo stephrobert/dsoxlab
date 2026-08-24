@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.85] - 2026-08-24
+
+### Fixed
+
+- **The author guide no longer describes a trap that 0.1.84 removed** (issue
+  #195). `docs/catalog-author.md` still announced that an undeclared fixture
+  passed silently — « nothing says so » — twelve versions after the check that
+  reports it was added. The page now states what actually happens, in both
+  directions and with the exit code.
+
+### Added
+
+- **A test keeps the author guide in step with the validators.** Every anomaly
+  key a validator can emit must be cited in `docs/catalog-author.*`, and no key
+  may be cited that no longer exists. Adding a check without documenting it
+  fails the suite, and the message names the missing key.
+
+  Correcting a stale sentence protects nothing — it goes stale again. What was
+  missing is anything mechanical tying *what the validator detects* to *what the
+  documentation says about it*. The guard cannot read a sentence, but it forces
+  the page open at the moment the behaviour changes, which is the moment that
+  was missed.
+
+  The pages gained the table this required: all 25 keys an author can act on,
+  with what each one means. Three keys are exempt by name — they depend on the
+  network or on a file incident, not on the contract an author writes.
+
+
 ## [0.1.84] - 2026-08-24
 
 This release closes the blind-spot audit. Its entries were developed as
