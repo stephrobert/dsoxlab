@@ -85,7 +85,7 @@ def test_empty_validation_block_falls_back_to_defaults(tmp_path: Path) -> None:
         ("skills is a scalar", VALID_LAB.replace("skills: [demo]", "skills: 42")),
     ],
 )
-def test_malformed_lab_stays_within_contract(tmp_path: Path, label: str, document: str) -> None:
+def test_a_malformed_lab_stays_within_contract(tmp_path: Path, label: str, document: str) -> None:
     """Un lab.yaml hostile est rejeté DANS le contrat, jamais en AttributeError."""
     lab_yaml = _write(tmp_path, "lab.yaml", document)
     with pytest.raises(CONTRACT_EXCEPTIONS):
@@ -135,7 +135,7 @@ def test_empty_host_fields_fall_back_to_defaults(tmp_path: Path) -> None:
     assert host.ip == ""  # et surtout pas la chaîne "None"
 
 
-def test_invalid_translation_file_is_ignored(tmp_path: Path) -> None:
+def test_an_invalid_translation_file_is_ignored(tmp_path: Path) -> None:
     """Un lab.<lang>.yaml non-mapping ne doit pas casser le lab de base."""
     _write(tmp_path, "lab.yaml", VALID_LAB)
     _write(tmp_path, "lab.fr.yaml", "- pas un mapping\n")

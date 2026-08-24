@@ -89,7 +89,7 @@ def test_a_fixture_escaping_the_workdir_is_refused(tmp_path: Path) -> None:
     assert list(work.iterdir()) == [], "nothing may be copied from outside fixtures/"
 
 
-def test_an_absolute_fixture_path_is_refused(tmp_path: Path) -> None:
+def test_an_absolute_fixture_path_is_always_refused(tmp_path: Path) -> None:
     lab = _lab(tmp_path, ["/etc/hostname"])
 
     ShellRuntime().start(lab)

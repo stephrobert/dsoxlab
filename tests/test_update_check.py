@@ -44,7 +44,7 @@ class TestParseVersion:
     def test_decoupe(self, brut: str, attendu: tuple[int, int, int]) -> None:
         assert update_check.parse_version(brut) == attendu
 
-    def test_ordre_numerique_et_non_alphabetique(self) -> None:
+    def test_ordre_numerique_et_non_pas_alphabetique(self) -> None:
         """0.1.9 < 0.1.24, ce qu'une comparaison de chaînes rate."""
         assert update_check.parse_version("0.1.9") < update_check.parse_version("0.1.24")
 
