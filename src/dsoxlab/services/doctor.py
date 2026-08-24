@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -41,6 +42,7 @@ from ..discovery.scanner import compter_fichiers_labs
 from ..i18n import _
 from ..infra import ansible as ansible_infra
 from ..models import LabDefinition, RepoMetadata
+from ..models.repo import InfraDefinition
 from ..models.runtime import RuntimeType
 from .lab_service import get_all_labs, resolve_pytest_cmd
 
@@ -61,6 +63,16 @@ _VM_RUNTIMES = frozenset({RuntimeType.VM, RuntimeType.KVM, RuntimeType.INCUS})
 STATE_OK = "ok"
 STATE_FAILED = "failed"
 STATE_CHOICE_REQUIRED = "choice_required"
+STATE_UNKNOWN = "unknown"
+"""La sonde n'a pas pu mesurer : ni vert, ni rouge.
+
+Ce module combat deux mensonges symétriques. Le premier est le rouge affiché
+devant une commande qui fonctionne ; le second, plus sournois, est le vert
+affiché faute d'avoir mesuré — c'est exactement le défaut du contrôle du pool
+qui rendait « ok » quand virsh ne répondait pas. Un contrôle en ``unknown``
+n'entre pas dans :meth:`DoctorReport.failing` (il ne prouve aucune panne),
+mais son jeton dit à un programme comme à un humain que rien n'est prouvé
+dans l'autre sens non plus."""
 
 
 class FixKind(StrEnum):
@@ -212,7 +224,12 @@ class DoctorReport:
     libellé qui devait dire la vérité, pas le classement."""
 
     def failing(self) -> list[Check]:
-        return [c for c in self.required if not c.ok]
+        # Un contrôle ``unknown`` n'a rien prouvé : il ne peut pas peindre le
+        # verdict en rouge. Son jeton suffit à dire qu'il n'est pas vert.
+        return [
+            c for c in self.required
+            if not c.ok and c.state != STATE_UNKNOWN
+        ]
 
     def fixable(self) -> list[Check]:
         return [c for c in self.required if not c.ok and c.fix]
@@ -242,7 +259,7 @@ def _check_shell() -> Check:
 
 
 def _sonder(
-    commande: list[str], *, delai: float = 5
+    commande: list[str], *, delai: float = 5, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str] | None:
     """Joue une sonde, ou rend ``None`` si elle ne répond pas.
 
@@ -257,7 +274,8 @@ def _sonder(
     """
     try:
         return subprocess.run(
-            commande, capture_output=True, text=True, timeout=delai, check=False,
+            commande, capture_output=True, text=True, timeout=delai,
+            check=False, env=env,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -408,6 +426,184 @@ def _check_ansible() -> Check:
             fix=_fix(["uv", "tool", "install", "ansible-core"]),
         )
     return _check("ansible", True, _("detail_ansible_ok"))
+
+
+#: Le périphérique par lequel un hyperviseur local accède à la virtualisation
+#: matérielle. Constante de module pour que les tests la déplacent : le point
+#: du contrôle est justement de mesurer une machine où il n'existe pas.
+_KVM_DEVICE = Path("/dev/kvm")
+
+
+def _check_hw_virt() -> Check:
+    """La virtualisation matérielle, lue là où qemu ira la chercher.
+
+    ``virsh version`` répond parfaitement sur une machine sans virtualisation :
+    le daemon tourne, le client cause, et ``provision`` échoue ensuite en
+    langage Terraform (« could not find capabilities for domaintype=kvm »),
+    ou pire, démarre en émulation logicielle et tout expire. Le premier
+    contexte réel où le périphérique manque est une VM sans virtualisation
+    imbriquée, et c'est machine éteinte, dans l'hyperviseur hôte, que ça se
+    règle : aucun correctif exécutable, la consigne vit dans le détail.
+
+    L'inaccessible est un état distinct de l'absent : le périphérique existe,
+    seul le droit manque, et ``usermod -aG kvm`` le rend, à la session
+    suivante seulement, d'où la catégorie.
+    """
+    if not _KVM_DEVICE.exists():
+        return _check(
+            "hw_virt", False, _("detail_hw_virt_missing", device=_KVM_DEVICE),
+        )
+    if not os.access(_KVM_DEVICE, os.R_OK | os.W_OK):
+        return _check(
+            "hw_virt", False, _("detail_hw_virt_denied", device=_KVM_DEVICE),
+            fix=_fix(
+                ["sudo", "usermod", "-aG", "kvm", _current_user()],
+                kind=FixKind.NEEDS_RELOGIN,
+            ),
+        )
+    return _check("hw_virt", True, str(_KVM_DEVICE))
+
+
+#: Architectures des images que chaque provider packagé sait fournir.
+#: ``kvm`` : les URL de ``templates/terraform/kvm/main.tf`` sont toutes des
+#: images x86_64/amd64, avec ``q35``, firmware EFI x86 et ``host-passthrough``.
+#: ``incus`` en est absent volontairement : le registre ``images:`` résout
+#: chaque alias dans l'architecture de l'hôte.
+_PROVIDER_IMAGE_ARCHS: dict[str, frozenset[str]] = {
+    "kvm": frozenset({"x86_64", "amd64"}),
+}
+
+
+def _check_cpu_arch(provider: str) -> Check:
+    """L'architecture du poste, confrontée aux images du provider actif.
+
+    Sur un processeur aarch64, les images amd64 du template kvm ne booteront
+    jamais, et rien ne le disait avant l'échec. Un provider hors du tableau
+    n'impose aucune contrainte : le contrôle rend alors l'architecture
+    mesurée, pas un verdict inventé.
+    """
+    machine = platform.machine().lower()
+    if not machine:
+        # Rien mesuré : ni vert ni rouge, et surtout pas un « ok » par défaut.
+        return _check(
+            "cpu_arch", False, _("detail_cpu_arch_unknown"),
+            forced_state=STATE_UNKNOWN,
+        )
+    archs = _PROVIDER_IMAGE_ARCHS.get(provider)
+    if archs is None or machine in archs:
+        return _check("cpu_arch", True, machine)
+    return _check(
+        "cpu_arch", False,
+        _(
+            "detail_cpu_arch_mismatch",
+            machine=machine, provider=provider,
+            archs="/".join(sorted(archs, reverse=True)),
+        ),
+    )
+
+
+def _mem_available_mb() -> int | None:
+    """``MemAvailable`` de ``/proc/meminfo``, en MiB, ou ``None`` si illisible.
+
+    ``MemAvailable`` plutôt que ``MemFree`` : c'est l'estimation du noyau de
+    ce qu'une nouvelle charge peut réellement obtenir, cache compris.
+    """
+    try:
+        contenu = Path("/proc/meminfo").read_text(encoding="ascii")
+    except OSError:
+        return None
+    for ligne in contenu.splitlines():
+        if ligne.startswith("MemAvailable:"):
+            champs = ligne.split()
+            if len(champs) >= 2 and champs[1].isdigit():
+                return int(champs[1]) // 1024
+    return None
+
+
+def _pool_available_gb(pool: str) -> int | None:
+    """L'espace disponible du pool libvirt visé, en GiB, ou ``None`` si non mesuré.
+
+    ``pool-info --bytes`` rend la place telle que libvirt la voit, c'est-à-dire
+    celle du répertoire cible réel du pool, où qu'il soit monté. ``LC_ALL=C``
+    n'est pas décoratif : virsh traduit ses libellés, et « Available: » devient
+    « Disponible : » sous une locale française.
+    """
+    probe = _sonder(
+        ["virsh", "-c", "qemu:///system", "pool-info", pool, "--bytes"],
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    if probe is None or probe.returncode != 0:
+        return None
+    for ligne in probe.stdout.splitlines():
+        if ligne.startswith("Available:"):
+            champs = ligne.split()
+            if len(champs) >= 2 and champs[1].isdigit():
+                return int(champs[1]) // 2**30
+    return None
+
+
+def _check_resources(infra: InfraDefinition, provider: str) -> Check:
+    """Ce que le poste offre, face à ce que le ``meta.yml`` déclare.
+
+    Un provisionnement a déjà expiré sur un hôte à 2 vCPU / 4 Go (hôte prêt à
+    181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme
+    des ``ram_mb`` et des ``disk_gb`` (+ ``extra_disk_gb``) du catalogue est la
+    demande ; ``MemAvailable`` et le pool libvirt sont l'offre.
+
+    Une sonde impossible ne vaut jamais « ok » : la portion non mesurée est
+    nommée, et le contrôle sort en ``unknown``, sauf si une portion mesurée
+    manque déjà, auquel cas le manque prouvé l'emporte.
+    """
+    besoin_ram = sum(h.ram_mb for h in infra.hosts)
+    besoin_disk = sum(h.disk_gb + h.extra_disk_gb for h in infra.hosts)
+
+    manque = False
+    inconnu = False
+    portions: list[str] = []
+
+    dispo_ram = _mem_available_mb()
+    if dispo_ram is None:
+        inconnu = True
+        portions.append(_("detail_resources_ram_unknown"))
+    else:
+        manque = manque or dispo_ram < besoin_ram
+        portions.append(
+            _("detail_resources_ram", avail=dispo_ram, need=besoin_ram)
+        )
+
+    if provider == "kvm":
+        pool = str(infra.provider_config("kvm").get("storage_pool") or "default")
+        dispo_disk = _pool_available_gb(pool)
+        if dispo_disk is None:
+            # Pool absent, inactif ou virsh muet : le contrôle du pool porte
+            # déjà ce rouge-là, le redire ici empilerait deux échecs pour une
+            # seule cause. Mais rien n'est mesuré, donc rien n'est vert.
+            inconnu = True
+            portions.append(_("detail_resources_disk_unknown", pool=pool))
+        else:
+            manque = manque or dispo_disk < besoin_disk
+            portions.append(
+                _(
+                    "detail_resources_disk",
+                    pool=pool, avail=dispo_disk, need=besoin_disk,
+                )
+            )
+    else:
+        # L'outil ne sait pas mesurer le stockage de ce provider : le dire
+        # vaut mieux qu'un vert conclu sur la seule RAM.
+        inconnu = True
+        portions.append(_("detail_resources_disk_unprobed", provider=provider))
+
+    # Le joint se traduit : la typographie française met une espace avant le
+    # point-virgule, l'anglaise non.
+    detail = _("detail_resources_join").join(portions)
+    if manque:
+        return _check("resources", False, detail)
+    if inconnu:
+        return _check(
+            "resources", False, detail, forced_state=STATE_UNKNOWN,
+        )
+    return _check("resources", True, detail)
 
 
 def creer_pool_fix(pool: str) -> Fix:
@@ -738,6 +934,19 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     if needs_vm:
         report.required.append(_check_terraform())
         report.required.append(_check_ansible())
+        # Prérequis matériels d'un hyperviseur local : virtualisation,
+        # architecture, ressources. Ils ne dépendent d'aucun binaire installé
+        # (/dev/kvm et /proc/meminfo se lisent sans virsh), donc ils parlent
+        # même quand l'hyperviseur manque : c'est une cause DIFFÉRENTE, pas le
+        # même rouge répété. Un provider distant (outscale…) provisionne
+        # ailleurs : rien de tout cela ne concerne alors ce poste.
+        if active in _LOCAL_HYPERVISORS:
+            report.required.append(_check_hw_virt())
+            report.required.append(_check_cpu_arch(active))
+            if repo_meta is not None and repo_meta.infra.hosts:
+                report.required.append(
+                    _check_resources(repo_meta.infra, active)
+                )
         # Contrôles propres à un hyperviseur : ils n'ont de sens qu'une fois le
         # provider choisi, sinon ils affichent du rouge pour un backend que ce
         # poste n'utilisera peut-être jamais.

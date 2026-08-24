@@ -876,6 +876,9 @@ silent.
     "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs detected",
     "check_lab_home": "LAB_HOME",
+    "check_hw_virt":  "Hardware virtualization",
+    "check_cpu_arch": "CPU architecture",
+    "check_resources": "RAM / disk resources",
 
     "detail_shell_always":   "always available",
     "detail_incus_missing":  "not found",
@@ -897,6 +900,29 @@ silent.
         "not found: `run` cannot play a vm lab's setup.yaml "
         "(ansible-runner does not install it)",
     "detail_ansible_ok":     "present",
+    "detail_hw_virt_missing":
+        "{device} is absent: no hardware virtualization, the vm labs cannot "
+        "run on this machine. Enable VT-x/AMD-V in the BIOS, or nested "
+        "virtualization in your hypervisor (machine powered off).",
+    "detail_hw_virt_denied":
+        "{device} exists but this user cannot open it: `provision` cannot "
+        "start any VM (re-login required after joining the kvm group)",
+    "detail_cpu_arch_mismatch":
+        "this machine is {machine}, but the {provider} images packaged with "
+        "dsoxlab only exist in {archs}: the vm labs cannot boot here",
+    "detail_cpu_arch_unknown":
+        "machine architecture could not be determined",
+    "detail_resources_ram":
+        "RAM: {avail} MB available for {need} MB declared",
+    "detail_resources_ram_unknown":
+        "RAM: /proc/meminfo unreadable, nothing measured",
+    "detail_resources_disk":
+        "pool {pool}: {avail} GB available for {need} GB declared",
+    "detail_resources_disk_unknown":
+        "pool {pool}: not answering, disk space not measured",
+    "detail_resources_disk_unprobed":
+        "disk: this tool cannot measure the {provider} storage pool",
+    "detail_resources_join": "; ",
     "detail_pool_missing":
         "the `{pool}` pool does not exist: `provision` will fail with "
         "\"Pool Not Found\"",
@@ -1041,6 +1067,7 @@ silent.
     "status_present":     "[green]installed[/green]",
     "status_absent":      "[dim]— absent[/dim]",
     "status_choose":      "[yellow]to be chosen[/yellow]",
+    "status_unknown":     "[yellow]? not measured[/yellow]",
     "doctor_fix_hint":    "ℹ Use [bold]dsoxlab doctor --fix[/bold] to attempt automatic remediation.",
     "doctor_manual_hint":
         "ℹ [bold]--fix[/bold] cannot repair what is missing: apply the "

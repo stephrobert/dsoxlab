@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.73] - 2026-08-24
+
+### Added
+
+- **`doctor` now checks the three prerequisites that decide whether a `vm` lab
+  can run at all** (issue #169). `virsh version` answers perfectly on a machine
+  with no hardware virtualization: the diagnosis was fully green while
+  `provision` failed in Terraform language ("could not find capabilities for
+  domaintype=kvm"), or crawled off into software emulation until everything
+  timed out. Three new checks, each with a stable key in `doctor --json`:
+
+  - `hw_virt` reads `/dev/kvm` where qemu will look for it. Absent means the vm
+    labs cannot run on this machine, and the detail says where the gesture
+    belongs: the BIOS, or nested virtualization in the host hypervisor, machine
+    powered off. Present but not openable is a different state with an
+    executable fix (`usermod -aG kvm`, `needs_relogin`).
+  - `cpu_arch` confronts `platform.machine()` with the images the active
+    provider can furnish: the kvm template only packages x86_64 images, and on
+    aarch64 nothing will ever boot. The mismatch names both sides.
+  - `resources` compares `MemAvailable` and the libvirt pool's free space to
+    the sum of `ram_mb` and `disk_gb` (+ `extra_disk_gb`) the catalog's
+    `meta.yml` declares. A field report gave the scale: a provisioning already
+    expired on a 2 vCPU / 4 GB host, ready at 181 seconds for a 180 timeout.
+
+  All three are required only when the catalog declares `vm` labs on a local
+  hypervisor: a 100 % `shell` catalog (terraform-training) shows none of them,
+  and a remote provider measures nothing on this machine.
+
+- **A probe that cannot measure no longer concludes anything: `state: unknown`**.
+  An unreadable `/proc/meminfo` or a silent libvirt pool is neither the
+  reassuring green of an unearned "ok" nor the accusing red of an unproven
+  failure. The token is exposed by `doctor --json` and rendered as "? not
+  measured"; it never paints the top-level verdict red.
+
 ## [0.1.72] - 2026-08-24
 
 ### Fixed

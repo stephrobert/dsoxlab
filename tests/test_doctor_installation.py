@@ -64,6 +64,29 @@ def _labels(checks: list[doctor.Check]) -> set[str]:
     return {c.label for c in checks}
 
 
+@pytest.fixture(autouse=True)
+def _prerequis_materiels_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Les prérequis matériels (virtualisation, archi, ressources) au vert.
+
+    /dev/kvm, platform.machine() et /proc/meminfo mesurent la machine qui joue
+    la suite : sans stub, ces tests de classement changeraient de verdict d'un
+    poste à l'autre. Le comportement propre de ces contrôles est couvert par
+    `test_doctor_prerequis_vm.py`.
+    """
+    monkeypatch.setattr(
+        doctor, "_check_hw_virt",
+        lambda: doctor._check("hw_virt", True, "/dev/kvm"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_cpu_arch",
+        lambda provider: doctor._check("cpu_arch", True, "x86_64"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_resources",
+        lambda infra, provider: doctor._check("resources", True, "ok"),
+    )
+
+
 @pytest.fixture
 def hyperviseur_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     """Les deux hyperviseurs installés et fonctionnels.

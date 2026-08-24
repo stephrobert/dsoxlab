@@ -359,8 +359,8 @@ Each check:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `labs`, `lab_home` |
-| `state` | string | `ok`, `failed`, or `choice_required` |
+| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `labs`, `lab_home` |
+| `state` | string | `ok`, `failed`, `choice_required`, or `unknown` |
 | `ok` | bool | the same thing as `state == "ok"`, kept for a plain green/red reading |
 | `label` | string | the component's name, translated — for display only |
 | `detail` | string | what was measured: a version, an error line, a count |
@@ -371,6 +371,13 @@ Each check:
 `state: choice_required` exists because a decision is not a failure: a catalog
 that declares several providers and has none selected blocks provisioning, but
 nothing is broken, and painting it red treats a choice like an outage.
+
+`state: unknown` exists because an impossible probe proves nothing, in either
+direction: a check whose measurement failed (an unreadable `/proc/meminfo`, a
+libvirt pool that does not answer) is neither the reassuring green of an
+unearned `ok` nor the accusing red of an unproven failure. Its `ok` field is
+`false` — nothing was verified — but it does not count toward the top-level
+verdict.
 
 `ok` covers `required` only, deliberately. A hypervisor this catalog will never
 use must not turn a perfectly healthy machine red.
