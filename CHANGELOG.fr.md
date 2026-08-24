@@ -9,6 +9,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.70] - 2026-08-24
+
+### Modifié
+
+- **`doctor --fix` ne joue plus de chaînes shell : un correctif typé et
+  catégorisé.** (#89) La commande la plus intrusive de l'outil, souvent sous
+  sudo, était aussi la seule à exécuter des chaînes interprétées par un shell
+  (`subprocess.run(..., shell=True)`, l'unique occurrence de `src/dsoxlab/`).
+  Les remédiations sont désormais un `Fix` typé : une séquence d'argv jouée
+  **dans l'ordre, token par token, sans aucun shell**, par le wrapper central
+  `run_command`. Un argument qui porte une espace arrive entier à la commande,
+  exactement ce qu'une chaîne shell aurait redécoupé ; un nouveau test le
+  prouve.
+
+  Chaque correctif porte aussi une catégorie, et c'est elle qui pilote le
+  message : `automatic` (exécuté, effet immédiat), `manual` (**jamais**
+  exécuté : `--fix` nomme le geste, l'humain le pose), `needs_relogin` et
+  `needs_reboot` (exécutés, puis `doctor` dit que la ligne restera rouge
+  jusqu'à la reconnexion ou au redémarrage : un effet différé, pas un échec).
+  Avant cela, un `usermod -aG` réussi ressemblait trait pour trait à un
+  `usermod` raté : l'utilisateur relançait `doctor`, revoyait le même rouge,
+  et concluait que le correctif avait échoué.
+
+  `doctor --json` expose désormais `fix_kind` sur chaque contrôle, et `fix`
+  devient la forme lisible des commandes typées (documenté dans
+  `docs/machine-output.fr.md`).
+
 ### Corrigé
 
 - **Rien ne disait qu'une version fusionnée n'avait jamais été taguée.** C'est

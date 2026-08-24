@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.70] - 2026-08-24
+
+### Changed
+
+- **`doctor --fix` no longer runs shell strings: a typed, categorized fix.**
+  (#89) The most intrusive command of the tool — often under sudo — was also
+  the only one executing strings through a shell (`subprocess.run(...,
+  shell=True)`, the single occurrence in `src/dsoxlab/`). Remediations are now
+  a typed `Fix`: a sequence of argv played **in order, token by token, without
+  any shell**, through the central `run_command` wrapper. An argument carrying
+  a space reaches the command whole, which is precisely what a shell string
+  would have split — and what a new test proves.
+
+  Each fix also carries a category, and the category drives the message:
+  `automatic` (run, effect immediate), `manual` (**never** run: `--fix` names
+  the step, the human takes it), `needs_relogin` and `needs_reboot` (run, then
+  `doctor` says the line will stay red until the session or the machine
+  restarts — a delayed effect, not a failure). Before that, a successful
+  `usermod -aG` looked exactly like a failed one: the user re-ran `doctor`,
+  saw the same red line, and concluded the fix had not worked.
+
+  `doctor --json` now exposes `fix_kind` on each check, and `fix` becomes the
+  readable form of the typed commands (documented in `docs/machine-output.md`).
+
 ### Fixed
 
 - **Nothing said that a merged version had never been tagged.** It happened

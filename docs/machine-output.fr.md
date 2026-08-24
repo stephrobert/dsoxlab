@@ -330,6 +330,7 @@ Un catalogue sans bloc `infra:` est un cas normal, pas une erreur : il rend
       "label": "pytest",
       "detail": "embarqué avec dsoxlab (celui qu'utilise « check »)",
       "fix": null,
+      "fix_kind": null,
       "hint": null
     }
   ],
@@ -341,6 +342,7 @@ Un catalogue sans bloc `infra:` est un cas normal, pas une erreur : il rend
       "label": "virsh/KVM",
       "detail": "virsh introuvable",
       "fix": "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
+      "fix_kind": "automatic",
       "hint": null
     }
   ],
@@ -364,7 +366,8 @@ Chaque contrôle :
 | `ok` | booléen | la même chose que `state == "ok"`, gardé pour une lecture vert/rouge immédiate |
 | `label` | chaîne | le nom du composant, traduit : pour l'affichage seulement |
 | `detail` | chaîne | ce qui a été mesuré : une version, une ligne d'erreur, un compte |
-| `fix` | chaîne ou null | une commande shell que `dsoxlab doctor --fix` joue telle quelle |
+| `fix` | chaîne ou null | la remédiation sous sa forme lisible ; `dsoxlab doctor --fix` joue les mêmes commandes token par token, sans shell |
+| `fix_kind` | chaîne ou null | la catégorie de la remédiation : `automatic`, `manual` (affichée, jamais exécutée), `needs_relogin` ou `needs_reboot` (exécutée, mais le contrôle reste rouge jusqu'à la reconnexion ou au redémarrage) |
 | `hint` | chaîne ou null | un geste que seul un humain doit poser : une page d'installation, une décision |
 
 `state: choice_required` existe parce qu'une décision n'est pas une panne : un
@@ -378,6 +381,12 @@ n'utilisera jamais n'a pas à peindre en rouge une machine qui va très bien.
 `fix` et `hint` restent séparés à dessein : l'un est une commande, l'autre une
 phrase. Les fondre ferait exécuter une URL de documentation par une
 automatisation.
+
+`fix_kind` est ce qu'une automatisation doit lire avant d'agir sur `fix` :
+une remédiation `manual` n'est jamais exécutée par `--fix`, et une
+`needs_relogin` ou `needs_reboot` réussit alors que son contrôle continue de
+rapporter `failed` jusqu'à la reconnexion ou au redémarrage. C'est un effet
+différé, pas un échec.
 
 ## `validate-structure`
 
