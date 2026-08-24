@@ -9,6 +9,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.80] - 2026-08-24
+
+### Ajouté
+
+- **La CI valide les trois templates Terraform packagés** (issue #175). Le
+  pipeline couvrait le lint, mypy, les tests unitaires, le fuzzing et une suite
+  e2e sur la roue installée — mais ne jouait **aucun `terraform validate` nulle
+  part**, aucun provisionnement, et sa suite e2e ne joue que le lab de
+  démonstration, qui est `shell`. Les templates sont épinglés en `~> 0.9` (kvm)
+  et `~> 0.3` (incus) : une version mineure du provider peut casser le schéma,
+  et le dépôt a déjà vécu ce cas. Les tests unitaires existants sur ces
+  templates vérifient qu'un fichier contient une chaîne, pas que Terraform sait
+  le lire : une régression de template ne se découvrait donc que chez un
+  apprenant, en langage Terraform.
+
+  Le job joue `terraform init -backend=false` puis `terraform validate` sur kvm,
+  incus et outscale, collecte **tous** les échecs plutôt que de s'arrêter au
+  premier, nomme le provider fautif via `::error::`, et fait échouer la
+  construction. Terraform vient de l'archive de l'éditeur avec la somme de
+  contrôle qu'il publie, sur le patron déjà utilisé pour poutine — aucune action
+  tierce n'est ajoutée à la chaîne d'approvisionnement.
+
+### Documentation
+
+- **La décision sur les images amont est désormais écrite**, dans
+  `templates/terraform/README.md`. Les sept URL d'images pointent des chemins
+  mutables (`latest` / `current`), et c'est un choix : une somme épinglée que
+  personne ne tient à jour servirait aux apprenants une image de plus en plus
+  périmée, avec ses vulnérabilités connues — le durcissement deviendrait le
+  vecteur du problème qu'il prétend traiter. Les raisons qui rendent le risque
+  acceptable ici, et les conditions qui inverseraient la décision, sont
+  explicitées.
+
+
 ## [0.1.79] - 2026-08-24
 
 ### Ajouté

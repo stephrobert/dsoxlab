@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.80] - 2026-08-24
+
+### Added
+
+- **CI validates the three packaged Terraform templates** (issue #175). The
+  pipeline covered lint, mypy, unit tests, fuzzing and an e2e suite on the
+  installed wheel — but ran **no `terraform validate` anywhere**, no
+  provisioning, and its e2e suite only plays the demo lab, which is `shell`.
+  The templates are pinned to `~> 0.9` (kvm) and `~> 0.3` (incus): a minor
+  provider release can break the schema, and this repository has already lived
+  through it. The existing unit tests on those templates assert that a file
+  contains a string, not that Terraform can read it, so a template regression
+  was only ever discovered on a learner's machine, in Terraform's own language.
+
+  The job runs `terraform init -backend=false` then `terraform validate` on
+  kvm, incus and outscale, collects every failure rather than stopping at the
+  first, names the offending provider through `::error::`, and fails the build.
+  Terraform comes from the vendor's release archive with its published
+  checksum, following the pattern already used for poutine — no third-party
+  action is added to the supply chain.
+
+### Documentation
+
+- **The upstream-image decision is now written down**, in
+  `templates/terraform/README.md`. The seven image URLs point at mutable
+  `latest` / `current` paths, and that is a choice: pinning a checksum that
+  nobody keeps current would serve learners an increasingly stale image, with
+  its known vulnerabilities — the hardening would become the vector of the
+  problem it claims to address. The reasons it is acceptable here, and the
+  conditions that would reverse it, are spelled out.
+
+
 ## [0.1.79] - 2026-08-24
 
 ### Added
