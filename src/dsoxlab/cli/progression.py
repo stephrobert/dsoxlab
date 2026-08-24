@@ -49,6 +49,7 @@ from ..services import (
     next_pending_lab,
     reset_lab,
 )
+from ..services.lab_service import a_mesure
 from ..sessions.store import (
     get_best_scores,
     get_results,
@@ -103,6 +104,11 @@ def check(
                 "total": result.total,
                 "score": score,
                 "max_score": max_score,
+                # `recorded` dit si la note vaut quelque chose : une exécution
+                # qui n'a rien collecté rend 0 sans être inscrite, et un
+                # tableau de bord qui l'ignorerait afficherait un lab « raté »
+                # là où rien n'a pu être joué.
+                "recorded": a_mesure(result),
                 "output": result.output,
             },
         })

@@ -140,6 +140,13 @@ STRINGS: dict[str, str] = {
     "cmd_infra_help": "Infrastructure commands for the catalog.",
 
     # ── new: scaffold a contract-compliant skeleton ─────────────────────────
+    "check_rien_mesure":
+        "No test could be collected: nothing was measured, and nothing is "
+        "recorded.",
+    "check_rien_mesure_suite":
+        "Look at the output above: a conftest.py that raises, an unreachable "
+        "machine or a missing dependency stops pytest from starting. This is "
+        "not a failed exercise.",
     "cmd_new_help":
         "Scaffold a catalog or a lab that matches the contract, ready to fill.",
     "cmd_new_catalog_help":

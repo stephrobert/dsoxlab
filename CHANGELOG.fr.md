@@ -9,6 +9,30 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.72] - 2026-08-24
+
+### Corrigé
+
+- **Une exécution qui n'avait rien mesuré était notée 0/100, et le lab devenait
+  « validé »** (issue #168). Quand pytest ne peut pas collecter — un
+  `conftest.py` qui lève à l'import, une machine injoignable, une dépendance
+  absente — le résultat porte `total == 0`. `compute_score` refusait déjà de
+  deviner un score dans ce cas, mais ce refus n'allait pas jusqu'à la base.
+
+  C'est la cascade qui faisait le dégât, et chaque maillon était correct pris
+  isolément : `get_best_scores` voyait le lab puisqu'il avait une ligne,
+  `status` le disait `validated` puisqu'une note existait, et `next` le sautait
+  puisqu'« un lab noté, même 0, n'est plus l'étape suivante ». L'apprenant
+  croyait avoir raté un exercice **qu'il n'avait jamais pu jouer**, et son
+  parcours avançait sans lui.
+
+  Plus rien n'est enregistré quand rien n'a été mesuré, `check` le dit au lieu
+  d'afficher un 0, et `check --json` porte `recorded` pour qu'une intégration
+  distingue un vrai échec d'un environnement qui n'a jamais tourné. Le prédicat
+  vit à **un seul endroit**, lu par celui qui enregistre comme par la sortie
+  machine, pour qu'il ne puisse pas diverger.
+
+
 ## [0.1.71] - 2026-08-24
 
 ### Ajouté
