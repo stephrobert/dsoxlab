@@ -831,6 +831,18 @@ hors ligne, elle se tait.
         "du meta.yml",
     "content_role_host_unknown":
         "le rôle « {role} » vise « {host} », absent de infra.hosts du meta.yml",
+    # ── fixtures : le répertoire et la déclaration doivent coïncider ────────
+    "content_fixture_missing":
+        "fixture déclarée mais absente de fixtures/ : « {fixture} » ne sera "
+        "jamais copiée",
+    "content_fixture_undeclared":
+        "« {fixture} » est dans fixtures/ mais n'est pas déclarée dans "
+        "runtime.fixtures : elle ne sera pas copiée, et le répertoire de "
+        "travail restera vide",
+    "content_fixture_escapes":
+        "« {fixture} » sort du workdir : un chemin de fixture est relatif à "
+        "fixtures/, sans « .. » ni chemin absolu",
+
     "content_doc_url_no_scheme": "aucun schéma d'URL",
     "content_doc_url_scheme": "schéma inattendu : {scheme}",
     "content_doc_url_unreachable": "injoignable : {error}",
@@ -1361,4 +1373,16 @@ hors ligne, elle se tait.
         "Utilise « dsoxlab completion install », qui fait la même chose sous "
         "un nom qui le dit. Le wrapper de ~/.local/bin n'est plus écrit : "
         "uv tool install et pipx y posent déjà le leur.",
+
+    # ── fixtures refusées à l'exécution (runtimes/shell.py) ─────────────────
+    "fixture_lab_injouable":
+        "Le lab « {lab} » ne peut pas démarrer : {count} fixture(s) déclarée(s) "
+        "ne peuvent pas être copiées. Sans elles, le répertoire de travail "
+        "serait vide et il n'y aurait rien à faire.",
+    "fixture_introuvable":
+        "« {fixture} » est déclarée dans runtime.fixtures mais absente de "
+        "fixtures/",
+    "fixture_hors_workdir":
+        "« {fixture} » sort du workdir : un chemin de fixture est relatif à "
+        "fixtures/, sans « .. » ni chemin absolu",
 }

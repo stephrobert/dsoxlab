@@ -32,10 +32,19 @@ import os
 import shutil
 from pathlib import Path
 
+from ..i18n import _
 from ..models.lab import LabDefinition
 from .base import BaseRuntime, EventCallback, SessionSpec
 
 logger = logging.getLogger(__name__)
+
+
+class FixtureError(RuntimeError):
+    """Une fixture déclarée n'a pas pu être copiée : le lab serait injouable.
+
+    Hérite de ``RuntimeError`` parce que la CLI en attrape déjà un autour de
+    ``run`` : le message, déjà traduit, s'affiche et la commande sort en 2.
+    """
 
 
 class ShellRuntime(BaseRuntime):
@@ -68,31 +77,39 @@ class ShellRuntime(BaseRuntime):
         workdir.mkdir(parents=True, exist_ok=True)
 
         fixtures_root = lab.path / "fixtures"
+        # Deux passes. La première refuse, la seconde copie : un `workdir`
+        # à moitié rempli est pire qu'un refus, parce qu'il a l'air de marcher.
+        # Les fautes sont TOUTES collectées avant de lever — un auteur corrige
+        # en une passe plutôt qu'en autant de `run` qu'il a de fixtures.
+        a_copier: list[tuple[Path, Path]] = []
+        fautes: list[str] = []
         for rel in lab.runtime.fixtures:
             chemin = Path(rel)
             if chemin.is_absolute() or ".." in chemin.parts:
-                logger.warning(
-                    "Fixture ignorée : %s sort du workdir. Un chemin de fixture "
-                    "est toujours relatif à fixtures/, sans « .. ».",
-                    rel,
-                )
+                fautes.append(_("fixture_hors_workdir", fixture=rel))
                 continue
             src = fixtures_root / chemin
             if not src.is_file():
-                logger.warning(
-                    "Fixture déclarée mais introuvable : %s "
-                    "(le lab devrait livrer ce fichier dans fixtures/)",
-                    src,
-                )
+                fautes.append(_("fixture_introuvable", fixture=rel))
                 continue
+            a_copier.append((src, workdir / chemin))
+
+        if fautes:
+            # Un `logger.warning` laissait `run` sortir en 0 sur un workdir vide,
+            # et l'apprenant sans rien à faire. Le lab est cassé : on le dit.
+            raise FixtureError(
+                _("fixture_lab_injouable", lab=lab.id, count=len(fautes))
+                + "\n  - " + "\n  - ".join(fautes)
+            )
+
+        for src, dst in a_copier:
             # Le chemin déclaré est PRÉSERVÉ : `modules/stockage/main.tf` arrive
             # en `<workdir>/modules/stockage/main.tf`. Aplatir sur le nom de
             # base rendait impossible tout lab à modules (deux `main.tf` dans
             # l'arborescence s'écrasaient l'un l'autre).
-            dst = workdir / chemin
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-            logger.info("fixture %s → %s", rel, dst)
+            logger.info("fixture %s → %s", src.name, dst)
 
     def session_spec(self, lab: LabDefinition) -> SessionSpec:
         """Un sous-shell dans ``<workdir>/``.

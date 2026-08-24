@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.76] - 2026-08-24
+
+### Fixed
+
+- **A fixture that cannot be copied no longer leaves an empty work directory in
+  silence** (issue #177). `ShellRuntime` iterates over `runtime.fixtures`, not
+  over the contents of `fixtures/`, so both possible gaps caused the same
+  damage without a word: a fixture *declared but missing from disk* went to a
+  `logger.warning`, and a fixture *present but undeclared* was never read. In
+  both cases `dsoxlab run` created an empty `challenge/work`, exited **0**, and
+  the learner had nothing to do. This is the defect that made **7 labs of
+  `terraform-training` unplayable on 2026-07-28**, all marked done — and it hid
+  all the better because the tooling that checks the solutions copies the whole
+  directory, so the answer key went green while the learner's path was broken.
+
+### Added
+
+- **`validate-structure` now compares `fixtures/` against the declaration**,
+  both ways: declared-but-missing, present-but-undeclared, and a path escaping
+  the workdir. The check runs in the default (offline) set, so a catalogue's CI
+  catches the mistake before a learner does. Hidden files are exempt: a
+  `.gitkeep` versions an empty directory, and flagging it would be a false
+  positive every author would learn to ignore.
+
+### Changed
+
+- **A fixture that cannot be copied now fails `run` instead of being skipped.**
+  This reverses an earlier decision — that a typo in one entry should not
+  deprive the learner of the whole workdir. It is the missing file that
+  deprives them: an authoring mistake is not something they can fix, and an
+  amputated exercise fails `check` for reasons they will look for in their own
+  work. Validation happens before any copy, so it is all or nothing: a
+  half-filled workdir looks like it works. Every offending fixture is named at
+  once, so an author fixes them in one pass rather than one `run` per fixture.
+
+
 ## [0.1.75] - 2026-08-24
 
 ### Fixed
