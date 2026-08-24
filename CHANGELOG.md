@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.68] - 2026-08-24
+
+### Added
+
+- **`dsoxlab status` answers "where am I?"** (issue #80). The state of a lab
+  existed, but scattered: the active context in a JSON file, the score in
+  SQLite, the working directory on disk, the containers in Docker. Every command
+  rebuilt a piece of it its own way, so none could answer. One service computes
+  it now, and five states name it:
+
+  | `state` | Meaning |
+  | --- | --- |
+  | `not_started` | nothing is prepared |
+  | `ready` | environment prepared, untouched |
+  | `in_progress` | work has started |
+  | `validated` | a score was obtained |
+  | `degraded` | a declared service no longer runs |
+
+  **`ready` and `in_progress` differ by the work itself**, not by whether `run`
+  was played: `run` records a fingerprint of the working directory, and the state
+  compares against it. Adding a file, changing one, emptying one — all count. On
+  a `vm` lab the work happens on the machine, where no local fingerprint would
+  see it, and `detail` says so rather than implying a measurement that did not
+  happen.
+
+  `degraded` wins over everything, because it is the only state calling for an
+  immediate gesture. A service that was never started is **not** degraded: that
+  is the normal case before the first `run`, and confusing the two would turn
+  every service lab red.
+
+### Changed
+
+- **`dsoxlab status` no longer checks SSH connectivity; `dsoxlab infra status`
+  does.** The name that should carry "where am I?" was taken by an
+  infrastructure command, useless on a catalog with no `infra:` block. Running
+  `status` with no active lab now names the new command, so nobody hunts for a
+  behaviour that moved.
+
+
 ### Fixed
 
 - **The release guard gave a green light when it could not measure.** Publishing

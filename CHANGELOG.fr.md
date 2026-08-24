@@ -9,6 +9,46 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.68] - 2026-08-24
+
+### Ajouté
+
+- **`dsoxlab status` répond à « où en suis-je ? »** (issue #80). L'état d'un lab
+  existait, mais éparpillé : le contexte actif dans un JSON, la note dans une
+  base SQLite, le répertoire de travail sur le disque, les conteneurs chez
+  Docker. Chaque commande en reconstituait un morceau à sa façon, donc aucune ne
+  pouvait répondre. Un seul service le calcule désormais, et cinq états le
+  nomment :
+
+  | `state` | Ce qu'il veut dire |
+  | --- | --- |
+  | `not_started` | rien n'est préparé |
+  | `ready` | environnement prêt, rien n'y a été touché |
+  | `in_progress` | le travail a commencé |
+  | `validated` | une note a été obtenue |
+  | `degraded` | un service déclaré ne tourne plus |
+
+  **`ready` et `in_progress` se distinguent par le travail lui-même**, et non
+  par le fait d'avoir joué `run` : celui-ci retient une empreinte du répertoire
+  de travail, et l'état la compare. Ajouter un fichier, en modifier un, en vider
+  un, tout compte. Sur un lab `vm`, le travail se fait sur la machine, où aucune
+  empreinte locale ne le verrait, et le `detail` le dit plutôt que de laisser
+  croire à une mesure qui n'a pas eu lieu.
+
+  `degraded` prime sur tout, parce que c'est le seul état qui appelle un geste
+  immédiat. Un service jamais démarré n'est **pas** une dégradation : c'est le
+  cas normal avant le premier `run`, et les confondre ferait virer au rouge tout
+  lab à service.
+
+### Modifié
+
+- **`dsoxlab status` ne vérifie plus la connectivité SSH ; `dsoxlab infra
+  status` s'en charge.** Le nom qui devait porter « où en suis-je ? » était pris
+  par une commande d'infrastructure, sans rien à dire sur un catalogue sans bloc
+  `infra:`. Lancé sans lab actif, `status` nomme désormais la nouvelle commande,
+  pour que personne ne cherche un comportement qui a déménagé.
+
+
 ### Corrigé
 
 - **Le garde-fou de publication donnait son feu vert quand il ne pouvait pas

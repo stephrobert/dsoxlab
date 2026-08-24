@@ -222,6 +222,17 @@ catalog_app = typer.Typer(
 )
 app.add_typer(catalog_app, name="catalog")
 
+# ── Sous-application 'infra' ──────────────────────────────────────────────────
+
+infra_app = typer.Typer(
+    name="infra",
+    help=_("cmd_infra_help"),
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+    cls=_I18nGroup,
+)
+app.add_typer(infra_app, name="infra")
+
 # ── Option globale lab-home ───────────────────────────────────────────────────
 
 LabHomeOption = Annotated[
@@ -932,10 +943,10 @@ def run(
             if lab.runtime.type.value in ("vm", "kvm", "incus"):
                 _run_ansible_with_progress(
                     lab.path / "setup.yaml",
-                    lambda cb: run_lab(lab, target_name=target, on_event=cb),
+                    lambda cb: run_lab(lab, target_name=target, on_event=cb, root=root),
                 )
             else:
-                run_lab(lab, target_name=target)
+                run_lab(lab, target_name=target, root=root)
         except Interrupted as exc:
             _interrompu(exc, f"dsoxlab run {lab.id}")
         except InfraNotProvisioned:
@@ -2646,8 +2657,59 @@ def _run_terraform_with_progress(
     return state["result"]
 
 
-@app.command("status", help=_("cmd_status_help"))
+@app.command("status", help=_("cmd_lab_status_help"))
 def status(
+    lab_id: Annotated[str | None, typer.Argument(help=_("arg_lab_id_optionnel"))] = None,
+    lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+) -> None:
+    """Où en est le lab actif, ou celui qu'on nomme."""
+    from .services.lab_state import calculer
+
+    root = _root(lab_home)
+    lang = _lang(root)
+    ctx = read_context(root)
+    effective_id = lab_id or ctx.active_lab
+
+    if not effective_id:
+        # Sans lab actif, dire quoi faire — et nommer la commande qui portait
+        # ce nom jusqu'en 0.1.67, pour qui la cherche encore ici.
+        if as_json:
+            machine.emit({"schema": 1, "lab": None, "state": None})
+            return
+        info(_("status_aucun_lab_actif"))
+        info(_("status_voir_infra"))
+        return
+
+    try:
+        lab = _lab(root, effective_id, lang)
+    except ValueError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+
+    repo_meta = _read_repo(root)
+    repo_id = repo_meta.id if repo_meta else root.name
+    etat = calculer(root, lab, repo_id)
+
+    if as_json:
+        machine.emit({
+            "schema": 1,
+            "lab": lab.id,
+            "state": etat.state,
+            "label": etat.label,
+            "detail": etat.detail,
+            "best_score": etat.best_score,
+            "max_score": etat.max_score,
+        })
+        return
+
+    from .reporting.console import print_lab_state
+
+    print_lab_state(etat)
+
+
+@infra_app.command("status", help=_("cmd_status_help"))
+def infra_status(
     lab_home: LabHomeOption = None,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:

@@ -113,6 +113,32 @@ STRINGS: dict[str, str] = {
         "Then, once the mission is done: dsoxlab check {lab}",
 
     # ── catalog: discover, install and locate a catalogue ───────────────────
+    "cmd_lab_status_help":
+        "Where the active lab stands: not started, ready, in progress, validated.",
+    "arg_lab_id_optionnel":
+        "Lab id. Defaults to the active lab.",
+    "lab_state_not_started": "not started",
+    "lab_state_not_started_detail":
+        "Nothing is prepared yet. Start with: dsoxlab run {lab}",
+    "lab_state_ready": "ready",
+    "lab_state_ready_detail": "Environment prepared, untouched: {path}",
+    "lab_state_in_progress": "in progress",
+    "lab_state_in_progress_detail": "Work started in {path}",
+    "lab_state_in_progress_vm":
+        "Prepared; the work happens on the lab machine.",
+    "lab_state_validated": "validated",
+    "lab_state_validated_detail": "Score obtained: {score} / {max}",
+    "lab_state_degraded": "degraded",
+    "lab_state_degraded_detail":
+        "A declared service is no longer running: {services}. "
+        "Restart it with: dsoxlab run <lab>",
+    "status_aucun_lab_actif":
+        "No active lab in this catalog. Pick one: dsoxlab run <lab>",
+    "status_voir_infra":
+        "For the infrastructure state, it is now: dsoxlab infra status",
+    "status_titre": "Lab state",
+    "cmd_infra_help": "Infrastructure commands for the catalog.",
+
     "cmd_catalog_help":
         "Discover, install and update lab catalogues.",
     "cmd_catalog_list_help":
@@ -468,11 +494,19 @@ Each lab declares:
                        names the command that removes them.
     [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
 
-  [cyan]status[/cyan]               Check SSH connectivity of the declared hosts, and say why
+  [cyan]status [lab][/cyan]         Where the active lab stands, or the one you name:
+                       [bold]not started[/bold], [bold]ready[/bold], [bold]in progress[/bold], [bold]validated[/bold], or
+                       [bold]degraded[/bold] when a declared service no longer runs. Ready
+                       and in progress differ by the contents of the working
+                       directory, compared with what [cyan]run[/cyan] had put there.
+    [dim]--json[/dim]               The state under a stable key, readable without translating.
+
+  [cyan]infra status[/cyan]         Check SSH connectivity of the declared hosts, and say why
                        one stays silent. On a provider whose machine state can
                        be queried, the hypervisor is [bold]asked[/bold]: a domain that
                        does not exist, one that is stopped and one that is
                        booting call for three different gestures.
+                       [dim]Was named « status » until 0.1.67.[/dim]
     [dim]--json[/dim]               Host reachability, as a document.
 
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.

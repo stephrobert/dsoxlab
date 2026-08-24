@@ -43,6 +43,7 @@ sous `<catalogue>/ssh/id_ed25519` et son `.pub`, produite par
 | `~/.cache/dsoxlab/version-check.json` | Dernière version vue sur PyPI, et sa date | `XDG_CACHE_HOME` |
 | `~/.local/share/dsoxlab/demo/` | Catalogue de démonstration installé par `dsoxlab demo` | `XDG_DATA_HOME` |
 | `~/.local/share/dsoxlab/catalogs/` | Catalogues installés par `dsoxlab catalog add`, un sous-répertoire par identifiant | `XDG_DATA_HOME` |
+| `~/.local/state/dsoxlab/<catalog-id>/labs/` | Points de départ du travail, pour distinguer un lab *prêt* d'un lab *en cours* | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/catalogue-actif` | Identifiant du catalogue actif, celui qu'on utilise sans se placer dans son répertoire | `XDG_STATE_HOME` |
 | `~/.ssh/config.d/<catalog-id>.conf` | Fragment SSH des hôtes du lab, pour que `ssh`, `scp` et votre IDE les atteignent par leur nom | aucune |
 

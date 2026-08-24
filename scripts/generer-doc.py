@@ -147,7 +147,7 @@ from pathlib import Path
 from dsoxlab import config, locking, logging_setup
 from dsoxlab.discovery.repo import read_repo_metadata
 from dsoxlab.infra import inventory, terraform
-from dsoxlab.services import catalog, demo, update_check
+from dsoxlab.services import catalog, demo, lab_state, update_check
 from dsoxlab.sessions import store
 from dsoxlab.templates import template_root
 
@@ -203,6 +203,7 @@ with tempfile.TemporaryDirectory() as tmp:
         update_check.cache_path(),
         catalog.racine_catalogues(),
         catalog._fichier_actif(),
+        lab_state._empreintes_dir(racine),
     ))
 
 rendus.update(str(p) for p in maison.rglob("*"))

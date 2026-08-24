@@ -35,6 +35,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
 | `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
+| `dsoxlab infra status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
 | `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |
 | `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |
 | `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
@@ -46,7 +47,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab scores` | Affiche l'historique des scores enregistrés. |
 | `dsoxlab show` | Affiche le détail et le statut d'un lab. |
 | `dsoxlab ssh` | Ouvre une session SSH interactive sur un hôte du lab. |
-| `dsoxlab status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
+| `dsoxlab status` | Où en est le lab actif : non commencé, prêt, en cours, validé. |
 | `dsoxlab submit` | Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session. |
 | `dsoxlab support` | Produit un rapport de diagnostic anonymisé, à coller dans une issue. |
 | `dsoxlab use` | Définit le contexte actif (section et/ou niveau par défaut). Utilisez --reset pour l'effacer. |
