@@ -733,11 +733,19 @@ def test_post_start_en_echec_reel_leve_service_error() -> None:
     s = Service(
         name="pytest-poststart-ko",
         image="nginx:alpine",
+        # Sans sonde, `start` pourrait lever parce que le conteneur n'accepte
+        # pas encore un `docker exec` — et le test passerait pour la MAUVAISE
+        # raison, en croyant prouver que `exit 3` remonte. Avec elle, la seule
+        # cause possible du ServiceError est la commande elle-même.
+        ready_exec=["true"],
         post_start=[["sh", "-c", "exit 3"]],
     )
     repo = "dsoxlab-test"
     try:
-        with pytest.raises(svc.ServiceError):
+        with pytest.raises(svc.ServiceError) as exc:
             svc.start(s, repo)
+        assert "exit 3" in str(exc.value) or "3" in str(exc.value), (
+            f"l'erreur doit nommer la commande fautive : {exc.value}"
+        )
     finally:
         svc.stop(s, repo)
