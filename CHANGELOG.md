@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.66] - 2026-08-24
+
+### Fixed
+
+- **A stopped container was reported as a failed initialisation command.** When
+  `post_start` met a container that was no longer running, Docker answered
+  `container <64 hex characters> is not running`, and dsoxlab quoted it inside
+  "initialising service 'x' failed on 'y'". Two things were wrong at once: it
+  sent you looking for a defect in a command that had never been played, and it
+  named the container by an identifier you had never seen. The message now says
+  the container stopped, gives its **exit code** and the **last ten lines of its
+  logs**, and names the container the way you declared it. The check runs only
+  when a `docker exec` has actually failed, so a healthy service is never
+  interrogated for nothing.
+
+- **The documentation check was red on a contributor's machine and green in
+  CI.** It scanned every Markdown file at the repository root, including
+  unversioned ones. A `CLAUDE.md` mentioning `~/.config/dsoxlab/config.yaml` to
+  say the path does not exist yet was enough to fail two tests locally, while CI
+  — where that file does not exist — stayed green. The check now considers only
+  files git tracks, and falls back to scanning everything when there is no git
+  repository at all, so an extracted archive does not turn the control green by
+  emptying it.
+
+### Changed
+
+- **The two Docker integration tests of `services` now declare the `ready_exec`
+  probe the contract recommends** (issue #155). They enchained a `docker exec`
+  right after `start()` without anything having proved the container could
+  accept one: the implicit wait depended on how busy the machine was. Their
+  failure messages also carry the container state, its exit code and its logs —
+  an intermittent failure in CI leaves no other trace, and `assert x.ok` alone
+  left nothing to diagnose.
+
 ## [0.1.64] - 2026-08-24
 
 ### Fixed

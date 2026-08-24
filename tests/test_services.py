@@ -40,6 +40,25 @@ def _lab(tmp_path: Path, runtime_block: str) -> LabDefinition:
     return LabDefinition.from_yaml(path)
 
 
+def _etat_conteneur(nom: str) -> str:
+    """L'état d'un conteneur, à joindre au message d'un test d'intégration raté.
+
+    Un `assert lu.ok` nu laisse un échec qu'on ne peut ni comprendre ni
+    reproduire : le conteneur a disparu à la sortie du test, et il ne reste que
+    « c'était faux ». Sur une exécution d'intégration continue, c'est la seule
+    trace qu'on aura jamais du problème.
+    """
+    etat = run_command(
+        ["docker", "inspect", "-f", "{{.State.Status}} (code {{.State.ExitCode}})", nom],
+        check=False, timeout=15,
+    )
+    logs = run_command(["docker", "logs", "--tail", "10", nom], check=False, timeout=15)
+    return (
+        f"état du conteneur {nom} : {etat.stdout.strip() or etat.stderr.strip()}\n"
+        f"dernières lignes :\n{(logs.stdout or logs.stderr).strip() or '(aucune)'}"
+    )
+
+
 # ── Parsing du contrat ──────────────────────────────────────────────────────
 
 def test_services_absent_donne_liste_vide(tmp_path: Path) -> None:
@@ -464,6 +483,64 @@ def test_post_start_en_echec_leve_service_error(monkeypatch: pytest.MonkeyPatch)
     assert "permission denied" in str(exc.value)
 
 
+def test_conteneur_arrete_avant_post_start_dit_pourquoi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un conteneur qui n'est plus debout se dit comme tel, pas comme une commande ratée.
+
+    Docker répond ``container <64 caractères hexadécimaux> is not running``.
+    Cité tel quel dans « l'initialisation a échoué sur … », il envoie chercher
+    un défaut dans une commande qui n'a jamais été jouée, et il désigne le
+    conteneur par un identifiant que l'utilisateur n'a jamais vu. La cause utile
+    est le code de sortie et les logs.
+    """
+    service = Service(
+        name="db", image="x",
+        post_start=[["init", "schema"], ["charger", "donnees"]],
+    )
+    appels: list[list[str]] = []
+
+    class _Res:
+        def __init__(self, ok: bool = True, stdout: str = "", stderr: str = "") -> None:
+            self.ok = ok
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def _fausse(cmd: list[str], **kw: object) -> _Res:
+        appels.append(list(cmd))
+        if cmd[:2] == ["docker", "exec"]:
+            # Ce que Docker répond vraiment sur un conteneur arrêté.
+            return _Res(False, stderr=(
+                "Error response from daemon: container "
+                "9dad8320afa7b24a503f83632df49a1d4b5f49d04e166f20cdac38426825ca1b "
+                "is not running"
+            ))
+        if cmd[:3] == ["docker", "inspect", "-f"] and "ExitCode" in cmd[3]:
+            return _Res(stdout="137")
+        if cmd[:2] == ["docker", "logs"]:
+            return _Res(stdout="out of memory, killed")
+        return _Res()
+
+    monkeypatch.setattr(svc, "_is_running", lambda name: False)
+    monkeypatch.setattr(svc, "_exists", lambda name: False)
+    monkeypatch.setattr(svc, "run_command", _fausse)
+
+    with pytest.raises(svc.ServiceError) as exc:
+        svc.start(service, "repo")
+
+    message = str(exc.value)
+    assert "137" in message, "le code de sortie du conteneur doit être dit"
+    assert "out of memory" in message, "les dernières lignes doivent être données"
+    assert "dsoxlab-repo-db" in message, "le conteneur doit être nommé lisiblement"
+    # Et surtout : on n'accuse pas la commande, qui n'y est pour rien. Ni
+    # l'identifiant hexadécimal, que l'utilisateur n'a jamais vu.
+    assert "init schema" not in message
+    assert "9dad8320" not in message
+    # On s'arrête à la première : inutile de rejouer les suivantes sur un
+    # conteneur qu'on sait arrêté.
+    assert len([c for c in appels if c[:2] == ["docker", "exec"]]) == 1
+
+
 # ── Nommage des conteneurs ──────────────────────────────────────────────────
 
 def test_container_name_namespace_par_repo(tmp_path: Path) -> None:
@@ -563,6 +640,12 @@ def test_post_start_execute_vraiment_dans_le_conteneur() -> None:
     s = Service(
         name="pytest-poststart",
         image="nginx:alpine",
+        # Le contrat recommande une sonde jouée DANS le conteneur, et ce test
+        # illustre l'usage recommandé plutôt que de s'en dispenser : sans elle,
+        # `start` rend la main sans qu'aucune étape n'ait prouvé que le
+        # conteneur accepte un `docker exec`, et l'enchaînement devient une
+        # course qu'une machine chargée finit par perdre.
+        ready_exec=["true"],
         post_start=[["sh", "-c", "echo initialise > /preuve-post-start"]],
     )
     repo = "dsoxlab-test"
@@ -570,7 +653,10 @@ def test_post_start_execute_vraiment_dans_le_conteneur() -> None:
         name = svc.start(s, repo)
         lu = run_command(["docker", "exec", name, "cat", "/preuve-post-start"],
                          check=False, timeout=30)
-        assert lu.ok, f"le fichier posé par post_start est illisible : {lu.stderr}"
+        assert lu.ok, (
+            f"le fichier posé par post_start est illisible (code {lu.returncode}) :\n"
+            f"{lu.stderr}\n{_etat_conteneur(name)}"
+        )
         assert lu.stdout.strip() == "initialise"
     finally:
         svc.stop(s, repo)
@@ -584,23 +670,61 @@ def test_deux_services_se_joignent_par_leur_nom() -> None:
     font déjà) mais l'effet : depuis un conteneur, le nom de l'autre service se
     résout. Sur le bridge par défaut de Docker, cette résolution n'existe pas.
     """
-    db = Service(name="pytest-db", image="nginx:alpine")
-    app = Service(name="pytest-app", image="nginx:alpine")
+    # `ready_exec` comme le recommande le contrat : `start` ne rend la main
+    # qu'une fois le conteneur capable de recevoir un `docker exec`. Sans elle,
+    # la résolution était tentée sur deux conteneurs dont rien n'avait prouvé
+    # qu'ils étaient joignables, et l'attente implicite tenait au hasard de la
+    # charge de la machine.
+    db = Service(name="pytest-db", image="nginx:alpine", ready_exec=["true"])
+    app = Service(name="pytest-app", image="nginx:alpine", ready_exec=["true"])
     repo = "dsoxlab-test-net"
     try:
-        svc.start(db, repo)
+        nom_db = svc.start(db, repo)
         nom_app = svc.start(app, repo)
         resolu = run_command(
             ["docker", "exec", nom_app, "getent", "hosts", "pytest-db"],
             check=False, timeout=30,
         )
-        assert resolu.ok, "le nom du service voisin ne se résout pas"
+        assert resolu.ok, (
+            "le nom du service voisin ne se résout pas "
+            f"(code {resolu.returncode}) :\n{resolu.stderr}\n"
+            f"{_etat_conteneur(nom_app)}\n{_etat_conteneur(nom_db)}"
+        )
         assert "pytest-db" in resolu.stdout
     finally:
         svc.stop(app, repo)
         svc.stop(db, repo)
         run_command(["docker", "network", "rm", svc.network_name(repo)],
                     check=False, timeout=30)
+
+
+@pytest.mark.skipif(not svc.docker_available(), reason="Docker injoignable")
+def test_conteneur_mort_ne_avant_post_start_dit_pourquoi_en_vrai() -> None:
+    """Le diagnostic contre un vrai Docker, pas contre un mock qui dit oui.
+
+    Le cas se produit sans aucune charge : une image sans processus au long
+    cours (entrypoint qui rend la main, commande fautive) sort avant que
+    l'initialisation puisse être jouée. Le test mocké prouve le message ; celui-ci
+    prouve qu'il se déclenche sur le comportement réel de Docker.
+    """
+    s = Service(
+        name="pytest-mortne",
+        image="hello-world",
+        post_start=[["sh", "-c", "echo jamais-joue"]],
+    )
+    repo = "dsoxlab-test"
+    try:
+        with pytest.raises(svc.ServiceError) as exc:
+            svc.start(s, repo)
+        message = str(exc.value)
+        assert svc.container_name(repo, s) in message, (
+            "le message doit nommer le conteneur, pas son identifiant hexadécimal"
+        )
+        assert "jamais-joue" not in message, (
+            "on n'accuse pas une commande qui n'a pas pu être jouée"
+        )
+    finally:
+        svc.stop(s, repo)
 
 
 @pytest.mark.skipif(not svc.docker_available(), reason="Docker injoignable")

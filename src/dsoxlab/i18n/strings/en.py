@@ -961,6 +961,10 @@ silent.
         "Service '{name}' failed to start:\n{detail}",
     "err_service_post_start_failed":
         "Initialising service '{name}' failed on « {command} »:\n{detail}",
+    "err_service_container_stopped":
+        "Service '{name}' is no longer running, so its initialisation cannot "
+        "be played.\nContainer {container}, exited with code {code}.\n"
+        "Last lines:\n{logs}",
     "err_vm_setup_missing":
         "Lab {lab_id} must ship setup.yaml at its root (dsoxlab contract for "
         "runtime: vm). Expected file: {path}",
