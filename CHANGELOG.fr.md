@@ -11,329 +11,10 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.1.84] - 2026-08-24
 
-### Ajouté
-
-- **`doctor` contrôle désormais le pool de stockage Incus**
-  (linux-dsoxlab-training#54). Un utilisateur a signalé que sur un
-  provisionnement Incus raté, « seules les résolutions liées à KVM sont
-  proposées ». Le symptôme avait raison et l'hypothèse la plus évidente avait
-  tort : `_check_incus` **propose bien** `incus admin init` — mais seulement
-  quand `incus list` échoue en le disant. Or `incus list` **réussit** sur une
-  installation jamais initialisée : elle rend simplement une liste vide. Le
-  contrôle passait au vert, et la branche Incus de `doctor` n'ajoutait que
-  l'outil ISO, là où la branche KVM contrôle son pool depuis longtemps. Le
-  template crée le réseau mais écrit `pool = "default"` en dur sans le créer.
-
-## [0.1.83] - 2026-08-24
-
-### Modifié
-
-- **Le journal parle désormais une seule langue, et c'est l'anglais**
-  (issue #140). Il mélangeait le français et l'anglais, ce qui n'est pas une
-  question de goût : c'est le fichier que `dsoxlab support` collecte et qu'un
-  utilisateur colle dans un rapport de bug. Mesuré avant d'être corrigé —
-  **41 messages français contre 4 anglais**.
-
-  Les appels `logger.*` restent **délibérément hors** du garde-fou i18n : un
-  message de journal n'est pas un texte d'interface, il ne passe par `_()` nulle
-  part, et le traduire à l'exécution rendrait deux rapports de bug incomparables
-  selon la locale de qui les produit. Cette exclusion justifiait de ne pas le
-  *traduire*, pas de le laisser incohérent.
-
-  L'anglais l'emporte pour trois raisons : un message de journal se cherche
-  **mot pour mot** dans un moteur de recherche, il se compare entre deux
-  machines aux locales différentes, et il est lu par quelqu'un qui diagnostique
-  — à côté des sorties de terraform, ansible et virsh, qui sont déjà anglaises.
-
-  La règle est écrite là où un contributeur la rencontre (le gabarit de PR) et
-  tenue par `test_journal_en_anglais.py`. Sans test, elle se redéferait ligne
-  par ligne, ce qui est exactement ce qui est arrivé à l'interface avant que son
-  propre garde-fou n'existe.
-
-
-## [0.1.82] - 2026-08-24
-
-### Corrigé
-
-- **Un test à conteneur réel ne peut plus démarrer sans sonde de disponibilité**
-  (issue #155). Deux tests de `test_services.py` échouaient par intermittence,
-  toujours sous charge, jamais au repos. Leur point commun : ils attendaient un
-  **vrai** conteneur. Sans sonde, `start` rend la main dès que `docker run` a
-  répondu, ce qui ne dit rien de l'état du service à l'intérieur — l'étape
-  suivante devient une course, gagnée au repos et perdue sous charge.
-
-  L'instabilité elle-même ne se reproduit plus : mesuré sous charge Docker
-  soutenue, 12 exécutions ciblées et 4 suites complètes, aucun échec. Ce qui est
-  ajouté est un garde-fou contre la **régression** de la correction, avec des
-  exemptions nommées une par une et motivées — un test dont le conteneur meurt
-  par conception ne peut pas porter de sonde, et l'exiger transformerait le
-  garde-fou en obstacle.
-
-- **`test_post_start_en_echec_reel_leve_service_error` passait pour la mauvaise
-  raison.** Sans sonde, le `ServiceError` qu'il attend pouvait venir du
-  conteneur pas encore prêt à recevoir un `docker exec`, plutôt que de la
-  commande en échec qu'il prétend prouver. Il déclare désormais une sonde et
-  vérifie que l'erreur nomme la commande fautive.
-
-
-## [0.1.81] - 2026-08-24
-
-### Corrigé
-
-- **Un cloud-init qui a mal fini le dit désormais** (issue #178).
-  `wait_for_hosts_ready` jouait `cloud-init status --wait >/dev/null 2>&1 ||
-  true` : l'état **et** le code de retour partaient tous les deux à la poubelle.
-  Hors ligne, derrière un proxy ou sur un miroir lent, les quinze paquets du
-  premier démarrage ne s'installent pas, cloud-init finit en `degraded`, et
-  l'hôte était **tout de même déclaré prêt** — les labs échouaient ensuite sur
-  des commandes absentes, sans que rien ne relie les deux. Ne pas bloquer reste
-  la bonne décision : ce qui compte pour rendre la main, c'est que cloud-init
-  ait *terminé*. Mais terminer mal doit se dire.
-
-### Ajouté
-
-- **`doctor` gagne un contrôle `egress`.** Le provisionnement télécharge une
-  image, puis cloud-init installe des paquets : sans accès sortant, les deux
-  échouent. Les miroirs sondés sont **lus dans les templates packagés**, jamais
-  écrits dans le moteur, et un seul miroir joignable suffit à conclure — ce qui
-  est en cause est l'accès sortant lui-même, pas la disponibilité d'un miroir.
-  Requis sur un dépôt qui provisionne des VM, informatif sinon.
-
-### Documentation
-
-- **La décision sur les paquets du premier démarrage est écrite**, dans
-  `templates/cloud-init/README.md`. Bloquer sur un `degraded` a été écarté :
-  cloud-init rend un état global, et traiterait donc un `tree` absent comme un
-  `lvm2` absent. Les images pré-cuites sont la vraie réponse, mais un projet à
-  part entière. Déclarer les paquets lab par lab changerait le contrat v1, gelé.
-  Ce qui est retenu, c'est de rendre l'échec visible aux trois moments qui
-  comptent : avant, pendant, et dans le message qui nomme l'hôte.
-
-
-## [0.1.80] - 2026-08-24
-
-### Ajouté
-
-- **La CI valide les trois templates Terraform packagés** (issue #175). Le
-  pipeline couvrait le lint, mypy, les tests unitaires, le fuzzing et une suite
-  e2e sur la roue installée — mais ne jouait **aucun `terraform validate` nulle
-  part**, aucun provisionnement, et sa suite e2e ne joue que le lab de
-  démonstration, qui est `shell`. Les templates sont épinglés en `~> 0.9` (kvm)
-  et `~> 0.3` (incus) : une version mineure du provider peut casser le schéma,
-  et le dépôt a déjà vécu ce cas. Les tests unitaires existants sur ces
-  templates vérifient qu'un fichier contient une chaîne, pas que Terraform sait
-  le lire : une régression de template ne se découvrait donc que chez un
-  apprenant, en langage Terraform.
-
-  Le job joue `terraform init -backend=false` puis `terraform validate` sur kvm,
-  incus et outscale, collecte **tous** les échecs plutôt que de s'arrêter au
-  premier, nomme le provider fautif via `::error::`, et fait échouer la
-  construction. Terraform vient de l'archive de l'éditeur avec la somme de
-  contrôle qu'il publie, sur le patron déjà utilisé pour poutine — aucune action
-  tierce n'est ajoutée à la chaîne d'approvisionnement.
-
-### Documentation
-
-- **La décision sur les images amont est désormais écrite**, dans
-  `templates/terraform/README.md`. Les sept URL d'images pointent des chemins
-  mutables (`latest` / `current`), et c'est un choix : une somme épinglée que
-  personne ne tient à jour servirait aux apprenants une image de plus en plus
-  périmée, avec ses vulnérabilités connues — le durcissement deviendrait le
-  vecteur du problème qu'il prétend traiter. Les raisons qui rendent le risque
-  acceptable ici, et les conditions qui inverseraient la décision, sont
-  explicitées.
-
-
-## [0.1.79] - 2026-08-24
-
-### Ajouté
-
-- **`doctor --strict` traduit le diagnostic en code de sortie** (issue #176).
-  `doctor` sortait en 0 quel que soit l'état de ses contrôles, ce qui est le bon
-  choix pour un humain — un diagnostic n'est pas un échec — mais rendait la
-  commande inutilisable comme portail automatisé : un script devait analyser le
-  JSON pour savoir si quelque chose manquait.
-
-  Deux codes plutôt qu'un, parce que les deux situations appellent des gestes
-  différents :
-
-  | Mode | Code | Quand |
-  | --- | --- | --- |
-  | `doctor` | `0` | toujours, inchangé |
-  | `doctor --strict` | `9` | un contrôle requis a échoué |
-  | `doctor --strict` | `10` | un contrôle requis n'a pas pu être mesuré |
-
-  `9` se répare, `10` se remesure. Un environnement dont une sonde n'a pas
-  abouti n'est pas validé pour autant — c'est précisément ce qu'une construction
-  d'image ne doit pas confondre avec un succès. `9` l'emporte quand les deux
-  coexistent : une certitude est plus forte qu'une ignorance.
-
-  Le comportement par défaut ne bouge pas, et `--strict` ne change rien d'autre :
-  le tableau et le document restent rendus, **avant** que le code ne tombe, pour
-  qu'un appelant recevant un code non nul puisse encore lire ce qui n'allait pas.
-
-
-## [0.1.78] - 2026-08-24
-
-### Corrigé
-
-- **Un lab dont le moteur de conteneurs est injoignable ne s'affiche plus
-  « prêt »** (issue #179). `_services_degrades` rendait une liste vide quand
-  `docker_available()` était faux : « Docker **était** là et son démon est
-  tombé » devenait donc indistinguable de « Docker n'a jamais été installé ».
-  Dans le premier cas le lab est bel et bien injouable — `run` y échoue déjà
-  explicitement, code 2 — et pourtant `status` annonçait `ready`, voire
-  `validated` lorsqu'une note existait d'une session précédente.
-- Les deux causes se distinguent désormais, parce qu'elles appellent des gestes
-  opposés : installer un paquet, ou démarrer un démon et vérifier que le compte
-  peut lui parler. Un lab qui ne déclare **aucun** service continue d'ignorer le
-  moteur, sans même payer une sonde — c'était la moitié juste de la décision
-  d'origine, elle est gardée et testée pour elle-même.
-
-
-## [0.1.77] - 2026-08-24
-
-### Corrigé
-
-- **`run_command(check=False)` tient enfin sa promesse** (issue #174). Un
-  binaire absent, un délai dépassé ou toute autre `OSError` levait une
-  `CommandError` *quelles que soient les options* : tout appelant qui croyait
-  recevoir un `CommandResult` en toutes circonstances se trompait — et le nom du
-  paramètre l'encourageait à le croire. Deux victimes, mesurées par exécution
-  avant d'être corrigées : `dsoxlab catalog add` sortait en trace Python sur un
-  poste sans git, ce qui est la deuxième commande du parcours d'accueil ; et une
-  sonde qui expirait faisait sauter la boucle de réessai **entière** au lieu
-  d'être comptée comme un échec à réessayer.
-- **Une clé i18n manquante ne parvient plus brute à l'utilisateur.** `_()` rend
-  la clé elle-même quand elle n'est pas définie : une clé posée dans le code
-  mais pas dans les dictionnaires s'affichait donc `catalog_git_absent`. Un
-  garde-fou existait, mais s'arrêtait à `validators/` et `models/` ; il couvre
-  désormais tout appel `_("…")` littéral du paquet, dans les deux langues.
-
-### Ajouté
-
-- **`git` et `docker` sont des contrôles de `doctor`.** Aucun des deux n'est une
-  dépendance Python — `uv tool install` n'apporte ni l'un ni l'autre — et aucun
-  n'était déclaré nulle part. `git` est requis partout, puisque `catalog add`
-  clone. `docker`, lui, suit ce que le catalogue déclare : requis dès qu'un lab
-  déclare `runtime.services`, informatif sinon, pour qu'un dépôt qui ne s'en
-  sert pas n'en voie jamais de rouge.
-- **`CommandResult.failure`** nomme *pourquoi* une commande n'a pas pu tourner
-  (`not_found`, `timeout`, `os_error`), séparément d'un code de retour non nul.
-  Les deux appellent des gestes opposés — lire stderr, ou installer un paquet et
-  réessayer — et un appelant qui ne regardait que `returncode` les confondait.
-
-### Modifié
-
-- **Le tirage d'une image est désormais distinct du démarrage d'un conteneur.**
-  Le premier `docker run` tirait l'image dans son propre budget de 180 secondes :
-  au-delà, la commande échouait sur un message de démarrage qui ne parlait pas du
-  réseau ; en deçà, `run` pendait plusieurs minutes sans dire pourquoi. Le tirage
-  a maintenant son propre délai et s'annonce, et il est sauté si l'image est déjà
-  locale.
-
-
-## [0.1.76] - 2026-08-24
-
-### Corrigé
-
-- **Une fixture qui ne peut pas être copiée ne laisse plus un répertoire de
-  travail vide en silence** (issue #177). `ShellRuntime` itère sur
-  `runtime.fixtures`, pas sur le contenu de `fixtures/` : les deux écarts
-  possibles produisaient donc le même dégât, sans un mot. Une fixture *déclarée
-  mais absente du disque* partait en `logger.warning`, une fixture *présente
-  mais non déclarée* n'était jamais lue. Dans les deux cas `dsoxlab run` créait
-  un `challenge/work` vide, sortait en **0**, et l'apprenant n'avait rien à
-  faire. C'est le défaut qui a rendu **7 labs de `terraform-training`
-  injouables le 2026-07-28**, tous marqués faits — et il se cachait d'autant
-  mieux que les outils de vérification des corrigés copient, eux, le répertoire
-  entier : la solution passait au vert pendant que le parcours apprenant était
-  cassé.
-
-### Ajouté
-
-- **`validate-structure` compare désormais `fixtures/` à la déclaration**, dans
-  les deux sens : déclarée mais absente, présente mais non déclarée, et chemin
-  qui sort du workdir. Le contrôle est dans le lot par défaut (hors ligne), si
-  bien que la CI d'un catalogue attrape la faute avant un apprenant. Les
-  fichiers cachés en sont exemptés : un `.gitkeep` sert à versionner un
-  répertoire vide, et le signaler serait un faux positif que chaque auteur
-  apprendrait à ignorer.
-
-### Modifié
-
-- **Une fixture qui ne peut pas être copiée fait maintenant échouer `run`, au
-  lieu d'être ignorée.** C'est le renversement d'une décision antérieure —
-  qu'une faute de frappe dans une entrée ne devait pas priver l'apprenant de
-  tout son workdir. C'est le fichier manquant qui l'en prive : une erreur
-  d'auteur n'est pas quelque chose qu'il peut réparer, et un exercice amputé
-  échoue au `check` pour des raisons qu'il cherchera dans son propre travail.
-  La validation précède toute copie, donc c'est tout ou rien : un workdir à
-  moitié rempli a l'air de marcher. Toutes les fixtures fautives sont nommées
-  d'un coup, pour que l'auteur corrige en une passe plutôt qu'en autant de
-  `run` qu'il a de fixtures.
-
-
-## [0.1.75] - 2026-08-24
-
-### Corrigé
-
-- **Le contrôle du pool libvirt concluait « vert » quand il n'avait pas pu
-  regarder** (issue #172). La sonde invoquait `virsh -c qemu:///system` en
-  direct, sans la détection du préfixe `sudo -n` que `infra/libvirt.py` a
-  construite pour ce cas : sur toute machine où l'URI système exige des
-  droits, la sonde échouait à chaque fois, et cet échec était rendu `ok`, un
-  contrôle vert en permanence précisément là où `provision` allait mourir sur
-  « Pool Not Found ». La sonde passe désormais par `run_virsh`, et une sonde
-  qui ne peut pas mesurer rend `state: unknown` (introduit en 0.1.73), qui ne
-  peint le verdict ni en vert ni en rouge. `_check_kvm` interroge aussi
-  explicitement l'**URI système** : un `virsh version` nu peut viser l'URI
-  session selon la distribution, et répondre parfaitement à un utilisateur que
-  l'URI système refuse.
-
-- **Trois `sudo virsh` bruts sans `-n` pouvaient pendre ou échouer en
-  silence** (issue #173). `_ensure_kvm_dhcp_leases` (deux occurrences) et
-  `_reset_kvm_domain` capturaient leur sortie : un prompt de mot de passe sudo
-  n'avait aucun terminal où s'afficher et l'appel restait pendu ; sur une
-  machine configurée par le groupe `libvirt` sans droits sudo, le bail DHCP
-  n'était jamais posé et l'échec partait dans un journal que personne ne lit,
-  l'hôte mourant plus tard en « injoignable » sans cause visible. Les trois
-  appels passent désormais par `run_virsh` (chemin détecté, URI système,
-  jamais de prompt), et un bail refusé s'affiche **à l'écran** pendant
-  `provision`, pas seulement au journal. Un test garde-fou refuse désormais
-  tout `subprocess.run(["sudo", …])` qui capture sa sortie sans `-n` dans
-  `src/dsoxlab/`, sur le modèle du garde-fou anti-`shell=True` de 0.1.70.
-
-- `run_command` convertit désormais tout `OSError` en `CommandError` au lieu
-  de laisser un binaire qui disparaît en cours de route faire planter
-  l'appelant : un diagnostic ne doit pas mourir en diagnostiquant.
-
-## [0.1.74] - 2026-08-24
-
-### Corrigé
-
-- **`provision` annonçait un succès après avoir renoncé à attendre des hôtes qui
-  ne répondaient pas** (issue #170). Un délai dépassé n'était qu'un
-  avertissement ; la commande affichait ensuite « ✔ N hôtes provisionnés » et
-  sortait en 0. L'infrastructure existait mais n'était pas utilisable, et le
-  `run` suivant échouait en « unreachable » sans lien visible avec la cause.
-  Tout script qui teste le code de retour était aveugle — y compris la
-  construction d'une image prête à l'emploi, qui devra s'y fier. Un code de
-  sortie dédié (`8`) le dit désormais, aux côtés de ceux des orphelins.
-
-- **`check --json` était pollué dès qu'un lab déclarait des services** (issue
-  #171). `_valider` ne propageait pas `quiet` à `_ensure_services`, dont les
-  messages de progression partaient sur la sortie standard : `dsoxlab check
-  --json | jq` échouait sur tout lab de ce type. C'était le défaut corrigé en
-  0.1.23, revenu par une porte latérale.
-
-  `quiet` ne fait taire que **le progrès**. Les erreurs continuent de partir sur
-  la sortie d'erreur dans les deux modes : un service qui refuse de démarrer
-  doit rester audible, sans quoi `--json` masquerait la seule information qui
-  compte.
-
-
-## [0.1.73] - 2026-08-24
+Cette version clôt l'audit des angles morts. Son contenu a été développé
+sous les numéros 0.1.73 à 0.1.83, mergés le même jour et publiés ici d'un
+seul tenant — ces numéros n'ont jamais été tagués, donc rien n'a jamais été
+installable sous eux.
 
 ### Ajouté
 
@@ -368,6 +49,269 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   rassurant d'un « ok » non mérité, ni le rouge accusateur d'une panne non
   prouvée. Le jeton est exposé par `doctor --json` et rendu « ? non mesuré » ;
   il ne peint jamais le verdict global en rouge.
+
+- **`validate-structure` compare désormais `fixtures/` à la déclaration**, dans
+  les deux sens : déclarée mais absente, présente mais non déclarée, et chemin
+  qui sort du workdir. Le contrôle est dans le lot par défaut (hors ligne), si
+  bien que la CI d'un catalogue attrape la faute avant un apprenant. Les
+  fichiers cachés en sont exemptés : un `.gitkeep` sert à versionner un
+  répertoire vide, et le signaler serait un faux positif que chaque auteur
+  apprendrait à ignorer.
+
+- **`git` et `docker` sont des contrôles de `doctor`.** Aucun des deux n'est une
+  dépendance Python — `uv tool install` n'apporte ni l'un ni l'autre — et aucun
+  n'était déclaré nulle part. `git` est requis partout, puisque `catalog add`
+  clone. `docker`, lui, suit ce que le catalogue déclare : requis dès qu'un lab
+  déclare `runtime.services`, informatif sinon, pour qu'un dépôt qui ne s'en
+  sert pas n'en voie jamais de rouge.
+- **`CommandResult.failure`** nomme *pourquoi* une commande n'a pas pu tourner
+  (`not_found`, `timeout`, `os_error`), séparément d'un code de retour non nul.
+  Les deux appellent des gestes opposés — lire stderr, ou installer un paquet et
+  réessayer — et un appelant qui ne regardait que `returncode` les confondait.
+
+- **`doctor --strict` traduit le diagnostic en code de sortie** (issue #176).
+  `doctor` sortait en 0 quel que soit l'état de ses contrôles, ce qui est le bon
+  choix pour un humain — un diagnostic n'est pas un échec — mais rendait la
+  commande inutilisable comme portail automatisé : un script devait analyser le
+  JSON pour savoir si quelque chose manquait.
+
+  Deux codes plutôt qu'un, parce que les deux situations appellent des gestes
+  différents :
+
+  | Mode | Code | Quand |
+  | --- | --- | --- |
+  | `doctor` | `0` | toujours, inchangé |
+  | `doctor --strict` | `9` | un contrôle requis a échoué |
+  | `doctor --strict` | `10` | un contrôle requis n'a pas pu être mesuré |
+
+  `9` se répare, `10` se remesure. Un environnement dont une sonde n'a pas
+  abouti n'est pas validé pour autant — c'est précisément ce qu'une construction
+  d'image ne doit pas confondre avec un succès. `9` l'emporte quand les deux
+  coexistent : une certitude est plus forte qu'une ignorance.
+
+  Le comportement par défaut ne bouge pas, et `--strict` ne change rien d'autre :
+  le tableau et le document restent rendus, **avant** que le code ne tombe, pour
+  qu'un appelant recevant un code non nul puisse encore lire ce qui n'allait pas.
+
+- **La CI valide les trois templates Terraform packagés** (issue #175). Le
+  pipeline couvrait le lint, mypy, les tests unitaires, le fuzzing et une suite
+  e2e sur la roue installée — mais ne jouait **aucun `terraform validate` nulle
+  part**, aucun provisionnement, et sa suite e2e ne joue que le lab de
+  démonstration, qui est `shell`. Les templates sont épinglés en `~> 0.9` (kvm)
+  et `~> 0.3` (incus) : une version mineure du provider peut casser le schéma,
+  et le dépôt a déjà vécu ce cas. Les tests unitaires existants sur ces
+  templates vérifient qu'un fichier contient une chaîne, pas que Terraform sait
+  le lire : une régression de template ne se découvrait donc que chez un
+  apprenant, en langage Terraform.
+
+  Le job joue `terraform init -backend=false` puis `terraform validate` sur kvm,
+  incus et outscale, collecte **tous** les échecs plutôt que de s'arrêter au
+  premier, nomme le provider fautif via `::error::`, et fait échouer la
+  construction. Terraform vient de l'archive de l'éditeur avec la somme de
+  contrôle qu'il publie, sur le patron déjà utilisé pour poutine — aucune action
+  tierce n'est ajoutée à la chaîne d'approvisionnement.
+
+- **`doctor` gagne un contrôle `egress`.** Le provisionnement télécharge une
+  image, puis cloud-init installe des paquets : sans accès sortant, les deux
+  échouent. Les miroirs sondés sont **lus dans les templates packagés**, jamais
+  écrits dans le moteur, et un seul miroir joignable suffit à conclure — ce qui
+  est en cause est l'accès sortant lui-même, pas la disponibilité d'un miroir.
+  Requis sur un dépôt qui provisionne des VM, informatif sinon.
+
+- **`doctor` contrôle désormais le pool de stockage Incus**
+  (linux-dsoxlab-training#54). Un utilisateur a signalé que sur un
+  provisionnement Incus raté, « seules les résolutions liées à KVM sont
+  proposées ». Le symptôme avait raison et l'hypothèse la plus évidente avait
+  tort : `_check_incus` **propose bien** `incus admin init` — mais seulement
+  quand `incus list` échoue en le disant. Or `incus list` **réussit** sur une
+  installation jamais initialisée : elle rend simplement une liste vide. Le
+  contrôle passait au vert, et la branche Incus de `doctor` n'ajoutait que
+  l'outil ISO, là où la branche KVM contrôle son pool depuis longtemps. Le
+  template crée le réseau mais écrit `pool = "default"` en dur sans le créer.
+
+### Modifié
+
+- **Une fixture qui ne peut pas être copiée fait maintenant échouer `run`, au
+  lieu d'être ignorée.** C'est le renversement d'une décision antérieure —
+  qu'une faute de frappe dans une entrée ne devait pas priver l'apprenant de
+  tout son workdir. C'est le fichier manquant qui l'en prive : une erreur
+  d'auteur n'est pas quelque chose qu'il peut réparer, et un exercice amputé
+  échoue au `check` pour des raisons qu'il cherchera dans son propre travail.
+  La validation précède toute copie, donc c'est tout ou rien : un workdir à
+  moitié rempli a l'air de marcher. Toutes les fixtures fautives sont nommées
+  d'un coup, pour que l'auteur corrige en une passe plutôt qu'en autant de
+  `run` qu'il a de fixtures.
+
+- **Le tirage d'une image est désormais distinct du démarrage d'un conteneur.**
+  Le premier `docker run` tirait l'image dans son propre budget de 180 secondes :
+  au-delà, la commande échouait sur un message de démarrage qui ne parlait pas du
+  réseau ; en deçà, `run` pendait plusieurs minutes sans dire pourquoi. Le tirage
+  a maintenant son propre délai et s'annonce, et il est sauté si l'image est déjà
+  locale.
+
+- **Le journal parle désormais une seule langue, et c'est l'anglais**
+  (issue #140). Il mélangeait le français et l'anglais, ce qui n'est pas une
+  question de goût : c'est le fichier que `dsoxlab support` collecte et qu'un
+  utilisateur colle dans un rapport de bug. Mesuré avant d'être corrigé —
+  **41 messages français contre 4 anglais**.
+
+  Les appels `logger.*` restent **délibérément hors** du garde-fou i18n : un
+  message de journal n'est pas un texte d'interface, il ne passe par `_()` nulle
+  part, et le traduire à l'exécution rendrait deux rapports de bug incomparables
+  selon la locale de qui les produit. Cette exclusion justifiait de ne pas le
+  *traduire*, pas de le laisser incohérent.
+
+  L'anglais l'emporte pour trois raisons : un message de journal se cherche
+  **mot pour mot** dans un moteur de recherche, il se compare entre deux
+  machines aux locales différentes, et il est lu par quelqu'un qui diagnostique
+  — à côté des sorties de terraform, ansible et virsh, qui sont déjà anglaises.
+
+  La règle est écrite là où un contributeur la rencontre (le gabarit de PR) et
+  tenue par `test_journal_en_anglais.py`. Sans test, elle se redéferait ligne
+  par ligne, ce qui est exactement ce qui est arrivé à l'interface avant que son
+  propre garde-fou n'existe.
+
+### Corrigé
+
+- **`provision` annonçait un succès après avoir renoncé à attendre des hôtes qui
+  ne répondaient pas** (issue #170). Un délai dépassé n'était qu'un
+  avertissement ; la commande affichait ensuite « ✔ N hôtes provisionnés » et
+  sortait en 0. L'infrastructure existait mais n'était pas utilisable, et le
+  `run` suivant échouait en « unreachable » sans lien visible avec la cause.
+  Tout script qui teste le code de retour était aveugle — y compris la
+  construction d'une image prête à l'emploi, qui devra s'y fier. Un code de
+  sortie dédié (`8`) le dit désormais, aux côtés de ceux des orphelins.
+
+- **`check --json` était pollué dès qu'un lab déclarait des services** (issue
+  #171). `_valider` ne propageait pas `quiet` à `_ensure_services`, dont les
+  messages de progression partaient sur la sortie standard : `dsoxlab check
+  --json | jq` échouait sur tout lab de ce type. C'était le défaut corrigé en
+  0.1.23, revenu par une porte latérale.
+
+  `quiet` ne fait taire que **le progrès**. Les erreurs continuent de partir sur
+  la sortie d'erreur dans les deux modes : un service qui refuse de démarrer
+  doit rester audible, sans quoi `--json` masquerait la seule information qui
+  compte.
+
+- **Le contrôle du pool libvirt concluait « vert » quand il n'avait pas pu
+  regarder** (issue #172). La sonde invoquait `virsh -c qemu:///system` en
+  direct, sans la détection du préfixe `sudo -n` que `infra/libvirt.py` a
+  construite pour ce cas : sur toute machine où l'URI système exige des
+  droits, la sonde échouait à chaque fois, et cet échec était rendu `ok`, un
+  contrôle vert en permanence précisément là où `provision` allait mourir sur
+  « Pool Not Found ». La sonde passe désormais par `run_virsh`, et une sonde
+  qui ne peut pas mesurer rend `state: unknown` (introduit en 0.1.73), qui ne
+  peint le verdict ni en vert ni en rouge. `_check_kvm` interroge aussi
+  explicitement l'**URI système** : un `virsh version` nu peut viser l'URI
+  session selon la distribution, et répondre parfaitement à un utilisateur que
+  l'URI système refuse.
+
+- **Trois `sudo virsh` bruts sans `-n` pouvaient pendre ou échouer en
+  silence** (issue #173). `_ensure_kvm_dhcp_leases` (deux occurrences) et
+  `_reset_kvm_domain` capturaient leur sortie : un prompt de mot de passe sudo
+  n'avait aucun terminal où s'afficher et l'appel restait pendu ; sur une
+  machine configurée par le groupe `libvirt` sans droits sudo, le bail DHCP
+  n'était jamais posé et l'échec partait dans un journal que personne ne lit,
+  l'hôte mourant plus tard en « injoignable » sans cause visible. Les trois
+  appels passent désormais par `run_virsh` (chemin détecté, URI système,
+  jamais de prompt), et un bail refusé s'affiche **à l'écran** pendant
+  `provision`, pas seulement au journal. Un test garde-fou refuse désormais
+  tout `subprocess.run(["sudo", …])` qui capture sa sortie sans `-n` dans
+  `src/dsoxlab/`, sur le modèle du garde-fou anti-`shell=True` de 0.1.70.
+
+- `run_command` convertit désormais tout `OSError` en `CommandError` au lieu
+  de laisser un binaire qui disparaît en cours de route faire planter
+  l'appelant : un diagnostic ne doit pas mourir en diagnostiquant.
+
+- **Une fixture qui ne peut pas être copiée ne laisse plus un répertoire de
+  travail vide en silence** (issue #177). `ShellRuntime` itère sur
+  `runtime.fixtures`, pas sur le contenu de `fixtures/` : les deux écarts
+  possibles produisaient donc le même dégât, sans un mot. Une fixture *déclarée
+  mais absente du disque* partait en `logger.warning`, une fixture *présente
+  mais non déclarée* n'était jamais lue. Dans les deux cas `dsoxlab run` créait
+  un `challenge/work` vide, sortait en **0**, et l'apprenant n'avait rien à
+  faire. C'est le défaut qui a rendu **7 labs de `terraform-training`
+  injouables le 2026-07-28**, tous marqués faits — et il se cachait d'autant
+  mieux que les outils de vérification des corrigés copient, eux, le répertoire
+  entier : la solution passait au vert pendant que le parcours apprenant était
+  cassé.
+
+- **`run_command(check=False)` tient enfin sa promesse** (issue #174). Un
+  binaire absent, un délai dépassé ou toute autre `OSError` levait une
+  `CommandError` *quelles que soient les options* : tout appelant qui croyait
+  recevoir un `CommandResult` en toutes circonstances se trompait — et le nom du
+  paramètre l'encourageait à le croire. Deux victimes, mesurées par exécution
+  avant d'être corrigées : `dsoxlab catalog add` sortait en trace Python sur un
+  poste sans git, ce qui est la deuxième commande du parcours d'accueil ; et une
+  sonde qui expirait faisait sauter la boucle de réessai **entière** au lieu
+  d'être comptée comme un échec à réessayer.
+- **Une clé i18n manquante ne parvient plus brute à l'utilisateur.** `_()` rend
+  la clé elle-même quand elle n'est pas définie : une clé posée dans le code
+  mais pas dans les dictionnaires s'affichait donc `catalog_git_absent`. Un
+  garde-fou existait, mais s'arrêtait à `validators/` et `models/` ; il couvre
+  désormais tout appel `_("…")` littéral du paquet, dans les deux langues.
+
+- **Un lab dont le moteur de conteneurs est injoignable ne s'affiche plus
+  « prêt »** (issue #179). `_services_degrades` rendait une liste vide quand
+  `docker_available()` était faux : « Docker **était** là et son démon est
+  tombé » devenait donc indistinguable de « Docker n'a jamais été installé ».
+  Dans le premier cas le lab est bel et bien injouable — `run` y échoue déjà
+  explicitement, code 2 — et pourtant `status` annonçait `ready`, voire
+  `validated` lorsqu'une note existait d'une session précédente.
+- Les deux causes se distinguent désormais, parce qu'elles appellent des gestes
+  opposés : installer un paquet, ou démarrer un démon et vérifier que le compte
+  peut lui parler. Un lab qui ne déclare **aucun** service continue d'ignorer le
+  moteur, sans même payer une sonde — c'était la moitié juste de la décision
+  d'origine, elle est gardée et testée pour elle-même.
+
+- **Un cloud-init qui a mal fini le dit désormais** (issue #178).
+  `wait_for_hosts_ready` jouait `cloud-init status --wait >/dev/null 2>&1 ||
+  true` : l'état **et** le code de retour partaient tous les deux à la poubelle.
+  Hors ligne, derrière un proxy ou sur un miroir lent, les quinze paquets du
+  premier démarrage ne s'installent pas, cloud-init finit en `degraded`, et
+  l'hôte était **tout de même déclaré prêt** — les labs échouaient ensuite sur
+  des commandes absentes, sans que rien ne relie les deux. Ne pas bloquer reste
+  la bonne décision : ce qui compte pour rendre la main, c'est que cloud-init
+  ait *terminé*. Mais terminer mal doit se dire.
+
+- **Un test à conteneur réel ne peut plus démarrer sans sonde de disponibilité**
+  (issue #155). Deux tests de `test_services.py` échouaient par intermittence,
+  toujours sous charge, jamais au repos. Leur point commun : ils attendaient un
+  **vrai** conteneur. Sans sonde, `start` rend la main dès que `docker run` a
+  répondu, ce qui ne dit rien de l'état du service à l'intérieur — l'étape
+  suivante devient une course, gagnée au repos et perdue sous charge.
+
+  L'instabilité elle-même ne se reproduit plus : mesuré sous charge Docker
+  soutenue, 12 exécutions ciblées et 4 suites complètes, aucun échec. Ce qui est
+  ajouté est un garde-fou contre la **régression** de la correction, avec des
+  exemptions nommées une par une et motivées — un test dont le conteneur meurt
+  par conception ne peut pas porter de sonde, et l'exiger transformerait le
+  garde-fou en obstacle.
+
+- **`test_post_start_en_echec_reel_leve_service_error` passait pour la mauvaise
+  raison.** Sans sonde, le `ServiceError` qu'il attend pouvait venir du
+  conteneur pas encore prêt à recevoir un `docker exec`, plutôt que de la
+  commande en échec qu'il prétend prouver. Il déclare désormais une sonde et
+  vérifie que l'erreur nomme la commande fautive.
+
+### Documentation
+
+- **La décision sur les images amont est désormais écrite**, dans
+  `templates/terraform/README.md`. Les sept URL d'images pointent des chemins
+  mutables (`latest` / `current`), et c'est un choix : une somme épinglée que
+  personne ne tient à jour servirait aux apprenants une image de plus en plus
+  périmée, avec ses vulnérabilités connues — le durcissement deviendrait le
+  vecteur du problème qu'il prétend traiter. Les raisons qui rendent le risque
+  acceptable ici, et les conditions qui inverseraient la décision, sont
+  explicitées.
+
+- **La décision sur les paquets du premier démarrage est écrite**, dans
+  `templates/cloud-init/README.md`. Bloquer sur un `degraded` a été écarté :
+  cloud-init rend un état global, et traiterait donc un `tree` absent comme un
+  `lvm2` absent. Les images pré-cuites sont la vraie réponse, mais un projet à
+  part entière. Déclarer les paquets lab par lab changerait le contrat v1, gelé.
+  Ce qui est retenu, c'est de rendre l'échec visible aux trois moments qui
+  comptent : avant, pendant, et dans le message qui nomme l'hôte.
 
 ## [0.1.72] - 2026-08-24
 
