@@ -139,6 +139,42 @@ STRINGS: dict[str, str] = {
     "status_titre": "Lab state",
     "cmd_infra_help": "Infrastructure commands for the catalog.",
 
+    # ── new: scaffold a contract-compliant skeleton ─────────────────────────
+    "cmd_new_help":
+        "Scaffold a catalog or a lab that matches the contract, ready to fill.",
+    "cmd_new_catalog_help":
+        "Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/.",
+    "cmd_new_lab_help":
+        "Scaffold a lab, discovered by the next list-labs.",
+    "arg_new_id": "Id, lowercase, no spaces.",
+    "opt_new_dans": "Directory to create the catalog in. Defaults to the current one.",
+    "opt_new_runtime":
+        "Lab runtime: shell (local workshop) or vm (dedicated machine).",
+    "scaffold_catalogue_cree": "Catalog '{name}' created in {path}",
+    "scaffold_catalogue_suite":
+        "To get started:\n"
+        "  cd {path}\n"
+        "  dsoxlab new lab <id>\n"
+        "  dsoxlab validate-structure",
+    "scaffold_lab_cree": "Lab '{name}' created in {path} ({runtime})",
+    "scaffold_lab_suite":
+        "It already matches the contract, and its tests fail until they are "
+        "written:\n"
+        "  dsoxlab list-labs\n"
+        "  dsoxlab validate-structure\n"
+        "Then fill scenario.md, and challenge/tests/test_functional.py.",
+    "scaffold_id_invalide":
+        "'{name}' cannot be used as an id: lowercase letters, digits, dot, "
+        "dash and underscore only.",
+    "scaffold_existe_deja":
+        "{path} already exists. Pick another id, or remove that directory: "
+        "a skeleton never overwrites work.",
+    "scaffold_runtime_inconnu":
+        "Unknown runtime '{name}'. Possible values: {connus}.",
+    "scaffold_hors_catalogue":
+        "{path} is not a catalog: no meta.yml at its root. Move into a "
+        "catalog, or create one: dsoxlab new catalog <id>",
+
     "cmd_catalog_help":
         "Discover, install and update lab catalogues.",
     "cmd_catalog_list_help":
@@ -476,6 +512,16 @@ Each lab declares:
   [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
                        play right away, with nothing to clone or provision.
     [dim]--force[/dim]              Reinstall over it (loses progress).
+
+  [cyan]new catalog <id>[/cyan]     Scaffolds an empty but compliant catalog: meta.yml,
+                       labs/, .gitignore, ssh/. It passes [cyan]validate-structure[/cyan]
+                       with no edit.
+    [dim]--in <dir>[/dim]           Where to create it. Defaults to the current directory.
+  [cyan]new lab <id>[/cyan]         Scaffolds a compliant lab, discovered by the next
+                       [cyan]list-labs[/cyan]. Its test [bold]fails[/bold] until it is written: a
+                       skeleton green from the start would teach grading
+                       without checking anything.
+    [dim]--runtime <type>[/dim]     [bold]shell[/bold] (local workshop) or [bold]vm[/bold] (dedicated machine).
 
   [cyan]catalog list[/cyan]         Known catalogues, and the ones installed.
     [dim]--json[/dim]               Machine document instead of tables.

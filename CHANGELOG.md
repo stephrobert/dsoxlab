@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.71] - 2026-08-24
+
+### Added
+
+- **`dsoxlab new catalog` and `dsoxlab new lab`: a skeleton that already matches
+  the contract** (issue #88). Writing a catalog meant knowing the contract by
+  heart, or copying an existing repository. Both paths produce the same
+  mistakes — a missing required file, a test file whose name is not the one the
+  validator expects, a fixture shipped but never declared — and the penalty is
+  silent: a `lab.yaml` that raises while parsing is never examined by
+  `validate-structure`, so a beginner ends up with a catalog that "passes
+  validation" and shows no lab at all.
+
+  ```console
+  $ dsoxlab new catalog my-catalog
+  $ cd my-catalog && dsoxlab new lab first-lab --runtime shell
+  $ dsoxlab list-labs && dsoxlab validate-structure
+  ```
+
+  The skeleton differs by runtime, as the contract demands: a `shell` lab
+  declares its `workdir`, a `vm` lab its `targets` and both playbooks.
+
+  **The generated test fails**, and is not skipped. A skeleton green from the
+  start would teach the wrong habit — grading without checking anything — and a
+  skipped test says neither that the work remains nor that it is done. A failing
+  test says the first, which is what its author needs.
+
+  The generated skeleton is checked against the **published schemas**, not only
+  against `validate-structure`: the contract is frozen and its schemas are
+  published, so ignoring them would let the generator drift into a variant
+  without anything saying so. That check caught the first version of this
+  generator, which wrote an unquoted `:` inside a description — valid-looking
+  YAML that would not load, and a lab that vanished in silence.
+
 ## [0.1.70] - 2026-08-24
 
 ### Changed

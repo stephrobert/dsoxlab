@@ -44,7 +44,7 @@ from ._commun import (
     LabHomeOption,
     _root,
 )
-from ._socle import app
+from ._socle import app, new_app
 from ._validation import _compter
 
 logger = logging.getLogger(__name__)
@@ -259,3 +259,54 @@ def validate_structure_cmd(
 
 
 # ── doctor ────────────────────────────────────────────────────────────────────
+
+
+# ── new : créer un squelette conforme au contrat ──────────────────────────────
+
+@new_app.command("catalog", help=_("cmd_new_catalog_help"))
+def new_catalog(
+    identifiant: Annotated[str, typer.Argument(help=_("arg_new_id"))],
+    dans: Annotated[
+        Path | None, typer.Option("--in", help=_("opt_new_dans"))
+    ] = None,
+) -> None:
+    """Crée un catalogue vide mais conforme."""
+    from ..services.scaffold import ScaffoldError, creer_catalogue
+
+    try:
+        creation = creer_catalogue(identifiant, dans or Path.cwd())
+    except ScaffoldError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+    except OSError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+
+    success(_("scaffold_catalogue_cree", name=identifiant, path=str(creation.racine)))
+    info(_("scaffold_catalogue_suite", path=str(creation.racine)))
+
+
+@new_app.command("lab", help=_("cmd_new_lab_help"))
+def new_lab(
+    identifiant: Annotated[str, typer.Argument(help=_("arg_new_id"))],
+    runtime: Annotated[
+        str, typer.Option("--runtime", help=_("opt_new_runtime"))
+    ] = "shell",
+    lab_home: LabHomeOption = None,
+) -> None:
+    """Crée un lab conforme, découvert dès le prochain `list-labs`."""
+    from ..services.scaffold import ScaffoldError, creer_lab
+
+    root = _root(lab_home)
+    try:
+        creation = creer_lab(identifiant, root, runtime=runtime)
+    except ScaffoldError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+    except OSError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+
+    success(_("scaffold_lab_cree", name=identifiant,
+              path=str(creation.racine), runtime=runtime))
+    info(_("scaffold_lab_suite"))

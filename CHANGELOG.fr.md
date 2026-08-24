@@ -9,6 +9,42 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.71] - 2026-08-24
+
+### Ajouté
+
+- **`dsoxlab new catalog` et `dsoxlab new lab` : un squelette déjà conforme au
+  contrat** (issue #88). Écrire un catalogue supposait de connaître le contrat
+  par cœur, ou de copier un dépôt existant. Les deux chemins produisent les
+  mêmes erreurs — un fichier obligatoire oublié, un nom de fichier de test qui
+  ne correspond pas à celui qu'attend le validator, une fixture livrée mais non
+  déclarée — et la sanction est muette : un `lab.yaml` qui lève au parsing n'est
+  jamais examiné par `validate-structure`, si bien qu'un débutant obtient un
+  catalogue qui « passe la validation » et n'affiche aucun lab.
+
+  ```console
+  $ dsoxlab new catalog mon-catalogue
+  $ cd mon-catalogue && dsoxlab new lab premier-lab --runtime shell
+  $ dsoxlab list-labs && dsoxlab validate-structure
+  ```
+
+  Le squelette diffère selon le runtime, comme le contrat l'exige : un lab
+  `shell` déclare son `workdir`, un lab `vm` ses `targets` et ses deux
+  playbooks.
+
+  **Le test généré échoue**, il n'est pas sauté. Un squelette vert d'emblée
+  apprendrait la mauvaise habitude, celle de noter sans rien vérifier ; et un
+  test sauté ne dit ni que le travail reste à faire, ni qu'il est fait. Un test
+  rouge dit la première chose, qui est celle dont son auteur a besoin.
+
+  Le squelette produit est éprouvé contre les **schémas publiés**, et pas
+  seulement contre `validate-structure` : le contrat est gelé et ses schémas
+  sont publiés, donc les ignorer laisserait le générateur diverger vers une
+  variante sans que rien ne le dise. Ce contrôle a attrapé la première version
+  de ce générateur, qui écrivait un `:` non quoté dans une description — du YAML
+  d'apparence valide qui ne se chargeait pas, et un lab qui disparaissait en
+  silence.
+
 ## [0.1.70] - 2026-08-24
 
 ### Modifié
