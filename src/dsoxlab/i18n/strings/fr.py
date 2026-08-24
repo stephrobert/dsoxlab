@@ -884,6 +884,9 @@ hors ligne, elle se tait.
     "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs détectés",
     "check_lab_home": "LAB_HOME",
+    "check_hw_virt":  "Virtualisation matérielle",
+    "check_cpu_arch": "Architecture CPU",
+    "check_resources": "Ressources RAM / disque",
 
     "detail_shell_always":   "toujours disponible",
     "detail_incus_missing":  "introuvable",
@@ -905,6 +908,32 @@ hors ligne, elle se tait.
         "introuvable : « run » ne peut pas jouer le setup.yaml d'un lab vm "
         "(ansible-runner ne l'installe pas)",
     "detail_ansible_ok":     "présent",
+    "detail_hw_virt_missing":
+        "{device} est absent : pas de virtualisation matérielle, les labs vm "
+        "ne peuvent pas tourner sur cette machine. Active VT-x/AMD-V dans le "
+        "BIOS, ou la virtualisation imbriquée dans ton hyperviseur (machine "
+        "éteinte).",
+    "detail_hw_virt_denied":
+        "{device} existe mais cet utilisateur ne peut pas l'ouvrir : "
+        "« provision » ne peut démarrer aucune VM (re-login requis après "
+        "l'ajout au groupe kvm)",
+    "detail_cpu_arch_mismatch":
+        "cette machine est en {machine}, or les images {provider} packagées "
+        "avec dsoxlab n'existent qu'en {archs} : les labs vm ne peuvent pas "
+        "démarrer ici",
+    "detail_cpu_arch_unknown":
+        "architecture de la machine indéterminable",
+    "detail_resources_ram":
+        "RAM : {avail} Mo disponibles pour {need} Mo déclarés",
+    "detail_resources_ram_unknown":
+        "RAM : /proc/meminfo illisible, rien de mesuré",
+    "detail_resources_disk":
+        "pool {pool} : {avail} Go disponibles pour {need} Go déclarés",
+    "detail_resources_disk_unknown":
+        "pool {pool} : muet, espace disque non mesuré",
+    "detail_resources_disk_unprobed":
+        "disque : l'outil ne sait pas mesurer le pool de stockage {provider}",
+    "detail_resources_join": " ; ",
     "detail_pool_missing":
         "le pool « {pool} » n'existe pas : « provision » échouera sur "
         "« Pool Not Found »",
@@ -1053,6 +1082,7 @@ hors ligne, elle se tait.
     "status_present":     "[green]installé[/green]",
     "status_absent":      "[dim]— absent[/dim]",
     "status_choose":      "[yellow]à choisir[/yellow]",
+    "status_unknown":     "[yellow]? non mesuré[/yellow]",
     "doctor_fix_hint":    "ℹ Utilisez [bold]dsoxlab doctor --fix[/bold] pour tenter la remédiation automatique.",
     "doctor_manual_hint":
         "ℹ [bold]--fix[/bold] ne sait pas corriger ce qui manque : appliquez "

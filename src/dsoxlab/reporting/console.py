@@ -22,7 +22,12 @@ from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
 from ..services.catalog import CatalogueConnu, CatalogueInstalle
-from ..services.doctor import STATE_CHOICE_REQUIRED, Check, DoctorReport
+from ..services.doctor import (
+    STATE_CHOICE_REQUIRED,
+    STATE_UNKNOWN,
+    Check,
+    DoctorReport,
+)
 from ..services.lab_state import LabState
 from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
@@ -291,6 +296,10 @@ def _libelle_statut(check: Check, *, blocking: bool) -> str:
     """
     if check.state == STATE_CHOICE_REQUIRED:
         return _("status_choose")
+    if check.state == STATE_UNKNOWN:
+        # Rien mesuré : ni le vert qui rassure à tort, ni le rouge qui accuse
+        # sans preuve. Le mot le dit dans les deux tableaux.
+        return _("status_unknown")
     if blocking:
         return _("status_ok") if check.ok else _("status_ko")
     return _("status_present") if check.ok else _("status_absent")

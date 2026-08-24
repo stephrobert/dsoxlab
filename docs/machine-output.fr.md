@@ -361,8 +361,8 @@ Chaque contrôle :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `labs`, `lab_home` |
-| `state` | chaîne | `ok`, `failed` ou `choice_required` |
+| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `labs`, `lab_home` |
+| `state` | chaîne | `ok`, `failed`, `choice_required` ou `unknown` |
 | `ok` | booléen | la même chose que `state == "ok"`, gardé pour une lecture vert/rouge immédiate |
 | `label` | chaîne | le nom du composant, traduit : pour l'affichage seulement |
 | `detail` | chaîne | ce qui a été mesuré : une version, une ligne d'erreur, un compte |
@@ -374,6 +374,13 @@ Chaque contrôle :
 catalogue qui déclare plusieurs providers sans qu'aucun soit choisi bloque bien
 le provisionnement, mais rien n'est cassé, et l'afficher en rouge reviendrait à
 traiter un choix comme une avarie.
+
+`state: unknown` existe parce qu'une sonde impossible ne prouve rien, dans
+aucun sens : un contrôle dont la mesure a échoué (un `/proc/meminfo` illisible,
+un pool libvirt qui ne répond pas) n'est ni le vert rassurant d'un `ok` non
+mérité, ni le rouge accusateur d'une panne non prouvée. Son champ `ok` vaut
+`false`, puisque rien n'a été vérifié, mais il ne compte pas dans le verdict
+global.
 
 `ok` ne porte que sur `required`, délibérément. Un hyperviseur que ce catalogue
 n'utilisera jamais n'a pas à peindre en rouge une machine qui va très bien.

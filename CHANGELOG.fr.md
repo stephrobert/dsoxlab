@@ -9,6 +9,42 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.73] - 2026-08-24
+
+### Ajouté
+
+- **`doctor` vérifie désormais les trois prérequis qui décident si un lab `vm`
+  peut tourner** (issue #169). `virsh version` répond parfaitement sur une
+  machine sans virtualisation matérielle : le diagnostic était entièrement vert
+  pendant que `provision` échouait en langage Terraform (« could not find
+  capabilities for domaintype=kvm »), ou partait en émulation logicielle
+  jusqu'à l'expiration. Trois nouveaux contrôles, chacun avec une clé stable
+  dans `doctor --json` :
+
+  - `hw_virt` lit `/dev/kvm`, là où qemu ira le chercher. Absent, les labs vm
+    ne peuvent pas tourner sur cette machine, et le détail dit où se joue le
+    geste : le BIOS, ou la virtualisation imbriquée de l'hyperviseur hôte,
+    machine éteinte. Présent mais interdit est un autre état, avec un correctif
+    exécutable (`usermod -aG kvm`, `needs_relogin`).
+  - `cpu_arch` confronte `platform.machine()` aux images que le provider actif
+    sait fournir : le template kvm n'embarque que des images x86_64, et sur
+    aarch64 rien ne bootera jamais. L'écart nomme les deux côtés.
+  - `resources` compare `MemAvailable` et l'espace libre du pool libvirt à la
+    somme des `ram_mb` et des `disk_gb` (+ `extra_disk_gb`) que le `meta.yml`
+    du catalogue déclare. Un rapport de terrain donne l'échelle : un
+    provisionnement a déjà expiré sur un hôte à 2 vCPU / 4 Go, prêt à
+    181 secondes pour un délai de 180.
+
+  Les trois ne sont requis que si le catalogue déclare des labs `vm` sur un
+  hyperviseur local : un catalogue 100 % `shell` (terraform-training) n'en
+  affiche aucun, et un provider distant ne mesure rien sur ce poste.
+
+- **Une sonde qui ne peut pas mesurer ne conclut plus rien : `state: unknown`**.
+  Un `/proc/meminfo` illisible ou un pool libvirt muet n'est ni le vert
+  rassurant d'un « ok » non mérité, ni le rouge accusateur d'une panne non
+  prouvée. Le jeton est exposé par `doctor --json` et rendu « ? non mesuré » ;
+  il ne peint jamais le verdict global en rouge.
+
 ## [0.1.72] - 2026-08-24
 
 ### Corrigé

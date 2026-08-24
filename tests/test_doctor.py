@@ -95,6 +95,22 @@ def _outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
         doctor, "_check_ansible",
         lambda: doctor._check("ansible", True, "ok"),
     )
+    # Même raison pour les prérequis matériels : /dev/kvm, platform.machine()
+    # et /proc/meminfo mesurent la machine qui joue la suite, pas le classement
+    # que ce module vérifie. Leur comportement propre vit dans
+    # `test_doctor_prerequis_vm.py`.
+    monkeypatch.setattr(
+        doctor, "_check_hw_virt",
+        lambda: doctor._check("hw_virt", True, "/dev/kvm"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_cpu_arch",
+        lambda provider: doctor._check("cpu_arch", True, "x86_64"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_resources",
+        lambda infra, provider: doctor._check("resources", True, "ok"),
+    )
 
 
 def _labs(monkeypatch: pytest.MonkeyPatch, labs: list[LabDefinition]) -> None:
