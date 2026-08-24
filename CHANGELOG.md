@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.82] - 2026-08-24
+
+### Fixed
+
+- **A real-container test can no longer start without a readiness probe**
+  (issue #155). Two tests of `test_services.py` failed intermittently, always
+  under load, never at rest. Their common trait: they waited for a **real**
+  container. Without a probe, `start` hands back control as soon as `docker
+  run` answers, which says nothing about the service inside — the next step
+  becomes a race, won at rest and lost under load.
+
+  The instability itself no longer reproduces: measured under sustained Docker
+  load, 12 targeted runs and 4 full suites, not one failure. What this adds is
+  a guard against the **regression** of the fix, with exemptions named one by
+  one and motivated — a test whose container dies on purpose cannot carry a
+  probe, and requiring one would turn the guard into an obstacle.
+
+- **`test_post_start_en_echec_reel_leve_service_error` was passing for the
+  wrong reason.** Without a probe, the `ServiceError` it expects could come
+  from the container not yet accepting a `docker exec`, rather than from the
+  failing command it means to prove. It now declares a probe and asserts that
+  the error names the offending command.
+
+
 ## [0.1.81] - 2026-08-24
 
 ### Fixed

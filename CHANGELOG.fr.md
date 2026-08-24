@@ -9,6 +9,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.82] - 2026-08-24
+
+### Corrigé
+
+- **Un test à conteneur réel ne peut plus démarrer sans sonde de disponibilité**
+  (issue #155). Deux tests de `test_services.py` échouaient par intermittence,
+  toujours sous charge, jamais au repos. Leur point commun : ils attendaient un
+  **vrai** conteneur. Sans sonde, `start` rend la main dès que `docker run` a
+  répondu, ce qui ne dit rien de l'état du service à l'intérieur — l'étape
+  suivante devient une course, gagnée au repos et perdue sous charge.
+
+  L'instabilité elle-même ne se reproduit plus : mesuré sous charge Docker
+  soutenue, 12 exécutions ciblées et 4 suites complètes, aucun échec. Ce qui est
+  ajouté est un garde-fou contre la **régression** de la correction, avec des
+  exemptions nommées une par une et motivées — un test dont le conteneur meurt
+  par conception ne peut pas porter de sonde, et l'exiger transformerait le
+  garde-fou en obstacle.
+
+- **`test_post_start_en_echec_reel_leve_service_error` passait pour la mauvaise
+  raison.** Sans sonde, le `ServiceError` qu'il attend pouvait venir du
+  conteneur pas encore prêt à recevoir un `docker exec`, plutôt que de la
+  commande en échec qu'il prétend prouver. Il déclare désormais une sonde et
+  vérifie que l'erreur nomme la commande fautive.
+
+
 ## [0.1.81] - 2026-08-24
 
 ### Corrigé
