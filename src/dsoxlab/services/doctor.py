@@ -1015,6 +1015,27 @@ def _hotes_images() -> list[str]:
     return hotes
 
 
+def _joignable(hote: str) -> bool:
+    """Une connexion sortante vers cet hôte aboutit-elle ?
+
+    Isolée en fonction parce que c'est le seul appel **réseau** de tout
+    `collect_checks`. Les tests la neutralisent d'un coup (`tests/conftest.py`),
+    faute de quoi chaque test de classement ouvrirait de vraies connexions :
+    lentes, dépendantes du réseau du moment, et fausses dès qu'une CI est
+    fermée. C'est le défaut que la fixture voisine corrigeait déjà pour
+    terraform et ansible — « ces tests mesurent la machine qui les exécute ».
+
+    Patcher ``socket`` globalement ne convenait pas : ``runtimes/services.py``
+    s'en sert pour attendre un conteneur, et le neutraliser rendrait cette
+    attente-là toujours vraie.
+    """
+    try:
+        with socket.create_connection((hote, 443), timeout=_DELAI_EGRESS):
+            return True
+    except OSError:
+        return False
+
+
 def _check_egress() -> Check:
     """Le provisionnement télécharge une image, puis cloud-init des paquets.
 
@@ -1033,11 +1054,8 @@ def _check_egress() -> Check:
         return _check("egress", False, _("detail_egress_indetermine"),
                       forced_state=STATE_UNKNOWN)
     for hote in hotes:
-        try:
-            with socket.create_connection((hote, 443), timeout=_DELAI_EGRESS):
-                return _check("egress", True, hote)
-        except OSError:
-            continue
+        if _joignable(hote):
+            return _check("egress", True, hote)
     return _check("egress", False,
                   _("detail_egress_absent", hosts=", ".join(hotes)),
                   hint="https://docs.docker.com/network/proxy/")

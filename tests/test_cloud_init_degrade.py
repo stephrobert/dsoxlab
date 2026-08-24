@@ -15,9 +15,7 @@ geste de reprise, dans le message).
 
 from __future__ import annotations
 
-import socket
 from pathlib import Path
-from typing import Self
 
 import pytest
 
@@ -153,14 +151,11 @@ def test_le_moteur_ne_cite_aucun_miroir_en_dur() -> None:
 
 
 def test_un_acces_sortant_coupe_se_voit(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dsoxlab.services.doctor import _check_egress
+    from dsoxlab.services import doctor
 
-    def _refuse(*args: object, **kwargs: object) -> None:
-        raise OSError("Network is unreachable")
+    monkeypatch.setattr(doctor, "_joignable", lambda hote: False)
 
-    monkeypatch.setattr(socket, "create_connection", _refuse)
-
-    assert _check_egress().ok is False
+    assert doctor._check_egress().ok is False
 
 
 def test_un_seul_miroir_joignable_suffit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,28 +164,20 @@ def test_un_seul_miroir_joignable_suffit(monkeypatch: pytest.MonkeyPatch) -> Non
     Exiger que les trois répondent ferait rougir un poste parfaitement
     fonctionnel dont un seul miroir est en maintenance.
     """
-    from dsoxlab.services.doctor import _check_egress
-
-    class _Fausse:
-        """Un contexte qui ne fait rien : seule sa réussite compte ici."""
-
-        def __enter__(self) -> Self:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
+    from dsoxlab.services import doctor
 
     essais = {"n": 0}
 
-    def _un_seul(adresse: tuple[str, int], **kwargs: object) -> _Fausse:
+    def _un_seul(hote: str) -> bool:
         essais["n"] += 1
-        if essais["n"] == 1:
-            raise OSError("refusé")
-        return _Fausse()
+        return essais["n"] > 1
 
-    monkeypatch.setattr(socket, "create_connection", _un_seul)
+    monkeypatch.setattr(doctor, "_joignable", _un_seul)
 
-    assert _check_egress().ok is True
+    resultat = doctor._check_egress()
+
+    assert resultat.ok is True
+    assert essais["n"] == 2, "le premier miroir refusé doit être suivi du second"
 
 
 def test_le_controle_suit_ce_que_le_depot_provisionne(tmp_path: Path) -> None:
