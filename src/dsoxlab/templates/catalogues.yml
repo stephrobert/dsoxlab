@@ -1,0 +1,33 @@
+# Catalogues connus de dsoxlab.
+#
+# Ce fichier est une DONNÉE, pas de la logique : le moteur ne lit ici que des
+# noms, des URL et des descriptions, et n'en tire aucune décision propre à un
+# domaine. Écrire `if nom == "linux"` dans le code romprait l'agnosticisme que
+# ce fichier existe précisément pour préserver.
+#
+# Pourquoi un fichier packagé plutôt qu'un registre distant : un registre est un
+# service à héberger, surveiller et maintenir disponible, pour un projet qui
+# compte aujourd'hui trois catalogues. Un manifeste versionné a de plus un
+# mérite qu'un service n'a pas — il est révisable en pull request : proposer un
+# catalogue tiers devient une contribution ordinaire, relue comme le reste.
+#
+# `dsoxlab catalog add <url>` accepte n'importe quelle URL git, y compris
+# absente d'ici : ce fichier facilite la découverte, il ne restreint rien.
+
+schema_version: 1
+
+catalogues:
+  - id: linux
+    depot: https://github.com/stephrobert/linux-dsoxlab-training
+    description_en: Linux administration, RHCSA and LFCS
+    description_fr: Administration Linux, RHCSA et LFCS
+
+  - id: ansible
+    depot: https://github.com/stephrobert/ansible-training
+    description_en: Ansible, from first playbook to collections
+    description_fr: Ansible, du premier playbook aux collections
+
+  - id: terraform
+    depot: https://github.com/stephrobert/terraform-training
+    description_en: Terraform and infrastructure as code
+    description_fr: Terraform et l'infrastructure as code

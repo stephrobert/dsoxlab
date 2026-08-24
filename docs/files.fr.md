@@ -42,6 +42,8 @@ sous `<catalogue>/ssh/id_ed25519` et son `.pub`, produite par
 | `~/.cache/dsoxlab/<catalog-id>/ssh_config` | Configuration OpenSSH générée pour les hôtes du lab | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/version-check.json` | Dernière version vue sur PyPI, et sa date | `XDG_CACHE_HOME` |
 | `~/.local/share/dsoxlab/demo/` | Catalogue de démonstration installé par `dsoxlab demo` | `XDG_DATA_HOME` |
+| `~/.local/share/dsoxlab/catalogs/` | Catalogues installés par `dsoxlab catalog add`, un sous-répertoire par identifiant | `XDG_DATA_HOME` |
+| `~/.local/state/dsoxlab/catalogue-actif` | Identifiant du catalogue actif, celui qu'on utilise sans se placer dans son répertoire | `XDG_STATE_HOME` |
 | `~/.ssh/config.d/<catalog-id>.conf` | Fragment SSH des hôtes du lab, pour que `ssh`, `scp` et votre IDE les atteignent par leur nom | aucune |
 
 `<catalog-id>` est le `repo.id` du `meta.yml` du catalogue. Le verrou retombe

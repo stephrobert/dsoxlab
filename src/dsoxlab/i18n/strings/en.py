@@ -111,6 +111,65 @@ STRINGS: dict[str, str] = {
         "  dsoxlab course {lab}\n"
         "  dsoxlab run {lab}\n"
         "Then, once the mission is done: dsoxlab check {lab}",
+
+    # ── catalog: discover, install and locate a catalogue ───────────────────
+    "cmd_catalog_help":
+        "Discover, install and update lab catalogues.",
+    "cmd_catalog_list_help":
+        "List known catalogues and the ones installed.",
+    "cmd_catalog_add_help":
+        "Install a catalogue by name, or by its repository URL.",
+    "cmd_catalog_update_help":
+        "Update an installed catalogue (all of them if none is named).",
+    "cmd_catalog_remove_help":
+        "Remove an installed catalogue.",
+    "arg_catalog_reference":
+        "Id from the manifest (dsoxlab catalog list), or a git repository URL.",
+    "arg_catalog_id":
+        "Id of an installed catalogue.",
+    "cmd_catalog_use_help":
+        "Choose the active catalogue, the one used outside its directory.",
+    "opt_catalog_force":
+        "Reinstall over an existing catalogue (any work in it is lost).",
+    "catalog_titre_connus": "Known catalogues",
+    "catalog_titre_installes": "Installed catalogues",
+    "catalog_col_id": "Id",
+    "catalog_col_description": "Description",
+    "catalog_col_depot": "Repository",
+    "catalog_col_chemin": "Path",
+    "catalog_col_actif": "Active",
+    "catalog_aucun_installe":
+        "No catalogue installed. Install one: dsoxlab catalog add <id>",
+    "catalog_installation": "Installing {name} from {url}…",
+    "catalog_installe":
+        "Catalogue '{name}' installed in {path}, and made active.",
+    "catalog_installe_suite":
+        "It is usable from any directory:\n"
+        "  dsoxlab list-labs\n"
+        "  dsoxlab next",
+    "catalog_actif_defini": "Active catalogue: '{name}' ({path})",
+    "catalog_retire": "Catalogue '{name}' removed ({path}).",
+    "catalog_a_jour": "Catalogue '{name}' is up to date.",
+    "catalog_mis_a_jour": "Catalogue '{name}' updated: {detail}",
+    "catalog_inconnu":
+        "Unknown catalogue '{name}'. List them with dsoxlab catalog list, "
+        "or pass its repository URL.",
+    "catalog_absent":
+        "No catalogue '{name}' installed. See: dsoxlab catalog list",
+    "catalog_deja_installe":
+        "Catalogue '{name}' is already installed in {path}. "
+        "Update it (dsoxlab catalog update {name}), or reinstall with --force, "
+        "which loses the progress and the work it holds.",
+    "catalog_clone_echec":
+        "Cloning {url} failed:\n{detail}",
+    "catalog_sans_meta":
+        "Repository {url} has no meta.yml at its root: it is not a dsoxlab "
+        "catalogue.",
+    "catalog_id_invalide":
+        "'{name}' cannot be used as a catalogue id.",
+    "catalog_update_echec":
+        "Updating '{name}' failed:\n{detail}",
+
     "cmd_support_help":
         "Produce an anonymised diagnostic report, ready to paste into an issue.",
     "opt_support_log_lines":
@@ -391,6 +450,17 @@ Each lab declares:
   [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
                        play right away, with nothing to clone or provision.
     [dim]--force[/dim]              Reinstall over it (loses progress).
+
+  [cyan]catalog list[/cyan]         Known catalogues, and the ones installed.
+    [dim]--json[/dim]               Machine document instead of tables.
+  [cyan]catalog add <id|url>[/cyan] Installs a catalogue and makes it active. The id comes
+                       from the packaged manifest; any git URL is accepted too,
+                       the manifest restricts nothing.
+    [dim]--force[/dim]              Reinstall over it (loses progress).
+  [cyan]catalog use <id>[/cyan]     Chooses the active catalogue, the one used without
+                       having to sit in its directory.
+  [cyan]catalog update [id][/cyan]  Updates one installed catalogue, or all of them.
+  [cyan]catalog remove <id>[/cyan]  Removes an installed catalogue.
 
   [cyan]provision[/cyan]            Bring up the infrastructure for vm labs (terraform apply).
                        Refuses to start when machines left by a failed

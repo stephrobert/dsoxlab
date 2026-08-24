@@ -56,6 +56,22 @@ def demo_catalog() -> Path:
     return template_root() / "demo"
 
 
+def catalogues_manifeste() -> Path:
+    """Le manifeste des catalogues connus, packagé avec l'outil.
+
+    C'est une **donnée**, pas de la logique : le moteur y lit des noms, des URL
+    et des descriptions, sans jamais en tirer de décision propre à un domaine.
+    L'agnosticisme tient à cette frontière, et un `if id == "linux"` dans le
+    code la romprait.
+
+    Packagé plutôt que distant, parce qu'un registre est un service à héberger
+    et à maintenir disponible pour trois catalogues, et parce qu'un fichier
+    versionné se révise en pull request : proposer un catalogue tiers devient
+    une contribution ordinaire.
+    """
+    return template_root() / "catalogues.yml"
+
+
 def terraform_template(provider: str) -> Path:
     """Retourne le chemin du template Terraform pour un provider.
 

@@ -17,6 +17,11 @@ guide in the terminal, `dsoxlab fullhelp`.
 
 | Command | Purpose |
 | --- | --- |
+| `dsoxlab catalog add` | Install a catalogue by name, or by its repository URL. |
+| `dsoxlab catalog list` | List known catalogues and the ones installed. |
+| `dsoxlab catalog remove` | Remove an installed catalogue. |
+| `dsoxlab catalog update` | Update an installed catalogue (all of them if none is named). |
+| `dsoxlab catalog use` | Choose the active catalogue, the one used outside its directory. |
 | `dsoxlab challenge` | Display the challenge mission for this lab (challenge/README.md). |
 | `dsoxlab check` | Run tests, calculate score (hints deducted) and record result. |
 | `dsoxlab clean` | Remove all resources created by the lab. |

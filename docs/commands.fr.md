@@ -18,6 +18,11 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 
 | Commande | Rôle |
 | --- | --- |
+| `dsoxlab catalog add` | Installe un catalogue par son nom ou par l'URL de son dépôt. |
+| `dsoxlab catalog list` | Liste les catalogues connus et ceux qui sont installés. |
+| `dsoxlab catalog remove` | Retire un catalogue installé. |
+| `dsoxlab catalog update` | Met à jour un catalogue installé (tous, si aucun n'est nommé). |
+| `dsoxlab catalog use` | Choisit le catalogue actif, celui qu'on utilise hors de son répertoire. |
 | `dsoxlab challenge` | Affiche la mission du challenge (challenge/README.md). |
 | `dsoxlab check` | Exécute les tests, calcule le score (hints déduits) et enregistre le résultat. |
 | `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
