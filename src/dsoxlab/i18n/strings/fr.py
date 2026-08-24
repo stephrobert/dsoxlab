@@ -140,6 +140,42 @@ STRINGS: dict[str, str] = {
     "status_titre": "État du lab",
     "cmd_infra_help": "Commandes d'infrastructure du catalogue.",
 
+    # ── new : créer un squelette conforme au contrat ────────────────────────
+    "cmd_new_help":
+        "Crée un catalogue ou un lab conforme au contrat, prêt à remplir.",
+    "cmd_new_catalog_help":
+        "Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/.",
+    "cmd_new_lab_help":
+        "Crée un lab conforme, découvert dès le prochain list-labs.",
+    "arg_new_id": "Identifiant, en minuscules, sans espace.",
+    "opt_new_dans": "Répertoire où créer le catalogue. Défaut : le répertoire courant.",
+    "opt_new_runtime":
+        "Runtime du lab : shell (atelier local) ou vm (machine dédiée).",
+    "scaffold_catalogue_cree": "Catalogue « {name} » créé dans {path}",
+    "scaffold_catalogue_suite":
+        "Pour commencer :\n"
+        "  cd {path}\n"
+        "  dsoxlab new lab <id>\n"
+        "  dsoxlab validate-structure",
+    "scaffold_lab_cree": "Lab « {name} » créé dans {path} ({runtime})",
+    "scaffold_lab_suite":
+        "Il est déjà conforme, et ses tests échouent tant qu'ils ne sont pas "
+        "écrits :\n"
+        "  dsoxlab list-labs\n"
+        "  dsoxlab validate-structure\n"
+        "Remplis ensuite scenario.md, puis challenge/tests/test_functional.py.",
+    "scaffold_id_invalide":
+        "« {name} » ne peut pas servir d'identifiant : minuscules, chiffres, "
+        "point, tiret et souligné seulement.",
+    "scaffold_existe_deja":
+        "{path} existe déjà. Choisis un autre identifiant, ou retire ce "
+        "répertoire : un squelette n'écrase jamais du travail.",
+    "scaffold_runtime_inconnu":
+        "Runtime « {name} » inconnu. Valeurs possibles : {connus}.",
+    "scaffold_hors_catalogue":
+        "{path} n'est pas un catalogue : aucun meta.yml à sa racine. "
+        "Place-toi dans un catalogue, ou crées-en un : dsoxlab new catalog <id>",
+
     "cmd_catalog_help":
         "Découvre, installe et met à jour les catalogues de labs.",
     "cmd_catalog_list_help":
@@ -479,6 +515,16 @@ Chaque lab déclare :
   [cyan]demo[/cyan]                 Installe un catalogue de démonstration et un premier lab
                        jouable immédiatement, sans rien cloner ni provisionner.
     [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
+
+  [cyan]new catalog <id>[/cyan]     Crée un catalogue vide mais conforme : meta.yml,
+                       labs/, .gitignore, ssh/. Il passe [cyan]validate-structure[/cyan]
+                       sans retouche.
+    [dim]--in <dir>[/dim]           Où le créer. Défaut : le répertoire courant.
+  [cyan]new lab <id>[/cyan]         Crée un lab conforme, découvert dès le prochain
+                       [cyan]list-labs[/cyan]. Son test [bold]échoue[/bold] tant qu'il n'est pas
+                       écrit : un squelette vert d'emblée apprendrait à noter
+                       sans rien vérifier.
+    [dim]--runtime <type>[/dim]     [bold]shell[/bold] (atelier local) ou [bold]vm[/bold] (machine dédiée).
 
   [cyan]catalog list[/cyan]         Les catalogues connus, et ceux qui sont installés.
     [dim]--json[/dim]               Document machine plutôt que tableaux.

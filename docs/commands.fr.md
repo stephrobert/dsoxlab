@@ -39,6 +39,8 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |
 | `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |
 | `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
+| `dsoxlab new catalog` | Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/. |
+| `dsoxlab new lab` | Crée un lab conforme, découvert dès le prochain list-labs. |
 | `dsoxlab next` | Recommande le prochain lab ou challenge à compléter dans le contexte actif. |
 | `dsoxlab progress` | Affiche la progression par bloc (labs complétés, score moyen, challenges et capstones). |
 | `dsoxlab provision` | Provisionne l'infrastructure du lab (terraform apply sur le provider courant). |
