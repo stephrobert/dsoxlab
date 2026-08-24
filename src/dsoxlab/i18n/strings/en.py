@@ -13,6 +13,8 @@ STRINGS: dict[str, str] = {
     "opt_type":     "Filter by type: lab, challenge or capstone",
     "opt_bloc":     "Filter by bloc number (1-8)",
     "opt_top":      "Number of displayed results",
+    "opt_doctor_strict":
+        "exit 9 if a required check fails, 10 if it could not be measured — for a script, not a human",
     "opt_fix":      "Attempt automatic remediation of missing components.",
     "opt_no_pager": "Print everything at once instead of paging output longer than the screen.",
     "opt_use_provider":
@@ -535,6 +537,9 @@ Each lab declares:
                        Informational components are left alone.
     [dim]--json[/dim]               The diagnosis as a document, each check carrying a
                        stable key and state. Not with [bold]--fix[/bold].
+    [dim]--strict[/dim]             Turn the diagnosis into an exit code, for a script:
+                       [bold]9[/bold] if a required check fails, [bold]10[/bold] if it could not
+                       be measured. Without it, doctor always exits 0.
 
   [cyan]demo[/cyan]                 Install a demonstration catalog and a first lab you can
                        play right away, with nothing to clone or provision.

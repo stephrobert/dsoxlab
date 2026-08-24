@@ -33,7 +33,8 @@ to know whether something is green or red.
 And one consequence worth stating on its own: **`--json` changes the shape of
 the output, never the verdict nor the exit code.** `check` on a failing lab
 exits 1 with or without it; `validate-structure` exits 1 as soon as one lab
-fails; `doctor` exits 0 either way and puts its verdict in `ok`. On a *hard*
+fails; `doctor` exits 0 either way and puts its verdict in `ok`
+(it is `--strict`, not `--json`, that turns it into an exit code). On a *hard*
 error — an unknown lab id, an unreadable `meta.yml` — standard output stays
 empty, the reason goes to standard error, and the exit code is unchanged. Read
 the exit code first.
@@ -51,7 +52,7 @@ the exit code first.
 | `dsoxlab scores` | the score history and exam verdicts | 0 |
 | `dsoxlab check <id>` | the test result and the score | 0, or 1 when the lab fails (document still printed) |
 | `dsoxlab status` | SSH reachability of the declared hosts | 0, or 1 when a declared host does not answer (document still printed) |
-| `dsoxlab doctor` | the environment diagnosis | 0, always — the verdict is in `ok` |
+| `dsoxlab doctor` | the environment diagnosis | 0, always — the verdict is in `ok`. With `--strict`, 9 (a required check fails) or 10 (a required check could not be measured) |
 | `dsoxlab validate-structure` | every contract issue found | 0, or 1 as soon as one lab fails (document still printed) |
 | `dsoxlab support` | the anonymised diagnostic report | 0 |
 
@@ -389,6 +390,36 @@ sentence. Merging them would have an automation run a documentation URL.
 remediation is never run by `--fix`, and a `needs_relogin` or `needs_reboot`
 one succeeds while its check keeps reporting `failed` until the session or
 the machine restarts — that is a delayed effect, not a failure.
+
+### The exit code, and the two modes
+
+By default `doctor` exits **0 whatever happens**: the verdict lives in `ok`.
+That is the right call for a human — a diagnosis is not a failure — but it made
+the command useless as a gate, since a script had to read the document to learn
+whether anything was missing.
+
+`--strict` turns the diagnosis into an exit code. It changes **nothing** else:
+the table and the document are still rendered identically, before the code
+lands.
+
+| Mode | Code | When |
+| --- | --- | --- |
+| `doctor` | `0` | always, including when a required check fails |
+| `doctor --strict` | `0` | every required check is `ok` |
+| `doctor --strict` | `9` | at least one required check is `failed` or `choice_required` |
+| `doctor --strict` | `10` | no failure, but at least one required check is `unknown` |
+
+Two codes rather than one, because the two situations call for different
+gestures: `9` gets repaired, `10` gets measured again. An environment whose
+probe did not complete is not validated for all that — which is exactly what an
+image build must not mistake for a success.
+
+`9` wins when both coexist: a certainty outweighs an ignorance.
+
+`--strict` combines with `--json`, and the order matters: the document goes to
+standard output **before** the code is returned, exactly like
+`validate-structure`. A caller receiving a non-zero code can still read what
+went wrong.
 
 ## `validate-structure`
 
