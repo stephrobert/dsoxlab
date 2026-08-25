@@ -9,6 +9,36 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.85] - 2026-08-24
+
+### Corrigé
+
+- **Le guide auteur ne décrit plus un piège que la 0.1.84 a supprimé** (issue
+  #195). `docs/catalog-author.md` annonçait encore qu'une fixture non déclarée
+  passait en silence — « nothing says so » — douze versions après l'ajout du
+  contrôle qui la signale. La page dit désormais ce qui se passe réellement,
+  dans les deux sens et avec le code de sortie.
+
+### Ajouté
+
+- **Un test tient le guide auteur en phase avec les validators.** Toute clé
+  d'anomalie qu'un validator peut produire doit être citée dans
+  `docs/catalog-author.*`, et aucune clé disparue ne peut y rester. Ajouter un
+  contrôle sans le documenter fait échouer la suite, et le message nomme la clé
+  manquante.
+
+  Corriger une phrase périmée ne protège de rien : elle repérimera. Ce qui
+  manquait est un lien **mécanique** entre ce que le validateur détecte et ce que
+  la documentation en dit. Le garde-fou ne sait pas lire une phrase, mais il
+  force à ouvrir la page au moment où le comportement change — et c'est ce
+  moment-là qui manquait.
+
+  Les pages ont gagné la table que cela exigeait : les 25 clés sur lesquelles un
+  auteur peut agir, avec le sens de chacune. Trois clés sont exemptées
+  nommément : elles dépendent du réseau ou d'un incident de fichier, pas du
+  contrat qu'un auteur écrit.
+
+
 ## [0.1.84] - 2026-08-24
 
 Cette version clôt l'audit des angles morts. Son contenu a été développé

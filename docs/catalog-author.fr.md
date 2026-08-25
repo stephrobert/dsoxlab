@@ -89,6 +89,40 @@ faute, il a fait un autre choix).
 
 `--check-urls` ajoute le seul contrôle réseau : chaque `doc_url` doit répondre.
 
+### Chaque clé, et ce qu'elle veut dire
+
+Le validateur nomme chaque anomalie par une clé stable. Un test tient cette table
+en phase avec le code : ajouter un contrôle sans le documenter ici fait échouer
+la suite.
+
+| Clé | Ce que ça veut dire |
+| --- | --- |
+| `struct_missing_file` | un fichier requis est absent |
+| `struct_missing_dir` | `challenge/tests/` est absent |
+| `struct_vm_targets_empty` | un lab `vm` ne déclare aucune `runtime.targets` |
+| `struct_default_unknown` | `runtime.default` nomme une target que `targets[]` ne définit pas |
+| `struct_shell_workdir_empty` | un lab `shell` ne déclare pas de `runtime.workdir` |
+| `struct_session_unknown` | `runtime.session` n'est ni `target` ni `local` |
+| `metadata_field_empty` | un champ requis est vide |
+| `metadata_list_empty` | `skills` ou `distros` est une liste vide |
+| `metadata_doc_url_scheme` | `doc_url` n'est pas en http(s) |
+| `metadata_lab_type_invalid` | `lab_type` sort de l'énuméré |
+| `metadata_exam_score_invalid` | `exam_passing_score` est hors bornes |
+| `content_broken_links` | un lien relatif ne pointe sur rien |
+| `content_missing_english` | un document n'est traduit que d'un côté |
+| `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |
+| `content_scoring_count_mismatch` | l'en-tête annonce un autre nombre de tâches notées |
+| `content_scoring_tasks_vs_tests` | tâches notées et tests ne se correspondent pas |
+| `content_target_host_unknown` | l'hôte d'une target est absent de `infra.hosts[]` |
+| `content_role_host_unknown` | une entrée de `roles` nomme un hôte inconnu |
+| `content_solution_plaintext` | un fichier de `solution/` est lisible en clair |
+| `content_fixture_missing` | une fixture est déclarée mais absente de `fixtures/` |
+| `content_fixture_undeclared` | un fichier est dans `fixtures/` sans être déclaré |
+| `content_fixture_escapes` | un chemin de fixture est absolu ou contient `..` |
+| `content_doc_url_no_scheme` | `doc_url` ne porte aucun schéma d'URL |
+| `content_doc_url_scheme` | `doc_url` emploie un schéma autre que http(s) |
+| `schema_version_too_new` | le fichier déclare un `schema_version` que ce dsoxlab ne sait pas lire |
+
 **Ce qu'il ne peut pas vérifier :** qu'un lab listé dans `meta.yml` existe sur le
 disque. Le validator parcourt ce que la découverte a déjà chargé. D'où l'ordre
 ci-dessus.
@@ -114,20 +148,30 @@ labs et **nommer** les blocs ; le rattachement compare le chemin relatif depuis
 répertoire de lab. La préparation est déclarative (`lab.yaml`) ou Ansible
 (`setup.yaml`).
 
-**5. Une fixture non déclarée n'est pas copiée, et rien ne le signale.** Le
-runtime shell itère sur `runtime.fixtures`, **pas** sur le répertoire
-`fixtures/`. Un lab qui livre des fichiers sans les déclarer ouvre sur un
-répertoire de travail vide, et l'apprenant n'a rien à faire. Le contrôle se fait
-à la main :
+**5. `fixtures/` et `runtime.fixtures` doivent dire la même chose.** Le runtime
+shell itère sur `runtime.fixtures`, **pas** sur le répertoire `fixtures/` — les
+deux peuvent donc diverger, et les deux sens échouaient en silence. Depuis la
+0.1.84, plus aucun :
 
-```bash
-dsoxlab run <id>
-ls <lab>/challenge/work      # doit lister exactement ce que fixtures déclare
-```
+| Situation | Ce qui se passe |
+| --- | --- |
+| déclarée, absente du disque | `run` **échoue** (code 2) et nomme toutes les fautives d'un coup |
+| présente sur le disque, non déclarée | `validate-structure` la signale (`content_fixture_undeclared`) |
+| chemin qui sort du workdir | signalé, et refusé à l'exécution (`content_fixture_escapes`) |
+
+La validation précède **toute** copie : c'est donc tout ou rien, parce qu'un
+répertoire de travail à moitié rempli a l'air de marcher, et que l'apprenant
+cherche alors l'erreur dans son propre travail. Ce défaut a rendu **7 labs
+injouables le 2026-07-28**, tous marqués faits — il se cachait d'autant mieux
+que les outils de vérification des corrigés copient, eux, le répertoire entier :
+la solution passait au vert pendant que le parcours apprenant était cassé.
+
+Les fichiers cachés (`.gitkeep`) sont exemptés : ils servent à versionner un
+répertoire vide, et les signaler serait un faux positif que chaque auteur
+apprendrait à ignorer.
 
 Le chemin déclaré est préservé : `modules/stockage/main.tf` atterrit sous
-`<workdir>/modules/stockage/main.tf`, répertoires intermédiaires compris. Un
-chemin absolu, ou contenant `..`, est refusé avec un avertissement.
+`<workdir>/modules/stockage/main.tf`, répertoires intermédiaires compris.
 
 **6. Une clé hors contrat est signalée, pas refusée.** Depuis la 0.1.54,
 `validate-structure` nomme toute clé que le moteur ne lira jamais, avec la plus
