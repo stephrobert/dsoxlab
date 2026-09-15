@@ -44,7 +44,54 @@ jobs:
         with:
           persist-credentials: false
 
+      # Two attempts, and this is not superstition.
+      #
+      # GitHub's GraphQL API intermittently returns an internal error when
+      # Scorecard runs RIGHT AFTER a push: "ListCommits: error during
+      # graphqlHandler.setup: internal error: githubv4.Query: Something went
+      # wrong while executing your query". The commit has just landed and its
+      # associated data has not propagated on GitHub's side yet.
+      #
+      # Measured on 2026-09-15 across the fleet: several push runs failed during
+      # a burst of merges, and the SAME repositories analysed cleanly minutes
+      # later without a single line having changed. The query was replayed by
+      # hand: it passes. So this is not broken data, it is a moment.
+      #
+      # Without a second attempt the branch stays red for a failure that is not
+      # ours, and a red branch people learn to ignore stops being useful.
       - name: Run Scorecard
+        id: scorecard
+        continue-on-error: true
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+          # Without this, Branch-Protection cannot be evaluated at all: the
+          # default GITHUB_TOKEN may not read *classic* branch protection, and
+          # the check returned `-1` — an internal error, silently excluded from
+          # the average rather than scored.
+          #
+          # A fine-grained PAT with `Administration: Read` (plus the Metadata
+          # that comes with it) is what Scorecard documents for this case. The
+          # token is reused from plumber.yml, which needs the exact same right
+          # for `branchMustBeProtected` — one privileged credential to rotate,
+          # not two.
+          #
+          # Note: had this repository used a *ruleset* instead of classic branch
+          # protection, no token would be needed — rulesets are readable by the
+          # default GITHUB_TOKEN.
+          repo_token: ${{ secrets.PLUMBER_ADMIN_TOKEN }}
+
+      - name: Let GitHub propagate the commit
+        if: steps.scorecard.outcome == 'failure'
+        run: sleep 90
+
+      # This one carries NO continue-on-error: if the second attempt fails too,
+      # the job fails, which is exactly what we want. A workflow that can no
+      # longer fail no longer measures anything.
+      - name: Run Scorecard (second attempt)
+        if: steps.scorecard.outcome == 'failure'
         uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
           results_file: results.sarif
