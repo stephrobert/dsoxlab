@@ -594,14 +594,25 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # TWO languages, and the second is not a flourish: this project is Python, but
+  # it also carries the workflows that build, sign and publish it — the half
+  # that runs with a token. Analysing only the Python left that half unwatched.
+  #
+  # `security-extended` rather than the default query set: the default aims for
+  # zero noise on a large application repository. It is already what the
+  # sibling scankit repository uses.
   codeql:
-    name: CodeQL analyze (python)
+    name: CodeQL analyze (${{ matrix.language }})
     needs: [zizmor, actionlint, poutine]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
       security-events: write   # upload the CodeQL results to Code Scanning
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
     steps:
       - name: Harden the runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -616,10 +627,12 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
-          languages: python
-          build-mode: none   # Python is interpreted, no build step to observe
+          languages: ${{ matrix.language }}
+          # Neither Python nor workflows compile: there is no build to observe.
+          build-mode: none
+          queries: security-extended
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
-          category: "/language:python"
+          category: "/language:${{ matrix.language }}"
