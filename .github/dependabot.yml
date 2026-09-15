@@ -1,5 +1,24 @@
+# Dependabot rules shared across the stephrobert repositories.
+#
+# This file is the SAME template in kubernetes-dsoxlab-training,
+# linux-dsoxlab-training, ansible-training, dsoxlab and scankit. Only the
+# package ecosystem changes with the language of the repository: `uv` for the
+# four Python repositories, `gomod` for scankit. A divergence is fixed by
+# realigning the repository on the template, not by adapting the template to
+# the repository.
+#
+# What the template fixes is the NUMBER of pull requests. Without a `groups`
+# block, Dependabot opens a branch, a PR and a full CI run PER DEPENDENCY.
+# Measured on 2026-09-15, the five repositories had five different
+# configurations: ansible-training, the only one whose package ecosystem had
+# no group, carried 6 open PRs, 5 of them for five packages of the same family
+# that ship on the same day and were never merged separately.
+#
+# It also satisfies Scorecard's Dependency-Update-Tool check, and surfaces
+# vulnerable transitive bumps early.
 version: 2
 updates:
+  # --- Python packages ------------------------------------------------------
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -8,43 +27,47 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     # Wait before proposing a brand-new release: a compromised package is
-    # usually yanked within days, so a cooldown shrinks the exposure window.
+    # usually yanked within days, so a cooldown shrinks the window in which we
+    # would have pulled it.
+    #
+    # The semver tiers are supported for PACKAGE ecosystems: a major waits two
+    # weeks, a patch three days.
     cooldown:
       default-days: 7
-    # One PR a week for everything that is not a major bump. Ungrouped, a
-    # single week produced four separate branches (ruff, pre-commit, typer,
-    # types-pyyaml), each with its own CI run, for updates nobody reviews one
-    # by one anyway.
-    #
-    # Majors stay on their own: they are the ones that break, and they are
-    # worth reading. Grouping them would also mean a single incompatible
-    # dependency blocks every other update in the same PR.
-    #
-    # Security updates are deliberately left ungrouped (the default,
-    # `applies-to: version-updates`): they are urgent and deserve a targeted
-    # PR, not a wait for the weekly batch.
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
-      python-minor-and-patch:
+      deps-minor-and-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
+  # --- GitHub Actions -------------------------------------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(ci)"
+    # `default-days` ONLY here: the semver-{major,minor,patch}-days cooldown
+    # tiers are NOT supported for the github-actions ecosystem. Declaring them
+    # fails validation on GitHub's side, which then stops opening PRs at all --
+    # and that looks exactly like "no update available". This project already
+    # learned it the hard way.
     cooldown:
       default-days: 7
-    # Same rule, and the case for it is even clearer here: the three
-    # `github/codeql-action/*` actions always ship the same version on the
-    # same day, so they used to open three PRs that were only ever merged
-    # together.
+    # One batch a week rather than one branch per action. The three
+    # `github/codeql-action/*` actions always ship the same version on the same
+    # day, and used to open three PRs that were only ever merged together.
     #
-    # Note for a future edit: the `semver-{major,minor,patch}-days` cooldown
-    # tiers are NOT supported for the github-actions ecosystem, only
-    # `default-days` is. Declaring them fails validation on GitHub's side,
-    # which this project already learned the hard way.
+    # Majors stay on their own: they are the ones that break, they deserve to
+    # be read, and grouping them would let one incompatible action block every
+    # other update in the batch.
+    #
+    # Security alerts stay out of the group, which is the default
+    # (`applies-to: version-updates`): they are urgent and deserve a targeted
+    # PR rather than waiting for the weekly batch.
     groups:
       actions-minor-and-patch:
         patterns: ["*"]
