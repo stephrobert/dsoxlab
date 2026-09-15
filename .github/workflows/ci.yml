@@ -251,6 +251,14 @@ jobs:
       - name: Install Python ${{ matrix.python-version }}
         run: uv python install "$PYTHON_VERSION"
 
+      # `--frozen` installs from the lock WITHOUT checking it against the
+      # pyproject: a lock that has drifted installs happily, and the
+      # vulnerability scanners keep reading a uv.lock that no longer describes
+      # what runs. `--check` neither resolves nor writes; it fails on a stale
+      # lock, and it belongs before the sync, not after.
+      - name: The lock still describes the pyproject
+        run: uv lock --check
+
       - name: Sync dependencies (locked)
         run: uv sync --frozen --python "$PYTHON_VERSION"
 
