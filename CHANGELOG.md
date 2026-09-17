@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.86] - 2026-09-17
+
+### Added
+
+- **`dsoxlab support --issue` opens the issue in the repository that should
+  receive it** (issue #225). `support` stopped one step short: it produced an
+  anonymised report "ready to paste", then left you to find the repository, the
+  template and the right field. That last step is where reports were lost, and
+  it happened just when the learner was already stuck on something else.
+
+  Routing is the real gain. A wrong brief, a test that does not prove the state
+  of the system, a dead `doc_url` are **catalogue** defects, not engine ones;
+  they still landed on the tool's repository for want of anywhere else to go,
+  and had to be transferred by hand afterwards. The CLI is the only one that can
+  tell without guessing: an active lab sends the issue to the catalogue, its
+  absence to the engine, and `--engine` / `--catalog` force the choice.
+
+  The **shape** is detected on disk, never assumed. An issue form ignores
+  `body=` and is filled field by field: a command written against `body` would
+  have looked like it worked while opening nothing but an empty form, with
+  nothing in the output to say so. dsoxlab therefore reads the
+  `.github/ISSUE_TEMPLATE/` of the target repository and fills the identifiers
+  it recognises (`lab`, `support`, `os`, `runtime`, `reproduce`), by exact
+  match. None is guessed from a label, and a repository without a form gets a
+  Markdown body instead.
+
+  **Length** is handled, not hoped for. Percent-encoding triples every byte, and
+  an over-long URL does not open: it returns a 414. The report is therefore cut
+  back in three steps, whole, then without its log lines, then bare form, and
+  the message says which of the three applies.
+
+  Nothing is sent without confirmation, `--yes` skips it for scripted use, and
+  `--print` returns the URL without opening a browser, like `guide --print`.
+
+- **`meta.yml: repo.issues_url`**, an optional contract field. It declares where
+  to file an issue about that catalogue. Without it the tool falls back to the
+  repository's `origin` remote, which works on all four current catalogues but
+  assumes a remote by that name and a host whose issues live under
+  `<repo>/issues`. Declaring it removes the assumption. **No catalogue address is
+  written in `src/dsoxlab/`**, and a token that an HTTPS clone may carry in clear
+  inside its remote is stripped before anything is displayed.
+
+### Fixed
+
+- **`dsoxlab support --log-lines 0` attached the whole log**, the exact opposite
+  of what its help has always promised ("0 to include none"). `lines[-0:]` is
+  `lines[0:]` in Python, so the slice meant to take nothing took everything. The
+  defect stayed invisible as long as nobody asked for zero lines; it surfaced the
+  day report length started deciding something.
+
 ## [0.1.85] - 2026-08-24
 
 ### Fixed

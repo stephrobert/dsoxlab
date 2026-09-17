@@ -60,10 +60,12 @@ body:
     id: runtime
     attributes:
       label: Runtime involved
+      # The contract values, not their compatibility aliases: `runtime.type` is
+      # `vm`, and `kvm`/`incus` name a provider. `dsoxlab support --issue` fills
+      # this field, and it can only fill an option that exists here.
       options:
         - shell
-        - incus
-        - kvm
+        - vm
         - not applicable
     validations:
       required: false

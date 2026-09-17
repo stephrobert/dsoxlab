@@ -156,6 +156,14 @@ def collecter(*, lignes_journal: int = 30) -> dict[str, Any]:
         catalogue["labs_vm"] = sum(
             1 for lab in labs if lab.runtime.type.value in ("vm", "kvm", "incus")
         )
+        # Le runtime du lab actif, et non celui du dépôt : un dépôt mixte porte
+        # les deux, et c'est bien le lab en cours qui explique la panne. Rendu
+        # sous la valeur du contrat (`vm`), jamais sous ses alias historiques
+        # `kvm`/`incus`, qui désignent un provider et non un runtime.
+        actif = next((lab for lab in labs if lab.id == contexte.active_lab), None)
+        if actif is not None:
+            brut = actif.runtime.type.value
+            catalogue["runtime_lab_actif"] = "vm" if brut in ("vm", "kvm", "incus") else brut
     except Exception as exc:  # noqa: BLE001 : un rapport partiel vaut mieux que rien
         catalogue["erreur"] = anonymiser(f"{type(exc).__name__}: {exc}")
     rapport["catalogue"] = catalogue

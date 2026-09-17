@@ -26,13 +26,15 @@ import os
 import shutil
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
 from ..i18n import _
 from ..reporting import (
+    console,
     error,
     info,
     machine,
@@ -58,6 +60,9 @@ from ._commun import (
     _root,
 )
 from ._socle import app, completion_app
+
+if TYPE_CHECKING:  # pragma: no cover - import de typage seulement
+    from ..models import RepoMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -407,9 +412,36 @@ def support(
     lignes: Annotated[
         int, typer.Option("--log-lines", help=_("opt_support_log_lines"))
     ] = 30,
+    issue: Annotated[
+        bool, typer.Option("--issue", help=_("opt_support_issue"))
+    ] = False,
+    print_only: Annotated[
+        bool, typer.Option("--print", help=_("opt_support_print"))
+    ] = False,
+    moteur: Annotated[
+        bool, typer.Option("--engine", help=_("opt_support_engine"))
+    ] = False,
+    catalogue: Annotated[
+        bool, typer.Option("--catalog", help=_("opt_support_catalog"))
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help=_("opt_yes"))] = False,
+    lab_home: LabHomeOption = None,
 ) -> None:
     """Rapport de diagnostic anonymisé, prêt à coller dans une issue."""
     from ..services.support import collecter, en_markdown
+
+    if as_json and issue:
+        # `--json` promet un document et rien d'autre sur la sortie standard ;
+        # `--issue` dialogue et ouvre un navigateur. Les deux ensemble ne
+        # veulent rien dire, et le silence ferait croire que l'issue est partie.
+        error(_("issue_json_exclusif"))
+        raise typer.Exit(2)
+    if moteur and catalogue:
+        error(_("issue_cible_ambigue"))
+        raise typer.Exit(2)
+    if print_only and not issue:
+        error(_("issue_print_sans_issue"))
+        raise typer.Exit(2)
 
     rapport = collecter(lignes_journal=max(0, lignes))
 
@@ -421,10 +453,132 @@ def support(
     # une issue. Rich l'habillerait de couleurs et le couperait à la largeur du
     # terminal, ce qui casserait les tableaux Markdown une fois collés.
     print(en_markdown(rapport))
-    info(_("support_hint"))
+
+    if not issue:
+        info(_("support_hint"))
+        return
+
+    _ouvrir_issue(
+        rapport,
+        root=_root(lab_home),
+        vers_moteur=moteur,
+        vers_catalogue=catalogue,
+        print_only=print_only,
+        assume_yes=yes,
+    )
 
 
-# ── fullhelp ──────────────────────────────────────────────────────────────────
+def _repo_meta_tolerant(root: Path) -> RepoMetadata | None:
+    """Le ``meta.yml``, ou ``None`` s'il ne se lit pas. Ne sort jamais.
+
+    ``_read_repo`` sort en 1 sur un contrat illisible, ce qui est juste partout
+    ailleurs. Pas ici : un catalogue cassé est précisément ce qu'on veut
+    signaler, et refuser d'ouvrir l'issue à cause de lui serait le comble.
+    """
+    from ..discovery.repo import read_repo_metadata
+
+    try:
+        return read_repo_metadata(root)
+    except Exception as exc:  # noqa: BLE001 : aucune cause ne doit empêcher le rapport
+        logger.warning("unreadable meta.yml for issue routing: %s", exc)
+        return None
+
+
+def _contexte_issue(rapport: dict[str, Any]) -> tuple[dict[str, str], str]:
+    """Les champs déductibles du rapport, et l'identifiant du lab actif.
+
+    Rien n'est inventé : chaque valeur vient du rapport déjà collecté. Ce qui
+    n'y figure pas reste vide, et c'est à l'apprenant de l'écrire.
+    """
+    catalogue = rapport.get("catalogue") or {}
+    lab_actif = str(catalogue.get("lab_actif") or "")
+    section = str(catalogue.get("section_active") or "")
+
+    reproduce = ""
+    if lab_actif:
+        # Un canevas, pas une affirmation : on sait quel lab est ouvert, pas ce
+        # que l'apprenant a tapé. Les deux premières lignes lui épargnent la
+        # recopie, la troisième est la seule qui compte et reste à lui.
+        etapes = [f"1. dsoxlab use {section}"] if section else []
+        etapes.append(f"{len(etapes) + 1}. dsoxlab run {lab_actif}")
+        etapes.append(f"{len(etapes) + 1}. ")
+        reproduce = "\n".join(etapes)
+
+    champs = {
+        "lab": lab_actif,
+        "os": str(rapport.get("distribution") or ""),
+        "runtime": str(catalogue.get("runtime_lab_actif") or ""),
+        "reproduce": reproduce,
+    }
+    return champs, lab_actif
+
+
+def _ouvrir_issue(
+    rapport: dict[str, Any],
+    *,
+    root: Path,
+    vers_moteur: bool,
+    vers_catalogue: bool,
+    print_only: bool,
+    assume_yes: bool,
+) -> None:
+    """Route, montre, demande, puis ouvre. Jamais dans un autre ordre."""
+    from ..services.issue_service import (
+        Cible,
+        Repli,
+        construire_lien,
+        resoudre_destination,
+    )
+    from ..services.support import en_markdown
+
+    champs, lab_actif = _contexte_issue(rapport)
+
+    # Le lab actif décide, faute d'instruction contraire : un défaut rencontré
+    # dans un lab est, le plus souvent, un défaut de ce lab.
+    if vers_catalogue:
+        cible = Cible.CATALOGUE
+    elif vers_moteur:
+        cible = Cible.MOTEUR
+    else:
+        cible = Cible.CATALOGUE if lab_actif else Cible.MOTEUR
+
+    destination = resoudre_destination(root, _repo_meta_tolerant(root), cible=cible)
+    if destination is None:
+        error(_("issue_sans_destination"))
+        raise typer.Exit(2)
+
+    lien = construire_lien(
+        destination,
+        contexte=champs,
+        rapport=en_markdown(rapport),
+        rapport_court=en_markdown({**rapport, "journal": []}),
+    )
+
+    info(_(
+        "issue_destination",
+        depot=destination.libelle,
+        cible=_(destination.cible.cle_i18n),
+        origine=_(destination.origine.cle_i18n),
+    ))
+    if lien.repli is Repli.SANS_JOURNAL:
+        warn(_("issue_repli_sans_journal"))
+    elif lien.repli is Repli.VIDE:
+        warn(_("issue_repli_vide"))
+
+    if print_only:
+        # soft_wrap : une URL coupée sur deux lignes n'est plus copiable. Même
+        # raison que pour `guide --print`, et même geste.
+        console.print(lien.url, soft_wrap=True)
+        return
+
+    if not assume_yes and not typer.confirm(_("issue_confirmer", depot=destination.libelle)):
+        info(_("issue_abandon"))
+        return
+
+    console.print(lien.url, soft_wrap=True)
+    if not webbrowser.open(lien.url):
+        error(_("issue_sans_navigateur"))
+
 
 # ── fullhelp ──────────────────────────────────────────────────────────────────
 

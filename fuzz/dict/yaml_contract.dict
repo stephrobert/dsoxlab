@@ -33,6 +33,7 @@ id="id:"
 category="category:"
 title="title:"
 blog_url="blog_url:"
+issues_url="issues_url:"
 description="description:"
 
 # ── meta.yml : infra ──

@@ -9,6 +9,57 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.86] - 2026-09-17
+
+### Ajouté
+
+- **`dsoxlab support --issue` ouvre l'issue dans le dépôt qui doit la recevoir**
+  (issue #225). `support` s'arrêtait à un pas du but : il produisait un rapport
+  anonymisé « prêt à coller », puis laissait trouver le dépôt, le template et le
+  bon champ. Ce dernier pas est celui où le rapport se perdait, et il survenait
+  au moment où l'apprenant était déjà bloqué par autre chose.
+
+  Le routage est le vrai apport. Un énoncé faux, un test qui ne prouve pas
+  l'état du système, une `doc_url` morte sont des défauts de **catalogue**, pas
+  du moteur ; ils atterrissaient pourtant sur le dépôt de l'outil faute de savoir
+  où aller, et il fallait ensuite les transférer à la main. La CLI est la seule à
+  pouvoir trancher sans se tromper : un lab actif envoie l'issue au catalogue,
+  son absence au moteur, et `--engine` / `--catalog` forcent le choix.
+
+  La **forme** est détectée sur le disque, jamais supposée. Un formulaire d'issue
+  ignore `body=` et se remplit par identifiant de champ : une commande écrite
+  contre `body` aurait eu l'air de marcher tout en n'ouvrant qu'un formulaire
+  vide, sans que rien ne le dise. dsoxlab lit donc le
+  `.github/ISSUE_TEMPLATE/` du dépôt visé et remplit les identifiants qu'il
+  reconnaît (`lab`, `support`, `os`, `runtime`, `reproduce`), par correspondance
+  exacte. Aucun n'est deviné d'après un libellé, et un dépôt sans formulaire
+  reçoit un corps Markdown.
+
+  La **longueur** est traitée, pas espérée. Le percent-encoding triple chaque
+  octet, et une URL trop longue ne s'ouvre pas : elle rend un 414. Le rapport
+  est donc réduit en trois temps, entier, puis sans ses lignes de journal, puis
+  formulaire nu, et le message dit lequel des trois s'applique.
+
+  Rien ne part sans confirmation, `--yes` la contourne pour un usage scripté, et
+  `--print` rend l'URL sans ouvrir de navigateur, comme `guide --print`.
+
+- **`meta.yml: repo.issues_url`**, champ optionnel du contrat. Il déclare où
+  déposer une issue qui concerne ce catalogue. Sans lui, l'outil retombe sur le
+  remote `origin` du dépôt, ce qui marche sur les quatre catalogues actuels mais
+  suppose un remote portant ce nom et un hébergeur dont les issues vivent sous
+  `<dépôt>/issues`. Le déclarer lève cette supposition. **Aucune adresse de
+  catalogue n'est écrite dans `src/dsoxlab/`**, et le jeton qu'un remote cloné
+  par HTTPS peut porter en clair est retiré avant tout affichage.
+
+### Corrigé
+
+- **`dsoxlab support --log-lines 0` joignait le journal entier**, à l'exact
+  opposé de ce que son aide promet depuis toujours (« 0 pour n'en joindre
+  aucune »). `lignes[-0:]` vaut `lignes[0:]` en Python, donc la tranche censée
+  ne rien prendre prenait tout. Le défaut restait invisible tant que personne ne
+  demandait zéro ligne ; il s'est vu du jour où la longueur du rapport a
+  commencé à décider de quelque chose.
+
 ## [0.1.85] - 2026-08-24
 
 ### Corrigé

@@ -33,7 +33,8 @@
         },
         "title": { "type": "string", "description": "Human-readable name." },
         "blog_url": { "type": "string", "description": "Home page of the online course." },
-        "description": { "type": "string", "description": "One paragraph about the repository." }
+        "description": { "type": "string", "description": "One paragraph about the repository." },
+        "issues_url": { "type": "string", "description": "Where to file an issue about THIS catalogue rather than about the engine. Read by `dsoxlab support --issue`. Optional: without it the tool falls back to the repository's `origin` remote." }
       }
     },
 
