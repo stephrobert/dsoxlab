@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.87] - 2026-09-17
+
+### Corrigé
+
+- **`support --issue` n'envoie plus au moteur le rapport d'un catalogue au
+  seul motif qu'aucun lab n'a encore tourné** (issue #228). Jusqu'en 0.1.86, le
+  lab actif décidait de la destination. Depuis la racine d'un catalogue, section
+  posée et `repo.issues_url` déclaré, l'issue partait malgré tout vers le moteur
+  tant qu'aucun lab n'avait été lancé.
+
+  C'est exactement la situation de celui dont le `run` vient d'échouer, ou qui
+  n'arrive pas à provisionner : son rapport partait au moteur alors que la cause
+  pouvait très bien être le `setup.yaml` d'un lab. Cela rendait aussi
+  invérifiable le critère d'acceptation des catalogues eux-mêmes, `use
+  <section>` puis `support --issue` ne pouvant pas atteindre le catalogue sur
+  trois des quatre.
+
+  La règle tient désormais en une phrase, et c'est ce qui la rend tenable :
+  **on écrit au catalogue dès qu'on en a un sous la main et qu'on sait où lui
+  écrire, au moteur sinon.** Elle ne distingue pas selon l'origine de l'adresse
+  (`repo.issues_url` ou remote `origin`) : deux règles là où une suffit seraient
+  deux règles à expliquer, et `--engine` reste le recours de celui qui sait que
+  son défaut vient de l'outil. Un catalogue identifiable mais sans adresse
+  joignable retombe sur le moteur plutôt que d'échouer, perdre le rapport étant
+  pire ; un `--catalog` explicite, lui, le dit au lieu de basculer en douce.
+
 ## [0.1.86] - 2026-09-17
 
 ### Ajouté

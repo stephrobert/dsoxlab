@@ -61,8 +61,9 @@ from ._commun import (
 )
 from ._socle import app, completion_app
 
-if TYPE_CHECKING:  # pragma: no cover - import de typage seulement
+if TYPE_CHECKING:  # pragma: no cover - imports de typage seulement
     from ..models import RepoMetadata
+    from ..services.issue_service import Destination
 
 logger = logging.getLogger(__name__)
 
@@ -484,8 +485,47 @@ def _repo_meta_tolerant(root: Path) -> RepoMetadata | None:
         return None
 
 
-def _contexte_issue(rapport: dict[str, Any]) -> tuple[dict[str, str], str]:
-    """Les champs déductibles du rapport, et l'identifiant du lab actif.
+def _router_issue(
+    root: Path,
+    repo_meta: RepoMetadata | None,
+    *,
+    vers_moteur: bool,
+    vers_catalogue: bool,
+) -> Destination | None:
+    """Le dépôt visé : le catalogue dès qu'on en a un et qu'on sait où lui écrire.
+
+    Le lab actif ne décide plus (issue #228). Il décidait jusqu'en 0.1.86, et
+    cela renvoyait au moteur quiconque n'avait pas encore lancé de lab, **depuis
+    la racine d'un catalogue**, section active posée et ``repo.issues_url``
+    déclaré. Or c'est exactement la situation de celui dont le ``run`` vient
+    d'échouer, ou qui n'arrive pas à provisionner : son rapport partait au
+    moteur alors que la cause pouvait être le ``setup.yaml`` d'un lab.
+
+    La règle tient désormais en une phrase, et c'est ce qui la rend tenable : on
+    écrit au catalogue quand on en a un sous la main et qu'on sait où lui
+    écrire, au moteur sinon. Elle ne distingue pas selon l'origine de l'adresse
+    (``repo.issues_url`` ou remote ``origin``) : deux règles là où une suffit
+    seraient deux règles à expliquer, et ``--engine`` reste le recours de celui
+    qui sait que son défaut vient de l'outil.
+    """
+    from ..services.issue_service import Cible, resoudre_destination
+
+    if vers_moteur:
+        return resoudre_destination(root, repo_meta, cible=Cible.MOTEUR)
+    if vers_catalogue:
+        return resoudre_destination(root, repo_meta, cible=Cible.CATALOGUE)
+
+    # `repo_meta is None` veut dire « pas de catalogue ici, ou illisible ». Dans
+    # les deux cas on ne peut rien affirmer sur un lab, donc le moteur.
+    if repo_meta is not None:
+        trouve = resoudre_destination(root, repo_meta, cible=Cible.CATALOGUE)
+        if trouve is not None:
+            return trouve
+    return resoudre_destination(root, repo_meta, cible=Cible.MOTEUR)
+
+
+def _contexte_issue(rapport: dict[str, Any]) -> dict[str, str]:
+    """Les champs déductibles du rapport.
 
     Rien n'est inventé : chaque valeur vient du rapport déjà collecté. Ce qui
     n'y figure pas reste vide, et c'est à l'apprenant de l'écrire.
@@ -510,7 +550,7 @@ def _contexte_issue(rapport: dict[str, Any]) -> tuple[dict[str, str], str]:
         "runtime": str(catalogue.get("runtime_lab_actif") or ""),
         "reproduce": reproduce,
     }
-    return champs, lab_actif
+    return champs
 
 
 def _ouvrir_issue(
@@ -523,26 +563,17 @@ def _ouvrir_issue(
     assume_yes: bool,
 ) -> None:
     """Route, montre, demande, puis ouvre. Jamais dans un autre ordre."""
-    from ..services.issue_service import (
-        Cible,
-        Repli,
-        construire_lien,
-        resoudre_destination,
-    )
+    from ..services.issue_service import Repli, construire_lien
     from ..services.support import en_markdown
 
-    champs, lab_actif = _contexte_issue(rapport)
+    champs = _contexte_issue(rapport)
 
-    # Le lab actif décide, faute d'instruction contraire : un défaut rencontré
-    # dans un lab est, le plus souvent, un défaut de ce lab.
-    if vers_catalogue:
-        cible = Cible.CATALOGUE
-    elif vers_moteur:
-        cible = Cible.MOTEUR
-    else:
-        cible = Cible.CATALOGUE if lab_actif else Cible.MOTEUR
-
-    destination = resoudre_destination(root, _repo_meta_tolerant(root), cible=cible)
+    destination = _router_issue(
+        root,
+        _repo_meta_tolerant(root),
+        vers_moteur=vers_moteur,
+        vers_catalogue=vers_catalogue,
+    )
     if destination is None:
         error(_("issue_sans_destination"))
         raise typer.Exit(2)

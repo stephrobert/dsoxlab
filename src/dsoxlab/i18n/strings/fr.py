@@ -654,8 +654,8 @@ Chaque lab déclare :
     [dim]--json[/dim]               Le même contenu, en document machine.
     [dim]--log-lines <n>[/dim]      Nombre de lignes de journal jointes (0 pour aucune).
     [dim]--issue[/dim]              Ouvre une issue pré-remplie dans le dépôt qui doit
-                         la recevoir : le catalogue de labs quand un lab est
-                         actif, le moteur sinon.
+                         la recevoir : le catalogue de labs dès qu'on se trouve
+                         dans l'un d'eux, le moteur sinon.
     [dim]--engine[/dim]             Force le dépôt du moteur.
     [dim]--catalog[/dim]            Force le catalogue de labs.
     [dim]--print[/dim]              Affiche l'URL au lieu d'ouvrir un navigateur.

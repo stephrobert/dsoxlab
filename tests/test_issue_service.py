@@ -25,6 +25,7 @@ from typer.testing import CliRunner
 
 import dsoxlab
 from dsoxlab.cli import app
+from dsoxlab.cli.diagnostic import _router_issue
 from dsoxlab.i18n.strings.en import STRINGS as EN
 from dsoxlab.i18n.strings.fr import STRINGS as FR
 from dsoxlab.logging_setup import dernieres_lignes
@@ -384,6 +385,92 @@ def test_le_dropdown_runtime_du_moteur_offre_les_valeurs_du_contrat() -> None:
     options = set(champs["runtime"]["attributes"]["options"])
 
     assert {"vm", "shell"} <= options
+
+
+# ── routage : le lab actif ne décide plus (issue #228) ────────────────────────
+
+def test_un_catalogue_joignable_recoit_l_issue_sans_aucun_lab_actif(
+    tmp_path: Path,
+) -> None:
+    """Le cœur de l'issue #228.
+
+    Jusqu'en 0.1.86, le lab actif décidait : depuis la racine d'un catalogue,
+    section posée et ``repo.issues_url`` déclaré, l'issue partait quand même au
+    moteur tant qu'aucun lab n'avait tourné. C'est exactement la situation de
+    celui dont le ``run`` vient d'échouer, et dont le rapport concerne donc
+    presque toujours le catalogue.
+    """
+    _depot_git(tmp_path, "https://github.com/proprio/catalogue.git")
+    meta = RepoMetadata(
+        id="demo",
+        category="demo",
+        issues_url="https://github.com/proprio/catalogue/issues",
+    )
+
+    destination = _router_issue(
+        tmp_path, meta, vers_moteur=False, vers_catalogue=False
+    )
+
+    assert destination is not None
+    assert destination.cible is Cible.CATALOGUE
+    assert destination.libelle == "proprio/catalogue"
+
+
+def test_hors_de_tout_catalogue_l_issue_va_au_moteur(tmp_path: Path) -> None:
+    """``repo_meta`` à ``None`` veut dire « pas de catalogue ici, ou illisible »."""
+    destination = _router_issue(
+        tmp_path, None, vers_moteur=False, vers_catalogue=False
+    )
+
+    assert destination is not None
+    assert destination.cible is Cible.MOTEUR
+
+
+def test_un_catalogue_sans_adresse_retombe_sur_le_moteur(tmp_path: Path) -> None:
+    """Identifiable mais injoignable : on écrit au moteur plutôt que nulle part.
+
+    Sans dépôt git ni ``issues_url``, il n'y a aucune adresse à viser. Sortir en
+    erreur ferait perdre le rapport ; le moteur saura au moins le transférer.
+    """
+    destination = _router_issue(
+        tmp_path,
+        RepoMetadata(id="demo", category="demo"),
+        vers_moteur=False,
+        vers_catalogue=False,
+    )
+
+    assert destination is not None
+    assert destination.cible is Cible.MOTEUR
+
+
+def test_engine_force_le_moteur_depuis_un_catalogue(tmp_path: Path) -> None:
+    _depot_git(tmp_path, "https://github.com/proprio/catalogue.git")
+    meta = RepoMetadata(
+        id="demo",
+        category="demo",
+        issues_url="https://github.com/proprio/catalogue/issues",
+    )
+
+    destination = _router_issue(tmp_path, meta, vers_moteur=True, vers_catalogue=False)
+
+    assert destination is not None
+    assert destination.cible is Cible.MOTEUR
+
+
+def test_catalog_force_sans_adresse_ne_bascule_pas_en_douce(tmp_path: Path) -> None:
+    """``--catalog`` explicite ne doit pas se voir répondre le moteur.
+
+    L'appelant a nommé sa destination : lui en servir une autre serait pire que
+    de lui dire qu'elle est introuvable.
+    """
+    destination = _router_issue(
+        tmp_path,
+        RepoMetadata(id="demo", category="demo"),
+        vers_moteur=False,
+        vers_catalogue=True,
+    )
+
+    assert destination is None
 
 
 # ── les phrases existent dans les deux langues ────────────────────────────────
