@@ -163,4 +163,9 @@ def dernieres_lignes(nombre: int = 40) -> list[str]:
         lignes = chemin.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return []
+    # AVANT la tranche : `lignes[-0:]` vaut `lignes[0:]`, c'est-à-dire le
+    # journal entier, à l'exact opposé de ce que `--log-lines 0` promet. Le
+    # défaut ne se voyait pas tant que personne ne demandait zéro ligne.
+    if nombre <= 0:
+        return []
     return lignes[-nombre:]

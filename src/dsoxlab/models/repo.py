@@ -353,6 +353,13 @@ class RepoMetadata:
     title: str = ""
     blog_url: str = ""
     description: str = ""
+    issues_url: str = ""
+    """Où déposer une issue qui concerne **ce catalogue**, et non le moteur.
+
+    Optionnel. Absent, ``dsoxlab support --issue`` retombe sur le remote ``origin``
+    du dépôt, ce qui suppose un hébergeur dont les issues vivent sous
+    ``<dépôt>/issues``. Le déclarer lève cette supposition."""
+
     infra: InfraDefinition = field(default_factory=InfraDefinition)
     sections: list[SectionDefinition] = field(default_factory=list)
     path: Path = field(default_factory=Path)
@@ -481,6 +488,7 @@ class RepoMetadata:
             title=str(repo.get("title", "")),
             blog_url=str(repo.get("blog_url", "")),
             description=str(repo.get("description", "")),
+            issues_url=str(repo.get("issues_url") or ""),
             infra=infra,
             sections=sections,
             path=meta_path.parent.resolve(),

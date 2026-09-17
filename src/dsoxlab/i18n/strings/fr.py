@@ -266,6 +266,47 @@ STRINGS: dict[str, str] = {
     "support_hint":
         "Collez ce rapport dans votre issue. Il ne contient ni chemin personnel, "
         "ni adresse publique, ni nom de machine.",
+    "opt_support_issue":
+        "Ouvre une issue pré-remplie dans le dépôt qui doit la recevoir.",
+    "opt_support_print":
+        "Affiche l'URL de l'issue au lieu d'ouvrir un navigateur (utile en SSH).",
+    "opt_support_engine":
+        "Signale un défaut du moteur dsoxlab, quel que soit le lab actif.",
+    "opt_support_catalog":
+        "Signale un défaut du catalogue de labs plutôt que du moteur.",
+    "issue_json_exclusif":
+        "--json et --issue ne se combinent pas : l'un imprime un document, "
+        "l'autre ouvre un navigateur.",
+    "issue_cible_ambigue":
+        "--engine et --catalog ne se combinent pas : choisissez le dépôt qui "
+        "doit recevoir l'issue.",
+    "issue_print_sans_issue":
+        "--print n'a de sens qu'accompagné de --issue.",
+    "issue_sans_destination":
+        "Aucune adresse d'issues n'est connue pour ce catalogue. Déclarez "
+        "repo.issues_url dans son meta.yml, ou passez --engine pour signaler "
+        "un défaut de l'outil lui-même.",
+    "issue_destination":
+        "Issue destinée à {depot} ({cible}), adresse tirée {origine}.",
+    "issue_cible_moteur":            "le moteur",
+    "issue_cible_catalogue":         "ce catalogue",
+    # L'article contracté appartient à la valeur, sans quoi la phrase composée
+    # rend « tirée de le remote git ». Le français ne se recolle pas par
+    # concaténation, et l'anglais n'a pas ce problème : les deux fichiers
+    # n'ont donc pas à porter la même découpe.
+    "issue_origine_paquet":          "des métadonnées du paquet",
+    "issue_origine_contrat":         "de meta.yml : repo.issues_url",
+    "issue_origine_remote":          "du remote git",
+    "issue_repli_sans_journal":
+        "L'URL était trop longue : les lignes de journal en ont été retirées. "
+        "Collez-les à la main depuis le rapport ci-dessus si elles comptent.",
+    "issue_repli_vide":
+        "Le rapport ne tient pas dans une URL : le formulaire s'ouvre vide, et "
+        "le rapport affiché ci-dessus est à coller à la main.",
+    "issue_confirmer":               "Ouvrir une issue sur {depot} dans le navigateur ?",
+    "issue_abandon":                 "Rien n'a été ouvert, et rien n'a été envoyé.",
+    "issue_sans_navigateur":
+        "Aucun navigateur n'a pu être ouvert : copiez l'URL ci-dessus.",
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
     "cmd_provision_help": "Provisionne l'infrastructure du lab (terraform apply sur le provider courant).",
     "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises.",
@@ -612,6 +653,13 @@ Chaque lab déclare :
                        par défaut (ni chemin personnel, ni adresse publique).
     [dim]--json[/dim]               Le même contenu, en document machine.
     [dim]--log-lines <n>[/dim]      Nombre de lignes de journal jointes (0 pour aucune).
+    [dim]--issue[/dim]              Ouvre une issue pré-remplie dans le dépôt qui doit
+                         la recevoir : le catalogue de labs quand un lab est
+                         actif, le moteur sinon.
+    [dim]--engine[/dim]             Force le dépôt du moteur.
+    [dim]--catalog[/dim]            Force le catalogue de labs.
+    [dim]--print[/dim]              Affiche l'URL au lieu d'ouvrir un navigateur.
+    [dim]--yes[/dim] [dim]/[/dim] [dim]-y[/dim]           Ouvre sans demander confirmation.
 
   [cyan]fullhelp[/cyan]             Ce guide.
 

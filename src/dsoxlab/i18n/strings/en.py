@@ -264,6 +264,43 @@ STRINGS: dict[str, str] = {
     "support_hint":
         "Paste this report into your issue. It carries no personal path, no "
         "public address and no machine name.",
+    "opt_support_issue":
+        "Open a prefilled issue in the repository that should receive it.",
+    "opt_support_print":
+        "Print the issue URL instead of opening a browser (useful over SSH).",
+    "opt_support_engine":
+        "Report against the dsoxlab engine, whichever lab is active.",
+    "opt_support_catalog":
+        "Report against the lab catalogue rather than the engine.",
+    "issue_json_exclusif":
+        "--json and --issue cannot be combined: one prints a document, the "
+        "other opens a browser.",
+    "issue_cible_ambigue":
+        "--engine and --catalog cannot be combined: pick the repository that "
+        "should receive the issue.",
+    "issue_print_sans_issue":
+        "--print only means something together with --issue.",
+    "issue_sans_destination":
+        "No issue address is known for this catalogue. Declare "
+        "repo.issues_url in its meta.yml, or pass --engine to report a defect "
+        "of the tool itself.",
+    "issue_destination":
+        "Issue headed for {depot} ({cible}), address read from {origine}.",
+    "issue_cible_moteur":            "the engine",
+    "issue_cible_catalogue":         "this catalogue",
+    "issue_origine_paquet":          "the package metadata",
+    "issue_origine_contrat":         "meta.yml: repo.issues_url",
+    "issue_origine_remote":          "the git remote",
+    "issue_repli_sans_journal":
+        "The URL was too long: the log lines were left out of it. Paste them "
+        "by hand from the report above if they matter.",
+    "issue_repli_vide":
+        "The report does not fit in a URL: the form opens empty, and the "
+        "report printed above is to be pasted by hand.",
+    "issue_confirmer":               "Open an issue on {depot} in your browser?",
+    "issue_abandon":                 "Nothing was opened, and nothing was sent.",
+    "issue_sans_navigateur":
+        "No browser could be opened: copy the URL above.",
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
     "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy), including machines left outside the state.",
@@ -608,6 +645,13 @@ Each lab declares:
                        default (no personal path, no public address).
     [dim]--json[/dim]               The same content, as a machine document.
     [dim]--log-lines <n>[/dim]      How many log lines to include (0 for none).
+    [dim]--issue[/dim]              Open a prefilled issue in the repository that
+                         should receive it: the lab catalogue when a lab is
+                         active, the engine otherwise.
+    [dim]--engine[/dim]             Force the engine repository.
+    [dim]--catalog[/dim]            Force the lab catalogue.
+    [dim]--print[/dim]              Print the URL instead of opening a browser.
+    [dim]--yes[/dim] [dim]/[/dim] [dim]-y[/dim]           Open without asking for confirmation.
 
   [cyan]fullhelp[/cyan]             This guide.
 

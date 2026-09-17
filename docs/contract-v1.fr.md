@@ -68,6 +68,7 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | `title` | non | chaîne | Nom lisible. |
 | `blog_url` | non | chaîne | Page d'accueil du cours en ligne. |
 | `description` | non | chaîne | Un paragraphe. |
+| `issues_url` | non | chaîne | Où déposer une issue qui concerne **ce catalogue** et non le moteur. Lu par `dsoxlab support --issue`. Sans lui, l'outil retombe sur le remote `origin` du dépôt, ce qui suppose un remote portant ce nom et un hébergeur dont les issues vivent sous `<dépôt>/issues`. |
 
 ### `infra` (optionnel, exigé par `runtime: vm`)
 

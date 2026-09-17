@@ -69,6 +69,7 @@ omission.
 | `title` | no | string | Human-readable name. |
 | `blog_url` | no | string | Home page of the online course. |
 | `description` | no | string | One paragraph. |
+| `issues_url` | no | string | Where to file an issue about **this catalogue** rather than about the engine. Read by `dsoxlab support --issue`. Without it, the tool falls back to the repository's `origin` remote, which assumes a remote by that name and a host whose issues live under `<repo>/issues`. |
 
 ### `infra` (optional — required by `runtime: vm`)
 
