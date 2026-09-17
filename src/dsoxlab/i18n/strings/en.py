@@ -646,8 +646,8 @@ Each lab declares:
     [dim]--json[/dim]               The same content, as a machine document.
     [dim]--log-lines <n>[/dim]      How many log lines to include (0 for none).
     [dim]--issue[/dim]              Open a prefilled issue in the repository that
-                         should receive it: the lab catalogue when a lab is
-                         active, the engine otherwise.
+                         should receive it: the lab catalogue whenever you are
+                         inside one, the engine otherwise.
     [dim]--engine[/dim]             Force the engine repository.
     [dim]--catalog[/dim]            Force the lab catalogue.
     [dim]--print[/dim]              Print the URL instead of opening a browser.

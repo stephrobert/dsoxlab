@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.87] - 2026-09-17
+
+### Fixed
+
+- **`support --issue` no longer sends a catalogue's report to the engine just
+  because no lab has run yet** (issue #228). Until 0.1.86 the active lab decided
+  the destination. Standing at the root of a catalogue, with a section set and
+  `repo.issues_url` declared, the issue still went to the engine as long as no
+  lab had been started.
+
+  That is precisely the situation of someone whose `run` has just failed, or who
+  cannot provision: the report left for the engine while the cause could well be
+  a lab's `setup.yaml`. It also made the catalogues' own acceptance criterion
+  unverifiable, since `use <section>` followed by `support --issue` could not
+  reach the catalogue on three of the four.
+
+  The rule now fits in one sentence, which is what makes it holdable: **write to
+  the catalogue whenever there is one at hand and its address is known, to the
+  engine otherwise.** It does not distinguish by where the address came from
+  (`repo.issues_url` or the `origin` remote): two rules where one suffices would
+  be two rules to explain, and `--engine` remains the way out for anyone who
+  knows their defect belongs to the tool. A catalogue that is identifiable but
+  has no reachable address falls back to the engine rather than failing, since
+  losing the report would be worse; an explicit `--catalog` still says so
+  instead of quietly switching.
+
 ## [0.1.86] - 2026-09-17
 
 ### Added
