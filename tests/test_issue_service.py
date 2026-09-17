@@ -161,6 +161,24 @@ def test_sans_contrat_le_remote_sert_de_repli(tmp_path: Path) -> None:
     assert destination.libelle == "proprio/catalogue"
 
 
+def test_un_issues_url_qui_n_est_pas_une_adresse_retombe_sur_le_remote(
+    tmp_path: Path,
+) -> None:
+    """Le parseur du contrat coule toute valeur en ``str``, par garantie de v1.
+
+    Une liste arrive donc ici en « ['a', 'b'] ». Cette valeur finirait dans un
+    navigateur : mieux vaut le remote, qui est au moins une adresse.
+    """
+    _depot_git(tmp_path, "https://github.com/proprio/catalogue.git")
+    meta = RepoMetadata(id="demo", category="demo", issues_url="['a', 'b']")
+
+    destination = resoudre_destination(tmp_path, meta, cible=Cible.CATALOGUE)
+
+    assert destination is not None
+    assert destination.origine is Origine.REMOTE
+    assert destination.url_issues == "https://github.com/proprio/catalogue/issues"
+
+
 def test_un_catalogue_sans_adresse_ne_leve_pas(tmp_path: Path) -> None:
     """Ni contrat ni remote : ce n'est pas une erreur, c'est un cas à dire.
 

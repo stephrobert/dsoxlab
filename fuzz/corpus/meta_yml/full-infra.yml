@@ -3,6 +3,7 @@ repo:
   category: linux
   title: Linux hands-on labs
   blog_url: https://blog.stephane-robert.info
+  issues_url: https://github.com/stephrobert/linux-dsoxlab-training/issues
   description: |
     Labs Linux pour la préparation RHCSA et LFCS.
 

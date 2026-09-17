@@ -325,6 +325,14 @@ def resoudre_destination(
         )
 
     declaree = (repo_meta.issues_url if repo_meta is not None else "").strip()
+    # Le parseur du contrat est tolérant par garantie de v1 : il coule toute
+    # valeur en `str`, si bien qu'une liste arrive ici en « ['a', 'b'] ». Cette
+    # adresse finirait dans un navigateur, donc on exige qu'elle en soit une, et
+    # on retombe sur le remote plutôt que d'ouvrir n'importe quoi.
+    if declaree and not declaree.startswith(("http://", "https://")):
+        logger.warning("ignoring repo.issues_url, not an http(s) address: %r", declaree)
+        declaree = ""
+
     if declaree:
         normalise = _normaliser_remote(declaree.removesuffix("/issues"))
         url = declaree.rstrip("/")
