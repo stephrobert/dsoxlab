@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.88] - 2026-09-20
+
+### Fixed
+
+- **`doctor` announced terraform and the hypervisor as informational on a
+  repository that only provisions** (issue #230). The required/informational
+  split derived the need for VMs from the labs alone. A `meta.yml` declaring
+  hosts and no `lab.yaml` therefore fell into the "entirely shell catalogue"
+  branch, the one that files hypervisors as optional to avoid a discouraging red
+  on first run.
+
+  The reasoning still holds for `terraform-training`, which has no `infra:`
+  block. It was wrong as soon as hosts are declared, that is on the very
+  repository whose main command depends on terraform and libvirt, and
+  `doctor --strict` returned **0** there on an environment unable to bring
+  anything up. A declared host is a commitment: it will be provisioned.
+
+- **"0 labs" is no longer a failure when the repository declares
+  infrastructure.** A stack of throwaway VMs has no reason to carry an exercise,
+  and that red was the only one its user ever saw.
+
+### Changed
+
+- **`repo.category` is optional** (issue #231). The field is purely pedagogical:
+  it only gives a lab its default `section`. A repository that just provisions
+  infrastructure still had to invent a value nothing reads, and that was the one
+  blocking friction of this use. `repo.id` remains the only required field.
+
+  The check did not disappear, it moved to where the question "does this
+  repository carry labs" can be answered: `validate-structure` asks for
+  `repo.category` as soon as one `lab.yaml` exists, and says why, since a lab
+  with no `section` of its own inherits an empty one and stays out of reach of
+  `list-labs --section`. The parser itself stays tolerant, which is a v1
+  guarantee.
+
+### Added
+
+- **`docs/infra-only.md` and its French counterpart**: using dsoxlab as a
+  provisioner of throwaway VMs, without writing a single exercise. The whole
+  file, which commands apply and which have no object, where the state lives,
+  and the three known limits, including this one: **containers are not available
+  this way**, since `runtime.services` is declared per lab.
+
 ## [0.1.87] - 2026-09-17
 
 ### Fixed

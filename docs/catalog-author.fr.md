@@ -122,6 +122,7 @@ la suite.
 | `content_doc_url_no_scheme` | `doc_url` ne porte aucun schéma d'URL |
 | `content_doc_url_scheme` | `doc_url` emploie un schéma autre que http(s) |
 | `schema_version_too_new` | le fichier déclare un `schema_version` que ce dsoxlab ne sait pas lire |
+| `category_absente_avec_labs` | le dépôt porte des labs mais ne déclare pas `repo.category` |
 
 **Ce qu'il ne peut pas vérifier :** qu'un lab listé dans `meta.yml` existe sur le
 disque. Le validator parcourt ce que la découverte a déjà chargé. D'où l'ordre

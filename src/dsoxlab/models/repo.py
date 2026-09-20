@@ -347,8 +347,12 @@ class RepoMetadata:
     id: str
     """Slug unique du dépôt — ex. ``linux-training``."""
 
-    category: str
-    """Catégorie technique — ex. ``linux``, ``ansible``, ``kubernetes``."""
+    category: str = ""
+    """Catégorie technique — ex. ``linux``, ``ansible``, ``kubernetes``.
+
+    Optionnelle depuis 0.1.88 : elle ne sert qu'à donner sa ``section`` par
+    défaut à un lab, et un dépôt qui ne provisionne que de l'infra n'en a aucun.
+    ``validate-structure`` la réclame dès que des labs existent."""
 
     title: str = ""
     blog_url: str = ""
@@ -431,7 +435,13 @@ class RepoMetadata:
                 meta_path, "repo", "contract_field_not_mapping",
                 got=type(repo).__name__,
             )
-        if not repo.get("id") or not repo.get("category"):
+        # `category` n'est plus exigé ici (issue #231). Il est purement
+        # pédagogique : il ne sert qu'à donner sa `section` par défaut à un lab.
+        # Un dépôt qui ne provisionne que de l'infra, sans un seul `lab.yaml`,
+        # devait jusqu'ici inventer une valeur que rien ne lisait. Le contrôle
+        # n'a pas disparu, il a rejoint `validate-structure`, qui sait, lui, si
+        # ce dépôt porte des labs.
+        if not repo.get("id"):
             raise ContractError(meta_path, "repo", "contract_repo_required")
 
         infra_data = as_mapping(data.get("infra"), "infra", meta_path)
@@ -484,7 +494,7 @@ class RepoMetadata:
         return cls(
             schema_version=schema_version,
             id=str(repo["id"]),
-            category=str(repo["category"]),
+            category=str(repo.get("category") or ""),
             title=str(repo.get("title", "")),
             blog_url=str(repo.get("blog_url", "")),
             description=str(repo.get("description", "")),

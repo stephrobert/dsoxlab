@@ -936,7 +936,13 @@ def _check_iso_tool() -> Check:
     )
 
 
-def _check_labs(root: Path, labs: list[LabDefinition], vus: int) -> Check:
+def _check_labs(
+    root: Path,
+    labs: list[LabDefinition],
+    vus: int,
+    *,
+    infra_declaree: bool = False,
+) -> Check:
     """Le compte des labs, et **ce qui manque** quand il ne colle pas.
 
     Un « 0 lab » muet oblige l'utilisateur à retrouver seul une information que
@@ -945,8 +951,16 @@ def _check_labs(root: Path, labs: list[LabDefinition], vus: int) -> Check:
     déclaré dans le `meta.yml` mais absent du disque. Plutôt que de deviner
     laquelle s'applique, on compare les fichiers présents aux labs chargés :
     l'écart les couvre toutes les trois.
+
+    ``infra_declaree`` dit qu'un bloc ``infra.hosts`` existe. Zéro lab n'est
+    alors pas un défaut mais la description du dépôt (issue #230) : une stack de
+    VM jetables n'a aucune raison de porter un exercice, et ce rouge était le
+    seul que voyait son utilisateur.
     """
     ecart = vus - len(labs)
+    if not labs and infra_declaree:
+        return _check("labs", True, _("detail_labs_infra_seule", root=root))
+
     detail = _("detail_labs_count", count=len(labs), root=root)
     if ecart > 0:
         detail += " " + _("detail_labs_ecart", ecart=ecart, presents=vus)
@@ -1130,7 +1144,16 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         report.optional.append(_check_docker())
         report.notes.append(_("reason_docker_no_services"))
 
-    needs_vm = uses_vm(labs)
+    # Un hôte déclaré est un engagement : il sera provisionné. Regarder les
+    # seuls labs (issue #230) rangeait terraform et l'hyperviseur en informatifs
+    # sur un dépôt qui ne fait *que* provisionner, c'est-à-dire sur le seul dont
+    # ils conditionnent la commande principale. `doctor --strict` y rendait 0 sur
+    # un environnement incapable de monter quoi que ce soit.
+    #
+    # `terraform-training` reste le contre-exemple : aucun bloc `infra:`, 87 labs
+    # `shell`, donc toujours aucun hyperviseur requis.
+    declare_des_hotes = bool(repo_meta and repo_meta.infra.hosts)
+    needs_vm = uses_vm(labs) or declare_des_hotes
     # Le provisionnement télécharge une image puis laisse cloud-init installer
     # des paquets : sans accès sortant, l'hôte est déclaré prêt et les labs
     # échouent plus tard sur des commandes absentes. Un dépôt entièrement
@@ -1222,6 +1245,8 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
             report.required.append(_check_incus_pool())
             report.required.append(_check_iso_tool())
 
-    report.required.append(_check_labs(root, labs, compter_fichiers_labs(root)))
+    report.required.append(_check_labs(
+        root, labs, compter_fichiers_labs(root), infra_declaree=declare_des_hotes,
+    ))
     report.required.append(_check_lab_home(root))
     return report

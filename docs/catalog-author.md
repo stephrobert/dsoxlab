@@ -120,6 +120,7 @@ step with the code: adding a check without documenting it here fails the suite.
 | `content_doc_url_no_scheme` | `doc_url` carries no URL scheme |
 | `content_doc_url_scheme` | `doc_url` uses a scheme other than http(s) |
 | `schema_version_too_new` | the file declares a `schema_version` this dsoxlab cannot read |
+| `category_absente_avec_labs` | the repository holds labs but declares no `repo.category` |
 
 **What it cannot check:** that a lab listed in `meta.yml` exists on disk. The
 validator walks what discovery already loaded. Hence the order above.

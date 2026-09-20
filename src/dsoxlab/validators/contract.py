@@ -36,6 +36,7 @@ from typing import Any
 
 import yaml
 
+from ..discovery.scanner import compter_fichiers_labs
 from ..models._contract import ContractError
 from ..models.schema_version import (
     UnsupportedSchemaVersion,
@@ -278,6 +279,46 @@ def _keyed_documents(root: Path) -> list[tuple[Path, frozenset[str]]]:
             documents.append((chemin, KNOWN_LAB_LANG_KEYS))
 
     return documents
+
+
+def validate_repo_fields(root: Path) -> ContractReport:
+    """Réclame ``repo.category`` aux dépôts qui portent des labs, à eux seuls.
+
+    Le parseur ne l'exige plus (issue #231) : ce champ ne sert qu'à donner sa
+    ``section`` par défaut à un lab, et un dépôt qui ne provisionne que de
+    l'infra n'en a aucun. Il devait pourtant inventer une valeur que rien ne
+    lisait, et c'était la seule friction bloquante de cet usage.
+
+    Le contrôle n'a pas disparu pour autant, il a simplement rejoint l'endroit
+    qui sait répondre à la question « ce dépôt a-t-il des labs ». On compte les
+    fichiers du disque plutôt que les labs chargés : un ``lab.yaml`` qui lève au
+    parsing reste un lab que l'auteur a écrit, et son catalogue a donc bien
+    besoin d'une catégorie.
+    """
+    report = ContractReport()
+    meta = root / "meta.yml"
+    if not meta.is_file():
+        return report
+
+    try:
+        data = yaml.safe_load(meta.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        # Illisible : `validate_schema_versions` le dit déjà, et le redire ici
+        # n'ajouterait qu'une seconde ligne rouge pour une seule cause.
+        return report
+    if not isinstance(data, dict):
+        return report
+
+    repo = data.get("repo")
+    if not isinstance(repo, dict) or str(repo.get("category") or "").strip():
+        return report
+
+    labs = compter_fichiers_labs(root)
+    if labs:
+        report.issues.append(ContractIssue(
+            path=meta, key="category_absente_avec_labs", params={"labs": labs},
+        ))
+    return report
 
 
 def validate_unknown_keys(root: Path) -> ContractReport:
