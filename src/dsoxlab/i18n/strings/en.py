@@ -915,7 +915,13 @@ silent.
     "contract_root_not_mapping":
         "the document must be a YAML mapping (got: {got}).",
     "contract_repo_required":
-        "'repo.id' and 'repo.category' are required (dsoxlab contract).",
+        "'repo.id' is required (dsoxlab contract).",
+    "detail_labs_infra_seule":
+        "no lab in {root}: this repository only provisions infrastructure.",
+    "category_absente_avec_labs":
+        "this repository carries {labs} lab(s) but declares no 'repo.category'. "
+        "Every lab that does not set its own 'section' inherits an empty one, "
+        "and stays out of reach of 'list-labs --section'.",
     "contract_provider_empty_list":
         "'infra.provider' is an empty list. Declare at least one provider "
         "(e.g. 'kvm').",

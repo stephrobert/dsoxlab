@@ -927,7 +927,13 @@ hors ligne, elle se tait.
     "contract_root_not_mapping":
         "le document doit être un mapping YAML (reçu : {got}).",
     "contract_repo_required":
-        "les champs 'repo.id' et 'repo.category' sont requis (contrat dsoxlab).",
+        "le champ 'repo.id' est requis (contrat dsoxlab).",
+    "detail_labs_infra_seule":
+        "aucun lab dans {root} : ce dépôt ne provisionne que de l'infrastructure.",
+    "category_absente_avec_labs":
+        "ce dépôt porte {labs} lab(s) mais ne déclare pas 'repo.category'. "
+        "Chaque lab qui ne pose pas sa propre 'section' en héritera une vide, "
+        "et restera introuvable par 'list-labs --section'.",
     "contract_provider_empty_list":
         "'infra.provider' est une liste vide. Déclare au moins un provider "
         "(ex. 'kvm').",

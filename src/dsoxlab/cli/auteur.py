@@ -71,7 +71,11 @@ def validate_structure_cmd(
         validate_solutions_encrypted,
         validate_targets,
     )
-    from ..validators.contract import validate_schema_versions, validate_unknown_keys
+    from ..validators.contract import (
+        validate_repo_fields,
+        validate_schema_versions,
+        validate_unknown_keys,
+    )
 
     root = _root(lab_home)
 
@@ -138,6 +142,20 @@ def validate_structure_cmd(
     _rendre("unknown_keys_header", [
         f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
         for a in unknown.issues
+    ])
+
+    # Puis les champs que le `meta.yml` devrait porter vu ce que le dépôt
+    # contient. `repo.category` n'est plus exigé du parseur, parce qu'un dépôt
+    # d'infra pure n'en a que faire ; il le reste de celui qui porte des labs,
+    # et c'est ici qu'on sait lequel des deux on a sous les yeux.
+    champs_repo = validate_repo_fields(root)
+    documents += [
+        machine.issue_dict("contract", a.key, a.params, path=a.path)
+        for a in champs_repo.issues
+    ]
+    _rendre("contract_issues_header", [
+        f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
+        for a in champs_repo.issues
     ])
 
     structure_reports = validate_all_structure(root)
@@ -231,6 +249,7 @@ def validate_structure_cmd(
     all_ok = (
         contract.ok
         and unknown.ok
+        and champs_repo.ok
         and all(r.ok for r in structure_reports)
         and not issues
         and not content_issues

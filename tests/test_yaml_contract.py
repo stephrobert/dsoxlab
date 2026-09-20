@@ -99,7 +99,7 @@ def test_a_malformed_lab_stays_within_contract(tmp_path: Path, label: str, docum
         ("root is a scalar", "42\n"),
         ("repo is a scalar", "repo: linux\n"),
         ("repo is empty", "repo:\n"),
-        ("missing category", "repo:\n  id: demo\n"),
+        ("missing id", "repo:\n  category: demo\n"),
         ("infra is a scalar", VALID_META + "infra: kvm\n"),
         # `hosts:` en mapping au lieu d'une liste : l'itération porterait sur
         # les clés (des str) et `h["name"]` lèverait TypeError.

@@ -65,7 +65,7 @@ omission.
 | Field | Required | Type | Notes |
 | --- | --- | --- | --- |
 | `id` | **yes** | string | Slug of the repository. Namespaces the state directory and the service containers. |
-| `category` | **yes** | string | Free-form. Becomes the default `section` of every lab. dsoxlab knows no list of domains. |
+| `category` | no | string | Free-form. Becomes the default `section` of every lab. dsoxlab knows no list of domains. Optional since 0.1.88: a repository that only provisions infrastructure has no lab to place. `validate-structure` asks for it as soon as one `lab.yaml` exists, because a lab that sets no `section` of its own would inherit an empty one and stay out of reach of `list-labs --section`. See [infrastructure without labs](./infra-only.md). |
 | `title` | no | string | Human-readable name. |
 | `blog_url` | no | string | Home page of the online course. |
 | `description` | no | string | One paragraph. |

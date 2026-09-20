@@ -9,6 +9,50 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.88] - 2026-09-20
+
+### Corrigé
+
+- **`doctor` annonçait terraform et l'hyperviseur comme informatifs sur un dépôt
+  qui ne fait que provisionner** (issue #230). Le classement requis/informatif
+  déduisait le besoin de VM des seuls labs. Un `meta.yml` qui déclare des hôtes
+  et aucun `lab.yaml` tombait donc dans la branche « catalogue entièrement
+  shell », celle qui range les hyperviseurs en facultatifs pour éviter le rouge
+  du premier lancement.
+
+  Le raisonnement reste juste pour `terraform-training`, qui n'a aucun bloc
+  `infra:`. Il était faux dès que des hôtes sont déclarés, c'est-à-dire sur le
+  seul dépôt dont terraform et libvirt conditionnent la commande principale, et
+  `doctor --strict` y rendait **0** sur un environnement incapable de monter
+  quoi que ce soit. Un hôte déclaré est un engagement : il sera provisionné.
+
+- **« 0 lab » n'est plus un échec quand le dépôt déclare une infrastructure.**
+  Une stack de VM jetables n'a aucune raison de porter un exercice, et ce rouge
+  était le seul que voyait son utilisateur.
+
+### Modifié
+
+- **`repo.category` est optionnel** (issue #231). Le champ est purement
+  pédagogique : il ne sert qu'à donner sa `section` par défaut à un lab. Un dépôt
+  qui ne provisionne que de l'infra devait pourtant inventer une valeur que rien
+  ne lit, et c'était la seule friction bloquante de cet usage. `repo.id` reste le
+  seul champ requis.
+
+  Le contrôle n'a pas disparu, il a rejoint l'endroit qui sait répondre à la
+  question « ce dépôt a-t-il des labs » : `validate-structure` réclame
+  `repo.category` dès qu'un `lab.yaml` existe, et dit pourquoi, un lab sans
+  `section` propre en héritant une vide qui le rend introuvable par
+  `list-labs --section`. Le parseur, lui, reste tolérant : c'est une garantie de
+  la v1.
+
+### Ajouté
+
+- **`docs/infra-only.md` et sa version française** : se servir de dsoxlab comme
+  fournisseur de VM jetables, sans écrire le moindre exercice. Le fichier
+  complet, les commandes qui s'appliquent et celles qui n'ont pas d'objet, où
+  vit l'état, et les trois limites connues, dont celle-ci : **les conteneurs ne
+  passent pas par là**, `runtime.services` se déclarant par lab.
+
 ## [0.1.87] - 2026-09-17
 
 ### Corrigé

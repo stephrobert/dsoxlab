@@ -17,7 +17,7 @@
 
     "repo": {
       "type": "object",
-      "required": ["id", "category"],
+      "required": ["id"],
       "additionalProperties": false,
       "description": "Identity of the repository. The only block dsoxlab requires.",
       "properties": {
@@ -29,7 +29,7 @@
         "category": {
           "type": "string",
           "minLength": 1,
-          "description": "Technical category of the repository. Becomes the default section of every lab. Free-form: dsoxlab knows no list of domains."
+          "description": "Technical category of the repository. Becomes the default section of every lab. Free-form: dsoxlab knows no list of domains. Optional since 0.1.88, because a repository that only provisions infrastructure has no lab to place; validate-structure asks for it as soon as labs exist."
         },
         "title": { "type": "string", "description": "Human-readable name." },
         "blog_url": { "type": "string", "description": "Home page of the online course." },

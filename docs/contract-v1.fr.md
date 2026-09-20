@@ -64,7 +64,7 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | Champ | Obligatoire | Type | Remarques |
 | --- | --- | --- | --- |
 | `id` | **oui** | chaîne | Slug du dépôt. Sert d'espace de noms au répertoire d'état et aux conteneurs de services. |
-| `category` | **oui** | chaîne | Libre. Devient la `section` par défaut de chaque lab. dsoxlab ne connaît aucune liste de domaines. |
+| `category` | non | chaîne | Libre. Devient la `section` par défaut de chaque lab. dsoxlab ne connaît aucune liste de domaines. Optionnelle depuis 0.1.88 : un dépôt qui ne provisionne que de l'infrastructure n'a aucun lab à ranger. `validate-structure` la réclame dès qu'un `lab.yaml` existe, car un lab qui ne pose pas sa propre `section` en hériterait une vide et resterait introuvable par `list-labs --section`. Voir [l'infrastructure sans labs](./infra-only.fr.md). |
 | `title` | non | chaîne | Nom lisible. |
 | `blog_url` | non | chaîne | Page d'accueil du cours en ligne. |
 | `description` | non | chaîne | Un paragraphe. |
