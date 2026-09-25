@@ -17,6 +17,7 @@ Deux règles héritées du module s'appliquent aussi ici :
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,11 @@ def test_dev_kvm_absent_est_un_echec_qui_le_dit(
     c'est le périphérique qu'il faut lire, pas le client.
     """
     monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "kvm")
+    # Sans simulation, le détail dépendrait de la machine qui joue le test —
+    # un runner de CI est lui-même une VM, un poste de développement souvent pas.
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=None),
+    )
     check = doctor._check_hw_virt()
 
     assert check.key == "hw_virt"
@@ -110,6 +116,139 @@ def test_dev_kvm_absent_est_un_echec_qui_le_dit(
     # Le geste (BIOS, virtualisation imbriquée) appartient à l'humain, machine
     # éteinte : aucun correctif exécutable ne doit être proposé.
     assert check.fix is None
+
+
+def test_dans_une_vm_le_message_nomme_l_imbrication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le cas de toute image prête à l'emploi (issue #91).
+
+    Parler du BIOS à qui tourne dans une VM l'envoie chercher un réglage qui
+    n'existe pas chez lui : la machine virtuelle n'a pas de BIOS à visiter, et
+    l'imbrication s'active sur l'hôte, à l'extérieur.
+    """
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement",
+        lambda: doctor.Hebergement(dans_une_vm=True, hyperviseur="vmware"),
+    )
+
+    check = doctor._check_hw_virt()
+
+    assert check.state == doctor.STATE_FAILED
+    bas = check.detail.lower()
+    assert "vmware" in bas          # l'hyperviseur est nommé, pas deviné
+    assert "imbriquée" in bas or "nested" in bas
+    assert "bios" not in bas        # la fausse piste a disparu
+
+
+def test_sur_du_metal_nu_le_message_envoie_au_bios(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le symétrique : sur une machine physique, l'imbrication n'a aucun sens."""
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=False),
+    )
+
+    check = doctor._check_hw_virt()
+
+    bas = check.detail.lower()
+    assert "bios" in bas
+    assert "imbriquée" not in bas and "nested" not in bas
+
+
+def test_un_hebergement_indetermine_garde_le_ou(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ne pas savoir n'autorise pas à choisir : les deux consignes restent.
+
+    C'est la même règle que pour `unknown` sur un verdict — on n'affirme pas ce
+    qu'on n'a pas mesuré. Ici elle porte sur la consigne, pas sur l'état.
+    """
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=None),
+    )
+
+    check = doctor._check_hw_virt()
+
+    bas = check.detail.lower()
+    assert "bios" in bas
+    assert "imbriquée" in bas or "nested" in bas
+
+
+# ── où tourne ce système : la sonde qui décide du message ─────────────────────
+
+def _completed(sortie: str, code: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(args=[], returncode=code, stdout=sortie,
+                                       stderr="")
+
+
+def test_systemd_detect_virt_nomme_l_hyperviseur(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nommer vaut mieux qu'un booléen : la consigne diffère par produit."""
+    monkeypatch.setattr(
+        doctor, "_sonder", lambda *a, **k: _completed("vmware\n", 0),
+    )
+
+    hote = doctor._hebergement()
+
+    assert hote.dans_une_vm is True
+    assert hote.hyperviseur == "vmware"
+
+
+def test_le_metal_nu_se_lit_dans_le_code_retour(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`systemd-detect-virt --vm` sort en 1 avec « none » : c'est une mesure.
+
+    La traiter comme un échec de sonde ferait retomber sur le repli, et surtout
+    conclurait « je ne sais pas » là où la réponse est claire.
+    """
+    monkeypatch.setattr(
+        doctor, "_sonder", lambda *a, **k: _completed("none\n", 1),
+    )
+
+    assert doctor._hebergement().dans_une_vm is False
+
+
+def test_le_repli_lit_le_drapeau_hypervisor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`systemd-detect-virt` n'est pas universel : une image minimale s'en passe."""
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor\t: 0\nflags\t\t: fpu vme hypervisor lm\n")
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", cpuinfo)
+
+    hote = doctor._hebergement()
+
+    assert hote.dans_une_vm is True
+    # Le repli tranche la question, mais ne nomme personne : ne pas inventer.
+    assert hote.hyperviseur == ""
+
+
+def test_un_cpuinfo_sans_drapeau_vaut_metal_nu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor\t: 0\nflags\t\t: fpu vme de pse tsc\n")
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", cpuinfo)
+
+    assert doctor._hebergement().dans_une_vm is False
+
+
+def test_un_cpuinfo_illisible_ne_conclut_rien(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Les deux sondes muettes : l'ignorance est un état, pas un défaut à cacher."""
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", tmp_path / "jamais-ecrit")
+
+    assert doctor._hebergement().dans_une_vm is None
 
 
 def test_dev_kvm_inaccessible_est_reparable(

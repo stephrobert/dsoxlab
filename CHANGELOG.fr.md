@@ -9,6 +9,50 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.95] - 2026-09-25
+
+### Modifié
+
+- **`doctor` dit désormais *d'où* la virtualisation matérielle manque, et ne donne
+  que la consigne qui s'applique** (issue #91). Quand `/dev/kvm` est absent, le
+  détail disait : active VT-x/AMD-V dans le BIOS, **ou** la virtualisation
+  imbriquée dans ton hyperviseur. Un seul message pour deux situations opposées,
+  qui laissait le lecteur chercher quelle moitié le concernait — et qui envoyait la
+  moitié d'entre eux dans le BIOS d'une machine qui n'en a pas, une machine
+  virtuelle n'en ayant aucun.
+
+  Le contrôle commence maintenant par regarder où il tourne, via
+  `systemd-detect-virt --vm` puis, quand ce binaire manque — une image minimale
+  s'en passe souvent — le drapeau `hypervisor` de `/proc/cpuinfo`. Dans une machine
+  virtuelle, il annonce que l'imbrication n'est pas disponible, **nomme
+  l'hyperviseur détecté**, et dit que le réglage vit sur l'hôte, cette machine
+  éteinte, donc qu'il n'y a rien à chercher à l'intérieur. Sur une machine
+  physique, il renvoie au BIOS ou au setup UEFI et retire la phrase sur
+  l'imbrication.
+
+  Quand aucune des deux sondes ne répond, le message historique reste : ne pas
+  savoir n'autorise pas à choisir. C'est la règle de `unknown` sur un verdict,
+  appliquée à la consigne plutôt qu'à l'état.
+
+  Le verdict ne change pas — un `/dev/kvm` absent échoue toujours, et ne propose
+  toujours aucun correctif exécutable, le geste appartenant à un humain machine
+  éteinte. Ce qui change, c'est que la phrase est maintenant vraie pour celui qui
+  la lit.
+
+  Vérifié de bout en bout dans une vraie machine virtuelle dont le nœud
+  `/dev/kvm` a été retiré, dans les deux langues : le détail nomme `kvm` comme
+  hyperviseur et ne parle plus du BIOS.
+
+### Corrigé
+
+- **`doctor` lisait le nom du pool de stockage à deux endroits, dont un qui
+  ignorait l'override du dépôt.** Le contrôle du pool libvirt dérivait son pool
+  d'un `provider_config()` écrit sur place, là où le contrôle des ressources
+  passait par `nom_du_pool()`. Les deux s'accordaient aujourd'hui, et c'est
+  exactement le genre de duplication qui cesse de s'accorder sans que personne le
+  remarque. Une seule fonction porte cette lecture, à côté du
+  `local.storage_pool` du template Terraform.
+
 ## [0.1.94] - 2026-09-25
 
 ### Corrigé

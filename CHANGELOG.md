@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.95] - 2026-09-25
+
+### Changed
+
+- **`doctor` now says *where* hardware virtualization is missing from, and only
+  gives the instruction that applies** (issue #91). When `/dev/kvm` is absent, the
+  detail used to read: enable VT-x/AMD-V in the BIOS, **or** nested virtualization
+  in your hypervisor. One message for two opposite situations, leaving the reader
+  to work out which half is theirs — and sending half of them to a BIOS their
+  machine does not have, because a virtual machine has none.
+
+  The check now asks where it is running first, through `systemd-detect-virt --vm`
+  and, when that binary is absent — a minimal image often lacks it — the
+  `hypervisor` flag of `/proc/cpuinfo`. Inside a virtual machine it states that
+  nested virtualization is unavailable, **names the detected hypervisor**, and says
+  the setting lives on the host with this machine powered off, so there is nothing
+  to look for inside. On a physical machine it sends the reader to the BIOS or UEFI
+  setup and drops the nesting sentence entirely.
+
+  When neither probe answers, the historical message stays: not knowing does not
+  authorise choosing. That is the same rule as `unknown` on a verdict, applied to
+  the instruction instead of the state.
+
+  The verdict does not change — a missing `/dev/kvm` still fails, and still offers
+  no executable fix, because the gesture belongs to a human with the machine off.
+  What changes is that the sentence is now true for the reader in front of it.
+
+  Verified end to end in a real virtual machine with the `/dev/kvm` node removed,
+  in both languages: the detail names `kvm` as the hypervisor and no longer
+  mentions the BIOS.
+
+### Fixed
+
+- **`doctor` read the storage pool name in two places, one of which ignored the
+  repository's override.** The libvirt pool check derived its pool from
+  `provider_config()` inline while the resources check went through
+  `nom_du_pool()`. Both agreed today, and that is exactly the kind of duplication
+  that stops agreeing without anyone noticing. One function now holds that
+  reading, next to the Terraform template's `local.storage_pool`.
+
 ## [0.1.94] - 2026-09-25
 
 ### Fixed

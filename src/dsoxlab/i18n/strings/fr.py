@@ -1064,6 +1064,22 @@ hors ligne, elle se tait.
         "ne peuvent pas tourner sur cette machine. Active VT-x/AMD-V dans le "
         "BIOS, ou la virtualisation imbriquée dans ton hyperviseur (machine "
         "éteinte).",
+    "detail_hw_virt_nested_named":
+        "{device} est absent et ce système tourne lui-même dans une machine "
+        "virtuelle ({hypervisor}) : la virtualisation imbriquée n'est pas "
+        "disponible, donc les labs vm ne peuvent pas tourner ici. Elle "
+        "s'active sur l'hyperviseur HÔTE, cette machine éteinte — il n'y a "
+        "rien à changer à l'intérieur.",
+    "detail_hw_virt_nested":
+        "{device} est absent et ce système tourne lui-même dans une machine "
+        "virtuelle : la virtualisation imbriquée n'est pas disponible, donc "
+        "les labs vm ne peuvent pas tourner ici. Elle s'active sur "
+        "l'hyperviseur HÔTE, cette machine éteinte — il n'y a rien à changer "
+        "à l'intérieur.",
+    "detail_hw_virt_bare_metal":
+        "{device} est absent sur une machine physique : la virtualisation "
+        "matérielle est désactivée, donc les labs vm ne peuvent pas tourner "
+        "ici. Active VT-x/AMD-V dans le BIOS ou le setup UEFI.",
     "detail_hw_virt_denied":
         "{device} existe mais cet utilisateur ne peut pas l'ouvrir : "
         "« provision » ne peut démarrer aucune VM (re-login requis après "

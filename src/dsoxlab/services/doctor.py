@@ -535,6 +535,61 @@ def _check_ansible() -> Check:
 #: du contrôle est justement de mesurer une machine où il n'existe pas.
 _KVM_DEVICE = Path("/dev/kvm")
 
+#: ``/proc/cpuinfo``, le repli portable quand ``systemd-detect-virt`` manque.
+#: Constante de module pour la même raison que ``_KVM_DEVICE``.
+_CPUINFO = Path("/proc/cpuinfo")
+
+
+@dataclass(frozen=True)
+class Hebergement:
+    """Où ce système tourne : dans une VM, sur du matériel nu, ou indéterminé.
+
+    ``dans_une_vm`` vaut ``None`` quand aucune des deux sondes n'a abouti. Ce
+    troisième état n'est pas du zèle : il décide de la consigne affichée, et
+    inventer « matériel nu » par défaut enverrait dans un BIOS inexistant.
+    """
+
+    dans_une_vm: bool | None
+    hyperviseur: str = ""
+
+
+#: Les noms que ``systemd-detect-virt`` rend pour un conteneur, non pour une VM.
+#: ``--vm`` les exclut déjà, mais il n'existe pas partout et le repli, lui, ne
+#: distingue rien : un conteneur voit le ``flags`` de l'hôte.
+_SANS_VM = frozenset({"none", ""})
+
+
+def _hebergement() -> Hebergement:
+    """Dit si ce système tourne lui-même dans une machine virtuelle.
+
+    Deux sondes, dans cet ordre. ``systemd-detect-virt --vm`` **nomme**
+    l'hyperviseur (``kvm``, ``vmware``, ``oracle``, ``microsoft``…), ce qui vaut
+    mieux qu'un booléen : la consigne d'activation diffère d'un produit à
+    l'autre, et l'utilisateur doit savoir dans lequel aller cliquer. Il sort en
+    1 avec ``none`` sur du matériel nu, ce qui est une mesure, pas un échec.
+
+    À défaut — le binaire n'est pas universel, et une image minimale s'en passe
+    — le drapeau ``hypervisor`` de ``/proc/cpuinfo``, que tout hyperviseur x86
+    pose dans ses invités. Il ne nomme personne, mais il tranche la question qui
+    change le message.
+    """
+    sonde = _sonder(["systemd-detect-virt", "--vm"])
+    if sonde is not None:
+        nom = sonde.stdout.strip().lower()
+        if nom not in _SANS_VM:
+            return Hebergement(dans_une_vm=True, hyperviseur=nom)
+        if sonde.returncode != 0 or nom == "none":
+            return Hebergement(dans_une_vm=False)
+
+    try:
+        cpuinfo = _CPUINFO.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return Hebergement(dans_une_vm=None)
+    for ligne in cpuinfo.splitlines():
+        if ligne.startswith("flags") or ligne.startswith("Features"):
+            return Hebergement(dans_une_vm="hypervisor" in ligne.split())
+    return Hebergement(dans_une_vm=None)
+
 
 def _check_hw_virt() -> Check:
     """La virtualisation matérielle, lue là où qemu ira la chercher.
@@ -547,14 +602,31 @@ def _check_hw_virt() -> Check:
     imbriquée, et c'est machine éteinte, dans l'hyperviseur hôte, que ça se
     règle : aucun correctif exécutable, la consigne vit dans le détail.
 
+    **Le détail dépend donc d'où l'on tourne** (issue #91). Le message unique
+    disait « active VT-x/AMD-V dans le BIOS, ou la virtualisation imbriquée dans
+    ton hyperviseur » : un « ou » qui laisse chercher lequel des deux s'applique,
+    et qui envoie dans le BIOS d'une machine qui n'en a pas dès que dsoxlab
+    tourne dans une VM — le cas de toute image prête à l'emploi. Quand la sonde
+    sait, elle nomme l'hyperviseur et ne donne que la consigne utile ; quand
+    elle ne sait pas, le « ou » reste, parce qu'il est vrai.
+
     L'inaccessible est un état distinct de l'absent : le périphérique existe,
     seul le droit manque, et ``usermod -aG kvm`` le rend, à la session
     suivante seulement, d'où la catégorie.
     """
     if not _KVM_DEVICE.exists():
-        return _check(
-            "hw_virt", False, _("detail_hw_virt_missing", device=_KVM_DEVICE),
-        )
+        hote = _hebergement()
+        if hote.dans_une_vm is True:
+            cle = (
+                "detail_hw_virt_nested_named" if hote.hyperviseur
+                else "detail_hw_virt_nested"
+            )
+            detail = _(cle, device=_KVM_DEVICE, hypervisor=hote.hyperviseur)
+        elif hote.dans_une_vm is False:
+            detail = _("detail_hw_virt_bare_metal", device=_KVM_DEVICE)
+        else:
+            detail = _("detail_hw_virt_missing", device=_KVM_DEVICE)
+        return _check("hw_virt", False, detail)
     if not os.access(_KVM_DEVICE, os.R_OK | os.W_OK):
         return _check(
             "hw_virt", False, _("detail_hw_virt_denied", device=_KVM_DEVICE),
@@ -1365,10 +1437,11 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         # trois lignes rouges pour une seule cause, et noierait celle qui
         # compte : c'est exactement ce qui décourageait au premier lancement.
         if active == "kvm" and hypervisors["kvm"].ok:
+            # Même lecture que `_check_resources` et que le template Terraform :
+            # une seule fonction la porte, sinon les trois divergent un jour.
             pool = "default"
             if repo_meta is not None:
-                pool = str(repo_meta.infra.provider_config().get("storage_pool")
-                           or "default")
+                pool = nom_du_pool(repo_meta.infra)
             report.required.append(_check_libvirt_pool(pool))
         elif active == "incus" and hypervisors["incus"].ok:
             # Symétrie avec la branche kvm juste au-dessus : elle contrôle son
