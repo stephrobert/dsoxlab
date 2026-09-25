@@ -45,6 +45,7 @@ from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
     auteur,
     catalogues,
     contexte,
+    demarrage,
     destruction,
     diagnostic,
     etat,
@@ -81,7 +82,7 @@ from .diagnostic import _COMPLETE_VAR, _PROG_NAME, _script_completion
 _ORDRE_COMMANDES = (
     "install",
     "use", "list-labs", "show",
-    "run", "course", "challenge", "guide", "hint",
+    "start", "run", "course", "challenge", "guide", "hint",
     "check", "submit", "scores", "progress", "next", "reset", "clean",
     "validate-structure",
     "doctor",

@@ -53,6 +53,38 @@ STRINGS: dict[str, str] = {
     "guide_opening":     "Opening the guide for {lab_id} in your browser…",
     "guide_no_url":      "Lab {lab_id} declares no doc_url: no guide to open.",
     "guide_no_browser":  "No browser could be opened. Copy the URL above.",
+    "cmd_start_help":
+        "Play a lab end to end: context, prerequisites, infrastructure if needed, "
+        "then the session. Every step is announced with the single command that "
+        "replays it alone.",
+    "cmd_start_arg":
+        "Lab id. Omitted, the lab `next` suggests in the active section.",
+    "start_plan":
+        "[bold]Starting {lab_id}[/bold] — {total} steps, each announced with its "
+        "own command.",
+    "start_step":
+        "\n[bold cyan]▶ {number}/{total} · {name}[/bold cyan]  [dim]({command})[/dim]",
+    "start_step_context":  "active context",
+    "start_step_deps":     "prerequisites",
+    "start_step_infra":    "infrastructure",
+    "start_step_lab":      "preparation and session",
+    "start_step_failed":
+        "Step {number}/{total} ({name}) failed. Nothing beyond it was attempted.",
+    "start_step_retry":
+        "Replay that step alone: {command}",
+    "start_context_set":   "  section set to « {section} »",
+    "start_context_already":
+        "  already on « {section} », nothing to set",
+    "start_deps_ok":       "  {count} required checks, all green",
+    "start_deps_failing":  "  missing: {components}",
+    "start_infra_already":
+        "  already provisioned: the declared hosts have addresses, nothing to "
+        "build again",
+    "start_suggested":
+        "No lab named, so taking the one `next` suggests: {lab_id}",
+    "start_no_suggestion":
+        "Every lab of the active section already has a score: nothing to start. "
+        "Name a lab to replay it, or widen the context with `dsoxlab use`.",
     "cmd_run_help":      "Prepare and start the lab environment.",
     "cmd_run_arg":       "Lab identifier",
     "cmd_course_help":    "Display a course section, or the table of contents if no section is given.",
@@ -523,6 +555,14 @@ Each lab declares:
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
     [dim]--json[/dim]               The lab and its runtime status, as a document.
+
+  [cyan]start[/cyan] [dim][<id>][/dim]         Play a lab end to end. Announces each step with the
+                       single command that replays it alone: context, prerequisites,
+                       infrastructure when the lab needs one, then the session.
+                       It shortens the typing, never the understanding — a failure
+                       names the step that broke and how to retry just that one.
+    [dim]--target / -t[/dim]        Target for this run, as for [bold]run[/bold].
+                       [dim]<id>[/dim] is optional: without it, the lab [bold]next[/bold] suggests.
 
   [cyan]run <id>[/cyan]             Start the lab environment (a shell, or a provisioned vm).
 

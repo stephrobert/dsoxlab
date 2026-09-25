@@ -9,6 +9,84 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.101] - 2026-09-25
+
+### Ajouté
+
+- **`dsoxlab start [<id>]` : la séquence, jouée *et montrée*** (issue #79). Pour
+  commencer un lab, il fallait savoir dans quel ordre enchaîner des commandes dont
+  aucune ne dit qu'elle en suppose une autre : le premier `run` d'un lab `vm` sur
+  une infrastructure absente échoue, et l'apprenant doit deviner qu'il lui manquait
+  `provision` — qui ne figure même pas dans la séquence du README.
+
+  Cette commande avait été **révisée avant d'être écrite**, et sa révision gouverne
+  sa forme. L'argument, tiré de l'issue : une commande qui enchaîne implicitement
+  contexte, dépendances, provisionnement, services, préparation et session rend les
+  échecs *plus* opaques — quand elle casse, l'utilisateur doit deviner laquelle des
+  six étapes a lâché. C'est l'inverse de ce que ce jalon a passé son temps à faire.
+  Et pour un outil pédagogique, **la séquence est du contenu** : voir une
+  infrastructure se provisionner, puis un lab se préparer, puis une session
+  s'ouvrir fait partie de ce que l'apprenant vient chercher, et de ce qu'il fera
+  sans dsoxlab un jour.
+
+  `start` n'avale donc pas la séquence, il l'**énonce**. Chaque étape est annoncée
+  avec la commande unique qui la rejoue seule :
+
+  ```
+  Démarrage de l2-swap-management — 4 étapes, chacune annoncée avec sa commande.
+
+  ▶ 1/4 · contexte actif  (dsoxlab use l2)
+  ▶ 2/4 · prérequis  (dsoxlab doctor)
+    16 contrôles requis, tous verts
+  ▶ 3/4 · infrastructure  (dsoxlab provision)
+  ▶ 4/4 · préparation et session  (dsoxlab run l2-swap-management)
+  ```
+
+  En cas d'échec, il nomme **l'étape qui a cassé et la commande qui la rejoue
+  seule**, ne tente rien au-delà, et rend **le code de sortie de cette étape** —
+  jamais un code inventé pour `start`. C'est le critère non négociable de l'issue,
+  et deux tests le tiennent : chacun a été vérifié en le faisant échouer.
+
+  Ce qu'il raccourcit, c'est la frappe et l'ordre à retenir, jamais la
+  compréhension. Chaque commande unitaire fonctionne exactement comme avant.
+
+  Trois points qui ont demandé une décision :
+
+  - une étape qui **n'existe pas pour ce lab** est absente — un lab `shell` n'a
+    aucune infrastructure, et « 3/4 · infrastructure — sautée » serait du bruit.
+    Une étape qui **existe mais est déjà faite** reste annoncée et le dit. Le
+    premier essai passait de 3 à 2 étapes au second appel, parce que le contexte
+    était déjà posé : un total qui bouge est déroutant, et il cachait
+    `dsoxlab use`, que l'apprenant doit connaître ;
+  - `start` est **idempotent** : il lit le state Terraform et saute le
+    provisionnement quand les hôtes déclarés ont déjà une adresse. Il ne sonde pas
+    en SSH — une machine éteinte reste provisionnée, et « est-ce qu'elle répond »
+    est la question de `status` ;
+  - sans identifiant, il prend le lab que `next` suggère, calculé par le même
+    service.
+
+  Vérifié en vrai sur les deux runtimes, ce qu'exigent les critères
+  d'acceptation : un lab `shell` du catalogue de démonstration, et un lab `vm` du
+  catalogue Linux avec **aucune infrastructure** — trois VM montées en 38 secondes,
+  `setup.yaml` joué, session ouverte, puis détruites.
+
+  Cet essai réel a attrapé un défaut qu'aucun test unitaire ne pouvait voir :
+  `_infra_prete()` lisait `labenv` à la racine de l'inventaire au lieu de
+  `all.children.labenv`, si bien qu'il répondait toujours « à provisionner » et que
+  la seconde exécution remontait une infrastructure déjà debout. Corrigé, avec les
+  trois tests qui manquaient — ceux-là ne simulent plus la fonction qu'ils mesurent.
+
+### Modifié
+
+- **Le corps de `provision` est désormais une fonction sans verrou**
+  (`provisionner()`). `run` prend le verrou d'écriture lui-même et le rend *avant*
+  d'ouvrir la session interactive — sans quoi le `dsoxlab check` que l'apprenant
+  tape dans ce sous-shell serait refusé par sa propre session. `start` prend donc
+  le verrou pour la seule étape d'infrastructure, le rend, puis délègue à `run`. Le
+  tenir de bout en bout l'aurait fait sortir en **7** sur son propre verrou, ce qui
+  serait un comble pour une commande dont le but est de retirer des surprises. La
+  commande `provision`, elle, est inchangée.
+
 ## [0.1.100] - 2026-09-25
 
 ### Corrigé

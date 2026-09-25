@@ -54,6 +54,40 @@ STRINGS: dict[str, str] = {
     "guide_opening":      "Ouverture du guide de {lab_id} dans le navigateur…",
     "guide_no_url":       "Le lab {lab_id} ne déclare pas de doc_url : aucun guide à ouvrir.",
     "guide_no_browser":   "Aucun navigateur n'a pu être ouvert. Copiez l'URL ci-dessus.",
+    "cmd_start_help":
+        "Jouer un lab de bout en bout : contexte, prérequis, infrastructure si "
+        "besoin, puis la session. Chaque étape est annoncée avec la commande "
+        "unique qui la rejoue seule.",
+    "cmd_start_arg":
+        "Identifiant du lab. Omis, celui que « next » suggère dans la section "
+        "active.",
+    "start_plan":
+        "[bold]Démarrage de {lab_id}[/bold] — {total} étapes, chacune annoncée "
+        "avec sa commande.",
+    "start_step":
+        "\n[bold cyan]▶ {number}/{total} · {name}[/bold cyan]  [dim]({command})[/dim]",
+    "start_step_context":  "contexte actif",
+    "start_step_deps":     "prérequis",
+    "start_step_infra":    "infrastructure",
+    "start_step_lab":      "préparation et session",
+    "start_step_failed":
+        "L'étape {number}/{total} ({name}) a échoué. Rien au-delà n'a été tenté.",
+    "start_step_retry":
+        "Rejoue cette étape seule : {command}",
+    "start_context_set":   "  section posée sur « {section} »",
+    "start_context_already":
+        "  déjà sur « {section} », rien à poser",
+    "start_deps_ok":       "  {count} contrôles requis, tous verts",
+    "start_deps_failing":  "  il manque : {components}",
+    "start_infra_already":
+        "  déjà provisionnée : les hôtes déclarés ont une adresse, rien à "
+        "remonter",
+    "start_suggested":
+        "Aucun lab nommé, on prend celui que « next » suggère : {lab_id}",
+    "start_no_suggestion":
+        "Tous les labs de la section active portent déjà une note : rien à "
+        "démarrer. Nomme un lab pour le rejouer, ou élargis le contexte avec "
+        "« dsoxlab use ».",
     "cmd_run_help":       "Prépare et démarre l'environnement du lab.",
     "cmd_run_arg":        "Identifiant du lab",
     "cmd_course_help":    "Affiche une section du cours, ou le sommaire si aucune section n'est précisée.",
@@ -533,6 +567,14 @@ Chaque lab déclare :
 
   [cyan]show <id>[/cyan]            Détail complet d'un lab (compétences, runtime, liens…).
     [dim]--json[/dim]               Le lab et l'état de son runtime, en document.
+
+  [cyan]start[/cyan] [dim][<id>][/dim]         Joue un lab de bout en bout. Annonce chaque étape avec la
+                       commande unique qui la rejoue seule : contexte, prérequis,
+                       infrastructure quand le lab en a besoin, puis la session.
+                       Il raccourcit la frappe, jamais la compréhension — un échec
+                       nomme l'étape qui a cassé et comment la rejouer seule.
+    [dim]--target / -t[/dim]        Cible pour cette exécution, comme pour [bold]run[/bold].
+                       [dim]<id>[/dim] est optionnel : sans lui, le lab que [bold]next[/bold] suggère.
 
   [cyan]run <id>[/cyan]             Démarre l'environnement du lab (un shell, ou une vm provisionnée).
 
