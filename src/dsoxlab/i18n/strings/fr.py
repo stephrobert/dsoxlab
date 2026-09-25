@@ -1487,6 +1487,18 @@ hors ligne, elle se tait.
 
     # ── clés inconnues dans un fichier du contrat ─────────────────────────────
     "unknown_keys_header": "\n[bold red]Clés que personne ne lit :[/bold red]",
+    "catalog_issues_header":
+        "\n[bold red]Labs que le moteur ne voit pas :[/bold red]",
+    "lab_yaml_illisible":
+        "ce lab.yaml existe mais le moteur ne sait pas le charger ({raison}), "
+        "il est donc absent de tous les autres contrôles — et de « list-labs »",
+    "lab_yaml_illisible_position":
+        "ce lab.yaml existe mais le moteur ne sait pas le charger, il est donc "
+        "absent de tous les autres contrôles — et de « list-labs ». {raison} "
+        "(ligne {ligne}, colonne {colonne})",
+    "lab_declare_absent":
+        "la section « {section} » déclare « {chemin} », or il n'y a aucun "
+        "lab.yaml à cet emplacement : rien ne le chargera jamais",
     "unknown_key":
         "« {field} » ne fait pas partie du contrat. dsoxlab l'ignore, donc ce que "
         "tu voulais déclarer ne se produit jamais. Retire-la, ou consulte "

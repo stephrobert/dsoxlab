@@ -45,23 +45,31 @@ répertoire.
 
 ---
 
-## L'ordre des opérations
+## `validate-structure` voit les labs qu'il ne peut pas charger
 
-**`dsoxlab list-labs` d'abord, `dsoxlab validate-structure` ensuite.** Pas
-l'inverse, et c'est le conseil le plus utile de cette page.
+Depuis la 0.1.97, cette page ne dit plus de lancer `list-labs` d'abord. Ce conseil
+existait parce que le validator itérait sur les labs **découverts avec succès** :
+un `lab.yaml` qui levait au parsing n'y était tout simplement pas, si bien que le
+validator validait les survivants et ne disait rien du disparu. On pouvait lire
+« ✔ tous les labs sont valides » sur un catalogue amputé d'un lab.
 
-Un `lab.yaml` qui lève au parsing fait **disparaître son lab en silence** : le
-scanner journalise un avertissement et passe au suivant. `validate-structure`
-itère ensuite sur les labs **découverts avec succès** : il valide les
-survivants et ne dit rien du disparu. Un lab absent de `list-labs` est presque
-toujours un `lab.yaml` qui lève.
+Il rapporte désormais les deux moitiés de cet angle mort, sous **Labs que le
+moteur ne voit pas**, et il échoue :
 
-L'avertissement, lui, atteint bien `~/.local/state/dsoxlab/dsoxlab.log` (et
-`dsoxlab support` le collecte) : le diagnostic est à une commande, une fois
-qu'on sait où regarder.
+- un `lab.yaml` **présent sur le disque que le moteur ne sait pas charger** — YAML
+  cassé, champ requis manquant — avec la cause et la ligne où regarder ;
+- un lab **déclaré dans `meta.yml: sections[].labs[]` sans `lab.yaml` à cet
+  emplacement**. La découverte se fait par chemin : une telle entrée ne
+  correspondait à rien, et personne n'était prévenu qu'on l'attendait.
 
-Une exception depuis la 0.1.46 : un `schema_version` que cet outil ne sait pas
-lire s'affiche à l'écran et nomme le fichier, au lieu de s'évanouir.
+Un `schema_version` que cet outil ne sait pas lire garde son propre message, qui
+dit que la réparation est un dsoxlab plus récent, et non une retouche de votre
+fichier.
+
+Le message complet du parseur va toujours dans
+`~/.local/state/dsoxlab/dsoxlab.log`, que `dsoxlab support` collecte : le rapport,
+lui, garde la première ligne et la position, parce que six lignes de prose PyYAML
+dans un rapport cachent toutes les autres anomalies.
 
 ---
 
@@ -122,11 +130,15 @@ la suite.
 | `content_doc_url_no_scheme` | `doc_url` ne porte aucun schéma d'URL |
 | `content_doc_url_scheme` | `doc_url` emploie un schéma autre que http(s) |
 | `schema_version_too_new` | le fichier déclare un `schema_version` que ce dsoxlab ne sait pas lire |
+| `lab_yaml_illisible` | un `lab.yaml` existe sur le disque mais le moteur ne sait pas le charger |
+| `lab_yaml_illisible_position` | le même cas, quand le parseur donne une ligne et une colonne |
+| `lab_declare_absent` | le `meta.yml` déclare un lab et aucun `lab.yaml` ne s'y trouve |
 | `category_absente_avec_labs` | le dépôt porte des labs mais ne déclare pas `repo.category` |
 
-**Ce qu'il ne peut pas vérifier :** qu'un lab listé dans `meta.yml` existe sur le
-disque. Le validator parcourt ce que la découverte a déjà chargé. D'où l'ordre
-ci-dessus.
+**Ce qu'il vérifie et qu'il laissait passer :** un lab listé dans `meta.yml` sans
+rien sur le disque, et un `lab.yaml` que le moteur ne sait pas charger. Les deux
+étaient muets jusqu'à la 0.1.97 — le validator ne parcourait que ce que la
+découverte avait déjà chargé avec succès.
 
 ---
 

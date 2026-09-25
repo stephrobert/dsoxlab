@@ -41,7 +41,12 @@ from ._commun import _ensure_services, _verrou
 #: un tableau de bord qui n'aurait pas la clé ne saurait pas si la famille est
 #: saine ou si cette version de l'outil ne la connaît pas.
 _FAMILLES_ANOMALIES = (
-    "contract", "unknown_key", "structure", "content", "doc_url", "metadata",
+    # `catalog` (0.1.97) : les labs que le moteur ne voit pas — un lab.yaml
+    # illisible, ou déclaré au meta.yml et absent du disque. Famille distincte de
+    # `contract` parce qu'il ne s'agit pas d'un champ mal rempli mais d'un lab
+    # qui manque à tous les autres contrôles (issue #198).
+    "contract", "catalog", "unknown_key", "structure", "content", "doc_url",
+    "metadata",
 )
 
 

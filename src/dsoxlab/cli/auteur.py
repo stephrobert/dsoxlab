@@ -72,6 +72,8 @@ def validate_structure_cmd(
         validate_targets,
     )
     from ..validators.contract import (
+        validate_labs_chargeables,
+        validate_labs_declares,
         validate_repo_fields,
         validate_schema_versions,
         validate_unknown_keys,
@@ -129,6 +131,22 @@ def validate_structure_cmd(
             raise typer.Exit(1)
         error(_("labs_have_issues"))
         raise typer.Exit(1)
+
+    # Puis les labs que le moteur ne voit pas (issue #198). Avant tout le reste,
+    # parce que ces deux contrôles-là expliquent pourquoi un lab manque aux
+    # suivants : un `lab.yaml` illisible et un lab déclaré sans fichier
+    # disparaissaient tous les deux en silence, et l'auteur lisait « ✔ tous les
+    # labs sont valides » sur un catalogue amputé.
+    catalogue = validate_labs_chargeables(root)
+    catalogue.issues.extend(validate_labs_declares(root).issues)
+    documents += [
+        machine.issue_dict("catalog", a.key, a.params, path=a.path)
+        for a in catalogue.issues
+    ]
+    _rendre("catalog_issues_header", [
+        f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
+        for a in catalogue.issues
+    ])
 
     # Ensuite, toujours à la source : les clés que le moteur n'ira jamais lire.
     # Le parseur les ignore et continuera de le faire — c'est une garantie de
@@ -248,6 +266,10 @@ def validate_structure_cmd(
 
     all_ok = (
         contract.ok
+        # Un lab que le moteur ne voit pas fait échouer la validation, il ne la
+        # rend pas seulement bavarde : le verdict « tous les labs sont valides »
+        # ne peut pas porter sur un catalogue dont une partie n'a pas été lue.
+        and catalogue.ok
         and unknown.ok
         and champs_repo.ok
         and all(r.ok for r in structure_reports)

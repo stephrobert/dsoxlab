@@ -9,6 +9,44 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.97] - 2026-09-25
+
+### Corrigé
+
+- **`validate-structure` voit désormais les labs qu'il ne pouvait pas charger**
+  (issue #198). Il itérait sur `discover_labs()`, donc sur les **survivants**. Un
+  `lab.yaml` qui levait au parsing n'était simplement pas dans cette liste : le
+  validator validait les autres et n'en disait rien — un auteur pouvait lire
+  « ✔ tous les labs sont valides » sur un catalogue amputé d'un lab entier.
+
+  C'est le motif que le lot 0.1.84 a corrigé partout ailleurs : **un contrôle qui
+  n'a pas pu regarder ne conclut pas au vert.** La documentation devait enseigner
+  une règle pour le contourner — « `list-labs` d'abord, `validate-structure`
+  ensuite » —, règle qu'un utilisateur n'aurait jamais dû avoir à connaître. Cette
+  page ne le dit plus.
+
+  Les deux moitiés de l'angle mort sont maintenant rapportées, sous **Labs que le
+  moteur ne voit pas**, et elles font échouer la commande :
+
+  - un `lab.yaml` **présent sur le disque que le moteur ne sait pas charger**, avec
+    la cause et, quand le parseur les donne, la ligne et la colonne. Le message de
+    PyYAML fait six lignes dont deux chemins absolus répétés ; le rapport garde la
+    première ligne et la position, et le texte entier reste au journal que
+    `dsoxlab support` collecte. Ce qu'il faut à l'auteur, c'est *où* regarder ;
+  - un lab **déclaré dans `meta.yml: sections[].labs[]` sans `lab.yaml` à cet
+    emplacement**. La découverte se fait par chemin : une telle entrée ne
+    correspondait à rien, et personne n'était prévenu qu'on l'attendait. L'anomalie
+    pointe le `meta.yml`, qui est le fichier à ouvrir — désigner un chemin qui
+    n'existe pas n'aiderait personne.
+
+  Un `schema_version` trop récent n'est **délibérément pas** repris ici : il a déjà
+  son message, qui sait que la réparation est un dsoxlab plus récent et non une
+  retouche du catalogue. Dire un seul défaut deux fois fait chercher deux causes.
+
+  Nouvelle famille `catalog` dans le document `--json` et dans `counts`,
+  documentée dans `docs/machine-output.*`. Les trois catalogues ont été
+  revalidés : 86, 113 et 88 labs, `catalog: 0` partout.
+
 ## [0.1.96] - 2026-09-25
 
 ### Ajouté
