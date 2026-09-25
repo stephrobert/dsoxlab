@@ -9,6 +9,46 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.98] - 2026-09-25
+
+### Corrigé
+
+- **Le rapport de `support` s'écrit désormais en anglais, quoi que dise
+  `DSOXLAB_LANG`** (issue #227). Il était français, en dur :
+  `### Environnement`, `### Outils externes`, `_Aucune trace enregistrée._`,
+  `présent, version illisible`, et des libellés de lignes repris tels quels des
+  clés du document, françaises elles aussi. Une session `DSOXLAB_LANG=en`
+  obtenait donc un rapport français — et depuis la 0.1.86, `--issue` le dépose
+  dans `bug_report.yml`, dont tous les libellés sont anglais.
+
+  C'est exactement le raisonnement qui a mis le journal en anglais en 0.1.83,
+  avec une condition de plus : **ce rapport est publié**. Il se cherche mot pour
+  mot, se compare entre machines aux locales différentes, transporte déjà un
+  journal anglais, et atterrit maintenant dans un formulaire anglais. Ce qui est
+  publié ne suit pas la locale de celui qui l'a produit. La cohérence obtenue en
+  0.1.83 s'arrêtait au milieu du fichier.
+
+  Ce qui rendait la correction moins triviale qu'elle n'en a l'air : **les
+  libellés de lignes *sont* les clés du document**, et ce document est
+  `support --json`, un contrat pour les programmes. Renommer `systeme` en
+  `system` pour corriger un affichage aurait cassé des consommateurs pour une
+  raison sans rapport avec le défaut. Les deux sont donc séparés — les clés ne
+  bougent pas d'un caractère, et une table de correspondance donne au rendu ses
+  libellés anglais. Une clé absente de cette table est rendue telle quelle,
+  délibérément : les noms d'outils viennent du système, et un champ nouveau vaut
+  mieux affiché brut que caché.
+
+  Les mots que dsoxlab fournit comme *valeurs* ont bougé aussi, car ils voyagent
+  également dans le JSON : `aucun` → `none`, `présent, version illisible` →
+  `present, version unreadable`, `inconnu` → `unknown` pour un shell qu'il ne
+  sait pas nommer.
+
+  Neuf tests tiennent la règle, en partageant la liste de mots français de
+  `test_journal_en_anglais.py` — une seule définition de « ce mot n'existe qu'en
+  français » pour les deux règles. Chaque garde-fou a été vérifié en le faisant
+  échouer : un titre de section remis en français, le mot de la valeur absente
+  remis en français, et une clé du document renommée font tous rougir la suite.
+
 ## [0.1.97] - 2026-09-25
 
 ### Corrigé

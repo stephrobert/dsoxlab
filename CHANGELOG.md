@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.98] - 2026-09-25
+
+### Fixed
+
+- **The `support` report is now written in English, whatever `DSOXLAB_LANG` says**
+  (issue #227). It was French, hardcoded: `### Environnement`, `### Outils
+  externes`, `_Aucune trace enregistrée._`, `présent, version illisible`, and row
+  labels taken straight from the document keys, which are French too. An
+  `DSOXLAB_LANG=en` session therefore got a French report — and since 0.1.86,
+  `--issue` drops it into `bug_report.yml`, whose every label is English.
+
+  This is exactly the reasoning that put the log in English in 0.1.83, with one
+  more condition: **this report is published**. It gets searched word for word,
+  compared between machines with different locales, it already carries an English
+  log, and it now lands in an English form. What is published does not follow the
+  locale of whoever produced it. The coherence gained in 0.1.83 stopped halfway
+  through the file.
+
+  What made it less trivial than it looks: **the row labels *are* the document
+  keys**, and that document is `support --json`, a contract for programs. Renaming
+  `systeme` to `system` to fix a display would have broken consumers for a reason
+  unrelated to the defect. So the two are now separate — the keys stay exactly as
+  they were, and a translation table gives the rendering its English labels. A key
+  absent from that table renders as-is, deliberately: tool names come from the
+  system, and a new field is better shown raw than hidden.
+
+  The words dsoxlab supplies as *values* moved too, because they travel in the
+  JSON as well: `aucun` → `none`, `présent, version illisible` → `present, version
+  unreadable`, `inconnu` → `unknown` for a shell it cannot name.
+
+  Nine tests hold this, sharing the French-word list of
+  `test_journal_en_anglais.py` — one definition of "this word only exists in
+  French" for both rules. Each guard was verified by being made to fail: a section
+  title put back in French, the absent-value word put back in French, and a
+  document key renamed all turn the suite red.
+
 ## [0.1.97] - 2026-09-25
 
 ### Fixed

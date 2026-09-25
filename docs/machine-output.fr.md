@@ -496,6 +496,23 @@ document. Ses clés de premier niveau sont `dsoxlab`, `python`, `systeme`,
 lequel bâtir un tableau de bord : les chemins personnels et les adresses
 publiques y sont remplacés avant l'affichage.
 
+**Ces clés sont stables, et elles ne sont pas traduites.** Certaines sont
+françaises (`systeme`, `catalogue`, `etat`, `labs_decouverts`, `hotes_declares`…)
+parce que c'est ainsi qu'elles ont été publiées, et les renommer pour faire joli
+casserait tous les consommateurs sans rien apporter. Elles ne suivent pas
+`DSOXLAB_LANG`, et ne le suivront jamais : une clé est un identifiant, comme `key`
+et `state` ailleurs dans cette page.
+
+**Le rendu Markdown**, lui, est autre chose : depuis la 0.1.98 il s'écrit en
+anglais quoi que dise `DSOXLAB_LANG` — titres de sections, libellés de lignes, et
+les mots que dsoxlab fournit lui-même comme valeurs (`none` pour une valeur
+absente, `present, version unreadable` pour un outil qui répond mal). Ce rapport
+est *publié* : il se cherche mot pour mot, se compare entre machines aux locales
+différentes, transporte déjà un journal anglais, et `--issue` le dépose dans un
+formulaire dont les libellés sont anglais. Ce qui est publié ne suit pas la locale
+de celui qui l'a produit — c'est le raisonnement qui a mis le journal en anglais
+en 0.1.83.
+
 ---
 
 ## La règle d'évolution

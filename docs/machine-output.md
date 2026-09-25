@@ -487,6 +487,21 @@ top-level keys are `dsoxlab`, `python`, `systeme`, `distribution`,
 diagnostic bundle meant for an issue, not a state to build a dashboard on:
 personal paths and public addresses are replaced before it is printed.
 
+**Those keys are stable, and they are not translated.** Some of them are French
+(`systeme`, `catalogue`, `etat`, `labs_decouverts`, `hotes_declares`…) because
+that is how they were first published, and renaming them to please the eye would
+break every consumer for no benefit. They do not follow `DSOXLAB_LANG`, and they
+never will: a key is an identifier, like `key` and `state` elsewhere on this page.
+
+The **Markdown rendering** is a different thing, and since 0.1.98 it is written in
+English whatever `DSOXLAB_LANG` says — section titles, row labels, and the words
+dsoxlab itself supplies as values (`none` for an absent value, `present, version
+unreadable` for a tool that answers badly). The report is *published*: it gets
+searched word for word, compared between machines with different locales, it
+already carries an English log, and `--issue` drops it into a form whose labels
+are English. What is published does not follow the locale of whoever produced it —
+the same reasoning that put the log in English in 0.1.83.
+
 ---
 
 ## The evolution rule
