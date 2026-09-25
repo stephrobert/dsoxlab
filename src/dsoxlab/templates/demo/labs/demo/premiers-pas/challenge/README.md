@@ -4,6 +4,12 @@
 
 Prove you went round the loop, by producing three files in `reponses/`.
 
+**Where exactly?** Inside your **working directory**, and these three paths are
+relative to it. `dsoxlab run premiers-pas` drops you straight into it, so
+`mkdir -p reponses` is all you need. If you are reading this from somewhere else,
+the `Working directory:` line printed right below this challenge gives its full
+path.
+
 1. `reponses/cours.txt` — the word given at the end of the lesson
    (`dsoxlab course premiers-pas`).
 2. `reponses/mission.txt` — the word given right below, in this mission.
