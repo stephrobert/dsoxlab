@@ -17,6 +17,7 @@ Deux règles héritées du module s'appliquent aussi ici :
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,11 @@ def test_dev_kvm_absent_est_un_echec_qui_le_dit(
     c'est le périphérique qu'il faut lire, pas le client.
     """
     monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "kvm")
+    # Sans simulation, le détail dépendrait de la machine qui joue le test —
+    # un runner de CI est lui-même une VM, un poste de développement souvent pas.
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=None),
+    )
     check = doctor._check_hw_virt()
 
     assert check.key == "hw_virt"
@@ -110,6 +116,139 @@ def test_dev_kvm_absent_est_un_echec_qui_le_dit(
     # Le geste (BIOS, virtualisation imbriquée) appartient à l'humain, machine
     # éteinte : aucun correctif exécutable ne doit être proposé.
     assert check.fix is None
+
+
+def test_dans_une_vm_le_message_nomme_l_imbrication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le cas de toute image prête à l'emploi (issue #91).
+
+    Parler du BIOS à qui tourne dans une VM l'envoie chercher un réglage qui
+    n'existe pas chez lui : la machine virtuelle n'a pas de BIOS à visiter, et
+    l'imbrication s'active sur l'hôte, à l'extérieur.
+    """
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement",
+        lambda: doctor.Hebergement(dans_une_vm=True, hyperviseur="vmware"),
+    )
+
+    check = doctor._check_hw_virt()
+
+    assert check.state == doctor.STATE_FAILED
+    bas = check.detail.lower()
+    assert "vmware" in bas          # l'hyperviseur est nommé, pas deviné
+    assert "imbriquée" in bas or "nested" in bas
+    assert "bios" not in bas        # la fausse piste a disparu
+
+
+def test_sur_du_metal_nu_le_message_envoie_au_bios(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le symétrique : sur une machine physique, l'imbrication n'a aucun sens."""
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=False),
+    )
+
+    check = doctor._check_hw_virt()
+
+    bas = check.detail.lower()
+    assert "bios" in bas
+    assert "imbriquée" not in bas and "nested" not in bas
+
+
+def test_un_hebergement_indetermine_garde_le_ou(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ne pas savoir n'autorise pas à choisir : les deux consignes restent.
+
+    C'est la même règle que pour `unknown` sur un verdict — on n'affirme pas ce
+    qu'on n'a pas mesuré. Ici elle porte sur la consigne, pas sur l'état.
+    """
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
+    monkeypatch.setattr(
+        doctor, "_hebergement", lambda: doctor.Hebergement(dans_une_vm=None),
+    )
+
+    check = doctor._check_hw_virt()
+
+    bas = check.detail.lower()
+    assert "bios" in bas
+    assert "imbriquée" in bas or "nested" in bas
+
+
+# ── où tourne ce système : la sonde qui décide du message ─────────────────────
+
+def _completed(sortie: str, code: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(args=[], returncode=code, stdout=sortie,
+                                       stderr="")
+
+
+def test_systemd_detect_virt_nomme_l_hyperviseur(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nommer vaut mieux qu'un booléen : la consigne diffère par produit."""
+    monkeypatch.setattr(
+        doctor, "_sonder", lambda *a, **k: _completed("vmware\n", 0),
+    )
+
+    hote = doctor._hebergement()
+
+    assert hote.dans_une_vm is True
+    assert hote.hyperviseur == "vmware"
+
+
+def test_le_metal_nu_se_lit_dans_le_code_retour(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`systemd-detect-virt --vm` sort en 1 avec « none » : c'est une mesure.
+
+    La traiter comme un échec de sonde ferait retomber sur le repli, et surtout
+    conclurait « je ne sais pas » là où la réponse est claire.
+    """
+    monkeypatch.setattr(
+        doctor, "_sonder", lambda *a, **k: _completed("none\n", 1),
+    )
+
+    assert doctor._hebergement().dans_une_vm is False
+
+
+def test_le_repli_lit_le_drapeau_hypervisor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`systemd-detect-virt` n'est pas universel : une image minimale s'en passe."""
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor\t: 0\nflags\t\t: fpu vme hypervisor lm\n")
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", cpuinfo)
+
+    hote = doctor._hebergement()
+
+    assert hote.dans_une_vm is True
+    # Le repli tranche la question, mais ne nomme personne : ne pas inventer.
+    assert hote.hyperviseur == ""
+
+
+def test_un_cpuinfo_sans_drapeau_vaut_metal_nu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("processor\t: 0\nflags\t\t: fpu vme de pse tsc\n")
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", cpuinfo)
+
+    assert doctor._hebergement().dans_une_vm is False
+
+
+def test_un_cpuinfo_illisible_ne_conclut_rien(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Les deux sondes muettes : l'ignorance est un état, pas un défaut à cacher."""
+    monkeypatch.setattr(doctor, "_sonder", lambda *a, **k: None)
+    monkeypatch.setattr(doctor, "_CPUINFO", tmp_path / "jamais-ecrit")
+
+    assert doctor._hebergement().dans_une_vm is None
 
 
 def test_dev_kvm_inaccessible_est_reparable(
@@ -229,15 +368,85 @@ def test_une_ram_insuffisante_echoue_en_le_chiffrant(
     assert "3072" in check.detail
 
 
-def test_un_disque_insuffisant_echoue_aussi(
+def test_un_pool_plus_petit_que_le_nominal_ne_peint_plus_en_rouge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Le comportement change délibérément (issue #209).
+
+    Ce test exigeait l'inverse : un pool plus petit que la somme des tailles
+    déclarées faisait échouer le contrôle. Or ces tailles sont NOMINALES et les
+    qcow2 s'allouent à la demande — le catalogue Linux annonce 65 Go pour 3,2 Go
+    réellement occupés, mesurés par un utilisateur dont `doctor` était rouge en
+    contrôle **requis** sur une installation qui provisionnait très bien.
+
+    Comparer un maximum théorique à une mesure ne prouve rien. Le chiffre reste
+    affiché, annoncé comme un maximum, et un manque d'espace RÉEL se dit au
+    moment où il se produit, par `explique_echec_provision`.
+    """
     monkeypatch.setattr(doctor, "_mem_available_mb", lambda: 8192)
     monkeypatch.setattr(doctor, "_pool_available_gb", lambda pool: 8)
 
     check = doctor._check_resources(_infra(), "kvm")
 
+    assert check.state == doctor.STATE_OK
+    # Les deux chiffres restent lisibles : le pire cas dit quelque chose de vrai.
+    assert "8" in check.detail
+    assert "25" in check.detail
+
+
+def test_une_ram_insuffisante_echoue_meme_avec_un_pool_etroit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La régression à craindre : tout rendre informatif et ne plus rien juger.
+
+    La RAM, elle, se compare : `MemAvailable` et la somme des `ram_mb` sont deux
+    mesures de même nature.
+    """
+    monkeypatch.setattr(doctor, "_mem_available_mb", lambda: 512)
+    monkeypatch.setattr(doctor, "_pool_available_gb", lambda pool: 8)
+
+    check = doctor._check_resources(_infra(), "kvm")
+
     assert check.state == doctor.STATE_FAILED
+
+
+def test_un_pool_plein_est_explique_au_moment_de_l_echec() -> None:
+    """Le pendant du contrôle assoupli : sans lui, on retirerait un garde-fou.
+
+    libvirt rend « no space left on device » sans nommer le pool ni le geste.
+    """
+    connu = doctor.explique_echec_provision(
+        "Error: error creating volume: no space left on device"
+    )
+
+    assert connu is not None
+    explication, commande = connu
+    assert "pool" in explication.lower()
+    assert "pool-info" in commande
+
+
+def test_un_pool_plein_nomme_le_pool_du_depot() -> None:
+    """Une commande proposée qui vise le mauvais pool échoue à la copie.
+
+    libvirt ne nomme pas le pool dans « no space left on device » : c'est
+    l'appelant qui le sait, par `nom_du_pool`, et qui le transmet.
+    """
+    connu = doctor.explique_echec_provision(
+        "Error: error creating volume: no space left on device",
+        pool="labs-ssd",
+    )
+
+    assert connu is not None
+    assert "labs-ssd" in connu[1]
+
+
+def test_le_pool_du_depot_vient_des_overrides() -> None:
+    """`storage_pool` du `meta.yml` prime, `default` n'est que le repli."""
+    assert doctor.nom_du_pool(_infra()) == "default"
+
+    infra = _infra()
+    infra.providers = {"kvm": {"storage_pool": "labs-ssd"}}
+    assert doctor.nom_du_pool(infra) == "labs-ssd"
 
 
 def test_une_sonde_impossible_ne_vaut_jamais_vert(

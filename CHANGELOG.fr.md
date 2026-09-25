@@ -9,6 +9,296 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.95] - 2026-09-25
+
+### Modifié
+
+- **`doctor` dit désormais *d'où* la virtualisation matérielle manque, et ne donne
+  que la consigne qui s'applique** (issue #91). Quand `/dev/kvm` est absent, le
+  détail disait : active VT-x/AMD-V dans le BIOS, **ou** la virtualisation
+  imbriquée dans ton hyperviseur. Un seul message pour deux situations opposées,
+  qui laissait le lecteur chercher quelle moitié le concernait — et qui envoyait la
+  moitié d'entre eux dans le BIOS d'une machine qui n'en a pas, une machine
+  virtuelle n'en ayant aucun.
+
+  Le contrôle commence maintenant par regarder où il tourne, via
+  `systemd-detect-virt --vm` puis, quand ce binaire manque — une image minimale
+  s'en passe souvent — le drapeau `hypervisor` de `/proc/cpuinfo`. Dans une machine
+  virtuelle, il annonce que l'imbrication n'est pas disponible, **nomme
+  l'hyperviseur détecté**, et dit que le réglage vit sur l'hôte, cette machine
+  éteinte, donc qu'il n'y a rien à chercher à l'intérieur. Sur une machine
+  physique, il renvoie au BIOS ou au setup UEFI et retire la phrase sur
+  l'imbrication.
+
+  Quand aucune des deux sondes ne répond, le message historique reste : ne pas
+  savoir n'autorise pas à choisir. C'est la règle de `unknown` sur un verdict,
+  appliquée à la consigne plutôt qu'à l'état.
+
+  Le verdict ne change pas — un `/dev/kvm` absent échoue toujours, et ne propose
+  toujours aucun correctif exécutable, le geste appartenant à un humain machine
+  éteinte. Ce qui change, c'est que la phrase est maintenant vraie pour celui qui
+  la lit.
+
+  Vérifié de bout en bout dans une vraie machine virtuelle dont le nœud
+  `/dev/kvm` a été retiré, dans les deux langues : le détail nomme `kvm` comme
+  hyperviseur et ne parle plus du BIOS.
+
+### Corrigé
+
+- **`doctor` lisait le nom du pool de stockage à deux endroits, dont un qui
+  ignorait l'override du dépôt.** Le contrôle du pool libvirt dérivait son pool
+  d'un `provider_config()` écrit sur place, là où le contrôle des ressources
+  passait par `nom_du_pool()`. Les deux s'accordaient aujourd'hui, et c'est
+  exactement le genre de duplication qui cesse de s'accorder sans que personne le
+  remarque. Une seule fonction porte cette lecture, à côté du
+  `local.storage_pool` du template Terraform.
+
+## [0.1.94] - 2026-09-25
+
+### Corrigé
+
+- **`doctor` ne peint plus en rouge une installation saine à cause de tailles de
+  disque nominales** (issue #209). Le contrôle `Ressources RAM / disque`
+  additionnait les `disk_gb` + `extra_disk_gb` déclarés au `meta.yml` et
+  comparait ce total à l'espace libre que libvirt annonce pour le pool. Or ces
+  tailles sont **nominales** : les volumes qcow2 s'allouent à la demande. Le
+  catalogue Linux déclare 65 Go pour 3,2 Go réellement occupés — mesurés par un
+  utilisateur dont le `doctor` sortait rouge, en contrôle **requis**, sur une
+  machine qui provisionnait ses labs sans le moindre accroc.
+
+  Comparer un plafond théorique à une mesure ne prouve rien, et cette erreur-là
+  était la plus bruyante : requise, rouge, sur une installation qui marche. Elle
+  envoyait qui la lisait chercher un problème de disque inexistant, et lui
+  apprenait à se méfier du seul contrôle censé être digne de confiance.
+
+  Le chiffre reste — le pire cas dit quelque chose de vrai — mais il est annoncé
+  comme un plafond (`jusqu'à 65 Go déclarés, alloués à la demande (qcow2)`) et ne
+  décide plus du verdict. La RAM garde le sien : `MemAvailable` et la somme des
+  `ram_mb` sont deux mesures de même nature, donc elles se comparent.
+
+### Ajouté
+
+- **Un pool vraiment plein est désormais nommé au moment où il échoue** (issue
+  #209). Sans ce pendant, assouplir le contrôle ci-dessus aurait retiré un
+  garde-fou sans le remplacer. libvirt rend `no space left on device` sans nommer
+  ni le pool ni le geste ; `provision` le reconnaît maintenant, dit que les
+  disques qcow2 grandissent à l'usage — donc qu'un pool qui suffisait hier peut
+  manquer aujourd'hui — et affiche la commande qui montre ce qu'il reste.
+
+  Cette commande nomme **le pool du dépôt**, lu dans
+  `infra.providers.kvm.storage_pool`, et non un `default` supposé : une commande
+  proposée qui vise le mauvais pool échoue dans les mains de qui la copie. Il en
+  va de même, désormais, pour l'explication du `pool not found`.
+
+  C'est la règle qu'a posée tout le lot #172 → #179, appliquée dans l'autre sens :
+  un contrôle qui n'a pas pu regarder ne conclut jamais au vert — et un échec
+  qu'on ne peut pas prédire se nomme là où il se produit vraiment.
+
+## [0.1.93] - 2026-09-25
+
+### Corrigé
+
+- **`provision --host X` n'attend plus une réponse des hôtes qu'il n'a pas
+  créés** (issue #246). L'output `hosts` du template Terraform dérive de
+  `var.hosts`, donc de **tous** les hôtes déclarés au `meta.yml`, et non de ceux
+  que l'apply vient de monter. La CLI y lisait la liste des machines à sonder :
+  un ciblage réclamait donc une réponse à des machines qu'on avait explicitement
+  demandé de ne pas créer.
+
+  `provision --host` sortait en **8** à tous les coups dès qu'un dépôt déclare
+  plus d'un hôte, c'est-à-dire presque toujours. L'option en devenait
+  inutilisable là où elle sert le plus : on ne cible que pour éviter de monter
+  une topologie entière, donc dans un contexte automatisé, où le code de sortie
+  est lu.
+
+  L'output garde son sens — la topologie déclarée avec ses adresses — et c'est la
+  CLI, seule à savoir ce qu'elle a ciblé, qui restreint l'attente. Le message de
+  fin dit désormais ce qui a été **vérifié** et sur quel total : annoncer
+  « 1 hôte prêt » sur un dépôt qui en déclare trois laissait croire que les deux
+  autres avaient été jugés.
+
+  Trouvé en validant #234, où ce code 8 a d'abord été pris pour un échec du
+  correctif du firmware.
+
+## [0.1.92] - 2026-09-25
+
+### Corrigé
+
+- **`provision` fonctionne sur libvirt 8, 9 et 10** (issue #234). Le template
+  laissait libvirt choisir le firmware EFI (`os.firmware = "efi"`). Ce choix
+  automatique ne survit pas à la relecture du XML par le provider Terraform sur
+  libvirt 8 : `.os.firmware` revient `null`, et l'apply échoue sur « Provider
+  produced inconsistent result after apply », un message qui ne nomme ni la
+  version, ni la cause, ni le geste.
+
+  Le template **désigne** désormais son loader au lieu de le laisser choisir. Le
+  chemin n'est pas écrit pour autant : il est **découvert** dans
+  `virsh domcapabilities`, car il diffère selon la distribution
+  (`/usr/share/OVMF/` sur Debian et Ubuntu, `/usr/share/edk2/` sur Fedora et
+  Arch) et les variantes 2M/4M cohabitent. libvirt sait où sont ses firmwares, y
+  compris en version 8, et le rapporteur de l'issue l'a prouvé en joignant son
+  `domcapabilities`.
+
+  Le loader retenu est celui **sans Secure Boot** : les variantes `.ms.fd` et
+  `.secboot.fd` enrôlent les clés Microsoft, qui rejettent les kernels non signés
+  par elles, et les images cloud bloquent alors dans `/init`. Seule la
+  **destination** du NVRAM est déclarée, jamais `nv_ram.source`, qui déclenche le
+  second bug décrit dans l'issue.
+
+  Si aucun firmware utilisable n'est exposé, `provision` s'arrête en nommant le
+  paquet à installer, plutôt que de laisser Terraform échouer sur une variable
+  absente.
+
+### Modifié
+
+- **Le plancher libvirt redescend de 9.0 à 8.0.** Il avait été posé en 0.1.91
+  parce que l'autoselect EFI échouait sous cette version. La cause ayant disparu,
+  le maintenir aurait puni des postes pour un défaut qui n'existe plus : un seuil
+  qui survit à sa raison exclut sans rien protéger, et devient une dette que plus
+  personne n'ose lever.
+
+  Les trois versions ont été **provisionnées pour de vrai**, et la VM devait
+  **répondre en SSH**, pas seulement laisser Terraform se taire : **8.0** dans une
+  VM Ubuntu 22.04, où le défaut avait d'abord été reproduit mot pour mot ;
+  **9.0** dans une VM Debian 12, que personne n'avait jamais éprouvé ; **10.0**
+  sur la machine de référence, avec les trois hôtes du catalogue Linux, chacun
+  démarré en EFI et répondant en SSH et sudo. Rien en dessous de 8.0 n'a été
+  éprouvé, et c'est la seule raison pour laquelle un plancher subsiste.
+
+## [0.1.91] - 2026-09-25
+
+### Ajouté
+
+- **Les versions prises en charge sont déclarées, contrôlées et annoncées**
+  (issue #234). Rien ne disait qu'une version de libvirt pouvait être trop
+  ancienne. Sur libvirt 8.0, `provision` échoue parce que le firmware EFI choisi
+  automatiquement ne survit pas à la relecture du XML par le provider Terraform,
+  et l'erreur arrive en langage Terraform — « Provider produced inconsistent
+  result after apply » — sans nommer ni la version, ni la cause, ni le geste.
+
+  `doctor` refuse désormais une version inférieure à **libvirt 9.0** et dit
+  pourquoi. Le plancher est **mesuré**, pas choisi par prudence : 10.0
+  provisionne, vérifié en provisionnant une VM AlmaLinux 10 ; 8.0 échoue, tel que
+  remonté. 9.x n'a été éprouvé par personne et passe au bénéfice du doute plutôt
+  que d'exclure Debian 12 et AlmaLinux 9, qu'aucune mesure ne condamne. Le jour
+  où l'un d'eux est mesuré défaillant, un seul nombre change.
+
+  Une version que virsh rend de façon illisible sort en **`unknown`**, ni verte
+  ni rouge : on ne refuse pas un poste sur une sortie qu'on n'a pas su lire, et
+  on ne le déclare pas bon pour autant. `--strict` a son code pour ce cas (10).
+
+- **`doctor` et `support` annoncent la version du provider Terraform réellement
+  épinglée**, lue dans le `.terraform.lock.hcl` de l'état. La contrainte du
+  template, `~> 0.9`, ne la dit pas : deux postes qui l'honorent tous les deux
+  peuvent faire tourner des versions différentes, et c'est celle-là qui décide.
+  Comprendre l'issue #234 a demandé de la chercher à la main dans deux rapports
+  qui ne la portaient ni l'un ni l'autre ; un rapport la porte désormais sans que
+  personne ait à la demander.
+
+  Ce contrôle ne peint jamais en rouge : c'est une information, pas un
+  prérequis. Aucun plancher n'est connu pour ces providers — le rapporteur et la
+  machine de référence avaient la **même** version 0.9.9 — donc en inventer un
+  refuserait des postes sur une supposition.
+
+- **Les versions prises en charge sont documentées** dans le guide du formateur,
+  en anglais et en français, avec la mesure qui justifie chaque plancher.
+
+## [0.1.90] - 2026-09-25
+
+### Corrigé
+
+- **`challenge` annonçait un répertoire de travail où rien n'est lu** (issue
+  #237, remontée par @teofeo). La ligne « Répertoire de travail » affichait
+  `<lab>/challenge` **en dur**, alors que le travail se fait dans
+  `<lab>/<runtime.workdir>`. Un apprenant a suivi cette ligne, l'a croisée avec
+  un énoncé qui dit « reponses/cours.txt », en a conclu `challenge/reponses/`, et
+  a perdu une demi-heure sur son premier lab en suivant l'outil à la lettre.
+
+  Le défaut valait pour **tous les labs de tous les catalogues**, pas seulement
+  pour la démonstration. Mesuré sur celle-ci : les trois mêmes fichiers valent
+  **0/100** à la racine du catalogue et **100/100** sous le workdir. La ligne ne
+  se contentait donc pas d'être imprécise, elle désignait un endroit où rien
+  n'est lu.
+
+  Le chemin vient désormais du contrat. Un lab `vm` n'annonce plus rien : son
+  travail se fait sur la machine, et `runtime.workdir` y est ignoré alors qu'il
+  porte quand même la valeur par défaut du modèle. Se fier à la présence du champ
+  aurait donc reproduit le défaut dans l'autre sens, et c'est le test qui l'a
+  montré.
+
+- **L'énoncé du lab de démonstration dit enfin où écrire**, sans coder aucun
+  chemin. Il renvoie à la ligne que le moteur affiche et garde des chemins
+  relatifs : chaque catalogue déclare son propre `runtime.workdir`, donc un
+  énoncé qui écrirait `challenge/work` recréerait le défaut ailleurs et
+  l'enseignerait aux auteurs.
+
+### Ajouté
+
+- **Un garde-fou confronte l'énoncé du lab de démonstration à son propre test.**
+  Ce lab était déjà joué à chaque livraison jusqu'au 100/100 par
+  `tests_e2e/test_parcours.py`, et pourtant #237 est passé : ce test demande le
+  répertoire de travail à la CLI et pose les fichiers au bon endroit. Il prouve
+  que le lab **est jouable**, jamais que son énoncé **mène à le jouer**.
+
+  Tout fichier que `test_functional.py` lit doit désormais être cité dans
+  l'énoncé, dans les deux langues, et l'énoncé ne doit coder aucun workdir.
+  Renommer l'un sans l'autre fait échouer la suite.
+
+## [0.1.89] - 2026-09-25
+
+### Corrigé
+
+- **`validate-structure` inspectait le répertoire de travail, et rendait faux
+  les labs dont un provider traînait en cache** (issue #238). Terraform dépose
+  dans `challenge/work/.terraform/` le README du provider qu'il vient de
+  télécharger, dont les liens relatifs pointent vers l'arborescence GitHub du
+  provider, absente de l'archive distribuée. Trois labs de `terraform-training`
+  sortaient en erreur pour cette seule raison, sans qu'aucune correction soit
+  possible côté catalogue.
+
+  Le coût dépassait les trois faux positifs : le verdict dépendait de **l'ordre
+  des commandes**. Valider après un `run` accusait trois labs, valider après un
+  `clean` les déclarait bons. Un contrôle dont la sortie change selon qu'un cache
+  traîne cesse d'être un contrôle, et c'est alors le vrai défaut de structure qui
+  passe inaperçu.
+
+  Les liens internes et la parité de langue ne regardent donc plus que le contenu
+  d'auteur : le répertoire de travail déclaré par le lab en est écarté, ainsi que
+  tout répertoire caché ou de cache d'outillage (`.terraform`, `.venv`,
+  `node_modules`, `vendor`), où qu'il soit. Rien n'est perdu au passage : un
+  Markdown copié dans le workdir vient de `fixtures/`, qui reste contrôlé, et il
+  l'est désormais une fois plutôt que zéro ou deux selon qu'un `run` a eu lieu.
+
+### Ajouté
+
+- **`runtime.services[].spawns` : les conteneurs qu'un service lance lui-même
+  sont enfin nettoyés** (issue #239). Un service qui reçoit le socket Docker crée
+  ses propres conteneurs, que dsoxlab n'avait pas lancés et ne connaissait donc
+  pas. Ils survivaient à `clean` comme à l'arrêt du service, et retenaient leurs
+  ports publiés : trois d'entre eux tournaient encore après 15 et 23 heures.
+
+  La création suivante échouait alors sur « Bind for 0.0.0.0:2201 failed: port is
+  already allocated », à un endroit dont rien ne remontait au lab. L'instance
+  existait dans l'API mais n'atteignait jamais l'état `running`, la solution de
+  référence ne trouvait rien, et le lab paraissait cassé sans raison. Deux cycles
+  ont été perdus là-dessus. Chaque catalogue devait poser son propre nettoyage en
+  `post_start`, et un lab qui l'oubliait retombait dans le défaut.
+
+  Le lab déclare désormais les fragments de nom concernés, et l'outil s'en
+  charge. Deux points de conception, qui comptent plus que le nettoyage :
+
+  - les engendrés sont retirés quand dsoxlab **(re)crée** le conteneur du service
+    et à `clean`, **jamais** quand il réutilise un conteneur debout. Ce que le
+    service a engendré depuis est alors le travail en cours de l'apprenant, et
+    c'est précisément ce que le contournement en `post_start` ne distinguait pas ;
+  - les conteneurs de dsoxlab (`dsoxlab-…`) sont toujours épargnés, sans quoi un
+    fragment trop large ferait retirer par un service le conteneur d'un autre.
+
+  La limite est assumée et écrite au contrat : un fragment de nom reste un
+  fragment de nom, et deux instances du même produit lancées en parallèle se
+  marcheront dessus. Seul un service qui étiquetterait ses enfants permettrait un
+  filtrage par projet, et cela ne dépend pas de dsoxlab.
+
 ## [0.1.88] - 2026-09-20
 
 ### Corrigé

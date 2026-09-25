@@ -333,6 +333,9 @@ STRINGS: dict[str, str] = {
     "progress_nothing_to_do":  "Nothing to do",
     "provision_starting":  "Provisioning infrastructure (provider: {provider})…",
     "provision_no_ssh_key": "Lab SSH key missing: {path}\nWithout it, cloud keypair would be empty and VMs unreachable.\nRun first: dsoxlab instructor bootstrap",
+    "provision_done_cible":
+        "Provisioning complete — {count} targeted host(s) out of {total} declared are "
+        "ready. The others were not brought up, so they were not checked.",
     "provision_done":      "Provisioning complete — {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
     "provision_lease_refused":
@@ -959,6 +962,7 @@ silent.
     "check_kvm":      "virsh/KVM",
     "check_provider": "Infra provider",
     "check_terraform":    "Terraform",
+    "check_tf_providers": "Terraform providers",
     "check_ansible":      "ansible-playbook",
     "check_libvirt_pool": "libvirt pool",
     "check_iso_tool":     "genisoimage",
@@ -981,6 +985,22 @@ silent.
     "detail_incus_no_group": "client {version}, user not in the incus group (re-login required)",
     "detail_incus_no_init":  "client {version}, daemon ok but not initialised",
     "detail_kvm_daemon_err": "virsh present but error (daemon stopped?)",
+    "err_efi_loader_introuvable":
+        "libvirt exposes no usable EFI firmware on this machine. Install the "
+        "OVMF package (e.g. apt install ovmf, dnf install edk2-ovmf), then check "
+        "with: virsh domcapabilities | grep -A3 '<loader'.",
+    "detail_kvm_trop_ancien":
+        "libvirt {trouve}: dsoxlab requires {minimum} at least. Below that, the "
+        "automatically selected EFI firmware does not survive the Terraform "
+        "provider reading the XML back, and provision fails on \"Provider "
+        "produced inconsistent result after apply\" without naming the cause.",
+    "detail_kvm_version_illisible":
+        "libvirt version unreadable in virsh's answer ({sortie}): no way to tell "
+        "whether it is supported.",
+    "detail_tf_providers":
+        "{providers} (pinned by terraform init)",
+    "detail_tf_providers_absents":
+        "no provider pinned yet: provision has not run for this repository.",
     "detail_kvm_missing":    "not found",
     "detail_pytest_missing": "not found",
     "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
@@ -1026,6 +1046,20 @@ silent.
         "{device} is absent: no hardware virtualization, the vm labs cannot "
         "run on this machine. Enable VT-x/AMD-V in the BIOS, or nested "
         "virtualization in your hypervisor (machine powered off).",
+    "detail_hw_virt_nested_named":
+        "{device} is absent and this system is itself running inside a virtual "
+        "machine ({hypervisor}): nested virtualization is unavailable, so the "
+        "vm labs cannot run here. It is enabled on the HOST hypervisor, with "
+        "this machine powered off — nothing to change inside it.",
+    "detail_hw_virt_nested":
+        "{device} is absent and this system is itself running inside a virtual "
+        "machine: nested virtualization is unavailable, so the vm labs cannot "
+        "run here. It is enabled on the HOST hypervisor, with this machine "
+        "powered off — nothing to change inside it.",
+    "detail_hw_virt_bare_metal":
+        "{device} is absent on a physical machine: hardware virtualization is "
+        "off, so the vm labs cannot run here. Enable VT-x/AMD-V in the BIOS or "
+        "UEFI setup.",
     "detail_hw_virt_denied":
         "{device} exists but this user cannot open it: `provision` cannot "
         "start any VM (re-login required after joining the kvm group)",
@@ -1038,8 +1072,13 @@ silent.
         "RAM: {avail} MB available for {need} MB declared",
     "detail_resources_ram_unknown":
         "RAM: /proc/meminfo unreadable, nothing measured",
+    "explain_pool_full":
+        "Known cause: the libvirt storage pool is full. qcow2 disks grow with use, "
+        "so a pool that was enough yesterday can run short today. Check what is "
+        "left, then free space or destroy a lab infrastructure you no longer use:",
     "detail_resources_disk":
-        "pool {pool}: {avail} GB available for {need} GB declared",
+        "pool {pool}: {avail} GB available; up to {need} GB declared, "
+        "allocated on demand (qcow2)",
     "detail_resources_disk_unknown":
         "pool {pool}: not answering, disk space not measured",
     "detail_resources_disk_unprobed":

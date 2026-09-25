@@ -37,3 +37,30 @@ variable "target_hosts" {
   type        = list(string)
   default     = []
 }
+
+variable "efi_loader" {
+  description = <<-EOT
+    Chemin du firmware EFI, DÉCOUVERT par dsoxlab dans `virsh domcapabilities`
+    plutôt qu'écrit ici.
+
+    L'autoselect `os.firmware = "efi"` a longtemps servi, mais il ne survit pas à
+    la relecture du XML par le provider sur libvirt 8 : l'apply échoue alors sur
+    « Provider produced inconsistent result after apply », avec `.os.firmware`
+    revenu à null (dsoxlab issue #234, reproduit dans une VM Ubuntu 22.04).
+
+    Le chemin ne peut pas être écrit en dur : il diffère selon la distribution
+    (`/usr/share/OVMF/` sur Debian et Ubuntu, `/usr/share/edk2/` sur Fedora et
+    Arch) et les variantes 2M/4M cohabitent. libvirt sait où sont ses firmwares,
+    y compris en version 8, donc c'est lui qu'on interroge.
+
+    Le loader retenu est celui SANS Secure Boot : les variantes `.ms.fd` et
+    `.secboot.fd` enrôlent les clés Microsoft, qui rejettent les kernels non
+    signés par elles, et les images cloud AlmaLinux, Debian et Ubuntu bloquent
+    alors dans /init faute de charger leurs modules virtio.
+  EOT
+  type        = string
+  # Un défaut vide pour que `terraform validate` tourne sans variables, comme le
+  # fait la CI. Ce n'est pas une valeur utilisable : `apply` refuse de partir sur
+  # une chaîne vide, en nommant le paquet OVMF à installer.
+  default     = ""
+}

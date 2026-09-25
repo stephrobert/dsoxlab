@@ -9,6 +9,282 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.95] - 2026-09-25
+
+### Changed
+
+- **`doctor` now says *where* hardware virtualization is missing from, and only
+  gives the instruction that applies** (issue #91). When `/dev/kvm` is absent, the
+  detail used to read: enable VT-x/AMD-V in the BIOS, **or** nested virtualization
+  in your hypervisor. One message for two opposite situations, leaving the reader
+  to work out which half is theirs — and sending half of them to a BIOS their
+  machine does not have, because a virtual machine has none.
+
+  The check now asks where it is running first, through `systemd-detect-virt --vm`
+  and, when that binary is absent — a minimal image often lacks it — the
+  `hypervisor` flag of `/proc/cpuinfo`. Inside a virtual machine it states that
+  nested virtualization is unavailable, **names the detected hypervisor**, and says
+  the setting lives on the host with this machine powered off, so there is nothing
+  to look for inside. On a physical machine it sends the reader to the BIOS or UEFI
+  setup and drops the nesting sentence entirely.
+
+  When neither probe answers, the historical message stays: not knowing does not
+  authorise choosing. That is the same rule as `unknown` on a verdict, applied to
+  the instruction instead of the state.
+
+  The verdict does not change — a missing `/dev/kvm` still fails, and still offers
+  no executable fix, because the gesture belongs to a human with the machine off.
+  What changes is that the sentence is now true for the reader in front of it.
+
+  Verified end to end in a real virtual machine with the `/dev/kvm` node removed,
+  in both languages: the detail names `kvm` as the hypervisor and no longer
+  mentions the BIOS.
+
+### Fixed
+
+- **`doctor` read the storage pool name in two places, one of which ignored the
+  repository's override.** The libvirt pool check derived its pool from
+  `provider_config()` inline while the resources check went through
+  `nom_du_pool()`. Both agreed today, and that is exactly the kind of duplication
+  that stops agreeing without anyone noticing. One function now holds that
+  reading, next to the Terraform template's `local.storage_pool`.
+
+## [0.1.94] - 2026-09-25
+
+### Fixed
+
+- **`doctor` no longer paints a healthy installation red over nominal disk
+  sizes** (issue #209). The `RAM / disk resources` check summed the `disk_gb` +
+  `extra_disk_gb` declared in `meta.yml` and compared that total against the free
+  space libvirt reports for the pool. But those sizes are **nominal**: qcow2
+  volumes allocate on demand. The Linux catalogue declares 65 GB for 3.2 GB
+  actually used — measured by a user whose `doctor` came out red, as a
+  **required** check, on a machine that provisioned its labs without a hitch.
+
+  Comparing a theoretical ceiling against a measurement proves nothing, and this
+  one was the loudest kind of wrong: required, red, on a working install. It sent
+  whoever read it hunting for a disk problem that did not exist, and it taught
+  them to distrust the one check that is supposed to be trustworthy.
+
+  The figure stays — the worst case does say something true — but it is now
+  announced as a ceiling (`up to 65 GB declared, allocated on demand (qcow2)`)
+  and it no longer decides the verdict. RAM keeps its own: `MemAvailable` and the
+  sum of `ram_mb` are two measurements of the same nature, so they compare.
+
+### Added
+
+- **A pool that is genuinely full is now named at the moment it fails** (issue
+  #209). Relaxing the check above would otherwise have removed a safeguard
+  without replacing it. libvirt reports `no space left on device` without naming
+  either the pool or the gesture; `provision` now recognises it, says that qcow2
+  disks grow with use — so a pool that was enough yesterday can run short today —
+  and prints the command that shows what is left.
+
+  That command names **the repository's own pool**, read from
+  `infra.providers.kvm.storage_pool`, rather than a presumed `default`: a
+  suggested command that targets the wrong pool fails in the hands of whoever
+  copies it. The same now holds for the `pool not found` explanation.
+
+  This is the rule the whole #172 → #179 batch established, applied the other way
+  round: a check that cannot look never concludes green — and a failure that
+  cannot be predicted is named where it actually happens.
+
+## [0.1.93] - 2026-09-25
+
+### Fixed
+
+- **`provision --host X` no longer waits for hosts it did not create** (issue
+  #246). The template's `hosts` output derives from `var.hosts`, so from **every**
+  host declared in `meta.yml`, not from the ones the apply just brought up. The
+  CLI read its wait list from there: a targeted run therefore demanded an answer
+  from machines it had explicitly been told not to create.
+
+  `provision --host` exited **8** every single time on a repository declaring more
+  than one host, which is nearly always. That made the option useless precisely
+  where it matters most: you only target to avoid bringing up a whole topology, so
+  in an automated context, where the exit code is read.
+
+  The output keeps its meaning — the declared topology with its addresses — and it
+  is the CLI, the only one that knows what it targeted, which narrows the wait.
+  The closing message now states what was **checked** and out of how many:
+  announcing "1 host ready" on a repository declaring three suggested the other
+  two had been judged.
+
+  Found while validating #234, where that exit 8 was first taken for a failure of
+  the firmware fix.
+
+## [0.1.92] - 2026-09-25
+
+### Fixed
+
+- **`provision` works on libvirt 8, 9 and 10** (issue #234). The template let
+  libvirt pick the EFI firmware (`os.firmware = "efi"`). That automatic choice
+  does not survive the Terraform provider reading the XML back on libvirt 8:
+  `.os.firmware` comes back `null` and the apply fails on "Provider produced
+  inconsistent result after apply", a message naming neither the version, nor the
+  cause, nor what to do.
+
+  The template now **names** its loader instead of leaving the choice. The path is
+  not hardcoded for all that: it is **discovered** through
+  `virsh domcapabilities`, because it differs between distributions
+  (`/usr/share/OVMF/` on Debian and Ubuntu, `/usr/share/edk2/` on Fedora and
+  Arch) and the 2M/4M variants coexist. libvirt knows where its firmwares are,
+  version 8 included, as the issue reporter proved by attaching his
+  `domcapabilities`.
+
+  The loader chosen is the one **without Secure Boot**: the `.ms.fd` and
+  `.secboot.fd` variants enrol Microsoft's keys, which reject kernels not signed
+  by them, and cloud images then hang in `/init`. Only the NVRAM **destination**
+  is declared, never `nv_ram.source`, which triggers the second bug described in
+  the issue.
+
+  If no usable firmware is exposed, `provision` stops and names the package to
+  install, rather than letting Terraform fail on a missing variable.
+
+### Changed
+
+- **The libvirt floor drops from 9.0 back to 8.0.** It was set in 0.1.91 because
+  the EFI autoselect failed below it. That cause being gone, keeping the floor
+  would have punished machines for a defect that no longer exists: a threshold
+  that outlives its reason excludes without protecting anything, and becomes a
+  debt nobody dares lift.
+
+  All three versions were **provisioned for real**, and the VM had to **answer
+  over SSH**, not merely keep Terraform quiet: **8.0** in an Ubuntu 22.04 VM where
+  the defect was first reproduced word for word; **9.0** in a Debian 12 VM nobody
+  had ever tried; **10.0** on the reference machine with all three hosts of the
+  Linux catalogue, each booted in EFI and answering over SSH and sudo. Nothing
+  below 8.0 has been tried, and that is the only reason a floor remains.
+
+## [0.1.91] - 2026-09-25
+
+### Added
+
+- **Supported versions are declared, checked and reported** (issue #234). Nothing
+  said a libvirt version could be too old. On libvirt 8.0, `provision` fails
+  because the automatically selected EFI firmware does not survive the Terraform
+  provider reading the XML back, and the error arrives in Terraform's own
+  language — "Provider produced inconsistent result after apply" — naming neither
+  the version, nor the cause, nor what to do.
+
+  `doctor` now refuses anything below **libvirt 9.0** and says why. The floor is
+  **measured**, not picked out of caution: 10.0 provisions, verified by
+  provisioning an AlmaLinux 10 VM; 8.0 fails, as reported. 9.x has been tried by
+  nobody and is given the benefit of the doubt rather than ruling out Debian 12
+  and AlmaLinux 9, which no measurement condemns. The day one of them is measured
+  broken, a single number changes.
+
+  A version virsh reports unreadably comes out as **`unknown`**, neither green
+  nor red: we do not refuse a machine over output we could not parse, and we do
+  not call it good either. `--strict` has its own code for that (10).
+
+- **`doctor` and `support` report the Terraform provider version actually
+  pinned**, read from the state's `.terraform.lock.hcl`. The template's `~> 0.9`
+  constraint does not tell you: two machines both honouring it may run different
+  versions, and it is that one which decides. Understanding issue #234 required
+  digging it out by hand from two reports that carried it in neither; a report now
+  carries it without anyone having to ask.
+
+  That check never paints red: it is information, not a prerequisite. No floor is
+  known for these providers — the reporter and the reference machine had the
+  **same** 0.9.9 — so inventing one would refuse machines on a guess.
+
+- **Supported versions are documented** in the trainer guide, in English and in
+  French, with the measurement behind each floor.
+
+## [0.1.90] - 2026-09-25
+
+### Fixed
+
+- **`challenge` announced a working directory where nothing is read** (issue
+  #237, reported by @teofeo). The "Working directory" line printed
+  `<lab>/challenge` **hardcoded**, while the work happens in
+  `<lab>/<runtime.workdir>`. A learner followed that line, crossed it with a
+  brief saying "reponses/cours.txt", concluded `challenge/reponses/`, and lost
+  half an hour on their first lab by following the tool to the letter.
+
+  The defect applied to **every lab of every catalogue**, not just the demo.
+  Measured on the demo: the same three files score **0/100** at the catalogue
+  root and **100/100** under the workdir. The line was not merely imprecise, it
+  pointed at a place nothing reads.
+
+  The path now comes from the contract. A `vm` lab announces nothing at all: its
+  work happens on the machine, and `runtime.workdir` is ignored there even though
+  it still carries the model's default value. Relying on the field being set
+  would therefore have reproduced the defect the other way round, and it is the
+  test that showed it.
+
+- **The demo lab's brief finally says where to write**, without hardcoding any
+  path. It points at the line the engine prints and keeps relative paths: every
+  catalogue declares its own `runtime.workdir`, so a brief spelling out
+  `challenge/work` would recreate the defect elsewhere and teach it to authors.
+
+### Added
+
+- **A guard rail checks the demo lab's brief against its own test.** That lab was
+  already played to 100/100 on every release by `tests_e2e/test_parcours.py`, and
+  #237 still slipped through: that test asks the CLI for the working directory and
+  drops the files in the right place. It proves the lab **can be played**, never
+  that its brief **leads to playing it**.
+
+  Every file `test_functional.py` reads must now be cited in the brief, in both
+  languages, and the brief must hardcode no workdir. Renaming one without the
+  other fails the suite.
+
+## [0.1.89] - 2026-09-25
+
+### Fixed
+
+- **`validate-structure` inspected the working directory, and failed labs that
+  had a provider in cache** (issue #238). Terraform drops the README of the
+  provider it has just downloaded into `challenge/work/.terraform/`, and its
+  relative links point at the provider's GitHub tree, absent from the distributed
+  archive. Three labs of `terraform-training` failed for that reason alone, with
+  no fix possible on the catalogue side.
+
+  The cost went beyond three false positives: the verdict depended on **the order
+  of the commands**. Validating after a `run` accused three labs, validating
+  after a `clean` cleared them. A check whose output changes depending on whether
+  a cache is lying around stops being a check, and it is then the real structural
+  defect that goes unnoticed.
+
+  Internal links and language parity therefore only look at author content now:
+  the working directory declared by the lab is left out, as is any hidden or
+  tooling-cache directory (`.terraform`, `.venv`, `node_modules`, `vendor`),
+  wherever it sits. Nothing is lost on the way: a Markdown file copied into the
+  workdir comes from `fixtures/`, which is still checked, and it is now checked
+  once rather than zero or twice depending on whether a `run` happened.
+
+### Added
+
+- **`runtime.services[].spawns`: containers a service launches itself are finally
+  cleaned up** (issue #239). A service handed the Docker socket creates its own
+  containers, which dsoxlab never launched and therefore did not know about. They
+  survived `clean` as well as the service shutting down, and held on to their
+  published ports: three of them were still running after 15 and 23 hours.
+
+  The next creation then failed with "Bind for 0.0.0.0:2201 failed: port is
+  already allocated", somewhere nothing surfaced to the lab. The instance existed
+  in the API but never reached `running`, the reference solution found nothing,
+  and the lab looked broken for no reason. Two cycles were lost to this. Every
+  catalogue had to add its own cleanup in `post_start`, and a lab that forgot fell
+  straight back into the defect.
+
+  The lab now declares the name fragments involved and the tool takes care of it.
+  Two design points, which matter more than the cleanup itself:
+
+  - spawned containers are removed when dsoxlab **(re)creates** the service
+    container and on `clean`, **never** when it reuses a running one. What the
+    service has spawned since is then the learner's work in progress, and that is
+    exactly what the `post_start` workaround could not tell apart;
+  - dsoxlab's own containers (`dsoxlab-…`) are always spared, otherwise an
+    over-broad fragment would have one service remove another's container.
+
+  The limit is owned and written into the contract: a name fragment stays a name
+  fragment, and two instances of the same product running side by side will step
+  on each other. Only a service that labelled its children would allow filtering
+  per project, and that does not depend on dsoxlab.
+
 ## [0.1.88] - 2026-09-20
 
 ### Fixed

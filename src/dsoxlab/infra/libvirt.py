@@ -34,6 +34,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
@@ -380,3 +381,61 @@ def remove_domain(domain: str) -> None:
         # on retente la forme nue plutôt que d'abandonner sur un détail
         # d'options.
         _virsh(["undefine", domain], timeout=60)
+
+
+#: Les variantes de firmware qui activent Secure Boot, et qu'il faut écarter.
+#:
+#: libvirt 10 enrôle par défaut les clés Microsoft (``.ms.fd``), qui rejettent
+#: les kernels non signés par Microsoft : les images cloud AlmaLinux, Debian et
+#: Ubuntu démarrent puis bloquent dans ``/init``, faute de charger leurs modules
+#: virtio. Le template documente déjà ce choix, ce filtre ne fait que le rendre
+#: effectif quand le loader est choisi explicitement.
+_SECURE_BOOT = (".ms.fd", ".secboot.fd")
+
+
+def efi_loader() -> str | None:
+    """Le firmware EFI que CETTE machine expose, ou ``None`` si indéterminable.
+
+    Pourquoi le découvrir au lieu de laisser libvirt choisir : l'autoselect
+    (``<os firmware='efi'>``) ne survit pas à la relecture du XML par le provider
+    Terraform sur libvirt 8, qui rend alors ``.os.firmware: null`` et fait échouer
+    l'apply sur « Provider produced inconsistent result after apply » (issue
+    #234). Reproduit à l'identique dans une VM Ubuntu 22.04.
+
+    Pourquoi ne pas écrire le chemin en dur : il diffère selon la distribution
+    (``/usr/share/OVMF/`` sur Debian et Ubuntu, ``/usr/share/edk2/`` sur Fedora
+    et Arch), et les variantes 2M/4M cohabitent. libvirt, lui, sait où sont ses
+    firmwares et les énumère — y compris en version 8, vérifié sur les deux.
+
+    Rend ``None`` plutôt que de lever : l'appelant décide quoi en dire, et un
+    diagnostic qui plante en cherchant à diagnostiquer est le pire des cas.
+    """
+    resultat = run_virsh(["domcapabilities"], check=False)
+    if resultat is None or not resultat.ok or not resultat.stdout.strip():
+        logger.warning("virsh domcapabilities gave nothing: cannot pick an EFI loader")
+        return None
+
+    try:
+        racine = ET.fromstring(resultat.stdout)  # noqa: S314 — sortie de notre propre virsh
+    except ET.ParseError as exc:
+        logger.warning("unreadable virsh domcapabilities: %s", exc)
+        return None
+
+    # `os/loader/value` uniquement : les `enum` voisins portent aussi des
+    # `value` (rom, pflash, yes, no) qui ne sont pas des chemins.
+    candidats = [
+        (valeur.text or "").strip()
+        for valeur in racine.findall("./os/loader/value")
+        if (valeur.text or "").strip()
+    ]
+    sans_secure_boot = [c for c in candidats if not c.endswith(_SECURE_BOOT)]
+    if not sans_secure_boot:
+        logger.warning(
+            "libvirt exposes %d EFI loader(s), all with Secure Boot: %s",
+            len(candidats), ", ".join(candidats) or "none",
+        )
+        return None
+
+    retenu = sans_secure_boot[0]
+    logger.info("EFI loader discovered: %s", retenu)
+    return retenu

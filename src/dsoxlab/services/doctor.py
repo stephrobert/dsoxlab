@@ -395,6 +395,46 @@ def _check_incus() -> Check:
     return _check("incus", False, tail[-1] if tail else _("detail_unknown_error"))
 
 
+#: Version minimale de libvirt que dsoxlab prend en charge.
+#:
+#: **Redescendu de 9.0 à 8.0** : le plancher de la 0.1.91 écartait libvirt 8
+#: parce que l'autoselect EFI y échouait (issue #234). La cause est corrigée
+#: depuis — le template désigne son loader au lieu de laisser libvirt le choisir,
+#: et le chemin est découvert dans ``virsh domcapabilities`` — donc refuser cette
+#: version reviendrait à punir des postes pour un défaut qui n'existe plus.
+#:
+#: Refermer un plancher dès que la cause tombe compte autant que de l'ouvrir :
+#: un seuil qui survit à sa raison exclut sans rien protéger, et devient une
+#: dette que plus personne n'ose lever.
+#:
+#: Mesuré : 8.0.0 provisionne avec le loader désigné, dans une VM Ubuntu 22.04
+#: où le défaut avait d'abord été reproduit à l'identique ; 10.0.0 provisionne
+#: aussi, sur la machine de référence. Rien en dessous de 8.0 n'a été éprouvé.
+_LIBVIRT_MINIMUM = (8, 0)
+
+#: `virsh version` rend « Using library: libvirt 10.0.0 » : c'est la ligne qui
+#: compte, celle de la bibliothèque **qui tourne**.
+_VERSION_UTILISEE = re.compile(r"Using library:\s*libvirt\s*(\d+)\.(\d+)")
+
+#: Repli sur « Compiled against library: libvirt 10.0.0 », ce contre quoi le
+#: binaire a été bâti. Les deux diffèrent après une mise à jour de la
+#: bibliothèque sans redémarrage du client, d'où l'ordre ; mais une sortie
+#: abrégée ne porte parfois que celle-ci, et la refuser rendrait `unknown` un
+#: virsh parfaitement sain.
+_VERSION_COMPILEE = re.compile(
+    r"Compiled against(?:\s+library)?:?\s*(?:libvirt\s*)?(\d+)\.(\d+)"
+)
+
+
+def _version_libvirt(sortie: str) -> tuple[int, int] | None:
+    """La version de libvirt, ou ``None`` si la réponse n'en porte aucune."""
+    for motif in (_VERSION_UTILISEE, _VERSION_COMPILEE):
+        correspondance = motif.search(sortie or "")
+        if correspondance is not None:
+            return int(correspondance.group(1)), int(correspondance.group(2))
+    return None
+
+
 def _check_kvm() -> Check:
     if not shutil.which("virsh"):
         return _check(
@@ -420,6 +460,21 @@ def _check_kvm() -> Check:
             fix=_fix(["sudo", "systemctl", "start", "libvirtd"]),
         )
     first_line = probe.stdout.splitlines()[0] if probe.stdout else "ok"
+
+    version = _version_libvirt(probe.stdout)
+    if version is None:
+        # La sonde a répondu, mais pas de façon lisible. On ne peint ni en vert
+        # ni en rouge ce qu'on n'a pas su mesurer : `--strict` a son code (10).
+        return _check(
+            "kvm", False, _("detail_kvm_version_illisible", sortie=first_line),
+            forced_state=STATE_UNKNOWN,
+        )
+    if version < _LIBVIRT_MINIMUM:
+        return _check("kvm", False, _(
+            "detail_kvm_trop_ancien",
+            trouve=".".join(str(n) for n in version),
+            minimum=".".join(str(n) for n in _LIBVIRT_MINIMUM),
+        ))
     return _check("kvm", True, first_line)
 
 
@@ -480,6 +535,61 @@ def _check_ansible() -> Check:
 #: du contrôle est justement de mesurer une machine où il n'existe pas.
 _KVM_DEVICE = Path("/dev/kvm")
 
+#: ``/proc/cpuinfo``, le repli portable quand ``systemd-detect-virt`` manque.
+#: Constante de module pour la même raison que ``_KVM_DEVICE``.
+_CPUINFO = Path("/proc/cpuinfo")
+
+
+@dataclass(frozen=True)
+class Hebergement:
+    """Où ce système tourne : dans une VM, sur du matériel nu, ou indéterminé.
+
+    ``dans_une_vm`` vaut ``None`` quand aucune des deux sondes n'a abouti. Ce
+    troisième état n'est pas du zèle : il décide de la consigne affichée, et
+    inventer « matériel nu » par défaut enverrait dans un BIOS inexistant.
+    """
+
+    dans_une_vm: bool | None
+    hyperviseur: str = ""
+
+
+#: Les noms que ``systemd-detect-virt`` rend pour un conteneur, non pour une VM.
+#: ``--vm`` les exclut déjà, mais il n'existe pas partout et le repli, lui, ne
+#: distingue rien : un conteneur voit le ``flags`` de l'hôte.
+_SANS_VM = frozenset({"none", ""})
+
+
+def _hebergement() -> Hebergement:
+    """Dit si ce système tourne lui-même dans une machine virtuelle.
+
+    Deux sondes, dans cet ordre. ``systemd-detect-virt --vm`` **nomme**
+    l'hyperviseur (``kvm``, ``vmware``, ``oracle``, ``microsoft``…), ce qui vaut
+    mieux qu'un booléen : la consigne d'activation diffère d'un produit à
+    l'autre, et l'utilisateur doit savoir dans lequel aller cliquer. Il sort en
+    1 avec ``none`` sur du matériel nu, ce qui est une mesure, pas un échec.
+
+    À défaut — le binaire n'est pas universel, et une image minimale s'en passe
+    — le drapeau ``hypervisor`` de ``/proc/cpuinfo``, que tout hyperviseur x86
+    pose dans ses invités. Il ne nomme personne, mais il tranche la question qui
+    change le message.
+    """
+    sonde = _sonder(["systemd-detect-virt", "--vm"])
+    if sonde is not None:
+        nom = sonde.stdout.strip().lower()
+        if nom not in _SANS_VM:
+            return Hebergement(dans_une_vm=True, hyperviseur=nom)
+        if sonde.returncode != 0 or nom == "none":
+            return Hebergement(dans_une_vm=False)
+
+    try:
+        cpuinfo = _CPUINFO.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return Hebergement(dans_une_vm=None)
+    for ligne in cpuinfo.splitlines():
+        if ligne.startswith("flags") or ligne.startswith("Features"):
+            return Hebergement(dans_une_vm="hypervisor" in ligne.split())
+    return Hebergement(dans_une_vm=None)
+
 
 def _check_hw_virt() -> Check:
     """La virtualisation matérielle, lue là où qemu ira la chercher.
@@ -492,14 +602,31 @@ def _check_hw_virt() -> Check:
     imbriquée, et c'est machine éteinte, dans l'hyperviseur hôte, que ça se
     règle : aucun correctif exécutable, la consigne vit dans le détail.
 
+    **Le détail dépend donc d'où l'on tourne** (issue #91). Le message unique
+    disait « active VT-x/AMD-V dans le BIOS, ou la virtualisation imbriquée dans
+    ton hyperviseur » : un « ou » qui laisse chercher lequel des deux s'applique,
+    et qui envoie dans le BIOS d'une machine qui n'en a pas dès que dsoxlab
+    tourne dans une VM — le cas de toute image prête à l'emploi. Quand la sonde
+    sait, elle nomme l'hyperviseur et ne donne que la consigne utile ; quand
+    elle ne sait pas, le « ou » reste, parce qu'il est vrai.
+
     L'inaccessible est un état distinct de l'absent : le périphérique existe,
     seul le droit manque, et ``usermod -aG kvm`` le rend, à la session
     suivante seulement, d'où la catégorie.
     """
     if not _KVM_DEVICE.exists():
-        return _check(
-            "hw_virt", False, _("detail_hw_virt_missing", device=_KVM_DEVICE),
-        )
+        hote = _hebergement()
+        if hote.dans_une_vm is True:
+            cle = (
+                "detail_hw_virt_nested_named" if hote.hyperviseur
+                else "detail_hw_virt_nested"
+            )
+            detail = _(cle, device=_KVM_DEVICE, hypervisor=hote.hyperviseur)
+        elif hote.dans_une_vm is False:
+            detail = _("detail_hw_virt_bare_metal", device=_KVM_DEVICE)
+        else:
+            detail = _("detail_hw_virt_missing", device=_KVM_DEVICE)
+        return _check("hw_virt", False, detail)
     if not os.access(_KVM_DEVICE, os.R_OK | os.W_OK):
         return _check(
             "hw_virt", False, _("detail_hw_virt_denied", device=_KVM_DEVICE),
@@ -589,13 +716,28 @@ def _pool_available_gb(pool: str) -> int | None:
     return None
 
 
+def nom_du_pool(infra: InfraDefinition) -> str:
+    """Le pool libvirt que ce dépôt utilise, ``default`` à défaut d'override.
+
+    Public parce que deux appelants en ont besoin et qu'une seule les sert :
+    ``doctor``, qui mesure la place, et la CLI, qui doit nommer le bon pool dans
+    la commande qu'elle propose après un échec de provisionnement. Le template
+    Terraform lit la même clé (``local.storage_pool``) ; la dupliquer une
+    troisième fois serait le moyen sûr de les désaligner un jour.
+    """
+    return str(infra.provider_config("kvm").get("storage_pool") or "default")
+
+
 def _check_resources(infra: InfraDefinition, provider: str) -> Check:
     """Ce que le poste offre, face à ce que le ``meta.yml`` déclare.
 
     Un provisionnement a déjà expiré sur un hôte à 2 vCPU / 4 Go (hôte prêt à
-    181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme
-    des ``ram_mb`` et des ``disk_gb`` (+ ``extra_disk_gb``) du catalogue est la
-    demande ; ``MemAvailable`` et le pool libvirt sont l'offre.
+    181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme des
+    ``ram_mb`` du catalogue est la demande, ``MemAvailable`` est l'offre, et le
+    contrôle porte sur elles : deux mesures de même nature.
+
+    Le disque, lui, est **affiché sans être jugé** (issue #209) — les tailles
+    déclarées sont nominales quand les qcow2 s'allouent à la demande.
 
     Une sonde impossible ne vaut jamais « ok » : la portion non mesurée est
     nommée, et le contrôle sort en ``unknown``, sauf si une portion mesurée
@@ -619,7 +761,7 @@ def _check_resources(infra: InfraDefinition, provider: str) -> Check:
         )
 
     if provider == "kvm":
-        pool = str(infra.provider_config("kvm").get("storage_pool") or "default")
+        pool = nom_du_pool(infra)
         dispo_disk = _pool_available_gb(pool)
         if dispo_disk is None:
             # Pool absent, inactif ou virsh muet : le contrôle du pool porte
@@ -628,7 +770,19 @@ def _check_resources(infra: InfraDefinition, provider: str) -> Check:
             inconnu = True
             portions.append(_("detail_resources_disk_unknown", pool=pool))
         else:
-            manque = manque or dispo_disk < besoin_disk
+            # La portion disque INFORME, elle ne conclut pas (issue #209).
+            #
+            # `besoin_disk` est la somme des tailles NOMINALES déclarées, et les
+            # qcow2 s'allouent à la demande : le catalogue Linux annonce 65 Go
+            # pour 3,2 Go réellement occupés, mesurés par un utilisateur. Le
+            # comparer à l'espace libre revient à opposer un maximum théorique à
+            # une mesure, et cela peignait en rouge — en contrôle **requis** —
+            # des installations qui provisionnent parfaitement.
+            #
+            # On garde le chiffre, qui dit quelque chose de vrai sur le pire cas,
+            # en l'annonçant comme tel. Un manque d'espace RÉEL, lui, se dit au
+            # moment où il se produit : `explique_echec_provision` reconnaît
+            # désormais « no space left on device » et nomme le pool.
             portions.append(
                 _(
                     "detail_resources_disk",
@@ -827,12 +981,19 @@ def _pool_cite(motif: re.Pattern[str], message: str) -> str | None:
     return next((groupe for groupe in trouve.groups() if groupe), None)
 
 
-def explique_echec_provision(message: str) -> tuple[str, str] | None:
+def explique_echec_provision(
+    message: str, pool: str | None = None,
+) -> tuple[str, str] | None:
     """Reconnaît une cause connue dans l'erreur brute d'un provisionnement.
 
     Terraform rend des messages exacts mais opaques pour qui découvre l'outil.
     Quelques-uns ont une cause connue et un correctif d'une ligne, et ce sont
     ceux qui arrêtent un débutant sur une machine fraîche.
+
+    ``pool`` est celui que le dépôt utilise (``nom_du_pool``), pour les causes
+    dont le message libvirt ne nomme pas le pool : sans lui, la commande
+    proposée viserait ``default`` sur un dépôt qui déclare un autre pool, et
+    échouerait sous les yeux de qui la copie.
 
     Rendre ``(explication, commande)``, ou ``None`` si rien n'est reconnu : on
     ne devine pas, on nomme ce qu'on sait nommer.
@@ -868,7 +1029,17 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     pool_absent = _pool_cite(_POOL_ABSENT, message)
     if pool_absent is not None or "pool not found" in bas:
         return _("explain_pool_not_found"), creer_pool_command(
-            pool_absent or "default"
+            pool_absent or pool or "default"
+        )
+
+    # Plus d'espace dans le pool. `doctor` ne peut pas l'annoncer d'avance : les
+    # tailles déclarées sont nominales et les qcow2 s'allouent à la demande, donc
+    # comparer le pool à leur somme accuserait à tort (issue #209). En revanche,
+    # quand le disque manque VRAIMENT, c'est ici qu'on le sait, et le message de
+    # libvirt ne nomme ni le pool ni le geste.
+    if "no space left on device" in bas or "not enough space" in bas:
+        return _("explain_pool_full"), (
+            f"virsh -c qemu:///system pool-info {pool or 'default'}"
         )
 
     # « already exists » sur un domaine : un provisionnement précédent a échoué
@@ -1112,6 +1283,35 @@ def _check_egress() -> Check:
                   hint="https://docs.docker.com/network/proxy/")
 
 
+def _check_tf_providers(repo_meta: RepoMetadata | None) -> Check:
+    """Quelle version de chaque provider Terraform tourne pour ce dépôt.
+
+    La contrainte du template (``~> 0.9``) ne le dit pas : deux postes qui
+    l'honorent tous les deux peuvent avoir des versions différentes, et c'est
+    celle-là qui décide. Comprendre l'issue #234 a demandé de comparer à la main
+    deux rapports `support` qui ne la portaient ni l'un ni l'autre.
+
+    Toujours ``ok`` : c'est une information, pas un prérequis. Aucun plancher
+    n'est connu pour ces providers, et en inventer un serait refuser des postes
+    sur une supposition.
+    """
+    from ..infra.terraform import providers_epingles
+
+    if repo_meta is None:
+        return _check("tf_providers", True, _("detail_tf_providers_absents"))
+
+    try:
+        epingles = providers_epingles(repo_meta)
+    except Exception:  # noqa: BLE001 : un diagnostic ne casse pas la commande
+        epingles = {}
+
+    if not epingles:
+        return _check("tf_providers", True, _("detail_tf_providers_absents"))
+
+    rendu = ", ".join(f"{nom} {version}" for nom, version in sorted(epingles.items()))
+    return _check("tf_providers", True, _("detail_tf_providers", providers=rendu))
+
+
 def _hypervisor_checks() -> dict[str, Check]:
     return {"kvm": _check_kvm(), "incus": _check_incus()}
 
@@ -1160,6 +1360,9 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     # `shell` ne provisionne rien, donc n'a pas à en voir du rouge.
     if needs_vm:
         report.required.append(_check_egress())
+        # Informatif, mais affiché là où on le regarde : c'est la version qui
+        # décide du comportement de `provision`, et elle n'était nulle part.
+        report.optional.append(_check_tf_providers(repo_meta))
     else:
         report.optional.append(_check_egress())
         report.notes.append(_("reason_egress_sans_vm"))
@@ -1234,10 +1437,11 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         # trois lignes rouges pour une seule cause, et noierait celle qui
         # compte : c'est exactement ce qui décourageait au premier lancement.
         if active == "kvm" and hypervisors["kvm"].ok:
+            # Même lecture que `_check_resources` et que le template Terraform :
+            # une seule fonction la porte, sinon les trois divergent un jour.
             pool = "default"
             if repo_meta is not None:
-                pool = str(repo_meta.infra.provider_config().get("storage_pool")
-                           or "default")
+                pool = nom_du_pool(repo_meta.infra)
             report.required.append(_check_libvirt_pool(pool))
         elif active == "incus" and hypervisors["incus"].ok:
             # Symétrie avec la branche kvm juste au-dessus : elle contrôle son

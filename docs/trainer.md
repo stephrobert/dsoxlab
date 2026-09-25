@@ -56,6 +56,65 @@ catalogs never collide on the same subnet.
 
 ---
 
+## Supported versions
+
+| Component | Supported | How it was established |
+| --- | --- | --- |
+| **libvirt** | **8.0 or later** | Each of the three was provisioned for real, and the VM had to answer over SSH — not merely "Terraform did not complain". **8.0** in an Ubuntu 22.04 VM, where the defect of [#234](https://github.com/stephrobert/dsoxlab/issues/234) was first reproduced word for word; **9.0** in a Debian 12 VM, which nobody had ever tried; **10.0** on the reference machine, with a real `vm` lab from the Linux catalogue. Nothing below 8.0 has been tried, and that is the only reason a floor remains. |
+| `dmacvicar/libvirt` provider | `~> 0.9` | The constraint the packaged template declares. No floor is known inside that range, so none is enforced. |
+
+The floor was briefly 9.0, in 0.1.91, because the EFI firmware dsoxlab left
+libvirt to select did not survive the Terraform provider reading the XML back.
+That cause is gone: the template now **names** its loader, discovered through
+`virsh domcapabilities`. Keeping the floor would have punished machines for a
+defect that no longer exists — a threshold that outlives its reason excludes
+without protecting anything.
+
+`dsoxlab doctor` checks the libvirt floor and refuses a version below it, naming
+the cause. It also prints the provider version actually pinned for this catalog,
+which is what `terraform init` wrote in the state and not what the template asked
+for: two machines honouring `~> 0.9` can be running different versions. That
+version now appears in `dsoxlab support` too, so an issue carries it without
+anyone having to ask.
+
+Anything below the floor is not a hard block on the tool: only `provision` is
+concerned, and a catalog whose labs are all `shell` never calls it.
+
+---
+
+## Running dsoxlab inside a virtual machine
+
+A `vm` lab needs `/dev/kvm`. Inside a virtual machine, that means **nested
+virtualization**, and nested virtualization is a property of the **host**, not of
+the guest: nothing installed in the guest can produce it. It is enabled outside,
+with the guest powered off.
+
+| Host | Where it is enabled |
+| --- | --- |
+| **KVM / libvirt / Incus** | `/sys/module/kvm_intel/parameters/nested` (or `kvm_amd`) must read `Y`. Set `options kvm_intel nested=1` in `/etc/modprobe.d/` to make it permanent. |
+| **VMware Workstation / Fusion** | *Virtualize Intel VT-x/EPT* in the VM's processor settings, machine powered off. |
+| **VirtualBox** | Nested VT-x/AMD-V, which depends on the CPU — and is unavailable on a Windows where Hyper-V or WSL2 already holds the hypervisor. |
+| **macOS on Apple Silicon** | Neither VirtualBox nor KVM exists; the packaged images are x86_64, so this is a separate road (UTM/QEMU), not a setting to flip. |
+
+`dsoxlab doctor` names this case rather than leaving you to guess. When `/dev/kvm`
+is missing it first asks where it is running, through `systemd-detect-virt` and,
+failing that, the `hypervisor` flag of `/proc/cpuinfo`. Inside a virtual machine
+it says nested virtualization is unavailable and names the hypervisor it detected;
+on a physical machine it sends you to the BIOS or UEFI setup. It used to offer
+both at once, which meant telling half its readers to visit a BIOS their machine
+does not have.
+
+Sizing, if the guest is to run the `vm` labs of a full catalog: **4 vCPU and 8 GB
+for the guest itself**, measured, not estimated — the three hosts of the Linux
+catalog allocate 5120 MB between them, and the CPU is what decides whether they
+all answer inside the 180-second window. A guest with 2 vCPU has been seen
+reporting a host ready at 181 seconds.
+
+A catalog whose labs are all `shell` needs none of this: it never calls
+`provision`, and `doctor` keeps every hypervisor check in the informational table.
+
+---
+
 ## Getting started
 
 ```bash

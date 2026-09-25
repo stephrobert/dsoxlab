@@ -57,6 +57,67 @@ sous-réseau.
 
 ---
 
+## Versions prises en charge
+
+| Composant | Pris en charge | Comment cela a été établi |
+| --- | --- | --- |
+| **libvirt** | **8.0 ou plus récent** | Les trois versions ont provisionné pour de vrai, et la VM devait **répondre en SSH**, pas seulement « Terraform n'a pas protesté ». **8.0** dans une VM Ubuntu 22.04, où le défaut de [#234](https://github.com/stephrobert/dsoxlab/issues/234) avait d'abord été reproduit mot pour mot ; **9.0** dans une VM Debian 12, que personne n'avait jamais éprouvé ; **10.0** sur la machine de référence, avec un vrai lab `vm` du catalogue Linux. Rien en dessous de 8.0 n'a été éprouvé, et c'est la seule raison pour laquelle un plancher subsiste. |
+| Provider `dmacvicar/libvirt` | `~> 0.9` | La contrainte que déclare le template packagé. Aucun plancher n'est connu dans cette plage, donc aucun n'est imposé. |
+
+Le plancher a valu 9.0 le temps de la 0.1.91, parce que le firmware EFI dont
+dsoxlab laissait le choix à libvirt ne survivait pas à la relecture du XML par le
+provider Terraform. Cette cause a disparu : le template **désigne** désormais son
+loader, découvert par `virsh domcapabilities`. Maintenir le plancher aurait puni
+des postes pour un défaut qui n'existe plus, et un seuil qui survit à sa raison
+exclut sans rien protéger.
+
+`dsoxlab doctor` contrôle le plancher libvirt et refuse une version en dessous,
+en nommant la cause. Il affiche aussi la version du provider **réellement
+épinglée** pour ce catalogue, celle que `terraform init` a écrite dans l'état et
+non celle que le template réclame : deux machines qui honorent `~> 0.9` peuvent
+faire tourner des versions différentes. Cette version figure désormais dans
+`dsoxlab support`, si bien qu'une issue la porte sans que personne ait à la
+demander.
+
+En dessous du plancher, l'outil n'est pas bloqué pour autant : seul `provision`
+est concerné, et un catalogue dont tous les labs sont `shell` ne l'appelle jamais.
+
+---
+
+## Faire tourner dsoxlab dans une machine virtuelle
+
+Un lab `vm` a besoin de `/dev/kvm`. Dans une machine virtuelle, cela suppose la
+**virtualisation imbriquée**, et l'imbrication est une caractéristique de
+l'**hôte**, pas de l'invité : rien d'installé dans l'invité ne la produit. Elle
+s'active à l'extérieur, invité éteint.
+
+| Hôte | Où elle s'active |
+| --- | --- |
+| **KVM / libvirt / Incus** | `/sys/module/kvm_intel/parameters/nested` (ou `kvm_amd`) doit valoir `Y`. Un `options kvm_intel nested=1` dans `/etc/modprobe.d/` le rend permanent. |
+| **VMware Workstation / Fusion** | *Virtualize Intel VT-x/EPT*, dans les réglages processeur de la VM, machine éteinte. |
+| **VirtualBox** | L'imbrication VT-x/AMD-V, qui dépend du processeur — et qui est indisponible sur un Windows où Hyper-V ou WSL2 tient déjà l'hyperviseur. |
+| **macOS sur Apple Silicon** | Ni VirtualBox ni KVM n'y existent, et les images packagées sont en x86_64 : c'est une voie distincte (UTM/QEMU), pas une case à cocher. |
+
+`dsoxlab doctor` nomme ce cas au lieu de le laisser deviner. Quand `/dev/kvm`
+manque, il commence par regarder où il tourne, via `systemd-detect-virt` puis, à
+défaut, le drapeau `hypervisor` de `/proc/cpuinfo`. Dans une machine virtuelle, il
+dit que l'imbrication n'est pas disponible et nomme l'hyperviseur détecté ; sur
+une machine physique, il renvoie au BIOS ou au setup UEFI. Il proposait avant les
+deux d'un coup, ce qui revenait à envoyer la moitié de ses lecteurs visiter un
+BIOS que leur machine n'a pas.
+
+Dimensionnement, si l'invité doit faire tourner les labs `vm` d'un catalogue
+complet : **4 vCPU et 8 Go pour l'invité lui-même**, mesurés et non estimés — les
+trois hôtes du catalogue Linux se partagent 5120 Mo, et c'est le processeur qui
+décide s'ils répondent tous dans la fenêtre de 180 secondes. Un invité à 2 vCPU a
+déjà été vu annonçant un hôte prêt à 181 secondes.
+
+Un catalogue dont tous les labs sont `shell` n'a besoin de rien de tout cela : il
+n'appelle jamais `provision`, et `doctor` garde tous les contrôles d'hyperviseur
+dans le tableau informatif.
+
+---
+
 ## Démarrer
 
 ```bash

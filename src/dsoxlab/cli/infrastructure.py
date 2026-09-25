@@ -172,9 +172,13 @@ def provision(
         # plutôt que de laisser l'apprenant chercher : c'est là qu'il est
         # bloqué, et c'est le seul moment où l'on peut l'affirmer sans risque
         # de fausse alerte.
-        from ..services.doctor import explique_echec_provision
+        from ..services.doctor import explique_echec_provision, nom_du_pool
 
-        connu = explique_echec_provision(str(exc))
+        # Le pool du dépôt, pas `default` supposé : une commande proposée qui
+        # vise le mauvais pool échoue sous les yeux de qui la copie.
+        connu = explique_echec_provision(
+            str(exc), pool=nom_du_pool(repo_meta.infra),
+        )
         if connu is not None:
             explication, commande = connu
             info(explication)
@@ -203,7 +207,19 @@ def provision(
 
     attente_depassee = False
 
+    # L'output `hosts` du template dérive de `var.hosts`, donc de TOUS les
+    # hôtes déclarés au meta.yml, et non de ceux que cet apply a créés. Avec
+    # `--host`, attendre cette liste revient à réclamer une réponse à des
+    # machines qu'on a explicitement demandé de ne pas monter : `provision`
+    # sortait alors en 8 à tous les coups dès qu'un dépôt déclare plus d'un
+    # hôte, c'est-à-dire presque toujours (issue #246).
+    #
+    # L'output garde son sens — la topologie déclarée avec ses adresses — et
+    # c'est ici qu'on sait ce qui a été ciblé.
     ready_hosts = sorted(result.hosts)
+    if host:
+        cibles = set(host)
+        ready_hosts = [fqdn for fqdn in ready_hosts if fqdn in cibles]
     if ready_hosts:
         from rich.progress import (
             Progress,
@@ -296,7 +312,16 @@ def provision(
         info(_("provision_incomplet_suite"))
         raise typer.Exit(EXIT_HOTES_INJOIGNABLES)
 
-    success(_("provision_done", count=len(result.hosts)))
+    # Avec un ciblage, on annonce ce qui a été VÉRIFIÉ et sur quel total : dire
+    # « 1 hôte prêt » sur un dépôt qui en déclare trois laisse croire que les
+    # deux autres ont été jugés, alors qu'ils n'ont même pas été montés.
+    if host:
+        success(_(
+            "provision_done_cible",
+            count=len(ready_hosts), total=len(result.hosts),
+        ))
+    else:
+        success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
         info(f"  {fqdn} → {ip}")
 

@@ -164,7 +164,7 @@ KNOWN_LAB_KEYS: frozenset[str] = frozenset({
     "runtime.services[].ports", "runtime.services[].run_args",
     "runtime.services[].env", "runtime.services[].ready_tcp",
     "runtime.services[].ready_exec", "runtime.services[].ready_timeout",
-    "runtime.services[].post_start",
+    "runtime.services[].post_start", "runtime.services[].spawns",
     "validation.functional", "validation.security",
     "validation.persistence_after_reboot",
 })

@@ -72,6 +72,15 @@ class ProviderNotImplemented(RuntimeError):
     """
 
 
+class EfiLoaderUnavailable(RuntimeError):
+    """Levée quand libvirt n'expose aucun firmware EFI utilisable.
+
+    Le template désigne son loader au lieu de laisser libvirt le choisir (issue
+    #234) : sans chemin, le plan n'a rien à poser. Mieux vaut s'arrêter ici, où
+    la cause est connue, que laisser Terraform échouer sur une variable absente.
+    """
+
+
 @dataclass
 class ProvisionResult:
     """Résultat d'un ``terraform apply``."""
@@ -248,6 +257,20 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
         ],
         "provider_config": provider_cfg,
     }
+
+    # Le firmware EFI n'est pas écrit dans le template : il est demandé à la
+    # machine (issue #234). Seul kvm en a besoin ; incus et outscale ne
+    # déclarent pas cette variable, et la leur passer ferait échouer leur plan.
+    #
+    # Cette fonction ÉCRIT UN FICHIER : elle ne lève pas parce qu'une sonde
+    # système n'a rien rendu. La faire dépendre de libvirt la rendait
+    # inappelable sans hyperviseur, ce qui a cassé les contrôles de
+    # documentation, qui l'invoquent pour chaque provider afin de relever les
+    # chemins. La chaîne vide est écrite, et c'est `apply()` qui refuse de
+    # partir — au moment où l'absence de firmware compte vraiment.
+    if repo_meta.infra.provider == "kvm":
+        payload["efi_loader"] = libvirt.efi_loader() or ""
+
     tfvars_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return tfvars_path
 
@@ -572,6 +595,20 @@ def apply(
         raise TerraformNotInstalled(_("err_terraform_missing"))
 
     tf_dir = workdir(repo_meta)
+
+    # C'est ICI que l'absence de firmware compte, pas à l'écriture des
+    # variables : le template kvm désigne son loader (issue #234), donc sans
+    # chemin le plan n'a rien à poser. On s'arrête en nommant la cause plutôt
+    # que de laisser Terraform échouer sur une variable vide, message que rien
+    # ne relie au paquet OVMF manquant.
+    #
+    # On interroge la sonde, pas le fichier que `write_tfvars` vient d'écrire :
+    # dépendre de sa valeur de retour recouplait les deux, et cassait les tests
+    # qui la simulent. Le coût est une commande virsh de plus, sur une opération
+    # qui va démarrer des machines.
+    if repo_meta.infra.provider == "kvm" and not (libvirt.efi_loader() or "").strip():
+        raise EfiLoaderUnavailable(_("err_efi_loader_introuvable"))
+
     write_tfvars(repo_meta)
 
     # Le réseau KVM est figé (lifecycle ignore_changes) : on pose ici les baux
@@ -908,3 +945,38 @@ def _read_outputs(tf_dir: Path, *, env: dict[str, str] | None = None) -> Provisi
     }
 
     return ProvisionResult(outputs=outputs, hosts=hosts)
+
+
+#: Le fichier qu'écrit `terraform init`, et qui dit quelle version de chaque
+#: provider tourne réellement. La contrainte du template (`~> 0.9`) ne le dit
+#: pas : deux postes qui l'honorent tous les deux peuvent avoir des versions
+#: différentes, et c'est précisément ce que l'issue #234 a demandé de comparer
+#: à la main faute que l'outil le dise.
+_LOCK = ".terraform.lock.hcl"
+
+_PROVIDER_EPINGLE = re.compile(
+    r'provider\s+"[^"]*?/(?P<nom>[^"/]+)"\s*\{[^}]*?version\s*=\s*"(?P<version>[^"]+)"',
+    re.DOTALL,
+)
+
+
+def providers_epingles(repo_meta: RepoMetadata) -> dict[str, str]:
+    """Les providers Terraform en place pour ce dépôt, avec leur version.
+
+    Vide tant que ``provision`` n'a jamais tourné : le verrou n'existe qu'après
+    le premier ``terraform init``. Ce n'est pas une anomalie, et l'appelant le
+    dit ainsi plutôt que de laisser croire à un défaut.
+
+    Ne lève jamais : un diagnostic qui plante en cherchant à diagnostiquer est le
+    pire des cas, il emporte la commande qui l'appelle.
+    """
+    lock = workdir(repo_meta) / _LOCK
+    try:
+        contenu = lock.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    return {
+        correspondance.group("nom"): correspondance.group("version")
+        for correspondance in _PROVIDER_EPINGLE.finditer(contenu)
+    }

@@ -339,6 +339,9 @@ STRINGS: dict[str, str] = {
     "progress_nothing_to_do":  "Rien à faire",
     "provision_starting":  "Provisionnement de l'infrastructure (provider : {provider})…",
     "provision_no_ssh_key": "Clé SSH du lab manquante : {path}\nSans elle, le keypair cloud serait vide et les VMs inaccessibles.\nLance d'abord : dsoxlab instructor bootstrap",
+    "provision_done_cible":
+        "Provisionnement terminé — {count} hôte(s) ciblé(s) sur {total} déclaré(s), "
+        "prêt(s). Les autres n'ont pas été montés, donc pas vérifiés.",
     "provision_done":      "Provisionnement terminé — {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
     "provision_lease_refused":
@@ -973,6 +976,7 @@ hors ligne, elle se tait.
     "check_kvm":      "virsh/KVM",
     "check_provider": "Provider d'infra",
     "check_terraform":    "Terraform",
+    "check_tf_providers": "Providers Terraform",
     "check_ansible":      "ansible-playbook",
     "check_libvirt_pool": "Pool libvirt",
     "check_iso_tool":     "genisoimage",
@@ -995,6 +999,22 @@ hors ligne, elle se tait.
     "detail_incus_no_group": "client {version}, user hors groupe incus (re-login requis)",
     "detail_incus_no_init":  "client {version}, daemon ok mais non initialisé",
     "detail_kvm_daemon_err": "virsh présent mais erreur (daemon arrêté ?)",
+    "err_efi_loader_introuvable":
+        "libvirt n'expose aucun firmware EFI utilisable sur cette machine. "
+        "Installe le paquet OVMF (ex. apt install ovmf, dnf install edk2-ovmf), "
+        "puis vérifie avec : virsh domcapabilities | grep -A3 '<loader'.",
+    "detail_kvm_trop_ancien":
+        "libvirt {trouve} : dsoxlab en demande {minimum} au minimum. En dessous, "
+        "le firmware EFI choisi automatiquement ne survit pas à la relecture du "
+        "provider Terraform, et provision échoue sur « Provider produced "
+        "inconsistent result after apply » sans nommer la cause.",
+    "detail_kvm_version_illisible":
+        "version de libvirt illisible dans la réponse de virsh ({sortie}) : "
+        "impossible de dire si elle est prise en charge.",
+    "detail_tf_providers":
+        "{providers} (épinglés par terraform init)",
+    "detail_tf_providers_absents":
+        "aucun provider épinglé : provision n'a pas encore tourné pour ce dépôt.",
     "detail_kvm_missing":    "introuvable",
     "detail_pytest_missing": "introuvable",
     "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",
@@ -1044,6 +1064,22 @@ hors ligne, elle se tait.
         "ne peuvent pas tourner sur cette machine. Active VT-x/AMD-V dans le "
         "BIOS, ou la virtualisation imbriquée dans ton hyperviseur (machine "
         "éteinte).",
+    "detail_hw_virt_nested_named":
+        "{device} est absent et ce système tourne lui-même dans une machine "
+        "virtuelle ({hypervisor}) : la virtualisation imbriquée n'est pas "
+        "disponible, donc les labs vm ne peuvent pas tourner ici. Elle "
+        "s'active sur l'hyperviseur HÔTE, cette machine éteinte — il n'y a "
+        "rien à changer à l'intérieur.",
+    "detail_hw_virt_nested":
+        "{device} est absent et ce système tourne lui-même dans une machine "
+        "virtuelle : la virtualisation imbriquée n'est pas disponible, donc "
+        "les labs vm ne peuvent pas tourner ici. Elle s'active sur "
+        "l'hyperviseur HÔTE, cette machine éteinte — il n'y a rien à changer "
+        "à l'intérieur.",
+    "detail_hw_virt_bare_metal":
+        "{device} est absent sur une machine physique : la virtualisation "
+        "matérielle est désactivée, donc les labs vm ne peuvent pas tourner "
+        "ici. Active VT-x/AMD-V dans le BIOS ou le setup UEFI.",
     "detail_hw_virt_denied":
         "{device} existe mais cet utilisateur ne peut pas l'ouvrir : "
         "« provision » ne peut démarrer aucune VM (re-login requis après "
@@ -1058,8 +1094,14 @@ hors ligne, elle se tait.
         "RAM : {avail} Mo disponibles pour {need} Mo déclarés",
     "detail_resources_ram_unknown":
         "RAM : /proc/meminfo illisible, rien de mesuré",
+    "explain_pool_full":
+        "Cause connue : le pool de stockage libvirt est plein. Les disques qcow2 "
+        "grandissent à l'usage, donc un pool qui suffisait hier peut manquer "
+        "aujourd'hui. Regarde ce qu'il reste, puis libère de la place ou détruis "
+        "une infrastructure de lab que tu n'utilises plus :",
     "detail_resources_disk":
-        "pool {pool} : {avail} Go disponibles pour {need} Go déclarés",
+        "pool {pool} : {avail} Go disponibles ; jusqu'à {need} Go déclarés, "
+        "alloués à la demande (qcow2)",
     "detail_resources_disk_unknown":
         "pool {pool} : muet, espace disque non mesuré",
     "detail_resources_disk_unprobed":
