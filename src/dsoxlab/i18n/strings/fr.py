@@ -973,6 +973,7 @@ hors ligne, elle se tait.
     "check_kvm":      "virsh/KVM",
     "check_provider": "Provider d'infra",
     "check_terraform":    "Terraform",
+    "check_tf_providers": "Providers Terraform",
     "check_ansible":      "ansible-playbook",
     "check_libvirt_pool": "Pool libvirt",
     "check_iso_tool":     "genisoimage",
@@ -995,6 +996,18 @@ hors ligne, elle se tait.
     "detail_incus_no_group": "client {version}, user hors groupe incus (re-login requis)",
     "detail_incus_no_init":  "client {version}, daemon ok mais non initialisé",
     "detail_kvm_daemon_err": "virsh présent mais erreur (daemon arrêté ?)",
+    "detail_kvm_trop_ancien":
+        "libvirt {trouve} : dsoxlab en demande {minimum} au minimum. En dessous, "
+        "le firmware EFI choisi automatiquement ne survit pas à la relecture du "
+        "provider Terraform, et provision échoue sur « Provider produced "
+        "inconsistent result after apply » sans nommer la cause.",
+    "detail_kvm_version_illisible":
+        "version de libvirt illisible dans la réponse de virsh ({sortie}) : "
+        "impossible de dire si elle est prise en charge.",
+    "detail_tf_providers":
+        "{providers} (épinglés par terraform init)",
+    "detail_tf_providers_absents":
+        "aucun provider épinglé : provision n'a pas encore tourné pour ce dépôt.",
     "detail_kvm_missing":    "introuvable",
     "detail_pytest_missing": "introuvable",
     "detail_pytest_bundled": "embarqué avec dsoxlab (celui qu'utilise « check »)",

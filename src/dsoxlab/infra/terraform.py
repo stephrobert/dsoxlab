@@ -908,3 +908,38 @@ def _read_outputs(tf_dir: Path, *, env: dict[str, str] | None = None) -> Provisi
     }
 
     return ProvisionResult(outputs=outputs, hosts=hosts)
+
+
+#: Le fichier qu'écrit `terraform init`, et qui dit quelle version de chaque
+#: provider tourne réellement. La contrainte du template (`~> 0.9`) ne le dit
+#: pas : deux postes qui l'honorent tous les deux peuvent avoir des versions
+#: différentes, et c'est précisément ce que l'issue #234 a demandé de comparer
+#: à la main faute que l'outil le dise.
+_LOCK = ".terraform.lock.hcl"
+
+_PROVIDER_EPINGLE = re.compile(
+    r'provider\s+"[^"]*?/(?P<nom>[^"/]+)"\s*\{[^}]*?version\s*=\s*"(?P<version>[^"]+)"',
+    re.DOTALL,
+)
+
+
+def providers_epingles(repo_meta: RepoMetadata) -> dict[str, str]:
+    """Les providers Terraform en place pour ce dépôt, avec leur version.
+
+    Vide tant que ``provision`` n'a jamais tourné : le verrou n'existe qu'après
+    le premier ``terraform init``. Ce n'est pas une anomalie, et l'appelant le
+    dit ainsi plutôt que de laisser croire à un défaut.
+
+    Ne lève jamais : un diagnostic qui plante en cherchant à diagnostiquer est le
+    pire des cas, il emporte la commande qui l'appelle.
+    """
+    lock = workdir(repo_meta) / _LOCK
+    try:
+        contenu = lock.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    return {
+        correspondance.group("nom"): correspondance.group("version")
+        for correspondance in _PROVIDER_EPINGLE.finditer(contenu)
+    }

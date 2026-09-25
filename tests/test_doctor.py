@@ -182,7 +182,11 @@ def test_active_provider_is_required_and_the_others_are_not(
     report = doctor.collect_checks(tmp_path, _repo(provider="kvm"))
 
     assert _("check_kvm") in _labels(report.required)
-    assert _labels(report.optional) == {_("check_incus"), _("check_docker")}
+    # `tf_providers` accompagne tout dépôt qui provisionne : il dit quelle
+    # version du provider Terraform tourne, ce qu'aucune surface ne disait.
+    assert _labels(report.optional) == {
+        _("check_incus"), _("check_docker"), _("check_tf_providers"),
+    }
     assert [c.label for c in report.failing()] == [_("check_kvm")]
 
 
@@ -194,7 +198,7 @@ def test_remote_provider_requires_no_local_hypervisor(
     report = doctor.collect_checks(tmp_path, _repo(provider="outscale"))
 
     assert _labels(report.optional) == {_("check_kvm"), _("check_incus"),
-                                       _("check_docker")}
+                                       _("check_docker"), _("check_tf_providers")}
     assert not report.failing()
 
 

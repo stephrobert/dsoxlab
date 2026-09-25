@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.91] - 2026-09-25
+
+### Added
+
+- **Supported versions are declared, checked and reported** (issue #234). Nothing
+  said a libvirt version could be too old. On libvirt 8.0, `provision` fails
+  because the automatically selected EFI firmware does not survive the Terraform
+  provider reading the XML back, and the error arrives in Terraform's own
+  language — "Provider produced inconsistent result after apply" — naming neither
+  the version, nor the cause, nor what to do.
+
+  `doctor` now refuses anything below **libvirt 9.0** and says why. The floor is
+  **measured**, not picked out of caution: 10.0 provisions, verified by
+  provisioning an AlmaLinux 10 VM; 8.0 fails, as reported. 9.x has been tried by
+  nobody and is given the benefit of the doubt rather than ruling out Debian 12
+  and AlmaLinux 9, which no measurement condemns. The day one of them is measured
+  broken, a single number changes.
+
+  A version virsh reports unreadably comes out as **`unknown`**, neither green
+  nor red: we do not refuse a machine over output we could not parse, and we do
+  not call it good either. `--strict` has its own code for that (10).
+
+- **`doctor` and `support` report the Terraform provider version actually
+  pinned**, read from the state's `.terraform.lock.hcl`. The template's `~> 0.9`
+  constraint does not tell you: two machines both honouring it may run different
+  versions, and it is that one which decides. Understanding issue #234 required
+  digging it out by hand from two reports that carried it in neither; a report now
+  carries it without anyone having to ask.
+
+  That check never paints red: it is information, not a prerequisite. No floor is
+  known for these providers — the reporter and the reference machine had the
+  **same** 0.9.9 — so inventing one would refuse machines on a guess.
+
+- **Supported versions are documented** in the trainer guide, in English and in
+  French, with the measurement behind each floor.
+
 ## [0.1.90] - 2026-09-25
 
 ### Fixed
