@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.94] - 2026-09-25
+
+### Fixed
+
+- **`doctor` no longer paints a healthy installation red over nominal disk
+  sizes** (issue #209). The `RAM / disk resources` check summed the `disk_gb` +
+  `extra_disk_gb` declared in `meta.yml` and compared that total against the free
+  space libvirt reports for the pool. But those sizes are **nominal**: qcow2
+  volumes allocate on demand. The Linux catalogue declares 65 GB for 3.2 GB
+  actually used — measured by a user whose `doctor` came out red, as a
+  **required** check, on a machine that provisioned its labs without a hitch.
+
+  Comparing a theoretical ceiling against a measurement proves nothing, and this
+  one was the loudest kind of wrong: required, red, on a working install. It sent
+  whoever read it hunting for a disk problem that did not exist, and it taught
+  them to distrust the one check that is supposed to be trustworthy.
+
+  The figure stays — the worst case does say something true — but it is now
+  announced as a ceiling (`up to 65 GB declared, allocated on demand (qcow2)`)
+  and it no longer decides the verdict. RAM keeps its own: `MemAvailable` and the
+  sum of `ram_mb` are two measurements of the same nature, so they compare.
+
+### Added
+
+- **A pool that is genuinely full is now named at the moment it fails** (issue
+  #209). Relaxing the check above would otherwise have removed a safeguard
+  without replacing it. libvirt reports `no space left on device` without naming
+  either the pool or the gesture; `provision` now recognises it, says that qcow2
+  disks grow with use — so a pool that was enough yesterday can run short today —
+  and prints the command that shows what is left.
+
+  That command names **the repository's own pool**, read from
+  `infra.providers.kvm.storage_pool`, rather than a presumed `default`: a
+  suggested command that targets the wrong pool fails in the hands of whoever
+  copies it. The same now holds for the `pool not found` explanation.
+
+  This is the rule the whole #172 → #179 batch established, applied the other way
+  round: a check that cannot look never concludes green — and a failure that
+  cannot be predicted is named where it actually happens.
+
 ## [0.1.93] - 2026-09-25
 
 ### Fixed
