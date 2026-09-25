@@ -9,6 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.89] - 2026-09-25
+
+### Fixed
+
+- **`validate-structure` inspected the working directory, and failed labs that
+  had a provider in cache** (issue #238). Terraform drops the README of the
+  provider it has just downloaded into `challenge/work/.terraform/`, and its
+  relative links point at the provider's GitHub tree, absent from the distributed
+  archive. Three labs of `terraform-training` failed for that reason alone, with
+  no fix possible on the catalogue side.
+
+  The cost went beyond three false positives: the verdict depended on **the order
+  of the commands**. Validating after a `run` accused three labs, validating
+  after a `clean` cleared them. A check whose output changes depending on whether
+  a cache is lying around stops being a check, and it is then the real structural
+  defect that goes unnoticed.
+
+  Internal links and language parity therefore only look at author content now:
+  the working directory declared by the lab is left out, as is any hidden or
+  tooling-cache directory (`.terraform`, `.venv`, `node_modules`, `vendor`),
+  wherever it sits. Nothing is lost on the way: a Markdown file copied into the
+  workdir comes from `fixtures/`, which is still checked, and it is now checked
+  once rather than zero or twice depending on whether a `run` happened.
+
+### Added
+
+- **`runtime.services[].spawns`: containers a service launches itself are finally
+  cleaned up** (issue #239). A service handed the Docker socket creates its own
+  containers, which dsoxlab never launched and therefore did not know about. They
+  survived `clean` as well as the service shutting down, and held on to their
+  published ports: three of them were still running after 15 and 23 hours.
+
+  The next creation then failed with "Bind for 0.0.0.0:2201 failed: port is
+  already allocated", somewhere nothing surfaced to the lab. The instance existed
+  in the API but never reached `running`, the reference solution found nothing,
+  and the lab looked broken for no reason. Two cycles were lost to this. Every
+  catalogue had to add its own cleanup in `post_start`, and a lab that forgot fell
+  straight back into the defect.
+
+  The lab now declares the name fragments involved and the tool takes care of it.
+  Two design points, which matter more than the cleanup itself:
+
+  - spawned containers are removed when dsoxlab **(re)creates** the service
+    container and on `clean`, **never** when it reuses a running one. What the
+    service has spawned since is then the learner's work in progress, and that is
+    exactly what the `post_start` workaround could not tell apart;
+  - dsoxlab's own containers (`dsoxlab-…`) are always spared, otherwise an
+    over-broad fragment would have one service remove another's container.
+
+  The limit is owned and written into the contract: a name fragment stays a name
+  fragment, and two instances of the same product running side by side will step
+  on each other. Only a service that labelled its children would allow filtering
+  per project, and that does not depend on dsoxlab.
+
 ## [0.1.88] - 2026-09-20
 
 ### Fixed

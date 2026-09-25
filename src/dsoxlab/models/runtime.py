@@ -174,6 +174,35 @@ class Service:
     dsoxlab ne les interprète pas : il ne sait pas ce qu'est un secret ni un
     schéma, il exécute ce que le lab déclare."""
 
+    spawns: list[str] = field(default_factory=list)
+    """Fragments de nom des conteneurs que ce service **engendre lui-même**.
+
+    Un service qui reçoit le socket Docker en ``run_args`` peut créer ses propres
+    conteneurs : un émulateur de cloud en démarre un par instance qu'on lui
+    demande, et leur publie des ports sur l'hôte. dsoxlab ne les a pas lancés,
+    donc il ne les connaissait pas, donc ils survivaient à ``clean`` et à l'arrêt
+    du service. Mesuré (issue #239) : trois d'entre eux tournaient encore après
+    15 et 23 heures, et la création suivante échouait sur « Bind for
+    0.0.0.0:2201 failed: port is already allocated », message que rien ne
+    remontait au lab. L'instance restait hors de l'état ``running``, la solution
+    de référence ne trouvait rien, et le lab paraissait cassé sans raison.
+
+    Chaque entrée est passée telle quelle à ``docker ps --filter name=…``, donc
+    une **sous-chaîne**, pas un glob. Un service qui nomme ses enfants
+    ``floci-ec2-i-<id>`` déclare ``spawns: ["floci-ec2-"]``.
+
+    Ils sont retirés quand dsoxlab (re)crée le conteneur du service, et à
+    ``clean``. Jamais quand il réutilise un conteneur déjà debout : ce que le
+    service a engendré depuis est alors le travail en cours de l'apprenant, pas
+    un résidu.
+
+    **Sa limite, assumée** : un fragment de nom reste un fragment de nom. Deux
+    instances du même produit lancées en parallèle, sur deux projets, se
+    marcheront dessus. Le contrat ne peut pas faire mieux que ce que l'image
+    nomme ; seul un service qui étiquetterait ses enfants permettrait un filtrage
+    par projet. Les conteneurs de dsoxlab lui-même (``dsoxlab-…``) sont, eux,
+    toujours épargnés."""
+
 
 @dataclass
 class RuntimeConfig:

@@ -98,10 +98,49 @@ def _liens_casses(fichier: Path) -> list[str]:
     return casses
 
 
+def documents_du_lab(lab: LabDefinition, motif: str) -> list[Path]:
+    """Les fichiers du lab qui sont du **contenu d'auteur**, et eux seuls.
+
+    Deux familles sont écartées, pour la même raison : personne ne les a écrites,
+    donc personne ne peut les corriger.
+
+    Le **répertoire de travail** d'abord (``runtime.workdir``, souvent
+    ``challenge/work``). ``run`` le peuple, ``clean`` le retire, les catalogues le
+    gitignorent, et l'outillage du lab y dépose ses caches. Terraform y écrit
+    ``.terraform/``, avec le README du provider qu'il vient de télécharger : trois
+    labs de ``terraform-training`` sortaient en erreur sur les liens relatifs de
+    la documentation de ``dmacvicar/libvirt``, qui pointent vers l'arborescence
+    GitHub du provider, absente de l'archive distribuée (issue #238).
+
+    Les **répertoires cachés** ensuite, où qu'ils soient : `.terraform`, `.venv`,
+    `.git`. Même raisonnement, et le contrôle des fixtures exempte déjà les
+    fichiers cachés pour cette raison.
+
+    Le défaut coûtait plus que trois faux positifs : le verdict dépendait de
+    l'**ordre des commandes**. Valider après un `run` accusait trois labs,
+    valider après un `clean` les déclarait bons. Un contrôle dont la sortie change
+    selon qu'un cache traîne cesse d'être un contrôle, et c'est alors le vrai
+    défaut de structure qui passe inaperçu.
+    """
+    ecartes = {".terraform", ".venv", "node_modules", "vendor"}
+    workdir = (lab.runtime.workdir or "").strip("/")
+    prefixe = tuple(workdir.split("/")) if workdir else ()
+
+    retenus: list[Path] = []
+    for fichier in sorted(lab.path.rglob(motif)):
+        parts = fichier.relative_to(lab.path).parts
+        if prefixe and parts[: len(prefixe)] == prefixe:
+            continue
+        if any(p.startswith(".") or p in ecartes for p in parts[:-1]):
+            continue
+        retenus.append(fichier)
+    return retenus
+
+
 def validate_internal_links(lab: LabDefinition) -> ContentReport:
     """Tout lien relatif d'un Markdown du lab doit pointer sur un fichier."""
     report = ContentReport(lab_id=lab.id)
-    for fichier in sorted(lab.path.rglob("*.md")):
+    for fichier in documents_du_lab(lab, "*.md"):
         casses = _liens_casses(fichier)
         if casses:
             report.issues.append(ContentIssue(
@@ -291,7 +330,9 @@ def validate_language_parity(lab: LabDefinition) -> ContentReport:
     relit.
     """
     report = ContentReport(lab_id=lab.id)
-    for francais in sorted(lab.path.rglob("*.fr.md")):
+    # Même périmètre que les liens internes : un README de provider déposé dans
+    # le répertoire de travail n'a pas à être traduit par l'auteur du lab.
+    for francais in documents_du_lab(lab, "*.fr.md"):
         anglais = francais.with_name(francais.name.replace(".fr.md", ".md"))
         if not anglais.is_file():
             report.issues.append(ContentIssue(

@@ -222,6 +222,11 @@
                     { "type": "array", "items": { "type": "string" }, "minItems": 1 }
                   ]
                 }
+              },
+              "spawns": {
+                "type": "array",
+                "description": "Name fragments of the containers this service launches ITSELF, when it is given the Docker socket. Passed as-is to `docker ps --filter name=`, so a substring and not a glob. dsoxlab removes them when it (re)creates the service container and on clean, never when it reuses a running one. Containers named dsoxlab-… are always spared.",
+                "items": { "type": "string", "minLength": 1 }
               }
             }
           }

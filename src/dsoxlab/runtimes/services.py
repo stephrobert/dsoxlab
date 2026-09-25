@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import socket
 import time
@@ -32,6 +33,8 @@ from dataclasses import dataclass
 from ..i18n import _
 from ..models.runtime import Service
 from ..utils.shell import CommandError, run_command
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceError(RuntimeError):
@@ -316,6 +319,13 @@ def start(service: Service, repo_id: str, *,
     if _exists(name):
         run_command(["docker", "rm", "-f", name], check=False, timeout=30)
 
+    # Le service repart de zéro, donc ce qu'il avait engendré n'est plus rattaché
+    # à rien : ce sont des résidus, et leurs ports publiés feront échouer ses
+    # prochaines créations. On ne passe volontairement PAS par ici quand le
+    # conteneur est réutilisé : ce qu'il a engendré depuis est alors le travail en
+    # cours de l'apprenant, pas un reste de la session d'avant.
+    retirer_engendres(service)
+
     # Réseau partagé + alias : depuis un autre service du même dépôt, celui-ci
     # se joint par son `name` déclaré (`db`, `vault`…), pas par le nom complet
     # du conteneur. C'est ce qui rend `DATASOURCES_DEFAULT_HOST: db` écrivable
@@ -346,8 +356,56 @@ def start(service: Service, repo_id: str, *,
     return name
 
 
+def retirer_engendres(service: Service) -> list[str]:
+    """Retire les conteneurs que ce service a lancés lui-même, et les nomme.
+
+    Un service qui reçoit le socket Docker crée ses propres conteneurs. dsoxlab
+    ne les a pas lancés, donc il ne les voyait pas : ils survivaient à ``clean``
+    comme à l'arrêt du service, et retenaient leurs ports publiés. La création
+    suivante échouait alors sur « port is already allocated », à un endroit dont
+    rien ne remontait au lab (issue #239).
+
+    Le filtre est le fragment de nom que le lab déclare, passé tel quel à
+    ``docker ps``. Deux garde-fous, et pas un de plus, parce qu'il n'y a rien de
+    plus à savoir ici : un fragment vide est ignoré, sans quoi il désignerait
+    tous les conteneurs de la machine, et les conteneurs de dsoxlab lui-même sont
+    épargnés, sans quoi un fragment trop large ferait retirer par un service le
+    conteneur d'un autre.
+
+    Ne lève jamais : un nettoyage qui échoue ne doit pas empêcher le lab de
+    tourner, il doit se dire. L'appelant décide quoi en faire.
+    """
+    retires: list[str] = []
+    for brut in service.spawns:
+        fragment = brut.strip()
+        if not fragment:
+            logger.warning("service %s declares an empty spawns entry, ignored", service.name)
+            continue
+        res = run_command(
+            ["docker", "ps", "-a", "--filter", f"name={fragment}",
+             "--format", "{{.Names}}"],
+            check=False, timeout=30,
+        )
+        if not res.ok:
+            logger.warning("could not list containers spawned by %s: %s",
+                           service.name, res.stderr.strip())
+            continue
+        for nom in res.stdout.split():
+            if nom.startswith("dsoxlab-"):
+                continue
+            if run_command(["docker", "rm", "-f", nom], check=False, timeout=30).ok:
+                retires.append(nom)
+                logger.info("removed container %s spawned by service %s", nom, service.name)
+    return retires
+
+
 def stop(service: Service, repo_id: str) -> bool:
-    """Arrête et retire le conteneur d'un service. True s'il existait."""
+    """Arrête et retire le conteneur d'un service, et ce qu'il a engendré.
+
+    True si le conteneur du service existait. Les engendrés sont retirés dans
+    tous les cas : ils survivent au service, c'est même tout le problème.
+    """
+    retirer_engendres(service)
     name = container_name(repo_id, service)
     if not _exists(name):
         return False

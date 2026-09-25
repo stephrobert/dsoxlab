@@ -300,6 +300,7 @@ plutôt que laissées à découvrir :
 | `ready_exec` | non | chaîne ou argv | `[]` | Sonde jouée **dans** le conteneur, réessayée jusqu'au succès. Le seul signal de disponibilité fiable. |
 | `ready_timeout` | non | entier | `90` | Secondes, pour les deux sondes. |
 | `post_start` | non | liste de chaînes ou d'argv | `[]` | Commandes jouées dans le conteneur une fois prêt. **Rejouées à chaque démarrage**, elles doivent donc être idempotentes. |
+| `spawns` | non | liste de chaînes | `[]` | Fragments de nom des conteneurs que ce service lance **lui-même**, quand on lui confie le socket Docker. Chacun part tel quel dans `docker ps --filter name=`, donc une sous-chaîne et non un glob. dsoxlab les retire quand il (re)crée le conteneur du service et à `clean`, jamais quand il réutilise un conteneur debout : ce que le service a engendré depuis est alors le travail en cours de l'apprenant. Les conteneurs nommés `dsoxlab-…` sont toujours épargnés. Un fragment de nom reste un fragment de nom : deux instances du même produit lancées en parallèle, sur deux projets, se marcheront dessus. |
 
 ### `validation`
 
