@@ -136,6 +136,46 @@ La marque et ses fichiers sont documentés dans
 [docs/brand.fr.md](./docs/brand.fr.md) ; **le nom et le logo ne sont pas
 couverts par la licence Apache 2.0**.
 
+## Remerciements
+
+Plusieurs personnes extérieures au projet ont amélioré dsoxlab en remontant ce
+sur quoi elles butaient, avec le diagnostic et souvent le correctif. Nommer ce
+que chaque retour a changé paraît plus utile qu'une liste de pseudonymes.
+
+**[@cedric-ribier](https://github.com/cedric-ribier)** est le plus persévérant,
+et quatre versions viennent de ses remontées :
+
+- `doctor` ne peint plus en rouge une installation saine à cause de tailles de
+  disque nominales (0.1.94). Il a écrit que l'information était *déroutante*,
+  ce qui était exactement le défaut : le contrôle comparait un maximum déclaré à
+  une mesure ;
+- le provisionnement KVM fonctionne de nouveau sur **libvirt 8** (0.1.92). Il a
+  reproduit le défaut `os.firmware` du provider libvirt, documenté le
+  contournement en amont, et c'est ce qui a rendu un correctif possible sur trois
+  versions de libvirt ;
+- l'agent Incus est installé sur AlmaLinux, dont le noyau RHEL n'a pas le driver
+  9p, et l'attente de disponibilité des hôtes est devenue réglable (0.1.41). Les
+  deux depuis un seul rapport, testé sur trois hôtes ;
+- `doctor` nomme l'absence de virtualisation imbriquée au lieu de renvoyer au
+  BIOS qu'une machine virtuelle n'a pas (0.1.95). Cela vient de son travail sur
+  une image prête à l'emploi, discuté dans
+  [#91](https://github.com/stephrobert/dsoxlab/issues/91).
+
+**[@Gedd18](https://github.com/Gedd18)** a trouvé que le `conftest.py` du
+catalogue de labs ne se chargeait plus dès qu'aucun provider d'infrastructure
+n'était résolu, ce qui bloquait en silence **tous les labs `shell`**, c'est-à-dire
+les premiers qu'un apprenant joue. Sa traceback est ce qui a transformé une
+chasse en correctif de cinq minutes.
+
+**[@VictorVare](https://github.com/VictorVare)** a diagnostiqué deux labs dont
+l'état de départ était inutilisable : un port 80 fermé sur un backend, et un port
+LDAP fermé. Dans les deux cas, il a distingué `No route to host` de
+`Connection refused` et d'une expiration, ce qui a nommé la cause au lieu de nous
+laisser hésiter entre HAProxy, SELinux et le pare-feu.
+
+Si vous butez sur quelque chose, le rapport vaut mieux que le contournement :
+`dsoxlab support --issue` remplit le diagnostic pour vous.
+
 ## Licence et attribution
 
 Distribué sous **licence Apache 2.0**, voir [LICENSE](./LICENSE) et

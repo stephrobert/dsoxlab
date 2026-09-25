@@ -9,6 +9,24 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.1] - 2026-09-25
+
+### Ajouté
+
+- **Une section `Remerciements` dans les deux README.** Trois personnes
+  extérieures au projet ont remonté des défauts avec le diagnostic, et souvent le
+  correctif. La section nomme **ce que chaque retour a changé** plutôt que de
+  lister des pseudonymes : quatre versions viennent de
+  [@cedric-ribier](https://github.com/cedric-ribier) (tailles de disque nominales,
+  libvirt 8, l'agent Incus sur AlmaLinux avec l'attente réglable, et la
+  virtualisation imbriquée nommée), le `conftest.py` qui bloquait en silence tous
+  les labs `shell` vient de [@Gedd18](https://github.com/Gedd18), et deux labs dont
+  l'état de départ était inutilisable de
+  [@VictorVare](https://github.com/VictorVare).
+
+  Un crédit qui dit ce qu'il a corrigé vaut mieux qu'une liste, et il apprend au
+  lecteur suivant quel genre de rapport est utile.
+
 ## [0.2.0] - 2026-09-25
 
 **Passage au produit.** Cette version n'ajoute aucun code : elle marque le

@@ -131,6 +131,43 @@ To report a vulnerability, follow [SECURITY.md](./SECURITY.md).
 The mark and its files are documented in [docs/brand.md](./docs/brand.md);
 **the name and the logo are not covered by the Apache 2.0 licence**.
 
+## Thanks
+
+Several people outside the project have made dsoxlab better by reporting what
+they hit, with the diagnosis and often the fix. Naming what each report changed
+seems more useful than a list of handles.
+
+**[@cedric-ribier](https://github.com/cedric-ribier)** has been the most
+persistent, and four releases come from his reports:
+
+- `doctor` no longer fails a healthy install over nominal disk sizes (0.1.94). He
+  pointed out the information was *confusing*, which was exactly the defect: the
+  check compared declared maximums against a measurement;
+- KVM provisioning works again on **libvirt 8** (0.1.92). He reproduced the
+  `os.firmware` defect of the libvirt provider, documented the workaround
+  upstream, and that is what made a fix possible on three libvirt versions;
+- the Incus agent is installed on AlmaLinux, whose RHEL kernel lacks the 9p
+  driver, and the host-ready wait became configurable (0.1.41). Both from a
+  single report, tested on three hosts;
+- `doctor` names missing nested virtualization instead of pointing at a BIOS a
+  virtual machine does not have (0.1.95). That came out of his work on a
+  ready-to-use appliance, discussed in
+  [#91](https://github.com/stephrobert/dsoxlab/issues/91).
+
+**[@Gedd18](https://github.com/Gedd18)** found that the lab catalog's
+`conftest.py` failed to load whenever no infrastructure provider was resolved,
+which silently blocked **every `shell` lab** — the very first ones a learner
+plays. His traceback is what made it a five-minute fix instead of a hunt.
+
+**[@VictorVare](https://github.com/VictorVare)** diagnosed two labs whose starting
+state was unusable: a closed port 80 on a backend, and a closed LDAP port. In both
+cases he distinguished `No route to host` from `Connection refused` and from a
+timeout, which named the cause instead of leaving us to guess between HAProxy,
+SELinux and the firewall.
+
+If you hit something, the report is worth more than the workaround: `dsoxlab
+support --issue` fills in the diagnosis for you.
+
 ## License & attribution
 
 Licensed under the **Apache License 2.0** — see [LICENSE](./LICENSE) and
