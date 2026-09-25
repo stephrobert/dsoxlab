@@ -333,6 +333,9 @@ STRINGS: dict[str, str] = {
     "progress_nothing_to_do":  "Nothing to do",
     "provision_starting":  "Provisioning infrastructure (provider: {provider})…",
     "provision_no_ssh_key": "Lab SSH key missing: {path}\nWithout it, cloud keypair would be empty and VMs unreachable.\nRun first: dsoxlab instructor bootstrap",
+    "provision_done_cible":
+        "Provisioning complete — {count} targeted host(s) out of {total} declared are "
+        "ready. The others were not brought up, so they were not checked.",
     "provision_done":      "Provisioning complete — {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
     "provision_lease_refused":
