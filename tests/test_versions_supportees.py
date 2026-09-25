@@ -232,3 +232,80 @@ def test_le_controle_des_providers_ne_peint_jamais_en_rouge(tmp_path: Path) -> N
 
     assert check.ok
     assert check.state == doctor.STATE_OK
+
+
+# ── écrire des variables ne doit pas exiger un hyperviseur ────────────────────
+
+def _meta_kvm(racine: Path) -> RepoMetadata:
+    from dsoxlab.discovery.repo import read_repo_metadata
+
+    (racine / "meta.yml").write_text(
+        "repo:\n  id: sentinelle\n  category: domaine\n"
+        "infra:\n  provider: kvm\n  network: reseau\n  cidr: 10.10.10.0/24\n"
+        "  hosts:\n    - name: hote.lab\n      distro: alma10\n",
+        encoding="utf-8",
+    )
+    meta = read_repo_metadata(racine)
+    assert meta is not None
+    return meta
+
+
+def test_write_tfvars_n_exige_pas_libvirt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le défaut que la CI a trouvé avant ce test, et qu'il ferme.
+
+    `write_tfvars` ÉCRIT UN FICHIER. L'avoir fait dépendre de
+    `libvirt.efi_loader()` la rendait inappelable sans hyperviseur : les
+    contrôles de documentation, qui l'invoquent pour chaque provider afin de
+    relever les chemins, échouaient tous en intégration continue. Ici, la sonde
+    ne rend rien, et l'écriture doit quand même aboutir.
+    """
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(terraform.libvirt, "efi_loader", lambda: None)
+
+    chemin = terraform.write_tfvars(_meta_kvm(tmp_path))
+
+    import json
+
+    assert json.loads(chemin.read_text(encoding="utf-8"))["efi_loader"] == ""
+
+
+def test_write_tfvars_porte_le_loader_quand_il_existe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(
+        terraform.libvirt, "efi_loader", lambda: "/usr/share/edk2/ovmf/OVMF_CODE.fd"
+    )
+
+    chemin = terraform.write_tfvars(_meta_kvm(tmp_path))
+
+    import json
+
+    assert (
+        json.loads(chemin.read_text(encoding="utf-8"))["efi_loader"]
+        == "/usr/share/edk2/ovmf/OVMF_CODE.fd"
+    )
+
+
+def test_apply_refuse_de_partir_sans_firmware(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La vérification a quitté l'écriture pour rejoindre le provisionnement.
+
+    C'est là qu'elle compte : sans chemin, le plan n'a rien à poser, et un
+    message qui nomme le paquet OVMF vaut mieux qu'une erreur Terraform sur une
+    variable vide.
+    """
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(terraform.libvirt, "efi_loader", lambda: None)
+
+    with pytest.raises(terraform.EfiLoaderUnavailable):
+        terraform.apply(_meta_kvm(tmp_path))

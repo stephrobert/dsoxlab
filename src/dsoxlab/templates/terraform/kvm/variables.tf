@@ -59,4 +59,8 @@ variable "efi_loader" {
     alors dans /init faute de charger leurs modules virtio.
   EOT
   type        = string
+  # Un défaut vide pour que `terraform validate` tourne sans variables, comme le
+  # fait la CI. Ce n'est pas une valeur utilisable : `apply` refuse de partir sur
+  # une chaîne vide, en nommant le paquet OVMF à installer.
+  default     = ""
 }

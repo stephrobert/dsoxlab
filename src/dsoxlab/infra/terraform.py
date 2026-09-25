@@ -261,11 +261,15 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
     # Le firmware EFI n'est pas écrit dans le template : il est demandé à la
     # machine (issue #234). Seul kvm en a besoin ; incus et outscale ne
     # déclarent pas cette variable, et la leur passer ferait échouer leur plan.
+    #
+    # Cette fonction ÉCRIT UN FICHIER : elle ne lève pas parce qu'une sonde
+    # système n'a rien rendu. La faire dépendre de libvirt la rendait
+    # inappelable sans hyperviseur, ce qui a cassé les contrôles de
+    # documentation, qui l'invoquent pour chaque provider afin de relever les
+    # chemins. La chaîne vide est écrite, et c'est `apply()` qui refuse de
+    # partir — au moment où l'absence de firmware compte vraiment.
     if repo_meta.infra.provider == "kvm":
-        loader = libvirt.efi_loader()
-        if loader is None:
-            raise EfiLoaderUnavailable(_("err_efi_loader_introuvable"))
-        payload["efi_loader"] = loader
+        payload["efi_loader"] = libvirt.efi_loader() or ""
 
     tfvars_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return tfvars_path
@@ -591,6 +595,20 @@ def apply(
         raise TerraformNotInstalled(_("err_terraform_missing"))
 
     tf_dir = workdir(repo_meta)
+
+    # C'est ICI que l'absence de firmware compte, pas à l'écriture des
+    # variables : le template kvm désigne son loader (issue #234), donc sans
+    # chemin le plan n'a rien à poser. On s'arrête en nommant la cause plutôt
+    # que de laisser Terraform échouer sur une variable vide, message que rien
+    # ne relie au paquet OVMF manquant.
+    #
+    # On interroge la sonde, pas le fichier que `write_tfvars` vient d'écrire :
+    # dépendre de sa valeur de retour recouplait les deux, et cassait les tests
+    # qui la simulent. Le coût est une commande virsh de plus, sur une opération
+    # qui va démarrer des machines.
+    if repo_meta.infra.provider == "kvm" and not (libvirt.efi_loader() or "").strip():
+        raise EfiLoaderUnavailable(_("err_efi_loader_introuvable"))
+
     write_tfvars(repo_meta)
 
     # Le réseau KVM est figé (lifecycle ignore_changes) : on pose ici les baux
