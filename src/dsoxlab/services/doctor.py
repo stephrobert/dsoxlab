@@ -40,6 +40,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from ..discovery.scanner import compter_fichiers_labs
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..infra import ansible as ansible_infra
 from ..infra import libvirt as libvirt_infra
@@ -68,14 +69,14 @@ STATE_FAILED = "failed"
 STATE_CHOICE_REQUIRED = "choice_required"
 
 #: ``doctor --strict`` : un contrôle requis a échoué, c'est établi.
-EXIT_DOCTOR_REQUIS_KO = 9
+EXIT_DOCTOR_REQUIS_KO = ExitCode.DOCTOR_REQUIS_KO
 
 #: ``doctor --strict`` : un contrôle requis n'a **pas pu** être mesuré. Ce n'est
 #: pas un échec, et ce n'est surtout pas un succès : un appelant automatisé qui
 #: valide un environnement ne peut rien conclure d'une sonde qui n'a pas
 #: regardé. Le code se distingue du précédent parce que les gestes diffèrent —
 #: réparer, ou refaire la mesure.
-EXIT_DOCTOR_INDETERMINE = 10
+EXIT_DOCTOR_INDETERMINE = ExitCode.DOCTOR_INDETERMINE
 STATE_UNKNOWN = "unknown"
 """La sonde n'a pas pu mesurer : ni vert, ni rouge.
 

@@ -41,6 +41,11 @@ Sur une erreur *dure* : identifiant de lab inconnu, `meta.yml` illisible, la
 sortie standard reste vide, la cause part sur la sortie d'erreur, et le code ne
 bouge pas. Lisez le code de retour d'abord.
 
+C'est pourquoi les codes ont leur propre page :
+**[les codes de sortie](./exit-codes.fr.md)** donne la table complète, avec ce que
+chacun signifie *et* le geste qu'il appelle — `7` se réessaie, `9` se répare,
+`10` se remesure.
+
 ---
 
 ## Les commandes qui prennent `--json`

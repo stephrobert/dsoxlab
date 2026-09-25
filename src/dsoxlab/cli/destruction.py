@@ -26,6 +26,7 @@ from typing import Annotated
 
 import typer
 
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..infra import libvirt
 from ..interrupt import (
@@ -147,7 +148,7 @@ def destroy(
     # détruite » et sortait en 0 en laissant les machines debout, ce qui est le
     # contraire de ce que la commande promet. On regarde l'hyperviseur.
     if not _handle_orphans_after_destroy(repo_meta, assume_yes=yes):
-        raise typer.Exit(6)
+        raise typer.Exit(ExitCode.ORPHELINS_NON_RETIRES)
 
     # Le fragment SSH pointe désormais des machines mortes : le laisser
     # enverrait l'apprenant vers des adresses recyclées, ce qui est pire que

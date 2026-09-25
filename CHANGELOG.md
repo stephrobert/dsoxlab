@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.96] - 2026-09-25
+
+### Added
+
+- **`docs/exit-codes.md` and its French counterpart: the whole table, in one
+  place** (issue #197). An exit code is the hardest contract this tool exposes —
+  no schema, no version, no message — and it was the only interface without a
+  page. A caller had to read the per-command documentation end to end to
+  reconstitute the table.
+
+  The page gives, for each code, what it means **and the gesture it calls for**,
+  because that is the distinction the codes were designed around: `7` gets
+  retried (another invocation is writing, the cause is temporary by nature), `9`
+  gets repaired, `10` gets measured again. It also states what `1` and `2`
+  separate — "the answer is no" from "the command could not run" — which was
+  nowhere written down.
+
+  Linked from `docs/machine-output.*` and listed in the documentation index.
+
+### Changed
+
+- **All exit codes now live in one `ExitCode` enum** (`src/dsoxlab/exit_codes.py`,
+  issue #197). They were scattered: `locking.py` held 7, `inventory.py` 8,
+  `doctor.py` 9 and 10, `_socle.py` a 127 written in plain sight with no constant
+  at all, and 1 through 6 existed nowhere but at the call sites. Four were added
+  in a single day, each in the module that needed it. Nothing prevented assigning
+  the same value twice, and no test compared the modules to each other.
+
+  The five historical constants (`EXIT_LOCKED`, `EXIT_HOTES_INJOIGNABLES`,
+  `EXIT_DOCTOR_REQUIS_KO`, `EXIT_DOCTOR_INDETERMINE`, `EXIT_INTERRUPTED`) become
+  aliases of the enum. Their values are published and they are imported
+  elsewhere: tidying a value away is no reason to break an import, and a test
+  pins each one.
+
+### Fixed
+
+- **Three invariants are now tested, and each was verified by being made to
+  fail.** A duplicate value in an `IntEnum` does not raise — it silently becomes
+  an alias, and two distinct causes would then speak with one code, so the test
+  compares `list(ExitCode)` against `__members__`. Every code must appear on
+  **both** documentation pages, which is the only check that catches a code added
+  to the code without a word to explain it. And no bare literal above `4` may be
+  passed to `typer.Exit` in `src/dsoxlab/` — the very path by which the 127 had
+  ended up alone, undocumented, in `_socle.py`.
+
 ## [0.1.95] - 2026-09-25
 
 ### Changed
