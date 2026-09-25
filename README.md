@@ -37,7 +37,8 @@ locally, per catalog.
 
 ## Install and play, in five minutes
 
-Requires **Python 3.11+**. Nothing to clone, nothing to build.
+Requires **Python 3.11+** and either [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+or `pipx` to install it with. Nothing to clone, nothing to build.
 
 ```bash
 uv tool install dsoxlab      # or: pipx install dsoxlab
