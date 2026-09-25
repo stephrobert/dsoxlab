@@ -982,6 +982,10 @@ silent.
     "detail_incus_no_group": "client {version}, user not in the incus group (re-login required)",
     "detail_incus_no_init":  "client {version}, daemon ok but not initialised",
     "detail_kvm_daemon_err": "virsh present but error (daemon stopped?)",
+    "err_efi_loader_introuvable":
+        "libvirt exposes no usable EFI firmware on this machine. Install the "
+        "OVMF package (e.g. apt install ovmf, dnf install edk2-ovmf), then check "
+        "with: virsh domcapabilities | grep -A3 '<loader'.",
     "detail_kvm_trop_ancien":
         "libvirt {trouve}: dsoxlab requires {minimum} at least. Below that, the "
         "automatically selected EFI firmware does not survive the Terraform "

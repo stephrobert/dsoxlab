@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.92] - 2026-09-25
+
+### Fixed
+
+- **`provision` works on libvirt 8, 9 and 10** (issue #234). The template let
+  libvirt pick the EFI firmware (`os.firmware = "efi"`). That automatic choice
+  does not survive the Terraform provider reading the XML back on libvirt 8:
+  `.os.firmware` comes back `null` and the apply fails on "Provider produced
+  inconsistent result after apply", a message naming neither the version, nor the
+  cause, nor what to do.
+
+  The template now **names** its loader instead of leaving the choice. The path is
+  not hardcoded for all that: it is **discovered** through
+  `virsh domcapabilities`, because it differs between distributions
+  (`/usr/share/OVMF/` on Debian and Ubuntu, `/usr/share/edk2/` on Fedora and
+  Arch) and the 2M/4M variants coexist. libvirt knows where its firmwares are,
+  version 8 included, as the issue reporter proved by attaching his
+  `domcapabilities`.
+
+  The loader chosen is the one **without Secure Boot**: the `.ms.fd` and
+  `.secboot.fd` variants enrol Microsoft's keys, which reject kernels not signed
+  by them, and cloud images then hang in `/init`. Only the NVRAM **destination**
+  is declared, never `nv_ram.source`, which triggers the second bug described in
+  the issue.
+
+  If no usable firmware is exposed, `provision` stops and names the package to
+  install, rather than letting Terraform fail on a missing variable.
+
+### Changed
+
+- **The libvirt floor drops from 9.0 back to 8.0.** It was set in 0.1.91 because
+  the EFI autoselect failed below it. That cause being gone, keeping the floor
+  would have punished machines for a defect that no longer exists: a threshold
+  that outlives its reason excludes without protecting anything, and becomes a
+  debt nobody dares lift.
+
+  All three versions were **provisioned for real**, and the VM had to **answer
+  over SSH**, not merely keep Terraform quiet: **8.0** in an Ubuntu 22.04 VM where
+  the defect was first reproduced word for word; **9.0** in a Debian 12 VM nobody
+  had ever tried; **10.0** on the reference machine with all three hosts of the
+  Linux catalogue, each booted in EFI and answering over SSH and sudo. Nothing
+  below 8.0 has been tried, and that is the only reason a floor remains.
+
 ## [0.1.91] - 2026-09-25
 
 ### Added

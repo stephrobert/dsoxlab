@@ -397,17 +397,20 @@ def _check_incus() -> Check:
 
 #: Version minimale de libvirt que dsoxlab prend en charge.
 #:
-#: Ce plancher est **mesuré**, pas choisi par prudence : libvirt 10.0.0
-#: provisionne sans incident, et 8.0.0 échoue sur l'autoselect EFI, où
-#: ``os.firmware = "efi"`` ne survit pas à la relecture du XML par le provider
-#: Terraform (issue #234, remontée depuis Ubuntu 22.04). L'erreur arrivait en
-#: langage Terraform — « Provider produced inconsistent result after apply » —
-#: sans que rien ne nomme la version en cause.
+#: **Redescendu de 9.0 à 8.0** : le plancher de la 0.1.91 écartait libvirt 8
+#: parce que l'autoselect EFI y échouait (issue #234). La cause est corrigée
+#: depuis — le template désigne son loader au lieu de laisser libvirt le choisir,
+#: et le chemin est découvert dans ``virsh domcapabilities`` — donc refuser cette
+#: version reviendrait à punir des postes pour un défaut qui n'existe plus.
 #:
-#: 9.x n'a été éprouvé par personne. Il passe au bénéfice du doute plutôt que
-#: d'exclure Debian 12 et AlmaLinux 9, qu'aucune mesure ne condamne. Le jour où
-#: l'un d'eux est mesuré défaillant, ce nombre est le seul à changer.
-_LIBVIRT_MINIMUM = (9, 0)
+#: Refermer un plancher dès que la cause tombe compte autant que de l'ouvrir :
+#: un seuil qui survit à sa raison exclut sans rien protéger, et devient une
+#: dette que plus personne n'ose lever.
+#:
+#: Mesuré : 8.0.0 provisionne avec le loader désigné, dans une VM Ubuntu 22.04
+#: où le défaut avait d'abord été reproduit à l'identique ; 10.0.0 provisionne
+#: aussi, sur la machine de référence. Rien en dessous de 8.0 n'a été éprouvé.
+_LIBVIRT_MINIMUM = (8, 0)
 
 #: `virsh version` rend « Using library: libvirt 10.0.0 » : c'est la ligne qui
 #: compte, celle de la bibliothèque **qui tourne**.

@@ -9,6 +9,51 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.92] - 2026-09-25
+
+### Corrigé
+
+- **`provision` fonctionne sur libvirt 8, 9 et 10** (issue #234). Le template
+  laissait libvirt choisir le firmware EFI (`os.firmware = "efi"`). Ce choix
+  automatique ne survit pas à la relecture du XML par le provider Terraform sur
+  libvirt 8 : `.os.firmware` revient `null`, et l'apply échoue sur « Provider
+  produced inconsistent result after apply », un message qui ne nomme ni la
+  version, ni la cause, ni le geste.
+
+  Le template **désigne** désormais son loader au lieu de le laisser choisir. Le
+  chemin n'est pas écrit pour autant : il est **découvert** dans
+  `virsh domcapabilities`, car il diffère selon la distribution
+  (`/usr/share/OVMF/` sur Debian et Ubuntu, `/usr/share/edk2/` sur Fedora et
+  Arch) et les variantes 2M/4M cohabitent. libvirt sait où sont ses firmwares, y
+  compris en version 8, et le rapporteur de l'issue l'a prouvé en joignant son
+  `domcapabilities`.
+
+  Le loader retenu est celui **sans Secure Boot** : les variantes `.ms.fd` et
+  `.secboot.fd` enrôlent les clés Microsoft, qui rejettent les kernels non signés
+  par elles, et les images cloud bloquent alors dans `/init`. Seule la
+  **destination** du NVRAM est déclarée, jamais `nv_ram.source`, qui déclenche le
+  second bug décrit dans l'issue.
+
+  Si aucun firmware utilisable n'est exposé, `provision` s'arrête en nommant le
+  paquet à installer, plutôt que de laisser Terraform échouer sur une variable
+  absente.
+
+### Modifié
+
+- **Le plancher libvirt redescend de 9.0 à 8.0.** Il avait été posé en 0.1.91
+  parce que l'autoselect EFI échouait sous cette version. La cause ayant disparu,
+  le maintenir aurait puni des postes pour un défaut qui n'existe plus : un seuil
+  qui survit à sa raison exclut sans rien protéger, et devient une dette que plus
+  personne n'ose lever.
+
+  Les trois versions ont été **provisionnées pour de vrai**, et la VM devait
+  **répondre en SSH**, pas seulement laisser Terraform se taire : **8.0** dans une
+  VM Ubuntu 22.04, où le défaut avait d'abord été reproduit mot pour mot ;
+  **9.0** dans une VM Debian 12, que personne n'avait jamais éprouvé ; **10.0**
+  sur la machine de référence, avec les trois hôtes du catalogue Linux, chacun
+  démarré en EFI et répondant en SSH et sudo. Rien en dessous de 8.0 n'a été
+  éprouvé, et c'est la seule raison pour laquelle un plancher subsiste.
+
 ## [0.1.91] - 2026-09-25
 
 ### Ajouté

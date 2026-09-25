@@ -323,24 +323,36 @@ resource "libvirt_domain" "host" {
   os = {
     type         = "hvm"
     type_machine = "q35"
-    # firmware = "efi" : UEFI obligatoire pour les images cloud
-    # AlmaLinux 10+ (l'image générique n'embarque plus de bootloader
-    # BIOS legacy depuis AlmaLinux 10). Sans ça → kernel panic au
-    # démarrage. Ubuntu cloud reste compatible BIOS, mais UEFI marche
-    # aussi sur Ubuntu donc on uniformise.
-    firmware = "efi"
-    # Désactive Secure Boot : libvirt 10+ enrôle par défaut les clés
-    # Microsoft (OVMF_CODE_4M.ms.fd) qui rejettent les kernels non
-    # signés MS. AlmaLinux/Debian/Ubuntu cloud images démarrent puis
-    # bloquent à /init faute de modules virtio chargés.
-    firmware_info = {
-      # Ordre IMPORTANT : libvirt retourne les features dans l'ordre
-      # alphabétique de leur name, donc on les déclare aussi dans cet
-      # ordre pour éviter "Provider produced inconsistent result".
-      features = [
-        { enabled = "no", name = "enrolled-keys" },
-        { enabled = "no", name = "secure-boot" },
-      ]
+
+    # UEFI est obligatoire pour les images cloud AlmaLinux 10+, dont l'image
+    # générique n'embarque plus de bootloader BIOS legacy : sans lui, kernel
+    # panic au démarrage. Ubuntu cloud reste compatible BIOS, mais UEFI marche
+    # aussi, donc on uniformise.
+    #
+    # Le loader est DÉSIGNÉ, non plus choisi par libvirt. `firmware = "efi"` et
+    # son `firmware_info` ont été retirés d'ici : cet autoselect ne survit pas à
+    # la relecture du XML par le provider sur libvirt 8, qui rend
+    # `.os.firmware: null` et fait échouer l'apply sur « Provider produced
+    # inconsistent result after apply » (dsoxlab issue #234). Reproduit à
+    # l'identique dans une VM Ubuntu 22.04, puis vérifié corrigé par ce bloc.
+    #
+    # `var.efi_loader` vient de `virsh domcapabilities`, interrogé par dsoxlab :
+    # le chemin diffère selon la distribution et on ne peut pas l'écrire ici.
+    loader          = var.efi_loader
+    loader_type     = "pflash"
+    loader_readonly = "yes"
+    # Secure Boot désactivé, pour la raison qui motivait déjà `firmware_info` :
+    # les variantes `.ms.fd` enrôlent les clés Microsoft, qui rejettent les
+    # kernels non signés par elles. Le choix du loader l'écarte en amont, ceci
+    # le dit aussi à libvirt.
+    loader_secure = "no"
+
+    # SEULE la destination est déclarée, jamais `nv_ram.source`. Avec une source,
+    # le provider rend un chemin pollué d'espaces et de sauts de ligne, et
+    # `os.nv_ram.nv_ram` casse à son tour — second bug remonté dans #234. Sans
+    # elle, libvirt copie lui-même le template associé au loader.
+    nv_ram = {
+      nv_ram = "/var/lib/libvirt/qemu/nvram/${each.value.name}_VARS.fd"
     }
   }
 

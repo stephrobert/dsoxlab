@@ -996,6 +996,10 @@ hors ligne, elle se tait.
     "detail_incus_no_group": "client {version}, user hors groupe incus (re-login requis)",
     "detail_incus_no_init":  "client {version}, daemon ok mais non initialisé",
     "detail_kvm_daemon_err": "virsh présent mais erreur (daemon arrêté ?)",
+    "err_efi_loader_introuvable":
+        "libvirt n'expose aucun firmware EFI utilisable sur cette machine. "
+        "Installe le paquet OVMF (ex. apt install ovmf, dnf install edk2-ovmf), "
+        "puis vérifie avec : virsh domcapabilities | grep -A3 '<loader'.",
     "detail_kvm_trop_ancien":
         "libvirt {trouve} : dsoxlab en demande {minimum} au minimum. En dessous, "
         "le firmware EFI choisi automatiquement ne survit pas à la relecture du "

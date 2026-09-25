@@ -92,18 +92,37 @@ def test_libvirt_recent_passe(monkeypatch: pytest.MonkeyPatch) -> None:
     assert check.state == doctor.STATE_OK
 
 
+def test_libvirt_8_est_desormais_pris_en_charge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le plancher est redescendu de 9.0 à 8.0, et c'est volontaire.
+
+    Il écartait libvirt 8 parce que l'autoselect EFI y échouait. La cause est
+    corrigée — le template désigne son loader, découvert dans
+    `virsh domcapabilities` — donc refuser cette version punirait des postes pour
+    un défaut qui n'existe plus. Un seuil qui survit à sa raison exclut sans rien
+    protéger.
+    """
+    _virsh(monkeypatch, VIRSH_8)
+
+    check = doctor._check_kvm()
+
+    assert check.ok
+    assert check.state == doctor.STATE_OK
+
+
 def test_libvirt_trop_ancien_echoue_et_nomme_la_cause(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Le cas de l'issue #234, qui n'arrivait qu'en langage Terraform."""
-    _virsh(monkeypatch, VIRSH_8)
+    """Sous le plancher, l'échec se dit ici plutôt qu'en langage Terraform."""
+    _virsh(monkeypatch, VIRSH_8.replace("8.0.0", "7.6.0"))
 
     check = doctor._check_kvm()
 
     assert not check.ok
     assert check.state == doctor.STATE_FAILED
+    assert "7.6" in check.detail
     assert "8.0" in check.detail
-    assert "9.0" in check.detail
 
 
 def test_une_version_illisible_ne_conclut_pas(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,11 +142,12 @@ def test_une_version_illisible_ne_conclut_pas(monkeypatch: pytest.MonkeyPatch) -
 def test_le_plancher_est_celui_qui_a_ete_mesure() -> None:
     """Le figer ici rend le choix visible, et son changement délibéré.
 
-    9.0 n'est pas un chiffre rond choisi par prudence : 8.0 est mesuré
-    défaillant, 10.0 mesuré bon, et 9.x inconnu passe au bénéfice du doute
-    plutôt que d'exclure Debian 12 et AlmaLinux 9.
+    Redescendu de 9.0 à 8.0 : 8.0.0 provisionne désormais, mesuré dans une VM
+    Ubuntu 22.04 où le défaut avait d'abord été reproduit à l'identique, une fois
+    le loader désigné au lieu d'être choisi par libvirt. Rien en dessous de 8.0
+    n'a été éprouvé, et c'est la seule raison pour laquelle un plancher subsiste.
     """
-    assert doctor._LIBVIRT_MINIMUM == (9, 0)
+    assert doctor._LIBVIRT_MINIMUM == (8, 0)
 
 
 # ── annoncer le provider Terraform réellement en place ────────────────────────
@@ -212,3 +232,80 @@ def test_le_controle_des_providers_ne_peint_jamais_en_rouge(tmp_path: Path) -> N
 
     assert check.ok
     assert check.state == doctor.STATE_OK
+
+
+# ── écrire des variables ne doit pas exiger un hyperviseur ────────────────────
+
+def _meta_kvm(racine: Path) -> RepoMetadata:
+    from dsoxlab.discovery.repo import read_repo_metadata
+
+    (racine / "meta.yml").write_text(
+        "repo:\n  id: sentinelle\n  category: domaine\n"
+        "infra:\n  provider: kvm\n  network: reseau\n  cidr: 10.10.10.0/24\n"
+        "  hosts:\n    - name: hote.lab\n      distro: alma10\n",
+        encoding="utf-8",
+    )
+    meta = read_repo_metadata(racine)
+    assert meta is not None
+    return meta
+
+
+def test_write_tfvars_n_exige_pas_libvirt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le défaut que la CI a trouvé avant ce test, et qu'il ferme.
+
+    `write_tfvars` ÉCRIT UN FICHIER. L'avoir fait dépendre de
+    `libvirt.efi_loader()` la rendait inappelable sans hyperviseur : les
+    contrôles de documentation, qui l'invoquent pour chaque provider afin de
+    relever les chemins, échouaient tous en intégration continue. Ici, la sonde
+    ne rend rien, et l'écriture doit quand même aboutir.
+    """
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(terraform.libvirt, "efi_loader", lambda: None)
+
+    chemin = terraform.write_tfvars(_meta_kvm(tmp_path))
+
+    import json
+
+    assert json.loads(chemin.read_text(encoding="utf-8"))["efi_loader"] == ""
+
+
+def test_write_tfvars_porte_le_loader_quand_il_existe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(
+        terraform.libvirt, "efi_loader", lambda: "/usr/share/edk2/ovmf/OVMF_CODE.fd"
+    )
+
+    chemin = terraform.write_tfvars(_meta_kvm(tmp_path))
+
+    import json
+
+    assert (
+        json.loads(chemin.read_text(encoding="utf-8"))["efi_loader"]
+        == "/usr/share/edk2/ovmf/OVMF_CODE.fd"
+    )
+
+
+def test_apply_refuse_de_partir_sans_firmware(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La vérification a quitté l'écriture pour rejoindre le provisionnement.
+
+    C'est là qu'elle compte : sans chemin, le plan n'a rien à poser, et un
+    message qui nomme le paquet OVMF vaut mieux qu'une erreur Terraform sur une
+    variable vide.
+    """
+    from dsoxlab.infra import terraform
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "etat"))
+    monkeypatch.setattr(terraform.libvirt, "efi_loader", lambda: None)
+
+    with pytest.raises(terraform.EfiLoaderUnavailable):
+        terraform.apply(_meta_kvm(tmp_path))
