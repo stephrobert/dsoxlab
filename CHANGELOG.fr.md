@@ -9,6 +9,53 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.96] - 2026-09-25
+
+### Ajouté
+
+- **`docs/exit-codes.fr.md` et sa version anglaise : toute la table, au même
+  endroit** (issue #197). Un code de sortie est le contrat le plus dur que cet
+  outil expose — ni schéma, ni version, ni message — et c'était la seule interface
+  sans page. Un appelant devait parcourir la documentation commande par commande
+  pour reconstituer la table.
+
+  La page donne, pour chaque code, ce qu'il signifie **et le geste qu'il appelle**,
+  parce que c'est la distinction autour de laquelle ces codes ont été conçus :
+  `7` se réessaie (une autre invocation écrit, la cause est temporaire par
+  nature), `9` se répare, `10` se remesure. Elle dit aussi ce que `1` et `2`
+  séparent — « la réponse est non » de « la commande n'a pas pu s'exécuter » —,
+  ce qui n'était écrit nulle part.
+
+  Reliée depuis `docs/machine-output.*` et inscrite à l'index de la documentation.
+
+### Modifié
+
+- **Tous les codes de sortie vivent désormais dans un énuméré `ExitCode`**
+  (`src/dsoxlab/exit_codes.py`, issue #197). Ils étaient dispersés : `locking.py`
+  portait le 7, `inventory.py` le 8, `doctor.py` les 9 et 10, `_socle.py` un 127
+  écrit en clair sans même une constante, et les codes 1 à 6 n'existaient nulle
+  part ailleurs qu'aux points d'appel. Quatre ont été ajoutés dans la même
+  journée, chacun dans le module qui en avait besoin. Rien n'empêchait
+  d'attribuer deux fois la même valeur, et aucun test ne comparait les modules
+  entre eux.
+
+  Les cinq constantes historiques (`EXIT_LOCKED`, `EXIT_HOTES_INJOIGNABLES`,
+  `EXIT_DOCTOR_REQUIS_KO`, `EXIT_DOCTOR_INDETERMINE`, `EXIT_INTERRUPTED`)
+  deviennent des alias de l'énuméré. Leurs valeurs sont publiées et elles sont
+  importées ailleurs : ranger une valeur n'est pas une raison de casser un
+  import, et un test épingle chacune d'elles.
+
+### Corrigé
+
+- **Trois invariants sont désormais tenus par des tests, et chacun a été vérifié
+  en le faisant échouer.** Une valeur en double dans un `IntEnum` ne lève pas —
+  elle devient un alias silencieux, et deux causes distinctes parleraient alors
+  d'un seul code, d'où la comparaison de `list(ExitCode)` à `__members__`. Chaque
+  code doit figurer dans les **deux** pages de documentation, seul contrôle qui
+  attrape un code ajouté sans un mot pour l'expliquer. Et aucun littéral au-delà
+  de `4` ne peut être passé à `typer.Exit` dans `src/dsoxlab/` — le chemin même
+  par lequel le 127 avait fini seul, sans documentation, dans `_socle.py`.
+
 ## [0.1.95] - 2026-09-25
 
 ### Modifié

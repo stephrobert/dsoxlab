@@ -29,6 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..models.repo import RepoMetadata
 from ..utils.fichiers import ecrire_atomiquement
@@ -370,7 +371,8 @@ HOST_READY_TIMEOUT_ENV = "DSOXLAB_HOST_READY_TIMEOUT"
 #: provisionnés » et sortait en 0. L'échec était donc invisible à tout script,
 #: et le `run` suivant échouait en « unreachable » sans lien visible avec la
 #: cause. Un code dédié le dit, comme 5 et 6 le font pour les orphelins.
-EXIT_HOTES_INJOIGNABLES = 8
+#: Alias de ``ExitCode.HOTES_INJOIGNABLES`` (issue #197).
+EXIT_HOTES_INJOIGNABLES = ExitCode.HOTES_INJOIGNABLES
 
 
 #: Défaut, en secondes. Confortable sur un poste dédié, juste sur un hôte

@@ -29,6 +29,7 @@ dit ce que c'est en trente secondes ; ces pages disent comment cela fonctionne.
 | [Où dsoxlab écrit](./files.fr.md) | Chaque fichier que dsoxlab crée, et les variables d'environnement qu'il lit |
 | [L'infrastructure sans labs](./infra-only.fr.md) | Se servir de dsoxlab comme fournisseur de VM jetables, sans écrire le moindre exercice |
 | [La sortie machine](./machine-output.fr.md) | Ce que rend `--json`, champ par champ, et ce sur quoi on peut bâtir |
+| [Les codes de sortie](./exit-codes.fr.md) | Chaque code que la CLI rend, ce qu'il signifie et le geste qu'il appelle |
 | [La marque](./brand.fr.md) | Nom, logo et conditions d'usage |
 
 Les contributeurs ont [CONTRIBUTING.fr.md](../CONTRIBUTING.fr.md) : installation,

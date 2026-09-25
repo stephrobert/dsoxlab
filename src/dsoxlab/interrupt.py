@@ -54,11 +54,15 @@ from enum import StrEnum
 from types import FrameType
 from typing import Any, Self
 
+from .exit_codes import ExitCode
+
 logger = logging.getLogger(__name__)
 
 #: ``128 + SIGINT``. Le shell rend déjà ce code quand il tue lui-même un
 #: processus au Ctrl-C : l'outil dit donc la même chose que son environnement.
-EXIT_INTERRUPTED = 130
+#: Alias de ``ExitCode.INTERROMPU`` (issue #197) : la valeur vit dans
+#: ``exit_codes.py``, ce nom reste parce qu'il est importé ailleurs.
+EXIT_INTERRUPTED = ExitCode.INTERROMPU
 
 #: Le seul événement que dsoxlab injecte lui-même dans le flux d'un outil
 #: externe (Terraform, ansible-runner) : « un Ctrl-C vient d'arriver »,

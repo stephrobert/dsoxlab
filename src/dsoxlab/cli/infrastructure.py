@@ -27,6 +27,7 @@ from typing import Annotated
 
 import typer
 
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..interrupt import (
     Interrupted,
@@ -97,7 +98,7 @@ def provision(
             others=", ".join(conflicts),
             other=conflicts[0],
         ))
-        raise typer.Exit(5)
+        raise typer.Exit(ExitCode.ORPHELINS)
 
     # Garde-fou « machines fantômes » : un provisionnement interrompu après la
     # définition d'un domaine le laisse sur l'hyperviseur sans jamais l'inscrire
@@ -111,7 +112,7 @@ def provision(
     if scan.orphans:
         error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
         info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
-        raise typer.Exit(5)
+        raise typer.Exit(ExitCode.ORPHELINS)
 
     info(_("provision_starting", provider=provider))
 

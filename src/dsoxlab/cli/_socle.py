@@ -27,6 +27,7 @@ from typing import Any
 import typer
 from typer.core import TyperGroup, TyperOption
 
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..interrupt import (
     Interrupted,
@@ -93,7 +94,10 @@ class _I18nGroup(TyperGroup):
                 else "err_fichier_introuvable",
                 nom=manquant,
             ))
-            raise typer.Exit(127 if est_executable else 2) from None
+            raise typer.Exit(
+                ExitCode.EXECUTABLE_INTROUVABLE if est_executable
+                else ExitCode.IMPOSSIBLE
+            ) from None
 
 
 app = typer.Typer(

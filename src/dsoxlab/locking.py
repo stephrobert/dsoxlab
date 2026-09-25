@@ -68,13 +68,18 @@ from typing import Any, Self
 import yaml
 
 from .config import xdg_state_home
+from .exit_codes import ExitCode
 
 logger = logging.getLogger(__name__)
 
 #: Code de sortie d'une commande refusée parce qu'une autre tient le verrou.
 #: Distinct des codes déjà employés (1 à 6) : un script qui enchaîne des
 #: commandes doit pouvoir réessayer sur celui-ci et abandonner sur les autres.
-EXIT_LOCKED = 7
+#:
+#: Alias de ``ExitCode.VERROU`` depuis 0.1.96 : la valeur vit désormais dans
+#: ``exit_codes.py``, avec toutes les autres, et ce nom reste parce qu'il est
+#: importé ailleurs (issue #197).
+EXIT_LOCKED = ExitCode.VERROU
 
 #: Caractères tolérés dans un nom de répertoire dérivé d'une donnée du contrat.
 _HORS_SLUG = re.compile(r"[^A-Za-z0-9_.-]")

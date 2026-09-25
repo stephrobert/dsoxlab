@@ -39,6 +39,10 @@ error — an unknown lab id, an unreadable `meta.yml` — standard output stays
 empty, the reason goes to standard error, and the exit code is unchanged. Read
 the exit code first.
 
+Which is why the codes have a page of their own: **[exit codes](./exit-codes.md)**
+gives the whole table, with what each one means *and* the gesture it calls for —
+`7` gets retried, `9` gets repaired, `10` gets measured again.
+
 ---
 
 ## The commands that take `--json`
