@@ -13,6 +13,25 @@ Ce qui n'est PAS anonymisé, et pourquoi : les adresses privées (10.x, 192.168.
 172.16-31.x) restent lisibles. Ce sont celles des VM de lab, elles ne désignent
 personne hors du réseau local, et les masquer rendrait inexploitable tout
 rapport portant sur l'infrastructure, c'est-à-dire la moitié d'entre eux.
+
+**Le rapport rendu s'écrit en anglais, quelle que soit ``DSOXLAB_LANG``**
+(0.1.98, issue #227). Il ne passe donc par ``_()`` nulle part, et
+``tests/test_support_en_anglais.py`` tient la règle. C'est exactement le
+raisonnement qui a mis le journal en anglais en 0.1.83, avec une condition de
+plus : ce rapport est **publié**. Il se cherche mot pour mot, se compare entre
+deux machines aux locales différentes, transporte déjà un journal anglais, et
+depuis la 0.1.86 ``--issue`` le dépose dans un formulaire dont tous les libellés
+sont anglais. Une session ``DSOXLAB_LANG=en`` obtenait un rapport français : la
+cohérence de la 0.1.83 s'arrêtait au milieu du fichier.
+
+Deux choses restent séparées, et c'est tout l'enjeu de la correction :
+
+- **les clés du document** rendu par :func:`collecter`, qui sont la sortie de
+  ``support --json``, donc un contrat pour les programmes. Elles sont françaises
+  (``systeme``, ``labs_decouverts``…) et le **restent** : les renommer casserait
+  un contrat sans rapport avec le problème ;
+- **les libellés du rendu Markdown**, qui sont anglais, par la table
+  :data:`_LIBELLES` ci-dessous.
 """
 
 from __future__ import annotations
@@ -99,10 +118,10 @@ def _version_outil(commande: tuple[str, ...]) -> str | None:
             list(commande), capture_output=True, text=True, timeout=5, check=False
         )
     except (OSError, subprocess.SubprocessError):
-        return "présent, version illisible"
+        return "present, version unreadable"
     sortie = (proc.stdout or "") + (proc.stderr or "")
     lignes = [ligne.strip() for ligne in sortie.splitlines() if ligne.strip()]
-    return lignes[0][:120] if lignes else "présent, version illisible"
+    return lignes[0][:120] if lignes else "present, version unreadable"
 
 
 def _distribution() -> str:
@@ -130,7 +149,7 @@ def collecter(*, lignes_journal: int = 30) -> dict[str, Any]:
         "systeme": f"{platform.system()} {platform.release()}",
         "distribution": _distribution(),
         "architecture": platform.machine(),
-        "shell": Path(os.environ.get("SHELL", "")).name or "inconnu",
+        "shell": Path(os.environ.get("SHELL", "")).name or "unknown",
     }
 
     rapport["outils"] = {
@@ -186,34 +205,77 @@ def collecter(*, lignes_journal: int = 30) -> dict[str, Any]:
     return rapport
 
 
+#: Libellé anglais de chaque clé du document, pour le **rendu** seul.
+#:
+#: Les clés, elles, ne bougent pas : ce sont celles de ``support --json``, un
+#: contrat documenté dans ``docs/machine-output.*``. Renommer ``systeme`` en
+#: ``system`` pour corriger un affichage casserait un consommateur sans aucun
+#: rapport avec le défaut qu'on répare (issue #227).
+#:
+#: Une clé absente de cette table est rendue telle quelle. C'est voulu : les
+#: noms d'outils (``terraform``, ``virsh``…) viennent du système et n'ont pas à
+#: être traduits, et un champ nouveau vaut mieux affiché brut que caché.
+_LIBELLES: dict[str, str] = {
+    # Environnement
+    "systeme": "system",
+    "distribution": "distribution",
+    "architecture": "architecture",
+    # Catalogue
+    "racine": "root",
+    "section_active": "active_section",
+    "lab_actif": "active_lab",
+    "categorie": "category",
+    "provider_actif": "active_provider",
+    "providers_declares": "declared_providers",
+    "providers_terraform": "terraform_providers",
+    "hotes_declares": "declared_hosts",
+    "labs_decouverts": "labs_discovered",
+    "labs_vm": "vm_labs",
+    "labs_services": "labs_with_services",
+    "erreur": "error",
+    # Emplacements
+    "journal": "log",
+}
+
+#: Ce qu'une valeur absente écrit dans le rendu. ``collecter`` met ``None`` dans
+#: le document, qui devient ``null`` en JSON : c'est ici, et ici seulement, qu'un
+#: mot est nécessaire.
+_RIEN = "none"
+
+
 def _tableau(titre: str, valeurs: dict[str, Any]) -> list[str]:
     lignes = [f"### {titre}", "", "| | |", "|---|---|"]
     for cle, valeur in valeurs.items():
-        rendu = "aucun" if valeur is None else valeur
+        rendu = _RIEN if valeur is None else valeur
         if isinstance(rendu, list):
-            rendu = ", ".join(str(x) for x in rendu) or "aucun"
-        lignes.append(f"| {cle} | {rendu} |")
+            rendu = ", ".join(str(x) for x in rendu) or _RIEN
+        lignes.append(f"| {_LIBELLES.get(cle, cle)} | {rendu} |")
     lignes.append("")
     return lignes
 
 
 def en_markdown(rapport: dict[str, Any]) -> str:
-    """Le rapport prêt à coller dans une issue, sans retouche."""
+    """Le rapport prêt à coller dans une issue, sans retouche, **en anglais**.
+
+    Aucun appel à ``_()`` ici, et c'est délibéré : voir l'en-tête du module. Ce
+    texte est publié, comparé entre machines et déposé dans un formulaire
+    anglais ; il ne suit pas la locale de celui qui le produit.
+    """
     general = {
         cle: rapport[cle]
         for cle in ("dsoxlab", "python", "systeme", "distribution",
                     "architecture", "shell")
     }
     lignes = ["## dsoxlab support", ""]
-    lignes += _tableau("Environnement", general)
-    lignes += _tableau("Outils externes", rapport["outils"])
-    lignes += _tableau("Catalogue", rapport["catalogue"])
-    lignes += _tableau("Emplacements", rapport["etat"])
+    lignes += _tableau("Environment", general)
+    lignes += _tableau("External tools", rapport["outils"])
+    lignes += _tableau("Catalog", rapport["catalogue"])
+    lignes += _tableau("Locations", rapport["etat"])
 
     journal = rapport.get("journal") or []
-    lignes += ["### Dernières lignes du journal", ""]
+    lignes += ["### Last log lines", ""]
     if journal:
         lignes += ["```", *journal, "```", ""]
     else:
-        lignes += ["_Aucune trace enregistrée._", ""]
+        lignes += ["_No log entry recorded._", ""]
     return "\n".join(lignes)
