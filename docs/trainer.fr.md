@@ -59,10 +59,17 @@ sous-réseau.
 
 ## Versions prises en charge
 
-| Composant | Pris en charge | Pourquoi ce plancher |
+| Composant | Pris en charge | Comment cela a été établi |
 | --- | --- | --- |
-| **libvirt** | **9.0 ou plus récent** | En dessous, le firmware EFI que dsoxlab choisit automatiquement ne survit pas à la relecture du XML par le provider Terraform, et `provision` échoue sur « Provider produced inconsistent result after apply » sans nommer la cause. Mesuré : 10.0 provisionne, 8.0 échoue ([#234](https://github.com/stephrobert/dsoxlab/issues/234)). 9.x n'a été éprouvé par personne et passe au bénéfice du doute, plutôt que d'exclure Debian 12 et AlmaLinux 9. |
+| **libvirt** | **8.0 ou plus récent** | Les trois versions ont provisionné pour de vrai, et la VM devait **répondre en SSH**, pas seulement « Terraform n'a pas protesté ». **8.0** dans une VM Ubuntu 22.04, où le défaut de [#234](https://github.com/stephrobert/dsoxlab/issues/234) avait d'abord été reproduit mot pour mot ; **9.0** dans une VM Debian 12, que personne n'avait jamais éprouvé ; **10.0** sur la machine de référence, avec un vrai lab `vm` du catalogue Linux. Rien en dessous de 8.0 n'a été éprouvé, et c'est la seule raison pour laquelle un plancher subsiste. |
 | Provider `dmacvicar/libvirt` | `~> 0.9` | La contrainte que déclare le template packagé. Aucun plancher n'est connu dans cette plage, donc aucun n'est imposé. |
+
+Le plancher a valu 9.0 le temps de la 0.1.91, parce que le firmware EFI dont
+dsoxlab laissait le choix à libvirt ne survivait pas à la relecture du XML par le
+provider Terraform. Cette cause a disparu : le template **désigne** désormais son
+loader, découvert par `virsh domcapabilities`. Maintenir le plancher aurait puni
+des postes pour un défaut qui n'existe plus, et un seuil qui survit à sa raison
+exclut sans rien protéger.
 
 `dsoxlab doctor` contrôle le plancher libvirt et refuse une version en dessous,
 en nommant la cause. Il affiche aussi la version du provider **réellement

@@ -72,6 +72,15 @@ class ProviderNotImplemented(RuntimeError):
     """
 
 
+class EfiLoaderUnavailable(RuntimeError):
+    """Levée quand libvirt n'expose aucun firmware EFI utilisable.
+
+    Le template désigne son loader au lieu de laisser libvirt le choisir (issue
+    #234) : sans chemin, le plan n'a rien à poser. Mieux vaut s'arrêter ici, où
+    la cause est connue, que laisser Terraform échouer sur une variable absente.
+    """
+
+
 @dataclass
 class ProvisionResult:
     """Résultat d'un ``terraform apply``."""
@@ -248,6 +257,16 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
         ],
         "provider_config": provider_cfg,
     }
+
+    # Le firmware EFI n'est pas écrit dans le template : il est demandé à la
+    # machine (issue #234). Seul kvm en a besoin ; incus et outscale ne
+    # déclarent pas cette variable, et la leur passer ferait échouer leur plan.
+    if repo_meta.infra.provider == "kvm":
+        loader = libvirt.efi_loader()
+        if loader is None:
+            raise EfiLoaderUnavailable(_("err_efi_loader_introuvable"))
+        payload["efi_loader"] = loader
+
     tfvars_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return tfvars_path
 

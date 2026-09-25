@@ -58,10 +58,17 @@ catalogs never collide on the same subnet.
 
 ## Supported versions
 
-| Component | Supported | Why this floor |
+| Component | Supported | How it was established |
 | --- | --- | --- |
-| **libvirt** | **9.0 or later** | Below that, the EFI firmware dsoxlab selects automatically does not survive the Terraform provider reading the XML back, and `provision` fails on "Provider produced inconsistent result after apply" without naming the cause. Measured: 10.0 provisions, 8.0 fails ([#234](https://github.com/stephrobert/dsoxlab/issues/234)). 9.x has not been tried by anyone and is given the benefit of the doubt rather than ruling out Debian 12 and AlmaLinux 9. |
+| **libvirt** | **8.0 or later** | Each of the three was provisioned for real, and the VM had to answer over SSH — not merely "Terraform did not complain". **8.0** in an Ubuntu 22.04 VM, where the defect of [#234](https://github.com/stephrobert/dsoxlab/issues/234) was first reproduced word for word; **9.0** in a Debian 12 VM, which nobody had ever tried; **10.0** on the reference machine, with a real `vm` lab from the Linux catalogue. Nothing below 8.0 has been tried, and that is the only reason a floor remains. |
 | `dmacvicar/libvirt` provider | `~> 0.9` | The constraint the packaged template declares. No floor is known inside that range, so none is enforced. |
+
+The floor was briefly 9.0, in 0.1.91, because the EFI firmware dsoxlab left
+libvirt to select did not survive the Terraform provider reading the XML back.
+That cause is gone: the template now **names** its loader, discovered through
+`virsh domcapabilities`. Keeping the floor would have punished machines for a
+defect that no longer exists — a threshold that outlives its reason excludes
+without protecting anything.
 
 `dsoxlab doctor` checks the libvirt floor and refuses a version below it, naming
 the cause. It also prints the provider version actually pinned for this catalog,
