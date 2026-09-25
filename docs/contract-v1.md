@@ -295,6 +295,7 @@ discovered:
 | `ready_exec` | no | string or argv | `[]` | Probe run **inside** the container, retried until it succeeds. The only trustworthy readiness signal. |
 | `ready_timeout` | no | integer | `90` | Seconds, for both probes. |
 | `post_start` | no | list of strings or argv | `[]` | Commands run inside the container once ready. **Replayed on every start**, so they must be idempotent. |
+| `spawns` | no | list of strings | `[]` | Name fragments of the containers this service launches **itself**, when it is handed the Docker socket. Each one goes straight to `docker ps --filter name=`, so a substring and not a glob. dsoxlab removes them when it (re)creates the service container and on `clean`, never when it reuses a running one, since what the service has spawned since is then the learner's work in progress. Containers named `dsoxlab-…` are always spared. A name fragment stays a name fragment: two instances of the same product running side by side, on two projects, will step on each other. |
 
 ### `validation`
 

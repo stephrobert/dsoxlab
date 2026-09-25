@@ -183,6 +183,9 @@ class LabDefinition:
                 post_start=as_argv_list(
                     s.get("post_start"), f"runtime.services[{idx}].post_start", lab_yaml
                 ),
+                spawns=as_str_list(
+                    s.get("spawns"), f"runtime.services[{idx}].spawns", lab_yaml
+                ),
             ))
 
         runtime = RuntimeConfig(

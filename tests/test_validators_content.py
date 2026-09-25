@@ -270,3 +270,80 @@ class TestCibles:
     def test_sans_infra_declaree_le_controle_se_tait(self, tmp_path: Path) -> None:
         """Un dépôt 100 % shell n'a pas d'`infra.hosts` : ce n'est pas une faute."""
         assert content.validate_targets(self._lab_vm(tmp_path, "x.lab"), set()).ok
+
+
+class TestPerimetreDuContenu:
+    """Ce que le contrôle doit refuser de regarder (issue #238).
+
+    Le défaut ne se voyait pas comme un faux positif mais comme un verdict
+    instable : `validate-structure` accusait trois labs de `terraform-training`
+    après un `run`, et les déclarait bons après un `clean`. La cause était le
+    README du provider `dmacvicar/libvirt`, déposé par Terraform dans
+    `challenge/work/.terraform/`, dont les liens relatifs pointent vers
+    l'arborescence GitHub du provider, absente de l'archive distribuée.
+
+    Un contrôle dont la sortie dépend de l'ordre des commandes n'est plus un
+    contrôle : on apprend à ignorer sa sortie, et c'est alors le vrai défaut de
+    structure qui passe inaperçu.
+    """
+
+    def _poser(self, racine: Path, relatif: str) -> None:
+        fichier = racine / relatif
+        fichier.parent.mkdir(parents=True, exist_ok=True)
+        fichier.write_text("Voir [la doc](./docs/absent.md).", encoding="utf-8")
+
+    def test_le_repertoire_de_travail_est_hors_perimetre(self, tmp_path: Path) -> None:
+        """Le cas réel : un README de provider tiré par Terraform."""
+        self._poser(
+            tmp_path,
+            "work/.terraform/providers/registry.terraform.io/dmacvicar/libvirt/"
+            "0.9.9/linux_amd64/README.md",
+        )
+
+        assert content.validate_internal_links(_lab(tmp_path)).ok
+
+    def test_un_fichier_du_workdir_est_hors_perimetre_meme_sans_cache(
+        self, tmp_path: Path
+    ) -> None:
+        """`run` le peuple, `clean` le retire : personne ne l'a écrit à la main."""
+        self._poser(tmp_path, "work/NOTES.md")
+
+        assert content.validate_internal_links(_lab(tmp_path)).ok
+
+    @pytest.mark.parametrize("cache", [".terraform", ".venv", "node_modules", "vendor"])
+    def test_les_caches_d_outillage_sont_hors_perimetre_ou_qu_ils_soient(
+        self, tmp_path: Path, cache: str
+    ) -> None:
+        """Le défaut n'est pas propre à Terraform, ni au workdir.
+
+        Tout cache déposé par l'outillage d'un lab porte de la documentation
+        tierce que l'auteur ne peut pas corriger.
+        """
+        self._poser(tmp_path, f"{cache}/quelque/part/README.md")
+
+        assert content.validate_internal_links(_lab(tmp_path)).ok
+
+    def test_le_contenu_de_l_auteur_reste_controle(self, tmp_path: Path) -> None:
+        """La régression à craindre : tout exclure et ne plus rien contrôler."""
+        self._poser(tmp_path, "README.md")
+        self._poser(tmp_path, "course/01-intro.md")
+
+        rapport = content.validate_internal_links(_lab(tmp_path))
+
+        assert not rapport.ok
+        assert len(rapport.issues) == 2
+
+    def test_la_parite_de_langue_a_le_meme_perimetre(self, tmp_path: Path) -> None:
+        """Un README de provider n'a pas à être traduit par l'auteur du lab."""
+        (tmp_path / "work" / ".terraform").mkdir(parents=True)
+        (tmp_path / "work" / ".terraform" / "GUIDE.fr.md").write_text("x", encoding="utf-8")
+
+        assert content.validate_language_parity(_lab(tmp_path)).ok
+
+    def test_la_parite_reste_exigee_du_contenu_de_l_auteur(self, tmp_path: Path) -> None:
+        (tmp_path / "scenario.fr.md").write_text("x", encoding="utf-8")
+
+        rapport = content.validate_language_parity(_lab(tmp_path))
+
+        assert not rapport.ok
+        assert rapport.issues[0].key == "content_missing_english"
