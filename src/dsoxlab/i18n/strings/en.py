@@ -1454,6 +1454,18 @@ silent.
 
     # ── unknown keys in a contract file ───────────────────────────────────────
     "unknown_keys_header": "\n[bold red]Keys nothing reads:[/bold red]",
+    "catalog_issues_header":
+        "\n[bold red]Labs the engine cannot see:[/bold red]",
+    "lab_yaml_illisible":
+        "this lab.yaml exists but the engine cannot load it ({raison}), so it "
+        "is absent from every other check — and from `list-labs`",
+    "lab_yaml_illisible_position":
+        "this lab.yaml exists but the engine cannot load it, so it is absent "
+        "from every other check — and from `list-labs`. {raison} "
+        "(line {ligne}, column {colonne})",
+    "lab_declare_absent":
+        "section `{section}` declares `{chemin}`, but there is no lab.yaml "
+        "there: nothing will ever load it",
     "unknown_key":
         "'{field}' is not part of the contract. dsoxlab ignores it, so whatever "
         "you meant by it never happens. Remove it, or check docs/contract-v1.md.",

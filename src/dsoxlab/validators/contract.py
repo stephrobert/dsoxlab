@@ -96,6 +96,123 @@ def _documents(root: Path) -> list[Path]:
     return documents
 
 
+def validate_labs_chargeables(root: Path) -> ContractReport:
+    """Les ``lab.yaml`` présents sur le disque que le moteur ne sait pas charger.
+
+    Le trou que ce contrôle ferme (issue #198) : ``validate-structure`` itérait
+    sur ``discover_labs()``, donc sur les survivants. Un ``lab.yaml`` dont le
+    YAML est cassé, ou auquel manque un champ requis du parsing, traversait la
+    validation sans un mot — et l'auteur lisait « ✔ tous les labs sont valides »
+    sur un catalogue amputé de ce lab.
+
+    C'est le motif que le lot 0.1.84 a corrigé partout ailleurs : **un contrôle
+    qui n'a pas pu regarder ne conclut pas au vert.**
+
+    Le ``schema_version`` trop récent n'est pas repris ici :
+    :func:`validate_schema_versions` le dit déjà, et mieux, puisqu'il sait que la
+    réparation est dans la version de l'outil et non dans le catalogue. Redire
+    le même défaut sous deux formes ferait chercher deux causes.
+    """
+    from ..discovery.scanner import scan_catalog
+
+    report = ContractReport()
+    try:
+        scan = scan_catalog(root)
+    except UnsupportedSchemaVersion:
+        # Le meta.yml vient du futur : validate_schema_versions l'a déjà dit, et
+        # la CLI s'arrête là-dessus. Ne rien ajouter plutôt que lever ici.
+        return report
+
+    for chemin, raison in scan.illisibles:
+        tete, position = _cause_lisible(raison)
+        if position is None:
+            report.issues.append(ContractIssue(
+                path=chemin, key="lab_yaml_illisible", params={"raison": tete},
+            ))
+            continue
+        ligne, colonne = position
+        report.issues.append(ContractIssue(
+            path=chemin, key="lab_yaml_illisible_position",
+            params={"raison": tete, "ligne": ligne, "colonne": colonne},
+        ))
+    return report
+
+
+#: ``line 12, column 8`` dans un message de PyYAML : la seule partie de sa prose
+#: qui dise à l'auteur où regarder.
+_POSITION_YAML = re.compile(r"line (\d+), column (\d+)")
+
+#: Au-delà, on ne lit plus une cause, on lit un mur. Le journal garde le message
+#: entier, et ``dsoxlab support`` le collecte.
+_RAISON_MAX = 120
+
+
+def _cause_lisible(raison: str) -> tuple[str, tuple[int, int] | None]:
+    """La cause en une ligne, et la position que le message porte s'il en a une.
+
+    Un ``ParserError`` de PyYAML fait six lignes, dont deux chemins absolus
+    répétés. Affiché tel quel dans un rapport, il noie les autres anomalies — or
+    le chemin du fichier est déjà sur la ligne, et le message entier est au
+    journal, que ``dsoxlab support`` collecte. Ce qui manque à l'auteur, c'est
+    **où** dans son fichier.
+
+    Rendre les deux séparément, plutôt qu'une phrase : ce module ne compose
+    aucun texte, c'est la CLI qui traduit. Une position collée ici en français
+    s'afficherait telle quelle sous ``DSOXLAB_LANG=en``.
+    """
+    lignes = [ligne.strip() for ligne in raison.splitlines() if ligne.strip()]
+    tete = lignes[0] if lignes else raison.strip()
+    if len(tete) > _RAISON_MAX:
+        tete = tete[:_RAISON_MAX].rstrip() + "…"
+    position = _POSITION_YAML.search(raison)
+    if position is None:
+        return tete, None
+    return tete, (int(position.group(1)), int(position.group(2)))
+
+
+def validate_labs_declares(root: Path) -> ContractReport:
+    """Les labs que le ``meta.yml`` déclare et dont aucun ``lab.yaml`` n'existe.
+
+    L'autre moitié du même angle mort (issue #198). La découverte se fait **par
+    chemin** : un lab existe si et seulement si ``labs/<chemin>/lab.yaml``
+    existe, et le ``meta.yml`` ne fait qu'ordonner. Une entrée de
+    ``sections[].labs[]`` qui ne correspond à rien était donc silencieuse des
+    deux côtés — le lab n'apparaissait pas, et rien ne disait qu'on l'attendait.
+
+    Le chemin est résolu exactement comme le scanner le fait, contre
+    ``<root>/labs`` : deux définitions de « où est ce lab » finiraient par
+    diverger, et c'est précisément ce qui produit un angle mort.
+    """
+    from ..discovery.repo import read_repo_metadata
+
+    report = ContractReport()
+    meta = root / "meta.yml"
+    if not meta.is_file():
+        return report
+    try:
+        repo_meta = read_repo_metadata(root)
+    except (KeyError, ValueError, yaml.YAMLError):
+        # Le meta.yml est en cause, et les contrôles de version le disent déjà.
+        return report
+    if repo_meta is None:
+        # Le fichier existe mais ne porte aucune métadonnée exploitable : rien
+        # n'est déclaré, donc rien ne manque.
+        return report
+
+    for section in repo_meta.sections:
+        for declare in section.labs:
+            if (root / "labs" / declare / "lab.yaml").is_file():
+                continue
+            report.issues.append(ContractIssue(
+                # Le meta.yml porte la déclaration : c'est lui qu'on ouvre pour
+                # corriger, pas un fichier qui n'existe pas.
+                path=meta,
+                key="lab_declare_absent",
+                params={"chemin": declare, "section": section.id},
+            ))
+    return report
+
+
 def validate_schema_versions(root: Path) -> ContractReport:
     """Signale tout ``schema_version`` non entier ou inconnu du catalogue.
 

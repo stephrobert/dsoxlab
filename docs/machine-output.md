@@ -445,7 +445,7 @@ went wrong.
     }
   ],
   "counts": {
-    "contract": 0, "unknown_key": 1, "structure": 1,
+    "contract": 0, "catalog": 0, "unknown_key": 1, "structure": 1,
     "content": 1, "doc_url": 0, "metadata": 3
   }
 }
@@ -463,11 +463,11 @@ Each issue:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `kind` | string | the family: `contract`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
+| `kind` | string | the family: `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
 | `key` | string | **the stable identity of the rule that fired** — filter, count and compare on this |
 | `params` | object | the facts of that rule, values reduced to strings and numbers |
 | `message` | string | the same thing said to a human, translated |
-| `lab` | string or null | the lab id; `null` for issues found before discovery (`contract`, `unknown_key`) |
+| `lab` | string or null | the lab id; `null` for issues found before discovery (`contract`, `catalog`, `unknown_key`) |
 | `path` | string or null | absolute path of the file at fault |
 | `field` | string or null | the metadata field at fault, on `metadata` issues only |
 

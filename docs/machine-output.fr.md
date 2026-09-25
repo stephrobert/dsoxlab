@@ -452,7 +452,7 @@ lire ce qui n'allait pas.
     }
   ],
   "counts": {
-    "contract": 0, "unknown_key": 1, "structure": 1,
+    "contract": 0, "catalog": 0, "unknown_key": 1, "structure": 1,
     "content": 1, "doc_url": 0, "metadata": 3
   }
 }
@@ -470,11 +470,11 @@ Chaque anomalie :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `kind` | chaîne | la famille : `contract`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
+| `kind` | chaîne | la famille : `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
 | `key` | chaîne | **l'identité stable de la règle qui a parlé** : c'est là-dessus qu'on filtre, compte et compare |
 | `params` | objet | les faits de cette règle, valeurs ramenées à des chaînes et des nombres |
 | `message` | chaîne | la même chose dite à un humain, traduite |
-| `lab` | chaîne ou null | l'identifiant du lab ; `null` pour les anomalies trouvées avant la découverte (`contract`, `unknown_key`) |
+| `lab` | chaîne ou null | l'identifiant du lab ; `null` pour les anomalies trouvées avant la découverte (`contract`, `catalog`, `unknown_key`) |
 | `path` | chaîne ou null | chemin absolu du fichier en cause |
 | `field` | chaîne ou null | le champ de métadonnée en cause, sur les anomalies `metadata` seulement |
 

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.97] - 2026-09-25
+
+### Fixed
+
+- **`validate-structure` now sees the labs it could not load** (issue #198). It
+  iterated over `discover_labs()`, that is, over the **survivors**. A `lab.yaml`
+  that raised while being parsed was simply not in that list, so the validator
+  validated the others and said nothing about it — an author could read "✔ every
+  lab is valid" on a catalog missing one lab entirely.
+
+  That is the pattern the 0.1.84 batch fixed everywhere else: **a check that could
+  not look does not conclude green.** The documentation had to teach a rule around
+  it — "run `list-labs` first, `validate-structure` second" — which a user should
+  never have needed to know. That page no longer says it.
+
+  Both halves of the blind spot are now reported, under **Labs the engine cannot
+  see**, and they fail the command:
+
+  - a `lab.yaml` **present on disk that the engine cannot load**, with the cause
+    and, when the parser gives them, the line and column. PyYAML's message runs to
+    six lines including two repeated absolute paths; the report keeps the first
+    line and the position, and the full text stays in the log that `dsoxlab
+    support` collects. What the author needs is *where* to look;
+  - a lab **declared in `meta.yml: sections[].labs[]` with no `lab.yaml` there**.
+    Discovery works by path, so such an entry matched nothing, and nobody was told
+    it was expected. The issue points at `meta.yml`, which is the file to open —
+    pointing at a path that does not exist would help no one.
+
+  A `schema_version` too new is deliberately **not** repeated here: it already has
+  its own message, which knows the fix is a newer dsoxlab rather than an edit to
+  the catalog. Saying one defect twice makes people look for two causes.
+
+  New `catalog` family in the `--json` document and in `counts`, documented in
+  `docs/machine-output.*`. The three catalogs were re-validated: 86, 113 and 88
+  labs, `catalog: 0` everywhere.
+
 ## [0.1.96] - 2026-09-25
 
 ### Added

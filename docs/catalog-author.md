@@ -45,23 +45,29 @@ directory.
 
 ---
 
-## The order of operations
+## `validate-structure` sees the labs it cannot load
 
-**`dsoxlab list-labs` first, `dsoxlab validate-structure` second.** Not the
-other way round, and this is the single most useful thing on this page.
+Since 0.1.97, this page no longer tells you to run `list-labs` first. That advice
+existed because the validator iterated over the labs that had been *successfully
+discovered*: a `lab.yaml` that raised while being parsed simply was not there, so
+the validator validated the survivors and said nothing about the casualty. You
+could read "✔ every lab is valid" on a catalog missing one.
 
-A `lab.yaml` that raises while being parsed makes its lab **disappear in
-silence**: the scanner logs a warning and moves on. `validate-structure` then
-iterates over the labs that were *successfully discovered*, so it validates the
-survivors and says nothing about the casualty. A lab missing from `list-labs` is
-almost always a `lab.yaml` that raises.
+It now reports both halves of that blind spot, under **Labs the engine cannot
+see**, and fails:
 
-The warning does reach `~/.local/state/dsoxlab/dsoxlab.log` (and `dsoxlab
-support` collects it), so the diagnosis is one command away once you know where
-to look.
+- a `lab.yaml` **present on disk that the engine cannot load** — broken YAML, a
+  required field missing — with the cause and the line to look at;
+- a lab **declared in `meta.yml: sections[].labs[]` with no `lab.yaml` there**.
+  Discovery works by path, so such an entry matched nothing and nobody was told
+  it was expected.
 
-One exception, since 0.1.46: a `schema_version` this dsoxlab cannot read is
-announced on screen and names the file, instead of vanishing.
+A `schema_version` this dsoxlab cannot read keeps its own message, which says the
+fix is a newer dsoxlab rather than an edit to your file.
+
+The full parser message still goes to `~/.local/state/dsoxlab/dsoxlab.log`, which
+`dsoxlab support` collects: the report keeps the first line and the position,
+because six lines of PyYAML prose in a report hide every other finding.
 
 ---
 
@@ -120,10 +126,14 @@ step with the code: adding a check without documenting it here fails the suite.
 | `content_doc_url_no_scheme` | `doc_url` carries no URL scheme |
 | `content_doc_url_scheme` | `doc_url` uses a scheme other than http(s) |
 | `schema_version_too_new` | the file declares a `schema_version` this dsoxlab cannot read |
+| `lab_yaml_illisible` | a `lab.yaml` exists on disk but the engine cannot load it |
+| `lab_yaml_illisible_position` | the same, when the parser gives a line and a column |
+| `lab_declare_absent` | `meta.yml` declares a lab and no `lab.yaml` sits there |
 | `category_absente_avec_labs` | the repository holds labs but declares no `repo.category` |
 
-**What it cannot check:** that a lab listed in `meta.yml` exists on disk. The
-validator walks what discovery already loaded. Hence the order above.
+**What it checks that it used to miss:** a lab listed in `meta.yml` with nothing
+on disk, and a `lab.yaml` the engine cannot load. Both were silent until 0.1.97 —
+the validator only walked what discovery had already loaded successfully.
 
 ---
 
