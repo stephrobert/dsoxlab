@@ -398,6 +398,17 @@ STRINGS: dict[str, str] = {
         "Terraform : {hosts}. Un provisionnement précédent a échoué après les "
         "avoir définies, donc Terraform ne les connaît pas, ne les détruit pas, "
         "et les recréer échouerait sur « domain already exists ».",
+    "bridge_name_too_long":
+        "infra.network « {network} » produit le pont « {bridge} » "
+        "({length} caractères). Le noyau Linux en accepte {limit}, donc le "
+        "réseau ne peut pas démarrer et chaque hôte échouerait sur « Numerical "
+        "result out of range ».",
+    "bridge_name_fix":
+        "Avec ce provider, infra.network doit faire au plus {max_network} "
+        "caractères — « {suggestion} » tiendrait déjà, mais un nom plus court se "
+        "lit mieux. Le nom du pont est dérivé de celui du réseau, c'est pourquoi "
+        "il n'apparaît nulle part dans ton fichier. Un « bridge_name » sous "
+        "infra.providers.<provider> remplace cette dérivation.",
     "provision_orphan_fix":
         "Supprime-les, puis relance dsoxlab provision : {cmd}",
     "destroy_orphan_domains":
@@ -985,6 +996,15 @@ hors ligne, elle se tait.
     "check_hw_virt":  "Virtualisation matérielle",
     "check_cpu_arch": "Architecture CPU",
     "check_resources": "Ressources RAM / disque",
+    "check_bridge_name": "Nom du pont réseau",
+    "detail_bridge_name_ok":
+        "{bridge} ({length}/{limit} caractères)",
+    "detail_bridge_name_absent":
+        "ce provider ne crée aucune interface sur ce poste",
+    "detail_bridge_name_too_long":
+        "infra.network « {network} » produit « {bridge} », {length} caractères "
+        "là où le noyau en accepte {limit} : le réseau ne peut pas démarrer, et "
+        "l'échec n'apparaît qu'une fois l'image de base téléchargée",
 
     "detail_shell_always":   "toujours disponible",
     "check_incus_pool": "Pool Incus",

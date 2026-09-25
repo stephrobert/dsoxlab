@@ -364,7 +364,7 @@ Each check:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `labs`, `lab_home` |
+| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name`, `labs`, `lab_home` |
 | `state` | string | `ok`, `failed`, `choice_required`, or `unknown` |
 | `ok` | bool | the same thing as `state == "ok"`, kept for a plain green/red reading |
 | `label` | string | the component's name, translated — for display only |

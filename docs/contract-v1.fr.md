@@ -75,7 +75,7 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | Champ | Obligatoire | Type | Défaut | Remarques |
 | --- | --- | --- | --- | --- |
 | `provider` | non | chaîne **ou** liste de chaînes | `kvm` | Providers empaquetés dans l'outil : `kvm`, `incus`, `outscale`. Une liste signifie que l'apprenant choisit. |
-| `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. |
+| `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. **Sa longueur est bornée**, voir plus bas. |
 | `cidr` | non | chaîne | | Sous-réseau de ce réseau. |
 | `hosts` | non | liste de mappings | `[]` | Les VM. Voir ci-dessous. |
 | `providers` | non | mapping | `{}` | Surcharges par provider, lues par le module Terraform correspondant. Valeurs libres : chaque provider a ses variables. Voir ci-dessous celles que lisent les templates empaquetés. |
@@ -84,6 +84,29 @@ Résolution du provider, première règle gagnante : `DSOXLAB_PROVIDER`, puis le
 contexte de session posé par `dsoxlab use --provider`, puis une chaîne brute ou
 une liste à un seul élément. Non résolu n'est pas une erreur : seules les
 commandes d'infrastructure en exigent un.
+
+#### Quelle longueur `network` peut faire
+
+Le noyau Linux refuse un nom d'interface réseau de plus de **15 caractères**
+(`IFNAMSIZ` vaut 16, terminateur compris). Les deux providers locaux créent une
+telle interface, et chacun dérive son nom autrement :
+
+| Provider | Nom du pont | Marge pour `network` |
+| --- | --- | --- |
+| `kvm` | `virbr-` + `network` dont chaque `lab-` est retiré | **9 caractères** après un préfixe `lab-`, 9 au total sans lui |
+| `incus` | `network`, tel quel | 15 caractères |
+| `outscale` | aucune interface sur ce poste | non bornée ici |
+
+Un `bridge_name` sous `infra.providers.<provider>` remplace la dérivation, et la
+limite porte alors sur ce nom.
+
+Cela compte parce que le nom du pont est **calculé** : il n'apparaît nulle part
+dans votre `meta.yml`. Un nom trop long échouait pendant le `terraform apply` —
+*après* le téléchargement de l'image de base — sur un `Numerical result out of
+range` qui ne nomme ni le pont, ni la limite, ni le champ qui l'a produit. Depuis
+la 0.1.100, `dsoxlab provision` refuse avant de travailler et `dsoxlab doctor` le
+signale, tous deux en nommant le pont calculé et la longueur que votre nom de
+réseau doit respecter.
 
 ### `infra.providers.<provider>`
 

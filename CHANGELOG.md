@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.100] - 2026-09-25
+
+### Fixed
+
+- **A network name too long for the kernel is now refused before any work, and
+  named** (issue #214). The Linux kernel rejects an interface name longer than 15
+  characters (`IFNAMSIZ` is 16, terminator included). The packaged kvm template
+  *computes* the bridge name as `virbr-` + the network name with every `lab-`
+  removed, so `network: lab-kubernetes` yields `virbr-kubernetes` — sixteen
+  characters. Terraform failed with:
+
+  ```
+  Error: Network Start Failed
+  Network defined but failed to start: error creating bridge interface
+  virbr-kubernetes: Numerical result out of range
+  ```
+
+  That message names neither the bridge, nor the limit, nor the field that
+  produced it — and the offending name appears **nowhere** in `meta.yml`, since
+  it is derived. Worse, the failure landed *after* the base image had been
+  downloaded, so every attempt cost a minute.
+
+  `provision` now refuses **before `terraform init`**, so before downloading a
+  provider or an image, exits `2` (`IMPOSSIBLE`), names the computed bridge with
+  its length, and states the length the network name must fit in. `doctor` reports
+  the same check, in the required table, as soon as the repository declares hosts
+  with a local provider — a check that probes nothing and only counts characters,
+  so it always has an answer.
+
+  The two derivation rules now live in Python, in `infra/pont.py`, where a check
+  can read them: `kvm` computes the name, `incus` uses the network name verbatim
+  (so the limit applies with no `lab-` margin), and `outscale` creates no
+  interface on this machine. A declared `bridge_name` override wins, exactly as
+  the template reads it — otherwise the check would refuse a catalog that had
+  already worked around the problem.
+
+  **A test confronts the Python rule with the HCL expression actually written in
+  the template.** Two definitions of "what the bridge is called" would drift, and
+  the drift would stay invisible until the next long-named catalog. That test is
+  also what caught a wrong assumption of mine: HCL's `replace` removes the
+  occurrence *wherever it sits*, so `mon-lab-reseau` gives `virbr-mon-reseau`, not
+  `virbr-monreseau`.
+
+  The remediation states the **target length** rather than how many characters to
+  drop: a suggested truncation is not a name anyone wants, and a target lets the
+  author pick one that means something. `docs/contract-v1.*` now documents the
+  limit per provider, which is where an author looks.
+
 ## [0.1.99] - 2026-09-25
 
 ### Changed
