@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-25
+
+### Added
+
+- **A `Thanks` section in both READMEs.** Three people outside the project have
+  reported defects with the diagnosis, and often the fix. The section names **what
+  each report changed** rather than listing handles: four releases come from
+  [@cedric-ribier](https://github.com/cedric-ribier) (nominal disk sizes, libvirt 8,
+  the Incus agent on AlmaLinux with a configurable host wait, and nested
+  virtualization named), the `conftest.py` that silently blocked every `shell` lab
+  from [@Gedd18](https://github.com/Gedd18), and two labs whose starting state was
+  unusable from [@VictorVare](https://github.com/VictorVare).
+
+  A credit that says what it fixed is worth more than a list, and it tells the next
+  reader what kind of report is useful.
+
 ## [0.2.0] - 2026-09-25
 
 **Productization.** This version adds no code: it marks a milestone, and its
