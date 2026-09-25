@@ -84,6 +84,40 @@ est concerné, et un catalogue dont tous les labs sont `shell` ne l'appelle jama
 
 ---
 
+## Faire tourner dsoxlab dans une machine virtuelle
+
+Un lab `vm` a besoin de `/dev/kvm`. Dans une machine virtuelle, cela suppose la
+**virtualisation imbriquée**, et l'imbrication est une caractéristique de
+l'**hôte**, pas de l'invité : rien d'installé dans l'invité ne la produit. Elle
+s'active à l'extérieur, invité éteint.
+
+| Hôte | Où elle s'active |
+| --- | --- |
+| **KVM / libvirt / Incus** | `/sys/module/kvm_intel/parameters/nested` (ou `kvm_amd`) doit valoir `Y`. Un `options kvm_intel nested=1` dans `/etc/modprobe.d/` le rend permanent. |
+| **VMware Workstation / Fusion** | *Virtualize Intel VT-x/EPT*, dans les réglages processeur de la VM, machine éteinte. |
+| **VirtualBox** | L'imbrication VT-x/AMD-V, qui dépend du processeur — et qui est indisponible sur un Windows où Hyper-V ou WSL2 tient déjà l'hyperviseur. |
+| **macOS sur Apple Silicon** | Ni VirtualBox ni KVM n'y existent, et les images packagées sont en x86_64 : c'est une voie distincte (UTM/QEMU), pas une case à cocher. |
+
+`dsoxlab doctor` nomme ce cas au lieu de le laisser deviner. Quand `/dev/kvm`
+manque, il commence par regarder où il tourne, via `systemd-detect-virt` puis, à
+défaut, le drapeau `hypervisor` de `/proc/cpuinfo`. Dans une machine virtuelle, il
+dit que l'imbrication n'est pas disponible et nomme l'hyperviseur détecté ; sur
+une machine physique, il renvoie au BIOS ou au setup UEFI. Il proposait avant les
+deux d'un coup, ce qui revenait à envoyer la moitié de ses lecteurs visiter un
+BIOS que leur machine n'a pas.
+
+Dimensionnement, si l'invité doit faire tourner les labs `vm` d'un catalogue
+complet : **4 vCPU et 8 Go pour l'invité lui-même**, mesurés et non estimés — les
+trois hôtes du catalogue Linux se partagent 5120 Mo, et c'est le processeur qui
+décide s'ils répondent tous dans la fenêtre de 180 secondes. Un invité à 2 vCPU a
+déjà été vu annonçant un hôte prêt à 181 secondes.
+
+Un catalogue dont tous les labs sont `shell` n'a besoin de rien de tout cela : il
+n'appelle jamais `provision`, et `doctor` garde tous les contrôles d'hyperviseur
+dans le tableau informatif.
+
+---
+
 ## Démarrer
 
 ```bash

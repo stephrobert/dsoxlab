@@ -1046,6 +1046,20 @@ silent.
         "{device} is absent: no hardware virtualization, the vm labs cannot "
         "run on this machine. Enable VT-x/AMD-V in the BIOS, or nested "
         "virtualization in your hypervisor (machine powered off).",
+    "detail_hw_virt_nested_named":
+        "{device} is absent and this system is itself running inside a virtual "
+        "machine ({hypervisor}): nested virtualization is unavailable, so the "
+        "vm labs cannot run here. It is enabled on the HOST hypervisor, with "
+        "this machine powered off — nothing to change inside it.",
+    "detail_hw_virt_nested":
+        "{device} is absent and this system is itself running inside a virtual "
+        "machine: nested virtualization is unavailable, so the vm labs cannot "
+        "run here. It is enabled on the HOST hypervisor, with this machine "
+        "powered off — nothing to change inside it.",
+    "detail_hw_virt_bare_metal":
+        "{device} is absent on a physical machine: hardware virtualization is "
+        "off, so the vm labs cannot run here. Enable VT-x/AMD-V in the BIOS or "
+        "UEFI setup.",
     "detail_hw_virt_denied":
         "{device} exists but this user cannot open it: `provision` cannot "
         "start any VM (re-login required after joining the kvm group)",
