@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.93] - 2026-09-25
+
+### Fixed
+
+- **`provision --host X` no longer waits for hosts it did not create** (issue
+  #246). The template's `hosts` output derives from `var.hosts`, so from **every**
+  host declared in `meta.yml`, not from the ones the apply just brought up. The
+  CLI read its wait list from there: a targeted run therefore demanded an answer
+  from machines it had explicitly been told not to create.
+
+  `provision --host` exited **8** every single time on a repository declaring more
+  than one host, which is nearly always. That made the option useless precisely
+  where it matters most: you only target to avoid bringing up a whole topology, so
+  in an automated context, where the exit code is read.
+
+  The output keeps its meaning — the declared topology with its addresses — and it
+  is the CLI, the only one that knows what it targeted, which narrows the wait.
+  The closing message now states what was **checked** and out of how many:
+  announcing "1 host ready" on a repository declaring three suggested the other
+  two had been judged.
+
+  Found while validating #234, where that exit 8 was first taken for a failure of
+  the firmware fix.
+
 ## [0.1.92] - 2026-09-25
 
 ### Fixed

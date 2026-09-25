@@ -9,6 +9,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.93] - 2026-09-25
+
+### Corrigé
+
+- **`provision --host X` n'attend plus une réponse des hôtes qu'il n'a pas
+  créés** (issue #246). L'output `hosts` du template Terraform dérive de
+  `var.hosts`, donc de **tous** les hôtes déclarés au `meta.yml`, et non de ceux
+  que l'apply vient de monter. La CLI y lisait la liste des machines à sonder :
+  un ciblage réclamait donc une réponse à des machines qu'on avait explicitement
+  demandé de ne pas créer.
+
+  `provision --host` sortait en **8** à tous les coups dès qu'un dépôt déclare
+  plus d'un hôte, c'est-à-dire presque toujours. L'option en devenait
+  inutilisable là où elle sert le plus : on ne cible que pour éviter de monter
+  une topologie entière, donc dans un contexte automatisé, où le code de sortie
+  est lu.
+
+  L'output garde son sens — la topologie déclarée avec ses adresses — et c'est la
+  CLI, seule à savoir ce qu'elle a ciblé, qui restreint l'attente. Le message de
+  fin dit désormais ce qui a été **vérifié** et sur quel total : annoncer
+  « 1 hôte prêt » sur un dépôt qui en déclare trois laissait croire que les deux
+  autres avaient été jugés.
+
+  Trouvé en validant #234, où ce code 8 a d'abord été pris pour un échec du
+  correctif du firmware.
+
 ## [0.1.92] - 2026-09-25
 
 ### Corrigé
