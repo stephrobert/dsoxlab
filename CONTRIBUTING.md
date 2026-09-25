@@ -6,9 +6,22 @@ Thanks for your interest in improving `dsoxlab`. This document explains how to
 set up the project, the conventions we follow, and the rules that keep the
 engine healthy.
 
-The project is bilingual for its users, but **the contribution language is
-English**: issues, pull requests, code comments and commit messages are written
-in English so everyone can take part.
+The project is bilingual for its users. Its **working language is French**:
+code comments, docstrings, commit messages and issues are written in French,
+because that is what this repository has always done across several thousand
+lines, and what its maintainer speaks.
+
+What **leaves** the repository is a different matter, and it is bilingual or
+English by design: every user-facing string goes through `_()` in English **and**
+French, the documentation lives in paired files (`docs/x.md` + `docs/x.fr.md`),
+and the log is English only — it gets searched word for word and compared between
+machines with different locales.
+
+**A contribution written in English is welcome and will not be turned away.** This
+page used to state the opposite, that everything including code comments was in
+English, while the code said otherwise everywhere. A governance rule the
+repository contradicts makes people write falsehoods with confidence, which is
+worse than having no rule at all.
 
 ## Table of contents
 
@@ -32,14 +45,20 @@ These are non-negotiable. A change that breaks one of them will not be merged.
    contain domain-specific logic (Linux, Ansible, Kubernetes, …). If you find
    yourself writing `if category == "linux"`, the logic belongs in the lab
    repository's `meta.yml`/`lab.yaml` contract, not in the engine.
-2. **One CLI, one entry point.** `src/dsoxlab/cli.py` is the only entry point.
-   Orchestration shell scripts live in the lab repositories, never here.
+2. **One CLI, one entry point.** `src/dsoxlab/cli/` is the only entry point — a
+   package of 17 modules since the monolithic `cli.py` passed 3 000 lines.
+   Looking for `src/dsoxlab/cli.py` returns nothing. Orchestration shell scripts
+   belong nowhere: not here, and not in the lab repositories either, where the
+   validator rejects them.
 3. **Strict typing.** `mypy --strict` must stay green. Annotate everything; do
    not propagate untyped dictionaries.
 4. **Portability.** No hardcoded personal paths or hosts. Use `pathlib.Path`
    and the XDG variables (`XDG_DATA_HOME`, `XDG_CONFIG_HOME`).
-5. **Every user-facing string is translated.** No hardcoded strings in
-   `cli.py` or `reporting/`. See [i18n](#internationalization-i18n).
+5. **Every user-facing string is translated.** No hardcoded strings under
+   `cli/` or in `reporting/`. See [i18n](#internationalization-i18n). Two things
+   are deliberately **not** translated, and tests enforce it: the log and the
+   `support` report, both written in English because they are compared between
+   machines and published.
 
 ## Development setup
 
@@ -65,7 +84,14 @@ cd ~/Projets/ansible-training && dsoxlab list-labs
 
 ```text
 src/dsoxlab/
-├── cli.py            ← Typer entry point (+ the i18n command group)
+├── cli/              ← Typer package, 17 modules (was a monolithic cli.py)
+│   ├── _socle.py         app and its sub-applications (catalog, infra…)
+│   ├── _commun.py        shared helpers (_root, _lab, the lock, services…)
+│   ├── parcours.py       run, course, challenge, guide
+│   ├── progression.py    check, submit, scores, progress, next, reset, clean
+│   └── …                 one module per command group, ordered by
+│                         _ORDRE_COMMANDES in __init__.py
+├── exit_codes.py     ← every exit code, as one ExitCode enum
 ├── config.py         ← LAB_HOME, active context, .dsoxlab-context.json
 ├── locking.py        ← per-catalog write lock (flock), exit code 7
 ├── logging_setup.py  ← the log every command writes, whatever the verbosity
@@ -216,7 +242,7 @@ When you add or change a user-facing string:
   ```
 
 When you add, remove or change a command or option, update **simultaneously**:
-the command `help=_("…")` in `cli.py`, the EN + FR keys, and the matching
+the command `help=_("…")` in its `cli/` module, the EN + FR keys, and the matching
 `fullhelp_commands` section in both languages. Never leave `fullhelp`
 describing a command that no longer exists.
 

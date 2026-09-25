@@ -9,6 +9,42 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.99] - 2026-09-25
+
+### Modifié
+
+- **Les prérequis nomment enfin l'outil que la ligne suivante utilise**
+  (issue #202). Le README disait « Nécessite **Python 3.11+**. Rien à cloner, rien
+  à compiler », puis installait trois lignes plus bas avec
+  `uv tool install dsoxlab`. La documentation apprenant allait plus loin :
+  « Python 3.11 ou plus récent, et c'est tout le prérequis. » Or le lecteur visé
+  est précisément celui qui n'a ni `uv` ni `pipx` : quelqu'un qui découvre
+  l'outil. Un README dont le but affiché est de supprimer les surprises en cachait
+  une dans sa première promesse. Les deux sont désormais nommés, avec le lien vers
+  l'installateur d'`uv`, en anglais et en français.
+
+- **`CONTRIBUTING.md` ne décrit plus un fichier disparu depuis vingt-cinq
+  versions, et n'exige plus l'inverse de ce que fait le dépôt** (issue #196). Deux
+  affirmations étaient fausses :
+
+  `src/dsoxlab/cli.py` y était nommé trois fois comme « l'unique point d'entrée ».
+  C'est un paquet de **17 modules** depuis la 0.1.72. Le coût a été mesuré : une
+  analyse externe du dépôt a *recommandé de découper `cli.py` en groupes de
+  commandes* — travail achevé douze versions plus tôt — parce qu'elle avait lu
+  cette page au lieu du code.
+
+  La page affirmait aussi que « issues, pull requests, commentaires de code et
+  messages de commit sont rédigés en anglais », alors que le code est commenté en
+  français sur plusieurs milliers de lignes, comme les commits et les issues. La
+  langue de travail est maintenant écrite telle qu'elle est : **le français à
+  l'intérieur**, et bilingue ou anglais pour tout ce qui sort du dépôt — chaînes
+  traduites par `_()` en EN et FR, documentation en fichiers appariés, journal et
+  rapport de `support` en anglais parce qu'ils se comparent entre machines et se
+  publient. Une contribution rédigée en anglais reste bienvenue, et la page le dit.
+
+  Une règle de gouvernance que le dépôt contredit est pire qu'aucune règle : elle
+  fait écrire du faux avec assurance.
+
 ## [0.1.98] - 2026-09-25
 
 ### Corrigé

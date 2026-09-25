@@ -37,7 +37,8 @@ l'historique en local, par catalogue.
 
 ## Installer et jouer, en cinq minutes
 
-Nécessite **Python 3.11+**. Rien à cloner, rien à compiler.
+Nécessite **Python 3.11+** et [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+ou `pipx` pour l'installer. Rien à cloner, rien à compiler.
 
 ```bash
 uv tool install dsoxlab      # ou : pipx install dsoxlab

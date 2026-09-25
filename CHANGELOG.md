@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.99] - 2026-09-25
+
+### Changed
+
+- **The prerequisites now name the tool the very next line uses** (issue #202).
+  The README said "Requires **Python 3.11+**. Nothing to clone, nothing to build",
+  and three lines below installed with `uv tool install dsoxlab`. The learner
+  documentation went further: "Python 3.11 or newer, and that is the whole
+  prerequisite." The reader this page is written for is precisely the one who has
+  neither `uv` nor `pipx` — someone discovering the tool. A README whose stated
+  purpose is to remove surprises hid one in its first promise. Both are now named,
+  with a link to `uv`'s installer, in English and in French.
+
+- **`CONTRIBUTING.md` no longer describes a file that has not existed for
+  twenty-five versions, nor demands the opposite of what the repository does**
+  (issue #196). Two claims were false:
+
+  `src/dsoxlab/cli.py` was named three times as "the only entry point". It has
+  been a package of **17 modules** since 0.1.72. The cost was measured: an
+  external review of the repository *recommended splitting `cli.py` into command
+  groups* — work finished twelve versions earlier — because it read this page
+  instead of the code.
+
+  The page also stated that "issues, pull requests, code comments and commit
+  messages are written in English", while the code is commented in French across
+  several thousand lines, and so are the commits and the issues. The working
+  language is now written as it is: **French inside**, and bilingual or English
+  for everything that leaves the repository — translated strings through `_()` in
+  EN and FR, paired documentation files, and the log and `support` report in
+  English because they are compared between machines and published. A contribution
+  written in English remains welcome, and the page says so.
+
+  A governance rule the repository contradicts is worse than no rule: it makes
+  people write falsehoods with confidence.
+
 ## [0.1.98] - 2026-09-25
 
 ### Fixed

@@ -10,7 +10,10 @@ pages](./README.md).
 
 ## Install
 
-Python 3.11 or newer, and that is the whole prerequisite.
+Two prerequisites, and no more: **Python 3.11 or newer**, and
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/) or `pipx` to
+install dsoxlab with. If you have neither, `uv` installs itself in one line and
+needs no administrator rights.
 
 ```bash
 uv tool install dsoxlab      # or: pipx install dsoxlab

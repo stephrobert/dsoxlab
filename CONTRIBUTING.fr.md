@@ -6,9 +6,22 @@ Merci de votre intérêt pour l'amélioration de `dsoxlab`. Ce document explique
 comment configurer le projet, les conventions suivies et les règles qui
 préservent la santé du moteur.
 
-Le projet est bilingue pour ses utilisateurs, mais **la langue de contribution
-est l'anglais** : issues, pull requests, commentaires de code et messages de
-commit sont rédigés en anglais pour que tout le monde puisse participer.
+Le projet est bilingue pour ses utilisateurs. Sa **langue de travail est le
+français** : commentaires de code, docstrings, messages de commit et issues
+s'écrivent en français — c'est ce que ce dépôt fait depuis toujours sur plusieurs
+milliers de lignes, et la langue de son mainteneur.
+
+Ce qui **sort** du dépôt est une autre affaire, et c'est bilingue ou anglais par
+conception : toute chaîne affichée passe par `_()` en anglais **et** en français,
+la documentation vit en fichiers appariés (`docs/x.md` + `docs/x.fr.md`), et le
+journal est en anglais seul — il se cherche mot pour mot et se compare entre
+machines aux locales différentes.
+
+**Une contribution rédigée en anglais est bienvenue et ne sera pas refusée.**
+Cette page affirmait l'inverse, que tout, commentaires de code compris, était en
+anglais, alors que le code disait le contraire partout. Une règle de gouvernance
+que le dépôt contredit fait écrire du faux avec assurance, ce qui est pire que
+pas de règle du tout.
 
 ## Table des matières
 
@@ -32,15 +45,20 @@ Non négociables. Une modification qui enfreint l'une d'elles ne sera pas mergé
    doit contenir de logique spécifique à un domaine (Linux, Ansible,
    Kubernetes…). Si vous écrivez `if category == "linux"`, la logique appartient
    au contrat du dépôt de labs (`meta.yml` / `lab.yaml`), pas au moteur.
-2. **Une CLI, un point d'entrée.** `src/dsoxlab/cli.py` est l'unique point
-   d'entrée. Les scripts shell d'orchestration vivent dans les dépôts de labs,
-   jamais ici.
+2. **Une CLI, un point d'entrée.** `src/dsoxlab/cli/` est l'unique point
+   d'entrée — un paquet de 17 modules depuis que le `cli.py` monolithique a
+   dépassé 3 000 lignes. Chercher `src/dsoxlab/cli.py` ne rend plus rien. Les
+   scripts shell d'orchestration n'ont leur place nulle part : ni ici, ni dans les
+   dépôts de labs, où le validator les rejette.
 3. **Typage strict.** `mypy --strict` doit rester vert. Tout annoter, ne pas
    propager de dictionnaires non typés.
 4. **Portabilité.** Aucun chemin ou hôte personnel codé en dur. Utiliser
    `pathlib.Path` et les variables XDG (`XDG_DATA_HOME`, `XDG_CONFIG_HOME`).
-5. **Toute chaîne affichée est traduite.** Aucune chaîne en dur dans `cli.py` ou
-   `reporting/`. Voir [i18n](#internationalisation-i18n).
+5. **Toute chaîne affichée est traduite.** Aucune chaîne en dur sous `cli/` ou
+   dans `reporting/`. Voir [i18n](#internationalisation-i18n). Deux choses ne
+   sont **délibérément pas** traduites, et des tests l'imposent : le journal et le
+   rapport de `support`, tous deux en anglais parce qu'ils se comparent entre
+   machines et se publient.
 
 ## Mise en place
 
@@ -65,7 +83,14 @@ cd ~/Projets/ansible-training && dsoxlab list-labs
 
 ```text
 src/dsoxlab/
-├── cli.py            ← point d'entrée Typer (+ le groupe de commandes i18n)
+├── cli/              ← paquet Typer, 17 modules (ex-cli.py monolithique)
+│   ├── _socle.py         app et ses sous-applications (catalog, infra…)
+│   ├── _commun.py        helpers partagés (_root, _lab, le verrou, services…)
+│   ├── parcours.py       run, course, challenge, guide
+│   ├── progression.py    check, submit, scores, progress, next, reset, clean
+│   └── …                 un module par groupe de commandes, ordonnés par
+│                         _ORDRE_COMMANDES dans __init__.py
+├── exit_codes.py     ← tous les codes de sortie, dans un énuméré ExitCode
 ├── config.py         ← LAB_HOME, contexte actif, .dsoxlab-context.json
 ├── locking.py        ← verrou d'écriture par catalogue (flock), code de sortie 7
 ├── logging_setup.py  ← le journal qu'écrit chaque commande, quelle que soit la verbosité
@@ -219,7 +244,7 @@ Quand vous ajoutez ou modifiez une chaîne affichée :
   ```
 
 Quand vous ajoutez, retirez ou modifiez une commande ou une option, mettez à
-jour **simultanément** : l'aide `help=_("…")` dans `cli.py`, les clés EN + FR,
+jour **simultanément** : l'aide `help=_("…")` dans son module de `cli/`, les clés EN + FR,
 et la section `fullhelp_commands` correspondante dans les deux langues. Ne
 laissez jamais `fullhelp` décrire une commande qui n'existe plus.
 
