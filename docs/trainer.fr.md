@@ -57,6 +57,26 @@ sous-réseau.
 
 ---
 
+## Versions prises en charge
+
+| Composant | Pris en charge | Pourquoi ce plancher |
+| --- | --- | --- |
+| **libvirt** | **9.0 ou plus récent** | En dessous, le firmware EFI que dsoxlab choisit automatiquement ne survit pas à la relecture du XML par le provider Terraform, et `provision` échoue sur « Provider produced inconsistent result after apply » sans nommer la cause. Mesuré : 10.0 provisionne, 8.0 échoue ([#234](https://github.com/stephrobert/dsoxlab/issues/234)). 9.x n'a été éprouvé par personne et passe au bénéfice du doute, plutôt que d'exclure Debian 12 et AlmaLinux 9. |
+| Provider `dmacvicar/libvirt` | `~> 0.9` | La contrainte que déclare le template packagé. Aucun plancher n'est connu dans cette plage, donc aucun n'est imposé. |
+
+`dsoxlab doctor` contrôle le plancher libvirt et refuse une version en dessous,
+en nommant la cause. Il affiche aussi la version du provider **réellement
+épinglée** pour ce catalogue, celle que `terraform init` a écrite dans l'état et
+non celle que le template réclame : deux machines qui honorent `~> 0.9` peuvent
+faire tourner des versions différentes. Cette version figure désormais dans
+`dsoxlab support`, si bien qu'une issue la porte sans que personne ait à la
+demander.
+
+En dessous du plancher, l'outil n'est pas bloqué pour autant : seul `provision`
+est concerné, et un catalogue dont tous les labs sont `shell` ne l'appelle jamais.
+
+---
+
 ## Démarrer
 
 ```bash

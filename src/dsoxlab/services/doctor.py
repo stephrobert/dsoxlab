@@ -395,6 +395,43 @@ def _check_incus() -> Check:
     return _check("incus", False, tail[-1] if tail else _("detail_unknown_error"))
 
 
+#: Version minimale de libvirt que dsoxlab prend en charge.
+#:
+#: Ce plancher est **mesuré**, pas choisi par prudence : libvirt 10.0.0
+#: provisionne sans incident, et 8.0.0 échoue sur l'autoselect EFI, où
+#: ``os.firmware = "efi"`` ne survit pas à la relecture du XML par le provider
+#: Terraform (issue #234, remontée depuis Ubuntu 22.04). L'erreur arrivait en
+#: langage Terraform — « Provider produced inconsistent result after apply » —
+#: sans que rien ne nomme la version en cause.
+#:
+#: 9.x n'a été éprouvé par personne. Il passe au bénéfice du doute plutôt que
+#: d'exclure Debian 12 et AlmaLinux 9, qu'aucune mesure ne condamne. Le jour où
+#: l'un d'eux est mesuré défaillant, ce nombre est le seul à changer.
+_LIBVIRT_MINIMUM = (9, 0)
+
+#: `virsh version` rend « Using library: libvirt 10.0.0 » : c'est la ligne qui
+#: compte, celle de la bibliothèque **qui tourne**.
+_VERSION_UTILISEE = re.compile(r"Using library:\s*libvirt\s*(\d+)\.(\d+)")
+
+#: Repli sur « Compiled against library: libvirt 10.0.0 », ce contre quoi le
+#: binaire a été bâti. Les deux diffèrent après une mise à jour de la
+#: bibliothèque sans redémarrage du client, d'où l'ordre ; mais une sortie
+#: abrégée ne porte parfois que celle-ci, et la refuser rendrait `unknown` un
+#: virsh parfaitement sain.
+_VERSION_COMPILEE = re.compile(
+    r"Compiled against(?:\s+library)?:?\s*(?:libvirt\s*)?(\d+)\.(\d+)"
+)
+
+
+def _version_libvirt(sortie: str) -> tuple[int, int] | None:
+    """La version de libvirt, ou ``None`` si la réponse n'en porte aucune."""
+    for motif in (_VERSION_UTILISEE, _VERSION_COMPILEE):
+        correspondance = motif.search(sortie or "")
+        if correspondance is not None:
+            return int(correspondance.group(1)), int(correspondance.group(2))
+    return None
+
+
 def _check_kvm() -> Check:
     if not shutil.which("virsh"):
         return _check(
@@ -420,6 +457,21 @@ def _check_kvm() -> Check:
             fix=_fix(["sudo", "systemctl", "start", "libvirtd"]),
         )
     first_line = probe.stdout.splitlines()[0] if probe.stdout else "ok"
+
+    version = _version_libvirt(probe.stdout)
+    if version is None:
+        # La sonde a répondu, mais pas de façon lisible. On ne peint ni en vert
+        # ni en rouge ce qu'on n'a pas su mesurer : `--strict` a son code (10).
+        return _check(
+            "kvm", False, _("detail_kvm_version_illisible", sortie=first_line),
+            forced_state=STATE_UNKNOWN,
+        )
+    if version < _LIBVIRT_MINIMUM:
+        return _check("kvm", False, _(
+            "detail_kvm_trop_ancien",
+            trouve=".".join(str(n) for n in version),
+            minimum=".".join(str(n) for n in _LIBVIRT_MINIMUM),
+        ))
     return _check("kvm", True, first_line)
 
 
@@ -1112,6 +1164,35 @@ def _check_egress() -> Check:
                   hint="https://docs.docker.com/network/proxy/")
 
 
+def _check_tf_providers(repo_meta: RepoMetadata | None) -> Check:
+    """Quelle version de chaque provider Terraform tourne pour ce dépôt.
+
+    La contrainte du template (``~> 0.9``) ne le dit pas : deux postes qui
+    l'honorent tous les deux peuvent avoir des versions différentes, et c'est
+    celle-là qui décide. Comprendre l'issue #234 a demandé de comparer à la main
+    deux rapports `support` qui ne la portaient ni l'un ni l'autre.
+
+    Toujours ``ok`` : c'est une information, pas un prérequis. Aucun plancher
+    n'est connu pour ces providers, et en inventer un serait refuser des postes
+    sur une supposition.
+    """
+    from ..infra.terraform import providers_epingles
+
+    if repo_meta is None:
+        return _check("tf_providers", True, _("detail_tf_providers_absents"))
+
+    try:
+        epingles = providers_epingles(repo_meta)
+    except Exception:  # noqa: BLE001 : un diagnostic ne casse pas la commande
+        epingles = {}
+
+    if not epingles:
+        return _check("tf_providers", True, _("detail_tf_providers_absents"))
+
+    rendu = ", ".join(f"{nom} {version}" for nom, version in sorted(epingles.items()))
+    return _check("tf_providers", True, _("detail_tf_providers", providers=rendu))
+
+
 def _hypervisor_checks() -> dict[str, Check]:
     return {"kvm": _check_kvm(), "incus": _check_incus()}
 
@@ -1160,6 +1241,9 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     # `shell` ne provisionne rien, donc n'a pas à en voir du rouge.
     if needs_vm:
         report.required.append(_check_egress())
+        # Informatif, mais affiché là où on le regarde : c'est la version qui
+        # décide du comportement de `provision`, et elle n'était nulle part.
+        report.optional.append(_check_tf_providers(repo_meta))
     else:
         report.optional.append(_check_egress())
         report.notes.append(_("reason_egress_sans_vm"))

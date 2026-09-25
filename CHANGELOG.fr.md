@@ -9,6 +9,44 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.91] - 2026-09-25
+
+### Ajouté
+
+- **Les versions prises en charge sont déclarées, contrôlées et annoncées**
+  (issue #234). Rien ne disait qu'une version de libvirt pouvait être trop
+  ancienne. Sur libvirt 8.0, `provision` échoue parce que le firmware EFI choisi
+  automatiquement ne survit pas à la relecture du XML par le provider Terraform,
+  et l'erreur arrive en langage Terraform — « Provider produced inconsistent
+  result after apply » — sans nommer ni la version, ni la cause, ni le geste.
+
+  `doctor` refuse désormais une version inférieure à **libvirt 9.0** et dit
+  pourquoi. Le plancher est **mesuré**, pas choisi par prudence : 10.0
+  provisionne, vérifié en provisionnant une VM AlmaLinux 10 ; 8.0 échoue, tel que
+  remonté. 9.x n'a été éprouvé par personne et passe au bénéfice du doute plutôt
+  que d'exclure Debian 12 et AlmaLinux 9, qu'aucune mesure ne condamne. Le jour
+  où l'un d'eux est mesuré défaillant, un seul nombre change.
+
+  Une version que virsh rend de façon illisible sort en **`unknown`**, ni verte
+  ni rouge : on ne refuse pas un poste sur une sortie qu'on n'a pas su lire, et
+  on ne le déclare pas bon pour autant. `--strict` a son code pour ce cas (10).
+
+- **`doctor` et `support` annoncent la version du provider Terraform réellement
+  épinglée**, lue dans le `.terraform.lock.hcl` de l'état. La contrainte du
+  template, `~> 0.9`, ne la dit pas : deux postes qui l'honorent tous les deux
+  peuvent faire tourner des versions différentes, et c'est celle-là qui décide.
+  Comprendre l'issue #234 a demandé de la chercher à la main dans deux rapports
+  qui ne la portaient ni l'un ni l'autre ; un rapport la porte désormais sans que
+  personne ait à la demander.
+
+  Ce contrôle ne peint jamais en rouge : c'est une information, pas un
+  prérequis. Aucun plancher n'est connu pour ces providers — le rapporteur et la
+  machine de référence avaient la **même** version 0.9.9 — donc en inventer un
+  refuserait des postes sur une supposition.
+
+- **Les versions prises en charge sont documentées** dans le guide du formateur,
+  en anglais et en français, avec la mesure qui justifie chaque plancher.
+
 ## [0.1.90] - 2026-09-25
 
 ### Corrigé

@@ -56,6 +56,25 @@ catalogs never collide on the same subnet.
 
 ---
 
+## Supported versions
+
+| Component | Supported | Why this floor |
+| --- | --- | --- |
+| **libvirt** | **9.0 or later** | Below that, the EFI firmware dsoxlab selects automatically does not survive the Terraform provider reading the XML back, and `provision` fails on "Provider produced inconsistent result after apply" without naming the cause. Measured: 10.0 provisions, 8.0 fails ([#234](https://github.com/stephrobert/dsoxlab/issues/234)). 9.x has not been tried by anyone and is given the benefit of the doubt rather than ruling out Debian 12 and AlmaLinux 9. |
+| `dmacvicar/libvirt` provider | `~> 0.9` | The constraint the packaged template declares. No floor is known inside that range, so none is enforced. |
+
+`dsoxlab doctor` checks the libvirt floor and refuses a version below it, naming
+the cause. It also prints the provider version actually pinned for this catalog,
+which is what `terraform init` wrote in the state and not what the template asked
+for: two machines honouring `~> 0.9` can be running different versions. That
+version now appears in `dsoxlab support` too, so an issue carries it without
+anyone having to ask.
+
+Anything below the floor is not a hard block on the tool: only `provision` is
+concerned, and a catalog whose labs are all `shell` never calls it.
+
+---
+
 ## Getting started
 
 ```bash

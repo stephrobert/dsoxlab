@@ -150,6 +150,16 @@ def collecter(*, lignes_journal: int = 30) -> dict[str, Any]:
             catalogue["categorie"] = meta.category
             catalogue["provider_actif"] = meta.infra.provider or None
             catalogue["providers_declares"] = list(meta.infra.providers_available)
+            # La version du provider Terraform en place, et non la contrainte du
+            # template : deux postes qui honorent « ~> 0.9 » peuvent avoir des
+            # versions différentes, et c'est celle-là qui décide. Comprendre
+            # l'issue #234 a demandé de la chercher à la main, faute que ce
+            # rapport la porte.
+            from ..infra.terraform import providers_epingles
+            epingles = providers_epingles(meta)
+            catalogue["providers_terraform"] = (
+                ", ".join(f"{nom} {v}" for nom, v in sorted(epingles.items())) or None
+            )
             catalogue["hotes_declares"] = len(meta.infra.hosts)
         labs = get_all_labs(racine)
         catalogue["labs_decouverts"] = len(labs)
