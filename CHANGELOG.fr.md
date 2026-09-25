@@ -9,6 +9,67 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.0] - 2026-09-25
+
+**Passage au produit.** Cette version n'ajoute aucun code : elle marque le
+franchissement d'un jalon, dont la thèse a été écrite à son ouverture —
+
+> un framework est un outil que son auteur sait utiliser, un produit est un outil
+> qu'un inconnu peut installer, comprendre et diagnostiquer.
+
+Soixante-onze issues y ont passé. Ce qui a changé n'est pas un décompte de
+fonctionnalités : c'est que le chemin entre « j'ai trouvé ce dépôt » et « j'ai joué
+un lab » n'a plus d'étape implicite, et que rien de vert n'affirme ce qu'il n'a pas
+mesuré.
+
+### Ce que le jalon a réellement livré
+
+**Installer et démarrer.** `uv tool install dsoxlab` est ce que le README montre en
+premier, `dsoxlab demo` donne un premier lab sans hyperviseur, sans catalogue à
+cloner et sans conteneur, et `dsoxlab start` joue un lab de bout en bout en
+**annonçant chaque étape avec la commande qui la rejoue seule** — la séquence est
+du contenu, pas de la plomberie à cacher.
+
+**Diagnostiquer.** `doctor` sépare ce que ce dépôt **exige** de ce qui ne fait que
+l'informer, et un contrôle a trois issues, jamais deux : `ok`, `failed`, et
+`unknown` quand la sonde elle-même n'a pas abouti. `--strict` le traduit en codes
+`9` et `10`, distincts parce que le premier se répare et le second se remesure.
+`dsoxlab support` produit un rapport anonymisé, et `--issue` le dépose là où il
+doit arriver.
+
+**Refuser de faire semblant.** C'est le fil de tout le jalon. Un `destroy` qui
+laissait des machines debout sortait en 0 ; un `provision` qui perdait des hôtes
+annonçait un succès ; un validator affirmait « tous les labs sont valides » d'un
+catalogue qu'il n'avait pas lu en entier ; un contrôle requis peignait en rouge une
+installation saine à cause de tailles de disque nominales. Chacun de ces cas a
+désormais un code, un message et un test — et plusieurs de ces tests ont été
+vérifiés en les faisant échouer.
+
+**Contrat et intégration.** `schema_version: 1` gèle le contrat v1,
+`meta.schema.json` et `lab.schema.json` sont publiés, `--json` est documenté champ
+par champ, et les codes de sortie ont leur propre page, qui dit pour chacun le
+geste qu'il appelle.
+
+### Le critère d'acceptation, joué et non affirmé
+
+> Un utilisateur qui n'a jamais vu le dépôt joue un lab de bout en bout en suivant
+> uniquement le README, sans hyperviseur.
+
+Fait, depuis le paquet publié, dans un `HOME` isolé, en tapant exactement ce que le
+README montre : installation, `demo`, `course`, `run`, `challenge`, `hint`,
+`check` — trois tests verts, 80/100, ce qui est le maximum que l'énoncé autorise
+puisqu'il invite délibérément à prendre l'indice qui coûte 20 points.
+
+### Ce qui a été délibérément laissé de côté
+
+Les images de VM prêtes à l'emploi (#91) passent en 0.3.0. Non par manque
+d'intérêt — un contributeur a construit une appliance qui fonctionne — mais parce
+que leur coût est **récurrent** : construction, hébergement, provenance, mises à
+jour de sécurité, et compatibilité avec chaque version d'hyperviseur. Ce que la
+0.2.0 en a gardé est la part qui la sert : `doctor` nomme désormais l'absence de
+virtualisation imbriquée au lieu d'envoyer son lecteur dans le BIOS qu'une machine
+virtuelle n'a pas.
+
 ## [0.1.101] - 2026-09-25
 
 ### Ajouté

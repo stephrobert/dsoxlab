@@ -9,6 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
+**Productization.** This version adds no code: it marks a milestone, and its
+thesis was written when the milestone opened —
+
+> a framework is a tool its author knows how to use; a product is a tool a
+> stranger can install, understand and diagnose.
+
+Seventy-one issues went into it. What changed is not a feature count, it is that
+the path from "I found this repository" to "I played a lab" no longer has an
+implicit step, and that nothing green claims what it has not measured.
+
+### What the milestone actually delivered
+
+**Installing and starting.** `uv tool install dsoxlab` is what the README shows
+first, `dsoxlab demo` gives a first lab with no hypervisor, no catalog to clone
+and no container, and `dsoxlab start` plays a lab end to end while **announcing
+each step with the command that replays it alone** — the sequence is content, not
+plumbing to hide.
+
+**Diagnosing.** `doctor` sorts what this repository *requires* from what merely
+informs it, and a check has three outcomes, never two: `ok`, `failed`, and
+`unknown` when the probe itself did not complete. `--strict` turns that into exit
+codes `9` and `10`, kept apart because one gets repaired and the other gets
+measured again. `dsoxlab support` produces an anonymised report, and `--issue`
+files it where it belongs.
+
+**Refusing to pretend.** That is the through line of the whole milestone. A
+`destroy` that left machines up exited 0; a `provision` that lost hosts announced
+success; a validator said "every lab is valid" about a catalog it had not fully
+read; a required check painted a healthy install red over nominal disk sizes. Each
+of those now has a code, a message, and a test — and several of those tests were
+verified by being made to fail.
+
+**Contract and integration.** `schema_version: 1` freezes the v1 contract,
+`meta.schema.json` and `lab.schema.json` are published, `--json` is documented
+field by field, and the exit codes have a page of their own stating, for each one,
+the gesture it calls for.
+
+### The acceptance criterion, played rather than asserted
+
+> A user who has never seen the repository plays a lab end to end following only
+> the README, with no hypervisor.
+
+Done, from the published package, in an isolated `HOME`, typing exactly what the
+README shows: install, `demo`, `course`, `run`, `challenge`, `hint`, `check` — three
+tests green, 80/100, which is the maximum the brief allows since it deliberately
+invites taking the hint that costs 20 points.
+
+### What was deliberately left out
+
+Ready-made VM images (#91) move to 0.3.0. Not for lack of merit — a contributor
+has built a working appliance — but because their cost is *recurrent*: build,
+hosting, provenance, security updates, and compatibility with every hypervisor
+release. What 0.2.0 kept from that issue is the part that serves it: `doctor` now
+names missing nested virtualization instead of sending its reader into a BIOS a
+virtual machine does not have.
+
 ## [0.1.101] - 2026-09-25
 
 ### Added
