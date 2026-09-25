@@ -21,6 +21,7 @@ from rich.tree import Tree
 from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
+from ..models.runtime import RuntimeType
 from ..services.catalog import CatalogueConnu, CatalogueInstalle
 from ..services.doctor import (
     STATE_CHOICE_REQUIRED,
@@ -795,8 +796,20 @@ def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
         msg = _("challenge_missing")
         console.print(f"[yellow]{msg}[/yellow]")
     console.print(Rule())
-    workdir = _("challenge_workdir", path=str(lab.path / "challenge"))
-    console.print(f"[dim]{workdir}[/dim]")
+    # Le répertoire de travail est celui que le lab DÉCLARE, pas `challenge/`
+    # (issue #237). L'écrire en dur annonçait `<lab>/challenge` là où le travail
+    # se fait dans `<lab>/challenge/work` : un apprenant a suivi cette ligne, l'a
+    # croisée avec un énoncé qui dit « reponses/cours.txt », et a perdu une
+    # demi-heure à chercher pourquoi ses fichiers n'étaient pas lus. Mesuré : les
+    # mêmes fichiers valent 0/100 à la racine et 100/100 sous le workdir.
+    #
+    # On teste le RUNTIME, pas la valeur : `workdir` vaut « challenge/work » par
+    # DÉFAUT dans le modèle, y compris pour un lab `vm` où le champ est ignoré.
+    # Se fier à sa présence annoncerait donc un répertoire local à des labs dont
+    # le travail se fait sur la machine, et il n'y a rien à y faire.
+    if lab.runtime.type is RuntimeType.SHELL and lab.runtime.workdir:
+        workdir = _("challenge_workdir", path=str(lab.path / lab.runtime.workdir))
+        console.print(f"[dim]{workdir}[/dim]")
 
 
 # ── fullhelp ──────────────────────────────────────────────────────────────────

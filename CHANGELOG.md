@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.90] - 2026-09-25
+
+### Fixed
+
+- **`challenge` announced a working directory where nothing is read** (issue
+  #237, reported by @teofeo). The "Working directory" line printed
+  `<lab>/challenge` **hardcoded**, while the work happens in
+  `<lab>/<runtime.workdir>`. A learner followed that line, crossed it with a
+  brief saying "reponses/cours.txt", concluded `challenge/reponses/`, and lost
+  half an hour on their first lab by following the tool to the letter.
+
+  The defect applied to **every lab of every catalogue**, not just the demo.
+  Measured on the demo: the same three files score **0/100** at the catalogue
+  root and **100/100** under the workdir. The line was not merely imprecise, it
+  pointed at a place nothing reads.
+
+  The path now comes from the contract. A `vm` lab announces nothing at all: its
+  work happens on the machine, and `runtime.workdir` is ignored there even though
+  it still carries the model's default value. Relying on the field being set
+  would therefore have reproduced the defect the other way round, and it is the
+  test that showed it.
+
+- **The demo lab's brief finally says where to write**, without hardcoding any
+  path. It points at the line the engine prints and keeps relative paths: every
+  catalogue declares its own `runtime.workdir`, so a brief spelling out
+  `challenge/work` would recreate the defect elsewhere and teach it to authors.
+
+### Added
+
+- **A guard rail checks the demo lab's brief against its own test.** That lab was
+  already played to 100/100 on every release by `tests_e2e/test_parcours.py`, and
+  #237 still slipped through: that test asks the CLI for the working directory and
+  drops the files in the right place. It proves the lab **can be played**, never
+  that its brief **leads to playing it**.
+
+  Every file `test_functional.py` reads must now be cited in the brief, in both
+  languages, and the brief must hardcode no workdir. Renaming one without the
+  other fails the suite.
+
 ## [0.1.89] - 2026-09-25
 
 ### Fixed

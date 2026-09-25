@@ -9,6 +9,47 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.90] - 2026-09-25
+
+### Corrigé
+
+- **`challenge` annonçait un répertoire de travail où rien n'est lu** (issue
+  #237, remontée par @teofeo). La ligne « Répertoire de travail » affichait
+  `<lab>/challenge` **en dur**, alors que le travail se fait dans
+  `<lab>/<runtime.workdir>`. Un apprenant a suivi cette ligne, l'a croisée avec
+  un énoncé qui dit « reponses/cours.txt », en a conclu `challenge/reponses/`, et
+  a perdu une demi-heure sur son premier lab en suivant l'outil à la lettre.
+
+  Le défaut valait pour **tous les labs de tous les catalogues**, pas seulement
+  pour la démonstration. Mesuré sur celle-ci : les trois mêmes fichiers valent
+  **0/100** à la racine du catalogue et **100/100** sous le workdir. La ligne ne
+  se contentait donc pas d'être imprécise, elle désignait un endroit où rien
+  n'est lu.
+
+  Le chemin vient désormais du contrat. Un lab `vm` n'annonce plus rien : son
+  travail se fait sur la machine, et `runtime.workdir` y est ignoré alors qu'il
+  porte quand même la valeur par défaut du modèle. Se fier à la présence du champ
+  aurait donc reproduit le défaut dans l'autre sens, et c'est le test qui l'a
+  montré.
+
+- **L'énoncé du lab de démonstration dit enfin où écrire**, sans coder aucun
+  chemin. Il renvoie à la ligne que le moteur affiche et garde des chemins
+  relatifs : chaque catalogue déclare son propre `runtime.workdir`, donc un
+  énoncé qui écrirait `challenge/work` recréerait le défaut ailleurs et
+  l'enseignerait aux auteurs.
+
+### Ajouté
+
+- **Un garde-fou confronte l'énoncé du lab de démonstration à son propre test.**
+  Ce lab était déjà joué à chaque livraison jusqu'au 100/100 par
+  `tests_e2e/test_parcours.py`, et pourtant #237 est passé : ce test demande le
+  répertoire de travail à la CLI et pose les fichiers au bon endroit. Il prouve
+  que le lab **est jouable**, jamais que son énoncé **mène à le jouer**.
+
+  Tout fichier que `test_functional.py` lit doit désormais être cité dans
+  l'énoncé, dans les deux langues, et l'énoncé ne doit coder aucun workdir.
+  Renommer l'un sans l'autre fait échouer la suite.
+
 ## [0.1.89] - 2026-09-25
 
 ### Corrigé
