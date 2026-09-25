@@ -44,6 +44,7 @@ from ..exit_codes import ExitCode
 from ..i18n import _
 from ..infra import ansible as ansible_infra
 from ..infra import libvirt as libvirt_infra
+from ..infra.pont import IFNAMSIZ_UTILES, nom_du_pont, reseau_raccourci
 from ..models import LabDefinition, RepoMetadata
 from ..models.repo import InfraDefinition
 from ..models.runtime import RuntimeType
@@ -715,6 +716,47 @@ def _pool_available_gb(pool: str) -> int | None:
             if len(champs) >= 2 and champs[1].isdigit():
                 return int(champs[1]) // 2**30
     return None
+
+
+def _check_bridge_name(repo_meta: RepoMetadata, provider: str) -> Check:
+    """Le pont que ce provider créera tient-il dans la limite du noyau ?
+
+    Un contrôle qui ne sonde rien : il lit le contrat et compte des caractères.
+    Il a donc toujours une réponse, et jamais d'``unknown``.
+
+    Il vaut mieux ici qu'au premier ``provision``, où l'échec arrive après le
+    téléchargement de l'image de base, sur un « Numerical result out of range »
+    qui ne nomme ni le pont, ni la limite, ni le champ qui l'a produit — et le
+    nom fautif n'apparaît nulle part dans le ``meta.yml``, puisqu'il est calculé
+    (issue #214).
+    """
+    pont = nom_du_pont(repo_meta, provider)
+    if pont is None:
+        # Ce provider ne crée aucune interface sur ce poste, ou aucun réseau
+        # n'est déclaré : il n'y a rien à mesurer, et rien à reprocher.
+        return _check("bridge_name", True, _("detail_bridge_name_absent"))
+    if len(pont) > IFNAMSIZ_UTILES:
+        return _check(
+            "bridge_name", False,
+            _(
+                "detail_bridge_name_too_long",
+                bridge=pont, length=len(pont), limit=IFNAMSIZ_UTILES,
+                network=repo_meta.infra.network,
+            ),
+            hint=_(
+                "bridge_name_fix",
+                max_network=max(
+                    0,
+                    len(repo_meta.infra.network) - (len(pont) - IFNAMSIZ_UTILES),
+                ),
+                suggestion=reseau_raccourci(repo_meta.infra.network, pont),
+            ),
+        )
+    return _check(
+        "bridge_name", True,
+        _("detail_bridge_name_ok", bridge=pont, length=len(pont),
+          limit=IFNAMSIZ_UTILES),
+    )
 
 
 def nom_du_pool(infra: InfraDefinition) -> str:
@@ -1430,6 +1472,12 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
                 report.required.append(
                     _check_resources(repo_meta.infra, active)
                 )
+            # Le nom du pont, qui ne dépend que du contrat : aucune sonde, donc
+            # aucune raison de le taire quand l'hyperviseur manque. Il vaut mieux
+            # ici qu'au premier `provision`, où l'échec arrive après le
+            # téléchargement de l'image de base (issue #214).
+            if repo_meta is not None:
+                report.required.append(_check_bridge_name(repo_meta, active))
         # Contrôles propres à un hyperviseur : ils n'ont de sens qu'une fois le
         # provider choisi, sinon ils affichent du rouge pour un backend que ce
         # poste n'utilisera peut-être jamais.

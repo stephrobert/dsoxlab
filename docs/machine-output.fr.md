@@ -367,7 +367,7 @@ Chaque contrôle :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `labs`, `lab_home` |
+| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name`, `labs`, `lab_home` |
 | `state` | chaîne | `ok`, `failed`, `choice_required` ou `unknown` |
 | `ok` | booléen | la même chose que `state == "ok"`, gardé pour une lecture vert/rouge immédiate |
 | `label` | chaîne | le nom du composant, traduit : pour l'affichage seulement |

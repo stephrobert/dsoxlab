@@ -9,6 +9,54 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.100] - 2026-09-25
+
+### Corrigé
+
+- **Un nom de réseau trop long pour le noyau est désormais refusé avant tout
+  travail, et nommé** (issue #214). Le noyau Linux rejette un nom d'interface de
+  plus de 15 caractères (`IFNAMSIZ` vaut 16, terminateur compris). Le template kvm
+  packagé *calcule* le nom du pont : `virbr-` + le nom du réseau dont chaque
+  `lab-` est retiré. `network: lab-kubernetes` donne donc `virbr-kubernetes`,
+  seize caractères, et Terraform échouait sur :
+
+  ```
+  Error: Network Start Failed
+  Network defined but failed to start: error creating bridge interface
+  virbr-kubernetes: Numerical result out of range
+  ```
+
+  Ce message ne nomme ni le pont, ni la limite, ni le champ qui l'a produit — et
+  le nom fautif n'apparaît **nulle part** dans le `meta.yml`, puisqu'il est dérivé.
+  Pire : l'échec arrivait *après* le téléchargement de l'image de base, donc chaque
+  essai coûtait une minute.
+
+  `provision` refuse maintenant **avant `terraform init`**, donc avant de
+  télécharger un provider ou une image, sort en `2` (`IMPOSSIBLE`), nomme le pont
+  calculé avec sa longueur, et dit la longueur que le nom de réseau doit
+  respecter. `doctor` joue le même contrôle, dans le tableau des requis, dès que le
+  dépôt déclare des hôtes avec un provider local — un contrôle qui ne sonde rien et
+  ne fait que compter des caractères, donc qui a toujours une réponse.
+
+  Les deux règles de dérivation vivent désormais en Python, dans `infra/pont.py`,
+  là où un contrôle peut les lire : `kvm` calcule le nom, `incus` emploie le nom du
+  réseau tel quel (la limite s'applique alors sans la marge du `lab-`), et
+  `outscale` ne crée aucune interface sur ce poste. Un `bridge_name` déclaré
+  l'emporte, exactement comme le template le lit — sans quoi le contrôle refuserait
+  un catalogue qui avait déjà contourné le problème.
+
+  **Un test confronte la règle Python à l'expression HCL réellement écrite dans le
+  template.** Deux définitions de « comment s'appelle le pont » finiraient par
+  diverger, et la divergence resterait invisible jusqu'au prochain catalogue au nom
+  long. C'est aussi ce test qui a attrapé une erreur de ma part : `replace` en HCL
+  retire l'occurrence *où qu'elle soit*, donc `mon-lab-reseau` donne
+  `virbr-mon-reseau`, et non `virbr-monreseau`.
+
+  La remédiation annonce la **longueur cible** plutôt que le nombre de caractères
+  à retirer : une troncature suggérée n'est un nom que personne ne veut, alors
+  qu'une cible laisse l'auteur en choisir un qui ait du sens. `docs/contract-v1.*`
+  documente maintenant la limite par provider, là où un auteur la cherche.
+
 ## [0.1.99] - 2026-09-25
 
 ### Modifié

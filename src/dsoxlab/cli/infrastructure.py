@@ -29,6 +29,11 @@ import typer
 
 from ..exit_codes import ExitCode
 from ..i18n import _
+from ..infra.pont import (
+    NomDePontTropLong,
+    reseau_raccourci,
+    verifier_nom_de_pont,
+)
 from ..interrupt import (
     Interrupted,
     Stage,
@@ -113,6 +118,26 @@ def provision(
         error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
         info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
         raise typer.Exit(ExitCode.ORPHELINS)
+
+    # Garde-fou « nom de pont » : le noyau refuse une interface de plus de
+    # 15 caractères, et l'échec arrive APRÈS le téléchargement de l'image de
+    # base, sur un « Numerical result out of range » qui ne nomme rien. La cause
+    # est connue d'avance, elle se dit donc d'avance (issue #214). Avant même
+    # `init`, qui tire ~50 Mo de provider.
+    try:
+        verifier_nom_de_pont(repo_meta, provider)
+    except NomDePontTropLong as exc:
+        error(_(
+            "bridge_name_too_long",
+            network=exc.reseau, bridge=exc.pont,
+            length=len(exc.pont), limit=exc.limite,
+        ))
+        info(_(
+            "bridge_name_fix",
+            max_network=exc.max_reseau,
+            suggestion=reseau_raccourci(exc.reseau, exc.pont),
+        ))
+        raise typer.Exit(ExitCode.IMPOSSIBLE) from None
 
     info(_("provision_starting", provider=provider))
 

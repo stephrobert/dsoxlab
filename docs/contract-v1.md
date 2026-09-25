@@ -76,7 +76,7 @@ omission.
 | Field | Required | Type | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `provider` | no | string **or** list of strings | `kvm` | Providers packaged with the tool: `kvm`, `incus`, `outscale`. A list means the learner chooses. |
-| `network` | no | string | — | Network the VMs join, dedicated to this repository. |
+| `network` | no | string | — | Network the VMs join, dedicated to this repository. **Its length is bounded**, see below. |
 | `cidr` | no | string | — | Subnet of that network. |
 | `hosts` | no | list of mappings | `[]` | The VMs. See below. |
 | `providers` | no | mapping | `{}` | Per-provider overrides, read by the matching Terraform module. Free-form values: each provider has its own variables. See below for the ones the packaged templates read. |
@@ -84,6 +84,28 @@ omission.
 Provider resolution, first rule wins: `DSOXLAB_PROVIDER`, then the session
 context set by `dsoxlab use --provider`, then a bare string or a single-item
 list. Unresolved is not an error — only infrastructure commands require one.
+
+#### How long `network` may be
+
+The Linux kernel refuses a network interface name longer than **15 characters**
+(`IFNAMSIZ` is 16, terminator included). Both local providers create such an
+interface, and each derives its name differently:
+
+| Provider | Bridge name | Room left for `network` |
+| --- | --- | --- |
+| `kvm` | `virbr-` + `network` with every `lab-` removed | **9 characters** after a `lab-` prefix, 9 in total without one |
+| `incus` | `network`, verbatim | 15 characters |
+| `outscale` | no interface on this machine | unbounded here |
+
+A `bridge_name` under `infra.providers.<provider>` overrides the derivation, and
+the limit then applies to that name instead.
+
+This matters because the bridge name is **computed**: it appears nowhere in your
+`meta.yml`. A too-long name used to fail during `terraform apply` — *after* the
+base image had been downloaded — on `Numerical result out of range`, which names
+neither the bridge, nor the limit, nor the field that produced it. Since 0.1.100,
+`dsoxlab provision` refuses before doing any work and `dsoxlab doctor` reports it,
+both naming the computed bridge and the length your network name must fit in.
 
 ### `infra.providers.<provider>`
 

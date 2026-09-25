@@ -390,6 +390,17 @@ STRINGS: dict[str, str] = {
         "Terraform state: {hosts}. A previous provisioning failed after defining "
         "them, so Terraform neither knows nor destroys them, and creating them "
         "again would fail on 'domain already exists'.",
+    "bridge_name_too_long":
+        "infra.network « {network} » produces the bridge « {bridge} » "
+        "({length} characters). The Linux kernel accepts {limit}, so the network "
+        "cannot start and every host would fail with « Numerical result out of "
+        "range ».",
+    "bridge_name_fix":
+        "With this provider, infra.network must be at most {max_network} "
+        "characters — « {suggestion} » would already fit, though a shorter name "
+        "reads better. The bridge name is derived from the network name, which is "
+        "why it appears nowhere in your file. A `bridge_name` under "
+        "infra.providers.<provider> overrides that derivation.",
     "provision_orphan_fix":
         "Remove them, then run dsoxlab provision again: {cmd}",
     "destroy_orphan_domains":
@@ -971,6 +982,15 @@ silent.
     "check_hw_virt":  "Hardware virtualization",
     "check_cpu_arch": "CPU architecture",
     "check_resources": "RAM / disk resources",
+    "check_bridge_name": "Network bridge name",
+    "detail_bridge_name_ok":
+        "{bridge} ({length}/{limit} characters)",
+    "detail_bridge_name_absent":
+        "this provider creates no interface on this machine",
+    "detail_bridge_name_too_long":
+        "infra.network « {network} » produces « {bridge} », {length} characters "
+        "where the kernel accepts {limit}: the network cannot start, and the "
+        "failure only shows up once the base image has been downloaded",
 
     "detail_shell_always":   "always available",
     "check_incus_pool": "Incus pool",
