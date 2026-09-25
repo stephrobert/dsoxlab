@@ -9,6 +9,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.101] - 2026-09-25
+
+### Added
+
+- **`dsoxlab start [<id>]`: the sequence, played *and shown*** (issue #79). To
+  begin a lab you had to know in which order to chain commands, none of which says
+  it assumes another: the first `run` of a `vm` lab on absent infrastructure fails,
+  and the learner has to guess that `provision` was missing. `provision` does not
+  even appear in the README's sequence.
+
+  This command had been **revised before being written**, and the revision governs
+  its shape. The argument, from the issue: a command that implicitly chains
+  context, dependencies, provisioning, services, preparation and session makes
+  failures *more* opaque — when it breaks, the user must guess which of the six
+  steps did. That is the opposite of what this milestone spent its time doing. And
+  for a teaching tool, **the sequence is content**: seeing infrastructure get
+  provisioned, then a lab prepared, then a session open is part of what a learner
+  came for, and what they will do without dsoxlab one day.
+
+  So `start` does not swallow the sequence, it **states** it. Each step is
+  announced with the single command that replays it alone:
+
+  ```
+  Starting l2-swap-management — 4 steps, each announced with its own command.
+
+  ▶ 1/4 · active context  (dsoxlab use l2)
+  ▶ 2/4 · prerequisites  (dsoxlab doctor)
+    16 required checks, all green
+  ▶ 3/4 · infrastructure  (dsoxlab provision)
+  ▶ 4/4 · preparation and session  (dsoxlab run l2-swap-management)
+  ```
+
+  On failure it names **the step that broke and the command that retries just that
+  one**, attempts nothing beyond it, and returns **that step's own exit code** —
+  never a code invented for `start`. That is the issue's non-negotiable criterion,
+  and two tests hold it: each was verified by being made to fail.
+
+  What it shortens is the typing and the order to remember, never the
+  understanding. Every unit command keeps working exactly as before.
+
+  Details that took a decision:
+
+  - a step that **does not exist for this lab** is absent — a `shell` lab has no
+    infrastructure, and "3/4 · infrastructure — skipped" would be noise. A step
+    that **exists but is already done** stays announced and says so. The first
+    trial run went from 3 steps to 2 on the second invocation, because the context
+    was already set: a total that moves is confusing, and it was hiding `dsoxlab
+    use`, which the learner needs to know;
+  - `start` is **idempotent**: it reads the Terraform state and skips provisioning
+    when the declared hosts already have addresses. It does not probe over SSH — a
+    powered-off machine is still provisioned, and "does it answer" is `status`'s
+    question;
+  - without an id, it takes the lab `next` suggests, computed by the same service.
+
+  Verified in the open on both runtimes, which is what the acceptance criteria
+  demand: a `shell` lab from the demonstration catalog, and a `vm` lab of the Linux
+  catalog with **no infrastructure at all** — three VMs brought up in 38 seconds,
+  `setup.yaml` played, session opened, then destroyed.
+
+  That real run caught a defect no unit test could: `_infra_prete()` read `labenv`
+  at the root of the inventory instead of `all.children.labenv`, so it always
+  answered "needs provisioning" and the second run rebuilt an infrastructure that
+  was already up. Fixed, with the three tests that were missing — they no longer
+  simulate the function they measure.
+
+### Changed
+
+- **The body of `provision` is now a function without the lock**
+  (`provisionner()`). `run` takes the write lock itself and releases it *before*
+  opening the interactive session — otherwise the `dsoxlab check` the learner types
+  in that sub-shell would be refused by their own session. `start` therefore takes
+  the lock for the infrastructure step only, releases it, then delegates to `run`.
+  Holding it throughout would have made `start` exit **7** on its own lock, which
+  would be quite something for a command whose purpose is to remove surprises. The
+  `provision` command itself is unchanged.
+
 ## [0.1.100] - 2026-09-25
 
 ### Fixed

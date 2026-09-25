@@ -48,6 +48,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab scores` | Show recorded scores history. |
 | `dsoxlab show` | Show details and status of a lab. |
 | `dsoxlab ssh` | Open an interactive SSH session on a lab host. |
+| `dsoxlab start` | Play a lab end to end: context, prerequisites, infrastructure if needed, then the session. Every step is announced with the single command that replays it alone. |
 | `dsoxlab status` | Where the active lab stands: not started, ready, in progress, validated. |
 | `dsoxlab submit` | Final submission: run tests, record score, then type 'exit' to leave the session. |
 | `dsoxlab support` | Produce an anonymised diagnostic report, ready to paste into an issue. |

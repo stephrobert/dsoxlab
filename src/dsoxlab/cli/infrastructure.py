@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -75,15 +76,29 @@ def provision(
     lab_home: LabHomeOption = None,
 ) -> None:
     """Lance terraform apply sur le provider courant avec progress bar."""
-    from ..infra import terraform as tf
-    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled, host_targets
-
     root = _root(lab_home)
     # Le verrou est pris avant même de lire le contrat : ce qui suit interroge
     # l'hyperviseur, puis écrit le state Terraform. Un `destroy` lancé dans un
     # autre terminal pendant le scan des machines orphelines rendrait ce scan
     # faux au moment où on s'en sert.
     ctx.call_on_close(_verrou(root, "provision").release)
+    provisionner(root, host=list(host) if host else None)
+
+
+def provisionner(root: Path, *, host: list[str] | None = None) -> None:
+    """Le corps de ``provision``, **sans verrou** : l'appelant choisit sa portée.
+
+    Extrait pour que ``start`` puisse rejouer cette étape (issue #79). La
+    commande, elle, tient le verrou jusqu'à sa fermeture ; ``start`` doit le
+    rendre avant d'appeler ``run``, qui prend le sien — sans cette séparation, il
+    sortirait en 7 sur son propre verrou.
+
+    Lève des ``typer.Exit`` : cette fonction reste de la couche CLI, elle a déjà
+    rendu la cause en une phrase traduite quand elle sort.
+    """
+    from ..infra import terraform as tf
+    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled, host_targets
+
     repo_meta = _read_repo(root)
     if repo_meta is None:
         error(_("provision_no_meta", root=root))

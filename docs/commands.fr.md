@@ -49,6 +49,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab scores` | Affiche l'historique des scores enregistrés. |
 | `dsoxlab show` | Affiche le détail et le statut d'un lab. |
 | `dsoxlab ssh` | Ouvre une session SSH interactive sur un hôte du lab. |
+| `dsoxlab start` | Jouer un lab de bout en bout : contexte, prérequis, infrastructure si besoin, puis la session. Chaque étape est annoncée avec la commande unique qui la rejoue seule. |
 | `dsoxlab status` | Où en est le lab actif : non commencé, prêt, en cours, validé. |
 | `dsoxlab submit` | Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session. |
 | `dsoxlab support` | Produit un rapport de diagnostic anonymisé, à coller dans une issue. |
