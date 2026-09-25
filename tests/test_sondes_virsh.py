@@ -322,6 +322,13 @@ def test_apply_porte_les_avertissements_de_bail(
     monkeypatch.setattr(terraform, "is_available", lambda: True)
     monkeypatch.setattr(terraform, "workdir", lambda meta: tmp_path)
     monkeypatch.setattr(terraform, "write_tfvars", lambda meta: None)
+    # `apply` refuse de partir sans firmware EFI depuis l'issue #234, et ce test
+    # tourne là où libvirt n'existe pas. On simule la sonde comme tout le reste
+    # de l'environnement : le sujet ici est le relais des avertissements de bail,
+    # pas le choix du firmware.
+    monkeypatch.setattr(
+        terraform.libvirt, "efi_loader", lambda: "/usr/share/OVMF/OVMF_CODE_4M.fd"
+    )
     monkeypatch.setattr(
         terraform, "_ensure_kvm_dhcp_leases", lambda meta, hosts=None: ["refusé"]
     )
