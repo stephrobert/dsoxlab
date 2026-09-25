@@ -9,6 +9,47 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.1.94] - 2026-09-25
+
+### Corrigé
+
+- **`doctor` ne peint plus en rouge une installation saine à cause de tailles de
+  disque nominales** (issue #209). Le contrôle `Ressources RAM / disque`
+  additionnait les `disk_gb` + `extra_disk_gb` déclarés au `meta.yml` et
+  comparait ce total à l'espace libre que libvirt annonce pour le pool. Or ces
+  tailles sont **nominales** : les volumes qcow2 s'allouent à la demande. Le
+  catalogue Linux déclare 65 Go pour 3,2 Go réellement occupés — mesurés par un
+  utilisateur dont le `doctor` sortait rouge, en contrôle **requis**, sur une
+  machine qui provisionnait ses labs sans le moindre accroc.
+
+  Comparer un plafond théorique à une mesure ne prouve rien, et cette erreur-là
+  était la plus bruyante : requise, rouge, sur une installation qui marche. Elle
+  envoyait qui la lisait chercher un problème de disque inexistant, et lui
+  apprenait à se méfier du seul contrôle censé être digne de confiance.
+
+  Le chiffre reste — le pire cas dit quelque chose de vrai — mais il est annoncé
+  comme un plafond (`jusqu'à 65 Go déclarés, alloués à la demande (qcow2)`) et ne
+  décide plus du verdict. La RAM garde le sien : `MemAvailable` et la somme des
+  `ram_mb` sont deux mesures de même nature, donc elles se comparent.
+
+### Ajouté
+
+- **Un pool vraiment plein est désormais nommé au moment où il échoue** (issue
+  #209). Sans ce pendant, assouplir le contrôle ci-dessus aurait retiré un
+  garde-fou sans le remplacer. libvirt rend `no space left on device` sans nommer
+  ni le pool ni le geste ; `provision` le reconnaît maintenant, dit que les
+  disques qcow2 grandissent à l'usage — donc qu'un pool qui suffisait hier peut
+  manquer aujourd'hui — et affiche la commande qui montre ce qu'il reste.
+
+  Cette commande nomme **le pool du dépôt**, lu dans
+  `infra.providers.kvm.storage_pool`, et non un `default` supposé : une commande
+  proposée qui vise le mauvais pool échoue dans les mains de qui la copie. Il en
+  va de même, désormais, pour l'explication du `pool not found`.
+
+  C'est la règle qu'a posée tout le lot #172 → #179, appliquée dans l'autre sens :
+  un contrôle qui n'a pas pu regarder ne conclut jamais au vert — et un échec
+  qu'on ne peut pas prédire se nomme là où il se produit vraiment.
+
 ## [0.1.93] - 2026-09-25
 
 ### Corrigé

@@ -1058,8 +1058,13 @@ silent.
         "RAM: {avail} MB available for {need} MB declared",
     "detail_resources_ram_unknown":
         "RAM: /proc/meminfo unreadable, nothing measured",
+    "explain_pool_full":
+        "Known cause: the libvirt storage pool is full. qcow2 disks grow with use, "
+        "so a pool that was enough yesterday can run short today. Check what is "
+        "left, then free space or destroy a lab infrastructure you no longer use:",
     "detail_resources_disk":
-        "pool {pool}: {avail} GB available for {need} GB declared",
+        "pool {pool}: {avail} GB available; up to {need} GB declared, "
+        "allocated on demand (qcow2)",
     "detail_resources_disk_unknown":
         "pool {pool}: not answering, disk space not measured",
     "detail_resources_disk_unprobed":

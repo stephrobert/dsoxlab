@@ -644,13 +644,28 @@ def _pool_available_gb(pool: str) -> int | None:
     return None
 
 
+def nom_du_pool(infra: InfraDefinition) -> str:
+    """Le pool libvirt que ce dépôt utilise, ``default`` à défaut d'override.
+
+    Public parce que deux appelants en ont besoin et qu'une seule les sert :
+    ``doctor``, qui mesure la place, et la CLI, qui doit nommer le bon pool dans
+    la commande qu'elle propose après un échec de provisionnement. Le template
+    Terraform lit la même clé (``local.storage_pool``) ; la dupliquer une
+    troisième fois serait le moyen sûr de les désaligner un jour.
+    """
+    return str(infra.provider_config("kvm").get("storage_pool") or "default")
+
+
 def _check_resources(infra: InfraDefinition, provider: str) -> Check:
     """Ce que le poste offre, face à ce que le ``meta.yml`` déclare.
 
     Un provisionnement a déjà expiré sur un hôte à 2 vCPU / 4 Go (hôte prêt à
-    181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme
-    des ``ram_mb`` et des ``disk_gb`` (+ ``extra_disk_gb``) du catalogue est la
-    demande ; ``MemAvailable`` et le pool libvirt sont l'offre.
+    181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme des
+    ``ram_mb`` du catalogue est la demande, ``MemAvailable`` est l'offre, et le
+    contrôle porte sur elles : deux mesures de même nature.
+
+    Le disque, lui, est **affiché sans être jugé** (issue #209) — les tailles
+    déclarées sont nominales quand les qcow2 s'allouent à la demande.
 
     Une sonde impossible ne vaut jamais « ok » : la portion non mesurée est
     nommée, et le contrôle sort en ``unknown``, sauf si une portion mesurée
@@ -674,7 +689,7 @@ def _check_resources(infra: InfraDefinition, provider: str) -> Check:
         )
 
     if provider == "kvm":
-        pool = str(infra.provider_config("kvm").get("storage_pool") or "default")
+        pool = nom_du_pool(infra)
         dispo_disk = _pool_available_gb(pool)
         if dispo_disk is None:
             # Pool absent, inactif ou virsh muet : le contrôle du pool porte
@@ -683,7 +698,19 @@ def _check_resources(infra: InfraDefinition, provider: str) -> Check:
             inconnu = True
             portions.append(_("detail_resources_disk_unknown", pool=pool))
         else:
-            manque = manque or dispo_disk < besoin_disk
+            # La portion disque INFORME, elle ne conclut pas (issue #209).
+            #
+            # `besoin_disk` est la somme des tailles NOMINALES déclarées, et les
+            # qcow2 s'allouent à la demande : le catalogue Linux annonce 65 Go
+            # pour 3,2 Go réellement occupés, mesurés par un utilisateur. Le
+            # comparer à l'espace libre revient à opposer un maximum théorique à
+            # une mesure, et cela peignait en rouge — en contrôle **requis** —
+            # des installations qui provisionnent parfaitement.
+            #
+            # On garde le chiffre, qui dit quelque chose de vrai sur le pire cas,
+            # en l'annonçant comme tel. Un manque d'espace RÉEL, lui, se dit au
+            # moment où il se produit : `explique_echec_provision` reconnaît
+            # désormais « no space left on device » et nomme le pool.
             portions.append(
                 _(
                     "detail_resources_disk",
@@ -882,12 +909,19 @@ def _pool_cite(motif: re.Pattern[str], message: str) -> str | None:
     return next((groupe for groupe in trouve.groups() if groupe), None)
 
 
-def explique_echec_provision(message: str) -> tuple[str, str] | None:
+def explique_echec_provision(
+    message: str, pool: str | None = None,
+) -> tuple[str, str] | None:
     """Reconnaît une cause connue dans l'erreur brute d'un provisionnement.
 
     Terraform rend des messages exacts mais opaques pour qui découvre l'outil.
     Quelques-uns ont une cause connue et un correctif d'une ligne, et ce sont
     ceux qui arrêtent un débutant sur une machine fraîche.
+
+    ``pool`` est celui que le dépôt utilise (``nom_du_pool``), pour les causes
+    dont le message libvirt ne nomme pas le pool : sans lui, la commande
+    proposée viserait ``default`` sur un dépôt qui déclare un autre pool, et
+    échouerait sous les yeux de qui la copie.
 
     Rendre ``(explication, commande)``, ou ``None`` si rien n'est reconnu : on
     ne devine pas, on nomme ce qu'on sait nommer.
@@ -923,7 +957,17 @@ def explique_echec_provision(message: str) -> tuple[str, str] | None:
     pool_absent = _pool_cite(_POOL_ABSENT, message)
     if pool_absent is not None or "pool not found" in bas:
         return _("explain_pool_not_found"), creer_pool_command(
-            pool_absent or "default"
+            pool_absent or pool or "default"
+        )
+
+    # Plus d'espace dans le pool. `doctor` ne peut pas l'annoncer d'avance : les
+    # tailles déclarées sont nominales et les qcow2 s'allouent à la demande, donc
+    # comparer le pool à leur somme accuserait à tort (issue #209). En revanche,
+    # quand le disque manque VRAIMENT, c'est ici qu'on le sait, et le message de
+    # libvirt ne nomme ni le pool ni le geste.
+    if "no space left on device" in bas or "not enough space" in bas:
+        return _("explain_pool_full"), (
+            f"virsh -c qemu:///system pool-info {pool or 'default'}"
         )
 
     # « already exists » sur un domaine : un provisionnement précédent a échoué

@@ -172,9 +172,13 @@ def provision(
         # plutôt que de laisser l'apprenant chercher : c'est là qu'il est
         # bloqué, et c'est le seul moment où l'on peut l'affirmer sans risque
         # de fausse alerte.
-        from ..services.doctor import explique_echec_provision
+        from ..services.doctor import explique_echec_provision, nom_du_pool
 
-        connu = explique_echec_provision(str(exc))
+        # Le pool du dépôt, pas `default` supposé : une commande proposée qui
+        # vise le mauvais pool échoue sous les yeux de qui la copie.
+        connu = explique_echec_provision(
+            str(exc), pool=nom_du_pool(repo_meta.infra),
+        )
         if connu is not None:
             explication, commande = connu
             info(explication)

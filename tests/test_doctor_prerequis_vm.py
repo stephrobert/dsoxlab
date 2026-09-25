@@ -229,15 +229,85 @@ def test_une_ram_insuffisante_echoue_en_le_chiffrant(
     assert "3072" in check.detail
 
 
-def test_un_disque_insuffisant_echoue_aussi(
+def test_un_pool_plus_petit_que_le_nominal_ne_peint_plus_en_rouge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Le comportement change délibérément (issue #209).
+
+    Ce test exigeait l'inverse : un pool plus petit que la somme des tailles
+    déclarées faisait échouer le contrôle. Or ces tailles sont NOMINALES et les
+    qcow2 s'allouent à la demande — le catalogue Linux annonce 65 Go pour 3,2 Go
+    réellement occupés, mesurés par un utilisateur dont `doctor` était rouge en
+    contrôle **requis** sur une installation qui provisionnait très bien.
+
+    Comparer un maximum théorique à une mesure ne prouve rien. Le chiffre reste
+    affiché, annoncé comme un maximum, et un manque d'espace RÉEL se dit au
+    moment où il se produit, par `explique_echec_provision`.
+    """
     monkeypatch.setattr(doctor, "_mem_available_mb", lambda: 8192)
     monkeypatch.setattr(doctor, "_pool_available_gb", lambda pool: 8)
 
     check = doctor._check_resources(_infra(), "kvm")
 
+    assert check.state == doctor.STATE_OK
+    # Les deux chiffres restent lisibles : le pire cas dit quelque chose de vrai.
+    assert "8" in check.detail
+    assert "25" in check.detail
+
+
+def test_une_ram_insuffisante_echoue_meme_avec_un_pool_etroit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La régression à craindre : tout rendre informatif et ne plus rien juger.
+
+    La RAM, elle, se compare : `MemAvailable` et la somme des `ram_mb` sont deux
+    mesures de même nature.
+    """
+    monkeypatch.setattr(doctor, "_mem_available_mb", lambda: 512)
+    monkeypatch.setattr(doctor, "_pool_available_gb", lambda pool: 8)
+
+    check = doctor._check_resources(_infra(), "kvm")
+
     assert check.state == doctor.STATE_FAILED
+
+
+def test_un_pool_plein_est_explique_au_moment_de_l_echec() -> None:
+    """Le pendant du contrôle assoupli : sans lui, on retirerait un garde-fou.
+
+    libvirt rend « no space left on device » sans nommer le pool ni le geste.
+    """
+    connu = doctor.explique_echec_provision(
+        "Error: error creating volume: no space left on device"
+    )
+
+    assert connu is not None
+    explication, commande = connu
+    assert "pool" in explication.lower()
+    assert "pool-info" in commande
+
+
+def test_un_pool_plein_nomme_le_pool_du_depot() -> None:
+    """Une commande proposée qui vise le mauvais pool échoue à la copie.
+
+    libvirt ne nomme pas le pool dans « no space left on device » : c'est
+    l'appelant qui le sait, par `nom_du_pool`, et qui le transmet.
+    """
+    connu = doctor.explique_echec_provision(
+        "Error: error creating volume: no space left on device",
+        pool="labs-ssd",
+    )
+
+    assert connu is not None
+    assert "labs-ssd" in connu[1]
+
+
+def test_le_pool_du_depot_vient_des_overrides() -> None:
+    """`storage_pool` du `meta.yml` prime, `default` n'est que le repli."""
+    assert doctor.nom_du_pool(_infra()) == "default"
+
+    infra = _infra()
+    infra.providers = {"kvm": {"storage_pool": "labs-ssd"}}
+    assert doctor.nom_du_pool(infra) == "labs-ssd"
 
 
 def test_une_sonde_impossible_ne_vaut_jamais_vert(

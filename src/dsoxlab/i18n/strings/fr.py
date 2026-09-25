@@ -1078,8 +1078,14 @@ hors ligne, elle se tait.
         "RAM : {avail} Mo disponibles pour {need} Mo déclarés",
     "detail_resources_ram_unknown":
         "RAM : /proc/meminfo illisible, rien de mesuré",
+    "explain_pool_full":
+        "Cause connue : le pool de stockage libvirt est plein. Les disques qcow2 "
+        "grandissent à l'usage, donc un pool qui suffisait hier peut manquer "
+        "aujourd'hui. Regarde ce qu'il reste, puis libère de la place ou détruis "
+        "une infrastructure de lab que tu n'utilises plus :",
     "detail_resources_disk":
-        "pool {pool} : {avail} Go disponibles pour {need} Go déclarés",
+        "pool {pool} : {avail} Go disponibles ; jusqu'à {need} Go déclarés, "
+        "alloués à la demande (qcow2)",
     "detail_resources_disk_unknown":
         "pool {pool} : muet, espace disque non mesuré",
     "detail_resources_disk_unprobed":
