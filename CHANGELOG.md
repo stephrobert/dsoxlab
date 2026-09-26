@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-09-26
+
+### Fixed
+
+- **`/dev/kvm` existed and could not be opened.** The node is there on a
+  GitHub runner — the job checks it first, and `kvm-ok` agrees — but it belongs
+  to the `kvm` group, and the `runner` account is not in it. QEMU then fails
+  with *Qemu failed to start*, a message that names neither the file nor the
+  right, and Packer halts twenty-three seconds in. A udev rule now makes the
+  node accessible, and the job **opens it** rather than assuming the rule
+  worked: a check that cannot look never concludes green.
+
+- **The build is no longer silent about its own failure.** `PACKER_LOG=1` now
+  writes to a file, and the last two hundred lines are printed **only when the
+  build fails**. The verbose log is unreadable when everything works and
+  indispensable when QEMU says nothing useful — which is exactly the situation
+  that cost this release.
+
 ## [0.2.4] - 2026-09-26
 
 ### Fixed
