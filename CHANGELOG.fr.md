@@ -9,6 +9,61 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.2] - 2026-09-26
+
+### Ajouté
+
+- **L'appliance : une VM prête à jouer, construite par la CI** (issue #91,
+  déplacée au jalon 0.3.0 et désormais entamée). Pour Windows et macOS, où
+  `uv tool install dsoxlab` n'est pas une option. Sur Linux elle reste la mauvaise
+  réponse, et le README le dit : télécharger un demi-gigaoctet pour éviter une
+  commande n'a aucun sens.
+
+  `packer/` porte la recette (builder `qemu`, installation Debian 13 automatisée,
+  quatre scripts de provisioning) et `.github/workflows/appliance.yml` la construit
+  **sur un runner GitHub-hosted**, sans machine à nous : les runners Linux exposent
+  `/dev/kvm`, donc QEMU y est accéléré. Ce choix retire du même coup `ovftool`
+  (propriétaire) et VirtualBox de la chaîne : l'OVA est dérivée du qcow2 avec
+  `qemu-img` et `tar` seulement.
+
+  L'image **n'épingle rien**. Le premier démarrage installe le dernier dsoxlab, et
+  les hyperviseurs seulement si l'hôte expose la virtualisation imbriquée, vérifiée
+  en direct et jamais supposée. D'où sa reconstruction sur les **tags mineurs
+  seulement** : republier un demi-gigaoctet à chaque correctif coûterait cher pour
+  ne rien changer.
+
+  Mesuré, non estimé : **461 Mio** pour le qcow2 et **446 Mio** pour l'OVA,
+  construits en 4 min 50 s, contre un budget que le workflow impose à 800 Mio. Une
+  appliance comparable construite avec `virtualbox-iso` pèse 979 Mio.
+
+### Corrigé
+
+- **Trois défauts de cette recette, chacun attrapé par une mesure et non par une
+  relecture.** Ils valent d'être consignés parce qu'ils sont du genre qui se livre
+  en silence :
+
+  `fstrim` **rend un succès sans rien libérer** quand le disque de build est
+  attaché en `discard=ignore`, qui est le défaut de Packer. L'invité annonçait
+  « 520.4 MiB trimmed » pendant que le qcow2 gardait tout : 1110 Mio d'artefact
+  contre 597 pour le témoin. Le disque est donc attaché en `unmap`, avec
+  `detect_zeroes=unmap` pour que la mise à zéro ne coûte rien, et le repli
+  `|| dd` qui ne se déclenchait jamais a disparu, avec les 17 Gio qu'il écrivait
+  quand il se déclenchait.
+
+  `vm_name` **n'avait pas d'extension**, et Packer n'en ajoute aucune : les globs
+  `*.qcow2` du contrôle de budget, des empreintes et de l'envoi n'auraient jamais
+  vu le fichier. Le premier build local, qui a produit `dsoxlab-appliance-dev`,
+  l'a prouvé.
+
+  Le contrôle de taille testait la **limite dure de 2 Go**, donc il aurait laissé
+  passer une image de 1,1 Gio le jour où le trim se recasse. C'est désormais un
+  **budget de 800 Mio**, avec `qemu-img info` et `check` affichés, et une erreur
+  qui dit où regarder.
+
+- **`lsb_release` n'existe plus** dès que la tâche `standard` quitte le preseed, or
+  `20-outils.sh` s'en servait pour le dépôt HashiCorp. Lu dans `/etc/os-release` à
+  la place : sans cela le build aurait échoué net.
+
 ## [0.2.1] - 2026-09-25
 
 ### Ajouté

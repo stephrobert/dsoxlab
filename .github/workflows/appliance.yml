@@ -1,0 +1,194 @@
+# Construit l'appliance dsoxlab et l'attache à une Release.
+#
+# Workflow SÉPARÉ de `release.yml`, pour deux raisons :
+#
+#   1. `workflow_dispatch` permet de l'éprouver sans poser de tag. Greffé à la
+#      release, ce job n'aurait tourné qu'au prochain tag mineur, c'est-à-dire
+#      jamais avant d'en avoir besoin : un workflow qu'on n'a jamais joué est un
+#      workflow qui ne marche pas ;
+#   2. un build d'image de vingt minutes ne doit ni retarder une publication PyPI,
+#      ni pouvoir la faire échouer.
+#
+# Sur les tags, il ne se déclenche que sur les **mineurs** (`v0.3.0`, `v0.4.0`) :
+# l'image n'épingle pas la version de dsoxlab, elle installe la dernière au
+# premier démarrage, donc republier un gigaoctet à chaque correctif coûterait
+# cher pour ne rien changer.
+
+name: Appliance
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.0"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release existante à laquelle attacher les images (vide = ne rien attacher)"
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: appliance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  appliance:
+    name: Build the appliance image
+    # AFTER the Release exists, and never blocking it. A 20-minute image build
+    # must not delay a package that is already on PyPI, and its failure must not
+    # leave a version half-published.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write     # attach the assets to the existing Release
+      id-token: write     # provenance attestation
+      attestations: write
+    env:
+      # `/` has ~14 GB free on a runner, `/mnt` has ~70. Building anywhere else
+      # dies on disk space, twenty minutes in.
+      BUILD_DIR: /mnt/appliance
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: KVM must really be available
+        # The one fact this whole job rests on: GitHub-hosted Linux runners expose
+        # /dev/kvm. Checked FIRST — without acceleration the build would exceed the
+        # job limit, and the failure would arrive an hour later.
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm || { echo "::error::no /dev/kvm on this runner"; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils cpu-checker
+          kvm-ok
+          df -h / /mnt | tail -2
+
+      - name: Install Packer
+        run: |
+          set -euo pipefail
+          wget -qO- https://apt.releases.hashicorp.com/gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+            https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq packer
+          packer version
+
+      - name: Resolve the Debian netinst ISO and its checksum
+        id: iso
+        # The checksum is read from Debian's signed SHA256SUMS rather than pinned
+        # here: a hash copied by hand is a hash that rots.
+        run: |
+          set -euo pipefail
+          base="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd"
+          name="$(curl -fsSL "$base/SHA256SUMS" | grep -oE 'debian-[0-9.]+-amd64-netinst\.iso' | head -1)"
+          sum="$(curl -fsSL "$base/SHA256SUMS" | grep " $name\$" | cut -d' ' -f1)"
+          test -n "$name" && test -n "$sum"
+          echo "url=$base/$name" >> "$GITHUB_OUTPUT"
+          echo "sum=$sum" >> "$GITHUB_OUTPUT"
+          echo "ISO : $name"
+
+      - name: packer init && validate
+        working-directory: packer
+        env:
+          ISO_URL: ${{ steps.iso.outputs.url }}
+          ISO_SUM: ${{ steps.iso.outputs.sum }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${BUILD_DIR}/out" "${BUILD_DIR}/tmp"
+          packer init .
+          packer validate \
+            -var "image_version=${GITHUB_REF_NAME#v}" \
+            -var "iso_url=${ISO_URL}" \
+            -var "iso_checksum=sha256:${ISO_SUM}" \
+            -var "output_directory=${BUILD_DIR}/out" .
+
+      - name: packer build
+        working-directory: packer
+        env:
+          PACKER_TMP_DIR: /mnt/appliance/tmp
+          ISO_URL: ${{ steps.iso.outputs.url }}
+          ISO_SUM: ${{ steps.iso.outputs.sum }}
+        run: |
+          set -euo pipefail
+          packer build \
+            -var "image_version=${GITHUB_REF_NAME#v}" \
+            -var "iso_url=${ISO_URL}" \
+            -var "iso_checksum=sha256:${ISO_SUM}" \
+            -var "output_directory=${BUILD_DIR}/out" .
+          ls -lh "${BUILD_DIR}/out"
+
+      - name: Derive the OVA from the qcow2
+        # No VirtualBox, no ovftool (proprietary). An OVA is a tar of three files,
+        # in THIS order: the .ovf, the .mf, then the disk — VirtualBox refuses the
+        # archive if the .ovf is not its first member.
+        #
+        # Verified locally before this workflow existed: the resulting OVA imports
+        # into VirtualBox 7.0 ("Successfully imported the appliance"), and the disk
+        # comes back byte-identical after the conversion.
+        run: bash packer/faire-ova.sh "${GITHUB_REF_NAME#v}" "${BUILD_DIR}/out"
+
+      - name: Every asset must stay within its budget
+        env:
+          # A BUDGET, not the 2 GB Release limit. Measured reference: 533 MiB for
+          # the qcow2 and 511 for the OVA, with 20 GiB of declared disk. A check
+          # set at the hard limit would silently wave through a 1.1 GB image the
+          # day the discard setting regresses — which is exactly how this recipe
+          # was found to be carrying 512 MiB of rubbish.
+          BUDGET_MIB: 800
+        run: |
+          set -euo pipefail
+          # `qemu-img info` and `check` give the real shape of the image: virtual
+          # size, allocated size, and the share of compressed clusters. Printed
+          # rather than guessed, so a regression is visible in the log.
+          for f in "${BUILD_DIR}"/out/*.qcow2; do
+            [ -f "$f" ] || continue
+            qemu-img info "$f"
+            qemu-img check "$f" || true
+          done
+
+          depasse=0
+          for f in "${BUILD_DIR}"/out/*.ova "${BUILD_DIR}"/out/*.qcow2; do
+            [ -f "$f" ] || continue
+            mib=$(( $(stat -c%s "$f") / 1024 / 1024 ))
+            echo "$(basename "$f") : ${mib} MiB (budget ${BUDGET_MIB})"
+            if [ "$mib" -gt "$BUDGET_MIB" ]; then
+              echo "::error::$(basename "$f") is ${mib} MiB, over the ${BUDGET_MIB} MiB budget."
+              echo "::error::Check the trim first: the log of 90-nettoyage.sh shows what fstrim returned."
+              depasse=1
+            fi
+          done
+          test "$depasse" -eq 0
+
+          ( cd "${BUILD_DIR}/out" && sha256sum ./*.ova ./*.qcow2 > SHA256SUMS && cat SHA256SUMS )
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            /mnt/appliance/out/*.ova
+            /mnt/appliance/out/*.qcow2
+
+      - name: Attach the images to the Release
+        # Sur un essai manuel sans tag, il n'y a rien à quoi les attacher : le
+        # build seul a prouvé ce qu'on voulait prouver.
+        if: github.event_name == 'push' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" --repo "$REPO" --clobber \
+            "${BUILD_DIR}"/out/*.ova \
+            "${BUILD_DIR}"/out/*.qcow2 \
+            "${BUILD_DIR}/out/SHA256SUMS"

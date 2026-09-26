@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-26
+
+### Added
+
+- **The appliance: a ready-to-play VM, built by the CI** (issue #91, moved to the
+  0.3.0 milestone and now started). For Windows and macOS, where `uv tool install
+  dsoxlab` is not an option. On Linux it stays the wrong answer, and the README
+  says so: downloading half a gigabyte to avoid one command makes no sense.
+
+  `packer/` holds the recipe — `qemu` builder, automated Debian 13 install, four
+  provisioning scripts — and `.github/workflows/appliance.yml` builds it **on a
+  GitHub-hosted runner**, with no self-hosted machine: Linux runners expose
+  `/dev/kvm`, so QEMU is accelerated. That choice also removes `ovftool`
+  (proprietary) and VirtualBox from the chain: the OVA is derived from the qcow2
+  with `qemu-img` and `tar` alone.
+
+  The image **pins nothing**. The first boot installs the latest dsoxlab, and the
+  hypervisors only if the host exposes nested virtualization — checked live, never
+  assumed. Which is why it is rebuilt on **minor tags only**: republishing half a
+  gigabyte for every patch would cost a lot and change nothing.
+
+  Measured, not estimated: **461 MiB** for the qcow2 and **446 MiB** for the OVA,
+  built in 4 min 50 s, against a budget the workflow enforces at 800 MiB. A
+  comparable appliance built with `virtualbox-iso` weighs 979 MiB.
+
+### Fixed
+
+- **Three defects in that recipe, each caught by a measurement rather than a
+  reading.** They are worth recording because they are the kind that ship
+  silently:
+
+  `fstrim` **returns success without freeing anything** when the build disk is
+  attached with `discard=ignore`, which is Packer's default. The guest announced
+  "520.4 MiB trimmed" while the qcow2 kept every byte: 1110 MiB of artifact
+  against 597 for the control. So the disk is now attached `unmap`, with
+  `detect_zeroes=unmap` so that zeroing costs nothing — and the never-triggered
+  `|| dd` fallback is gone, along with the 17 GiB it wrote when it did fire.
+
+  `vm_name` **had no extension**, and Packer adds none: the `*.qcow2` globs of the
+  budget check, the checksums and the upload would never have seen the file. The
+  first local build produced `dsoxlab-appliance-dev`, which proved it.
+
+  The size check tested the **2 GB hard limit**, so it would have waved through a
+  1.1 GB image the day the trim regressed. It is now a **budget of 800 MiB**, with
+  `qemu-img info` and `check` printed, and an error that says where to look.
+
+- **`lsb_release` no longer exists** once the `standard` task is dropped from the
+  preseed, and `20-outils.sh` used it for the HashiCorp repository. Read from
+  `/etc/os-release` instead — without this the build would have failed outright.
+
 ## [0.2.1] - 2026-09-25
 
 ### Added
