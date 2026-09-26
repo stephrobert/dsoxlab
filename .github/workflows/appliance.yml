@@ -110,9 +110,15 @@ jobs:
         # this workflow died on exactly that, four hundredths of a second in —
         # a defect no local build could show, since the directory exists and is
         # writable on a developer's machine.
+        #
+        # `out/` is deliberately NOT created: Packer refuses to start when its
+        # output directory already exists ("It must not exist"), which is how
+        # it guarantees it never writes over a previous build. Creating it here
+        # traded one failure for another, one step later — measured on the
+        # second real run.
         run: |
           set -euo pipefail
-          sudo mkdir -p "${BUILD_DIR}/out" "${BUILD_DIR}/tmp"
+          sudo mkdir -p "${BUILD_DIR}/tmp"
           sudo chown -R "$(id -u):$(id -g)" "${BUILD_DIR}"
           df -h "${BUILD_DIR}"
 
