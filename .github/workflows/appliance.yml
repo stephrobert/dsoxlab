@@ -137,6 +137,24 @@ jobs:
         # comes back byte-identical after the conversion.
         run: bash packer/faire-ova.sh "${GITHUB_REF_NAME#v}" "${BUILD_DIR}/out"
 
+      - name: The OVF must validate against the DMTF schema
+        # VirtualBox imports almost anything; VMware checks. Since the same OVA
+        # is offered for both, the only way to keep that promise without a
+        # Broadcom licence is to hold the file to the specification it claims to
+        # follow. `xmllint` resolves the imported CIM schemas itself.
+        #
+        # Blocking on purpose: an OVF that no longer validates is exactly the
+        # kind of drift nothing else here would catch, and it would only show up
+        # on a user's machine.
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends libxml2-utils
+          curl -fsS -o /tmp/dsp8023.xsd \
+            https://schemas.dmtf.org/ovf/envelope/1/dsp8023_1.1.0.xsd
+          ovf=$(mktemp -d)
+          tar -xf "${BUILD_DIR}"/out/*.ova -C "$ovf" --wildcards '*.ovf'
+          xmllint --noout --schema /tmp/dsp8023.xsd "$ovf"/*.ovf
+
       - name: Every asset must stay within its budget
         env:
           # A BUDGET, not the 2 GB Release limit. Measured reference: 533 MiB for
@@ -192,3 +210,52 @@ jobs:
             "${BUILD_DIR}"/out/*.ova \
             "${BUILD_DIR}"/out/*.qcow2 \
             "${BUILD_DIR}/out/SHA256SUMS"
+
+      - name: Keep only the last images, not all of them
+        # Roughly 900 MB per minor version, forever, for images that are worth
+        # nothing once the next one exists: the image pins NO dsoxlab version,
+        # it installs the latest at first boot. An old one therefore offers no
+        # reproducibility — only the weight.
+        #
+        # Two are kept, not one: if the newest turns out to be broken, the
+        # previous one is the fallback while it gets fixed. Below that there is
+        # no safety net; above, we are archiving for nobody.
+        #
+        # Only the images are removed. The Releases themselves, their changelog
+        # and the Python distributions stay: they are small, and pip and uv
+        # resolve versions through them.
+        if: github.event_name == 'push' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          GARDEES: 2
+        run: |
+          set -euo pipefail
+          mapfile -t tags < <(
+            gh release list --repo "$REPO" --limit 100 \
+              --json tagName,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[].tagName'
+          )
+          porteuses=0
+          for tag in "${tags[@]}"; do
+            images=$(gh release view "$tag" --repo "$REPO" --json assets \
+              --jq '.assets[].name
+                    | select(endswith(".ova") or endswith(".qcow2"))')
+            [ -n "$images" ] || continue
+            porteuses=$((porteuses + 1))
+            if [ "$porteuses" -le "$GARDEES" ]; then
+              echo "$tag : images conservées (${porteuses}/${GARDEES})"
+              continue
+            fi
+            echo "$tag : retrait des images"
+            while IFS= read -r nom; do
+              [ -n "$nom" ] || continue
+              gh release delete-asset "$tag" "$nom" --repo "$REPO" --yes
+              echo "  supprimé : $nom"
+            done < <(
+              gh release view "$tag" --repo "$REPO" --json assets \
+                --jq '.assets[].name
+                      | select(endswith(".ova") or endswith(".qcow2")
+                               or . == "SHA256SUMS")'
+            )
+          done

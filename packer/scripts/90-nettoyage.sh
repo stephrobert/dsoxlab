@@ -38,6 +38,12 @@ rm -f /root/.bash_history /home/student/.bash_history
 journalctl --rotate --vacuum-time=1s || true
 rm -rf /tmp/* /var/tmp/*
 
+# Le home appartient à son propriétaire, quoi qu'il se soit passé avant. C'est une
+# ceinture, pas un remplacement du `sudo -H` du .pkr.hcl : un seul fichier créé
+# par root dans ~student suffit à casser Ansible pour toujours, et le symptôme
+# (« rc=5, Stats: {} ») ne désigne pas sa cause.
+chown -R student:student /home/student
+
 # Les journaux de l'installateur et les vieux gabarits debconf : ils ne servent
 # qu'à diagnostiquer une installation qui vient de réussir.
 rm -rf /var/log/installer /var/cache/debconf/*-old

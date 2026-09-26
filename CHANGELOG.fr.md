@@ -36,6 +36,27 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   construits en 4 min 50 s, contre un budget que le workflow impose à 800 Mio. Une
   appliance comparable construite avec `virtualbox-iso` pèse 979 Mio.
 
+- **Le README présente désormais les deux façons d'entrer**, côte à côte :
+  installer l'outil, ou télécharger l'appliance. Il dit aussi laquelle est la
+  bonne sous Linux, plutôt que de les vendre à égalité.
+
+- **Seuls les deux derniers jeux d'images sont conservés sur les Releases.**
+  Environ 900 Mo par version mineure, pour toujours, pour des images qui
+  n'épinglent aucune version de dsoxlab et installent la dernière au premier
+  démarrage : une ancienne n'offre aucune reproductibilité, seulement son
+  poids. Deux plutôt qu'une, pour qu'une image cassée ait un recours. Les
+  Releases, leur changelog et les distributions Python ne sont pas touchés.
+
+- **L'OVA est proposée pour VMware autant que pour VirtualBox**, et le workflow
+  tient maintenant cette promesse : l'OVF est validé contre le schéma DMTF à
+  chaque build. VirtualBox importe à peu près n'importe quoi, VMware contrôle —
+  et sans licence Broadcom, la conformité à la spécification est la seule façon
+  honnête de tenir l'affirmation. La page de l'appliance dit franchement ce qui
+  a été éprouvé et ce qui ne l'a pas été, et qu'**Apple Silicon est hors de
+  portée** : les deux images sont x86-64, les runners arm64 de GitHub n'exposent
+  aucun `/dev/kvm` pour en construire une autre, et la virtualisation imbriquée
+  sur ces Mac n'existe qu'à partir du M3.
+
 ### Corrigé
 
 - **Trois défauts de cette recette, chacun attrapé par une mesure et non par une
@@ -63,6 +84,76 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 - **`lsb_release` n'existe plus** dès que la tâche `standard` quitte le preseed, or
   `20-outils.sh` s'en servait pour le dépôt HashiCorp. Lu dans `/etc/os-release` à
   la place : sans cela le build aurait échoué net.
+
+- **Dix défauts de plus, trouvés en jouant l'appliance plutôt qu'en relisant la
+  recette.** Chacun échappait à tous les contrôles précédents, et le premier à lui
+  seul rendait l'image inutilisable pour ceux à qui elle est destinée :
+
+  **Le réseau ne survivait pas au changement d'hyperviseur.** L'installateur
+  Debian fige le nom de l'interface qu'il a vue — `enp0s2` sous le QEMU qui
+  construit l'image — et ce nom dérive de la position PCI de la carte. Sous
+  VirtualBox, la carte s'appelle `enp0s17` : la configuration ne s'appliquait donc
+  à rien. L'appliance importée démarrait avec `enp0s17 DOWN`, un `resolv.conf`
+  sans le moindre `nameserver`, et un premier démarrage qui échouait sur
+  « Temporary failure in name resolution ». Rien n'était installé : ni dsoxlab, ni
+  les hyperviseurs, ni le bureau. Le réseau passe désormais par
+  `systemd-networkd`, dont le `[Match]` **décrit** la carte (`en*`, `eth*`) au
+  lieu de la nommer.
+
+  **Le premier démarrage se marquait fait même quand tout avait échoué**, et la
+  machine n'avait plus aucun moyen de se rattraper. Il dit maintenant ce qui a
+  échoué, ne pose pas de marqueur, et recommence au démarrage suivant. Il attend
+  aussi qu'un nom se résolve vraiment avant de commencer :
+  `network-online.target` était atteinte sans qu'aucun bail DHCP soit pris, d'où
+  les huit secondes du défaut ci-dessus.
+
+  **Root héritait du `HOME` de student** pendant la construction (`sudo -E`),
+  si bien que `terraform version` et `ansible-playbook --version` créaient un
+  `~/.ansible` et un `~/.terraform.d` appartenant à root. Ansible refusait alors
+  de démarrer pour l'apprenant, et dsoxlab rendait un `rc=5, Stats: {}` que rien
+  ne reliait à la cause. Corrigé par `sudo -H`, avec une ceinture `chown`.
+
+  **`ovmf` et `qemu-utils` manquaient** : sur Debian, tous deux ne sont que des
+  *recommandations* de `qemu-kvm`, donc `--no-install-recommends` les écartait.
+  Sans le premier, libvirt n'expose aucun firmware EFI et tout `provision`
+  s'arrête net ; sans le second, il ne sait pas créer de volume qcow2. Trouvés en
+  provisionnant pour de vrai depuis l'appliance — et le premier a été nommé en
+  2,3 secondes par le garde-fou de l'issue #234.
+
+  **Aucun pool libvirt `default`, aucune appartenance de groupe** : une Debian
+  fraîche n'en définit ni l'un ni l'autre, donc `doctor --strict` sortait en 9 et
+  `student` ne pouvait pas ouvrir `/dev/kvm`. Les deux sont posés au premier
+  démarrage, ce qui est aussi la raison de son redémarrage final.
+
+  **Le bureau n'avait pas de serveur X.** Même motif qu'`ovmf` et `qemu-utils`,
+  pour la troisième fois : `xserver-xorg` est une *recommandation* de `xfce4` et
+  de `lightdm`, jamais une dépendance, donc `--no-install-recommends` l'écartait.
+  `/usr/bin/Xorg` n'existait pas, `lightdm` était « failed », et la machine
+  arrivait sur une console malgré `graphical.target` — sans que rien ne relie ce
+  symptôme à un paquet manquant. Le serveur et ses pilotes vidéo (`vmware` pour
+  le contrôleur VMSVGA que présentent VirtualBox et VMware, `vesa` et `fbdev` en
+  secours) sont désormais nommés explicitement.
+
+  **`~/.ssh/config` n'incluait pas ce que dsoxlab y écrit.** `provision` dépose un
+  `~/.ssh/config.d/<catalogue>.conf` et avertit, à chaque exécution, que rien ne
+  le lit. L'`Include` est maintenant posé en tête du fichier, là où OpenSSH
+  l'exige.
+
+  **`start` déclarait « déjà provisionnée » une infrastructure inutilisable.**
+  Il tranchait sur le seul state, donc une adresse suffisait. L'enchaînement qui
+  suivait était absurde : `provision` sortait en 8 sur « les hôtes n'ont pas
+  répondu : l'infrastructure existe, mais elle n'est pas utilisable en l'état »,
+  et le `start` relancé juste après — donc relancé *parce que* rien ne répondait
+  — annonçait « déjà provisionné, rien à reconstruire », avant d'échouer plus
+  loin sur un `UNREACHABLE` brut d'Ansible que rien ne reliait à la cause. Il
+  sonde désormais aussi le port 22 : une adresse n'est pas une machine. Rejouer
+  `provision` ne coûte rien, puisqu'il reprend sans rien recréer, et il attend.
+
+  **La console était noyée sous des erreurs `AF_VSOCK`**, une par rechargement de
+  systemd, soit une dizaine de lignes rouges en cinq secondes pendant
+  l'installation des paquets. Rien n'était cassé, mais rien ne le disait non
+  plus. `systemd-ssh-generator` est maintenant neutralisé par un lien vers
+  `/dev/null`, la façon documentée de le faire.
 
 ## [0.2.1] - 2026-09-25
 

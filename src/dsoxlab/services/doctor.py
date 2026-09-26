@@ -1085,6 +1085,14 @@ def explique_echec_provision(
             f"virsh -c qemu:///system pool-info {pool or 'default'}"
         )
 
+    # `qemu-img` absent : libvirt sait créer un volume brut, pas un qcow2, et le
+    # dit dans ses termes. Rencontré dans l'appliance, où le paquet `qemu-utils`
+    # n'est qu'une recommandation de qemu-kvm : `--no-install-recommends` l'écarte,
+    # et les quatre volumes du plan échouent d'un coup sans que rien ne nomme le
+    # paquet qui manque.
+    if "without qemu-img" in bas or "non-raw file images" in bas:
+        return _("explain_qemu_img_absent"), "sudo apt install qemu-utils"
+
     # « already exists » sur un domaine : un provisionnement précédent a échoué
     # APRÈS avoir défini la machine, qui n'est donc pas dans le state Terraform.
     # `destroy` ne peut pas la voir, et le message ne dit pas quoi faire.

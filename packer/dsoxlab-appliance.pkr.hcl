@@ -107,11 +107,23 @@ build {
   sources = ["source.qemu.appliance"]
 
   provisioner "shell" {
-    execute_command = "echo '${var.ssh_password}' | sudo -S -E bash '{{ .Path }}'"
+    # `-H` et non `-E`, et ce n'est pas un détail de style. `-E` préserve
+    # l'environnement, donc `HOME` restait `/home/student` pendant que le script
+    # tournait en root : `terraform version` et `ansible-playbook --version` y ont
+    # créé `~/.terraform.d` et `~/.ansible/tmp` APPARTENANT À ROOT.
+    #
+    # Conséquence mesurée dans l'appliance : Ansible ne démarre plus du tout pour
+    # l'apprenant (« Permission denied: /home/student/.ansible/tmp », erreur sur
+    # DEFAULT_LOCAL_TMP), donc AUCUN lab `vm` ne fonctionne — et le symptôme rendu
+    # par dsoxlab est un « rc=5, Stats: {} » que rien ne relie à cette cause.
+    execute_command = "echo '${var.ssh_password}' | sudo -S -H bash '{{ .Path }}'"
     scripts = [
       "scripts/10-base.sh",
       "scripts/20-outils.sh",
       "scripts/30-premier-demarrage.sh",
+      # Avant-dernier à dessein : il bascule le résolveur, et 20-outils.sh
+      # télécharge encore. Après lui, plus rien n'a besoin du réseau.
+      "scripts/40-reseau-portable.sh",
       "scripts/90-nettoyage.sh",
     ]
   }

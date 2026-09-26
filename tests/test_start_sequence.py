@@ -296,7 +296,37 @@ def test_infra_prete_lit_vraiment_l_inventaire(
         inventory, "read_terraform_outputs",
         lambda _meta: {"hosts": {"value": {"un.lab": "10.10.10.11"}}},
     )
+    # Seule la sonde réseau est simulée : elle sortirait de la machine de test.
+    monkeypatch.setattr(demarrage, "_hote_repond", lambda _adresse, **_kw: True)
+
     assert demarrage._infra_prete(catalogue) is True
+
+
+def test_une_adresse_sans_hote_qui_repond_n_est_pas_prete(
+    catalogue: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L'enchaînement absurde mesuré dans l'appliance, et qu'on refuse désormais.
+
+    `provision` sort en 8 — « les hôtes n'ont pas répondu : l'infrastructure
+    existe, mais elle n'est pas utilisable en l'état » — puis le `start`
+    relancé juste après annonçait « déjà provisionné, rien à reconstruire »
+    parce que le state portait bien des adresses. Il échouait ensuite sur un
+    UNREACHABLE d'Ansible que rien ne reliait à la cause.
+
+    Une adresse n'est pas une machine : tant que le port 22 ne répond pas,
+    l'étape d'infrastructure est à rejouer — et `provision` la reprend sans
+    rien recréer.
+    """
+    from dsoxlab.cli import demarrage
+    from dsoxlab.infra import inventory
+
+    monkeypatch.setattr(
+        inventory, "read_terraform_outputs",
+        lambda _meta: {"hosts": {"value": {"un.lab": "10.10.10.11"}}},
+    )
+    monkeypatch.setattr(demarrage, "_hote_repond", lambda _adresse, **_kw: False)
+
+    assert demarrage._infra_prete(catalogue) is False
 
 
 def test_infra_absente_se_voit_dans_l_inventaire(

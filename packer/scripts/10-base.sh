@@ -47,6 +47,38 @@ apt-get install -y --no-install-recommends \
 # chercher son IP dans la console.
 systemctl enable qemu-guest-agent
 
+# Une console série, sans quoi l'appliance n'est diagnosticable qu'avec un écran.
+# Mesuré en la démarrant : la console était vide, 0 octet, alors que la VM
+# tournait. Ni la CI, ni un formateur à distance, ni l'utilisateur au téléphone ne
+# pouvait voir le premier démarrage — donc ni savoir si dsoxlab s'installait, ni
+# pourquoi lorsqu'il échouait.
+#
+# `console=tty0` d'abord, `console=ttyS0` ensuite : le noyau écrit sur les deux et
+# la DERNIÈRE reçoit /dev/console, donc l'ordre donne la série à ce qui lit un
+# fichier, sans priver d'affichage celui qui ouvre la fenêtre de sa VM.
+sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"/' \
+  /etc/default/grub
+grep -q '^GRUB_TERMINAL' /etc/default/grub \
+  || echo 'GRUB_TERMINAL="console serial"' >> /etc/default/grub
+grep -q '^GRUB_SERIAL_COMMAND' /etc/default/grub \
+  || echo 'GRUB_SERIAL_COMMAND="serial --speed=115200"' >> /etc/default/grub
+update-grub
+
+# Un shell sur la série : le noyau qui parle ne suffit pas, il faut pouvoir
+# répondre. C'est ce qui permettra au workflow de vérifier le premier démarrage.
+systemctl enable serial-getty@ttyS0.service
+
+# Le générateur ssh de systemd cherche un canal AF_VSOCK que ni VirtualBox ni
+# VMware n'exposent, et il échoue bruyamment : « Failed to query local AF_VSOCK
+# CID: Cannot assign requested address », une ligne par rechargement de systemd.
+# Mesuré au premier démarrage dans VirtualBox : une dizaine de lignes rouges en
+# cinq secondes, parce que chaque paquet installé provoque un daemon-reload.
+# Sur une appliance destinée à des débutants, un écran d'erreurs donne à croire
+# que tout est cassé alors que rien ne l'est. Le lien vers /dev/null est la
+# façon documentée de neutraliser un générateur.
+mkdir -p /etc/systemd/system-generators
+ln -sf /dev/null /etc/systemd/system-generators/systemd-ssh-generator
+
 # Le journal ne doit pas grossir sans fin dans une image qu'on ne surveille pas.
 mkdir -p /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/appliance.conf <<'CONF'
