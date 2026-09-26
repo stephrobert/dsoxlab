@@ -9,6 +9,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.5] - 2026-09-26
+
+### Corrigé
+
+- **`/dev/kvm` existait et ne pouvait pas s'ouvrir.** Le nœud est bien là sur
+  un runner GitHub — le job le contrôle en premier, et `kvm-ok` le confirme —
+  mais il appartient au groupe `kvm`, où le compte `runner` n'est pas. QEMU
+  échoue alors sur *Qemu failed to start*, un message qui ne nomme ni le
+  fichier ni le droit, et Packer s'arrête au bout de vingt-trois secondes. Une
+  règle udev rend désormais le nœud accessible, et le job **l'ouvre** au lieu
+  de supposer que la règle a pris : un contrôle qui n'a pas pu regarder ne
+  conclut jamais au vert.
+
+- **Le build ne tait plus son propre échec.** `PACKER_LOG=1` écrit maintenant
+  dans un fichier, dont les deux cents dernières lignes ne sont affichées
+  **qu'en cas d'échec**. Le journal détaillé est illisible quand tout va bien
+  et indispensable quand QEMU ne dit rien d'utile — c'est-à-dire exactement la
+  situation qui a coûté cette version.
+
 ## [0.2.4] - 2026-09-26
 
 ### Corrigé

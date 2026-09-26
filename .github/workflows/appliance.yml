@@ -77,6 +77,27 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-x86 qemu-utils cpu-checker
           kvm-ok
+
+          # Le noeud existe, ce qui ne dit pas qu'on peut l'ouvrir : sur un
+          # runner, /dev/kvm appartient au groupe `kvm` et le compte `runner`
+          # n'y est pas. QEMU échoue alors sur « Qemu failed to start », un
+          # message qui ne nomme ni le fichier ni le droit — mesuré sur le
+          # troisième run réel de ce workflow.
+          #
+          # La règle udev plutôt qu'un `chmod` : elle survit à un rechargement
+          # du module, et c'est la forme que recommandent les images de runner.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm-accessible.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+          # On ne suppose pas que ça a marché : on ouvre le noeud en écriture.
+          test -w /dev/kvm || {
+            echo "::error::/dev/kvm exists but is not writable by $(id -un)."
+            echo "::error::QEMU would fail with « Qemu failed to start » and say nothing more."
+            exit 1
+          }
           df -h / /mnt | tail -2
 
       - name: Install Packer
@@ -144,11 +165,22 @@ jobs:
           ISO_SUM: ${{ steps.iso.outputs.sum }}
         run: |
           set -euo pipefail
-          packer build \
+          # Le journal détaillé part dans un fichier plutôt qu'à l'écran : il
+          # est illisible en temps normal, et indispensable quand QEMU échoue
+          # en disant seulement « Qemu failed to start ». On ne l'affiche donc
+          # qu'en cas d'échec, et seulement sa fin.
+          export PACKER_LOG=1
+          export PACKER_LOG_PATH="${BUILD_DIR}/packer.log"
+          if ! packer build \
             -var "image_version=${GITHUB_REF_NAME#v}" \
             -var "iso_url=${ISO_URL}" \
             -var "iso_checksum=sha256:${ISO_SUM}" \
-            -var "output_directory=${BUILD_DIR}/out" .
+            -var "output_directory=${BUILD_DIR}/out" . ; then
+            echo "::group::packer log (last 200 lines)"
+            tail -200 "${PACKER_LOG_PATH}" || echo "aucun journal écrit"
+            echo "::endgroup::"
+            exit 1
+          fi
           ls -lh "${BUILD_DIR}/out"
 
       - name: Derive the OVA from the qcow2
