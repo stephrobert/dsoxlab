@@ -1156,6 +1156,12 @@ hors ligne, elle se tait.
         "RAM : {avail} Mo disponibles pour {need} Mo déclarés",
     "detail_resources_ram_unknown":
         "RAM : /proc/meminfo illisible, rien de mesuré",
+    "explain_qemu_img_absent":
+        "Cause connue : « qemu-img » manque, donc libvirt ne sait créer que des "
+        "volumes bruts et tous les volumes qcow2 du plan échouent d'un coup. Sur "
+        "Debian et Ubuntu il vit dans « qemu-utils », qui n'est qu'une "
+        "*recommandation* de qemu-kvm : une installation faite avec "
+        "--no-install-recommends l'écarte.",
     "explain_pool_full":
         "Cause connue : le pool de stockage libvirt est plein. Les disques qcow2 "
         "grandissent à l'usage, donc un pool qui suffisait hier peut manquer "

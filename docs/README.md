@@ -20,6 +20,10 @@ thirty seconds; these pages say how it works.
 | **[For the catalog author](./catalog-author.md)** | You write labs in your own repository |
 | **[For the trainer](./trainer.md)** | You run the machines and providers the labs need |
 
+There is a fourth door for those who would rather not install anything: **[the
+appliance](./appliance.md)**, a ready-to-play virtual machine, for Windows and
+macOS.
+
 ## References
 
 | Page | Content |

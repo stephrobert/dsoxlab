@@ -20,6 +20,10 @@ dit ce que c'est en trente secondes ; ces pages disent comment cela fonctionne.
 | **[Pour l'auteur de catalogue](./catalog-author.fr.md)** | Vous écrivez des labs dans votre propre dépôt |
 | **[Pour le formateur](./trainer.fr.md)** | Vous montez les machines et les providers dont les labs ont besoin |
 
+Il existe une quatrième porte pour qui préfère ne rien installer :
+**[l'appliance](./appliance.fr.md)**, une machine virtuelle prête à jouer, pour
+Windows et macOS.
+
 ## Références
 
 | Page | Contenu |

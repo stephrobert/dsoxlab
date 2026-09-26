@@ -331,7 +331,7 @@ A catalog with no `infra:` block is a normal case, not an error: it yields
       "state": "ok",
       "ok": true,
       "label": "pytest",
-      "detail": "bundled with dsoxlab (the one `check` uses)",
+      "detail": "bundled with dsoxlab (used by 'check')",
       "fix": null,
       "fix_kind": null,
       "hint": null

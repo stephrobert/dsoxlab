@@ -35,6 +35,30 @@ l'historique en local, par catalogue.
 
 ---
 
+## Deux façons d'entrer
+
+| | **Installer l'outil** | **Télécharger l'appliance** |
+| --- | --- | --- |
+| Pour | Linux, et macOS ou Windows si Python est là | Windows et macOS, ou qui préfère une machine jetable |
+| Il faut | Python 3.11+ et `uv` ou `pipx` | VirtualBox ou VMware, et 8 Go de RAM disponibles |
+| On obtient | une commande, quelques mégaoctets | une VM Debian 13 avec bureau, Ansible et Terraform, ~450 Mo à télécharger |
+| À lire | la section juste en dessous | **[L'appliance](docs/appliance.fr.md)** |
+
+Sous Linux, installer l'outil est la bonne réponse : télécharger un
+demi-gigaoctet pour s'épargner une commande n'a aucun sens, et ce README le dit
+plutôt que de vendre les deux à égalité.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/stephrobert/dsoxlab/main/docs/assets/appliance-bureau.png" alt="« dsoxlab doctor » dans un terminal du bureau de l'appliance, sous VirtualBox" width="820">
+</p>
+
+<p align="center">
+  <em>L'appliance quelques minutes après l'import : le bureau, 86 labs
+  découverts, et le seul choix restant nommé avec la commande qui le règle.</em>
+</p>
+
+---
+
 ## Installer et jouer, en cinq minutes
 
 Nécessite **Python 3.11+** et [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
@@ -64,6 +88,7 @@ lignes.
 | Je veux… | Lire |
 | --- | --- |
 | Installer dsoxlab, jouer des labs, comprendre ma note | **[Pour l'apprenant](docs/learner.fr.md)** |
+| Jouer des labs sous Windows ou macOS, sans rien installer | **[L'appliance](docs/appliance.fr.md)**, une VM prête à jouer |
 | Écrire mon propre catalogue de labs | **[Pour l'auteur de catalogue](docs/catalog-author.fr.md)**, puis [le contrat v1](docs/contract-v1.fr.md) champ par champ |
 | Monter les machines dont les labs ont besoin | **[Pour le formateur](docs/trainer.fr.md)** |
 | Savoir où dsoxlab écrit sur mon disque | [Où dsoxlab écrit](docs/files.fr.md) |

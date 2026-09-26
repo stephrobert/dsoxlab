@@ -125,13 +125,39 @@ def _echec(numero: int, total: int, etape: Etape) -> None:
     info(_("start_step_retry", command=etape.commande))
 
 
-def _infra_prete(root: Path) -> bool:
-    """L'infrastructure a-t-elle déjà des adresses, ou faut-il la monter ?
+def _hote_repond(adresse: str, *, delai: float = 2.0) -> bool:
+    """L'hôte accepte-t-il une connexion SSH ? Une seule question, courte.
 
-    C'est ce qui rend ``start`` idempotent : relancé sur un lab déjà prêt, il ne
-    reprovisionne pas. On lit le state plutôt que de sonder en SSH — un hôte
-    éteint reste provisionné, et c'est ``dsoxlab status`` qui répond à « est-ce
-    qu'il répond ? ». Se tromper ici coûterait une minute d'apply inutile.
+    On ne s'authentifie pas : un TCP accepté sur le 22 suffit à distinguer « la
+    machine est là » de « la machine a une adresse dans le state ». C'est la
+    seule chose que le state ne peut pas dire.
+    """
+    import socket
+
+    try:
+        with socket.create_connection((adresse, 22), timeout=delai):
+            return True
+    except OSError:
+        return False
+
+
+def _infra_prete(root: Path) -> bool:
+    """L'infrastructure est-elle utilisable, ou faut-il (re)jouer provision ?
+
+    Deux conditions, et la seconde a été apprise à l'usage : les hôtes ont une
+    adresse dans le state, **et** ils répondent.
+
+    Se contenter de l'adresse produisait un enchaînement absurde, mesuré dans
+    l'appliance : ``provision`` sortait en 8 sur « les hôtes n'ont pas répondu
+    dans le délai imparti : l'infrastructure existe, mais elle n'est pas
+    utilisable en l'état », et le ``start`` relancé juste après — donc relancé
+    PRÉCISÉMENT parce que rien ne répondait — annonçait « déjà provisionné,
+    rien à reconstruire », puis échouait plus loin sur un UNREACHABLE brut
+    d'Ansible que rien ne reliait à la cause.
+
+    Sonder coûte au pire deux secondes par hôte, et rien quand tout répond.
+    Rejouer ``provision`` ne coûte pas davantage : il reprend sans rien
+    recréer, et il attend — ce qui est exactement ce qu'il faut ici.
     """
     from ..infra.inventory import build_inventory, read_terraform_outputs
 
@@ -154,7 +180,17 @@ def _infra_prete(root: Path) -> bool:
         .get("labenv", {})
         .get("hosts", {})
     )
-    return bool(hotes)
+    if not hotes:
+        return False
+    adresses = [
+        variables.get("ansible_host")
+        for variables in hotes.values()
+        if isinstance(variables, dict)
+    ]
+    # Un hôte sans adresse dans l'inventaire n'est pas joignable non plus.
+    if not adresses or not all(adresses):
+        return False
+    return all(_hote_repond(str(adresse)) for adresse in adresses)
 
 
 @app.command("start", help=_("cmd_start_help"))

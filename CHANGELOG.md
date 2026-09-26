@@ -9,6 +9,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-26
+
+### Added
+
+- **The appliance: a ready-to-play VM, built by the CI** (issue #91, moved to the
+  0.3.0 milestone and now started). For Windows and macOS, where `uv tool install
+  dsoxlab` is not an option. On Linux it stays the wrong answer, and the README
+  says so: downloading half a gigabyte to avoid one command makes no sense.
+
+  `packer/` holds the recipe — `qemu` builder, automated Debian 13 install, four
+  provisioning scripts — and `.github/workflows/appliance.yml` builds it **on a
+  GitHub-hosted runner**, with no self-hosted machine: Linux runners expose
+  `/dev/kvm`, so QEMU is accelerated. That choice also removes `ovftool`
+  (proprietary) and VirtualBox from the chain: the OVA is derived from the qcow2
+  with `qemu-img` and `tar` alone.
+
+  The image **pins nothing**. The first boot installs the latest dsoxlab, and the
+  hypervisors only if the host exposes nested virtualization — checked live, never
+  assumed. Which is why it is rebuilt on **minor tags only**: republishing half a
+  gigabyte for every patch would cost a lot and change nothing.
+
+  Measured, not estimated: **461 MiB** for the qcow2 and **446 MiB** for the OVA,
+  built in 4 min 50 s, against a budget the workflow enforces at 800 MiB. A
+  comparable appliance built with `virtualbox-iso` weighs 979 MiB.
+
+- **The README now presents both ways in**, side by side: install the tool, or
+  download the appliance. It also says which one is right on Linux, rather than
+  selling them as equals.
+
+- **Only the last two sets of images are kept on the Releases.** Roughly 900 MB
+  per minor version, forever, for images that pin no dsoxlab version and
+  install the latest at first boot: an old one offers no reproducibility, only
+  weight. Two rather than one, so a broken image has a fallback. The Releases,
+  their changelog and the Python distributions are untouched.
+
+- **The OVA is offered for VMware as well as VirtualBox**, and the workflow now
+  holds it to that promise: the OVF is validated against the DMTF schema at
+  every build. VirtualBox imports almost anything, VMware checks — and without
+  a Broadcom licence, conformity to the specification is the only honest way to
+  keep the claim. The appliance page says plainly what was tested and what was
+  not, and that **Apple Silicon is out of reach**: both images are x86-64,
+  GitHub's arm64 runners expose no `/dev/kvm` to build another, and nested
+  virtualization on those Macs only exists from the M3.
+
+### Fixed
+
+- **Three defects in that recipe, each caught by a measurement rather than a
+  reading.** They are worth recording because they are the kind that ship
+  silently:
+
+  `fstrim` **returns success without freeing anything** when the build disk is
+  attached with `discard=ignore`, which is Packer's default. The guest announced
+  "520.4 MiB trimmed" while the qcow2 kept every byte: 1110 MiB of artifact
+  against 597 for the control. So the disk is now attached `unmap`, with
+  `detect_zeroes=unmap` so that zeroing costs nothing — and the never-triggered
+  `|| dd` fallback is gone, along with the 17 GiB it wrote when it did fire.
+
+  `vm_name` **had no extension**, and Packer adds none: the `*.qcow2` globs of the
+  budget check, the checksums and the upload would never have seen the file. The
+  first local build produced `dsoxlab-appliance-dev`, which proved it.
+
+  The size check tested the **2 GB hard limit**, so it would have waved through a
+  1.1 GB image the day the trim regressed. It is now a **budget of 800 MiB**, with
+  `qemu-img info` and `check` printed, and an error that says where to look.
+
+- **`lsb_release` no longer exists** once the `standard` task is dropped from the
+  preseed, and `20-outils.sh` used it for the HashiCorp repository. Read from
+  `/etc/os-release` instead — without this the build would have failed outright.
+
+- **Ten more defects, found by playing the appliance rather than reading the
+  recipe.** Each was invisible to every check that came before, and the first one
+  alone made the image useless to the very people it is built for:
+
+  **The network did not survive a change of hypervisor.** Debian's installer
+  freezes the interface name it saw at install time — `enp0s2` under the QEMU that
+  builds the image — and that name is derived from the card's PCI position. Under
+  VirtualBox the card is `enp0s17`, so the configuration applied to nothing: the
+  imported appliance came up with `enp0s17 DOWN`, a `resolv.conf` without a single
+  `nameserver`, and a first boot that failed on "Temporary failure in name
+  resolution". Nothing was installed — no dsoxlab, no hypervisors, no desktop. The
+  image now configures the network with `systemd-networkd`, whose `[Match]`
+  **describes** the card (`en*`, `eth*`) instead of naming it.
+
+  **The first boot marked itself done even when everything had failed**, so the
+  machine had no way left to catch up. It now reports what failed, keeps no
+  marker, and starts over at the next boot. It also waits for a name to actually
+  resolve before it begins: `network-online.target` was reached with no DHCP lease
+  taken, which is how the failure above got its eight-second timeout.
+
+  **Root inherited the student's `HOME`** during the build (`sudo -E`), so
+  `terraform version` and `ansible-playbook --version` created a root-owned
+  `~/.ansible` and `~/.terraform.d`. Ansible then refused to start for the learner
+  and dsoxlab reported `rc=5, Stats: {}` — a symptom nothing connected to the
+  cause. Fixed with `sudo -H`, plus a `chown` belt.
+
+  **`ovmf` and `qemu-utils` were missing**: both are mere *recommendations* of
+  `qemu-kvm` on Debian, so `--no-install-recommends` dropped them. Without the
+  first, libvirt exposes no EFI firmware and every `provision` stops dead; without
+  the second, it cannot create a qcow2 volume. Found by provisioning for real from
+  inside the appliance — and the first was named in 2.3 seconds by the guard added
+  for issue #234.
+
+  **No libvirt `default` pool and no group membership**: a fresh Debian defines
+  neither, so `doctor --strict` exited 9 and `student` could not open `/dev/kvm`.
+  Both are now set up at first boot, which is also why it reboots at the end.
+
+  **The desktop had no X server.** Same pattern as `ovmf` and `qemu-utils`, for
+  the third time: `xserver-xorg` is a *recommendation* of `xfce4` and `lightdm`,
+  never a dependency, so `--no-install-recommends` dropped it. `/usr/bin/Xorg`
+  did not exist, `lightdm` was `failed`, and the machine came up on a console
+  despite `graphical.target` — with nothing tying that to a missing package. The
+  server and its video drivers (`vmware` for the VMSVGA controller VirtualBox and
+  VMware present, `vesa` and `fbdev` as fallbacks) are now named explicitly.
+
+  **`~/.ssh/config` did not include what dsoxlab writes.** `provision` drops a
+  `~/.ssh/config.d/<catalog>.conf` and warns, at every run, that nothing reads it.
+  The `Include` is now placed at the top of the file, where OpenSSH requires it.
+
+  **`start` called an unusable infrastructure "already provisioned".** It
+  decided from the state alone, so an address was enough. The sequence that
+  followed was absurd: `provision` exited 8 on "some hosts did not answer: the
+  infrastructure exists, but it is not usable as it stands", and the `start`
+  relaunched right after — relaunched *because* nothing answered — announced
+  "already provisioned, nothing to build again", then failed further down on a
+  raw Ansible `UNREACHABLE` that nothing tied to the cause. It now probes port
+  22 as well: an address is not a machine. Replaying `provision` costs nothing,
+  since it resumes without recreating anything, and it waits.
+
+  **The console was flooded with `AF_VSOCK` errors**, one per systemd reload, so
+  a dozen red lines in five seconds while packages installed. Nothing was broken,
+  but nothing said so either. `systemd-ssh-generator` is now masked, the
+  documented way, with a symlink to `/dev/null`.
+
 ## [0.2.1] - 2026-09-25
 
 ### Added

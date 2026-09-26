@@ -1132,6 +1132,11 @@ silent.
         "RAM: {avail} MB available for {need} MB declared",
     "detail_resources_ram_unknown":
         "RAM: /proc/meminfo unreadable, nothing measured",
+    "explain_qemu_img_absent":
+        "Known cause: `qemu-img` is missing, so libvirt can only create raw "
+        "volumes — every qcow2 volume of the plan fails at once. On Debian and "
+        "Ubuntu it lives in `qemu-utils`, which is only a *recommendation* of "
+        "qemu-kvm: an install made with --no-install-recommends leaves it out.",
     "explain_pool_full":
         "Known cause: the libvirt storage pool is full. qcow2 disks grow with use, "
         "so a pool that was enough yesterday can run short today. Check what is "

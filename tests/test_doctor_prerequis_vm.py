@@ -555,3 +555,22 @@ def test_sans_hote_declare_les_ressources_se_taisent(
 
     assert "resources" not in _cles(report.required)
     assert _cles(report.required) >= {"hw_virt", "cpu_arch"}
+
+
+def test_un_qemu_img_absent_est_nomme(tmp_path: Path) -> None:
+    """Rencontré en provisionnant depuis l'appliance, pas en relisant du code.
+
+    libvirt dit « creation of non-raw file images is not supported without
+    qemu-img » et les quatre volumes du plan échouent d'un coup. Le paquet qui
+    manque — `qemu-utils` sur Debian, simple *recommandation* de qemu-kvm — n'est
+    nommé nulle part dans ce message.
+    """
+    connu = doctor.explique_echec_provision(
+        "Error: Volume Creation Failed\nFailed to create storage volume: internal "
+        "error: creation of non-raw file images is not supported without qemu-img."
+    )
+
+    assert connu is not None
+    explication, commande = connu
+    assert "qemu-img" in explication
+    assert "qemu-utils" in commande
