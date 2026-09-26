@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-26
+
+### Fixed
+
+- **The appliance build got one step further, and stopped on the step before.**
+  With `/mnt` finally writable, Packer refused to start: *Output directory
+  '/mnt/appliance/out' already exists. It must not exist.* That refusal is a
+  feature — it is how Packer guarantees it never writes over a previous
+  build — and the preparation step was creating that very directory. It now
+  creates only the parent and the temporary directory, and leaves `out/` to
+  Packer. Two failures in a row at the same place say something worth keeping:
+  a workflow that has never run is a workflow that does not work, and the only
+  way to know is to run it.
+
 ## [0.2.3] - 2026-09-26
 
 ### Fixed

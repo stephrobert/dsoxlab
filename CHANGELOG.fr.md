@@ -9,6 +9,21 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.4] - 2026-09-26
+
+### Corrigé
+
+- **Le build de l'appliance a avancé d'une étape, et s'est arrêté sur la
+  précédente.** `/mnt` étant enfin accessible en écriture, c'est Packer qui a
+  refusé de démarrer : *Output directory '/mnt/appliance/out' already exists.
+  It must not exist.* Ce refus est une qualité — c'est ainsi que Packer
+  garantit qu'il n'écrase jamais un build précédent — et l'étape de
+  préparation créait précisément ce répertoire. Elle ne crée plus que le
+  parent et le répertoire temporaire, et laisse `out/` à Packer. Deux échecs
+  de suite au même endroit disent quelque chose qu'il vaut la peine de
+  retenir : un workflow qui n'a jamais tourné est un workflow qui ne marche
+  pas, et le seul moyen de le savoir est de le jouer.
+
 ## [0.2.3] - 2026-09-26
 
 ### Corrigé
