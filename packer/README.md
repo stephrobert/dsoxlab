@@ -7,6 +7,17 @@ has to be set up by hand.
 answer, and `dsoxlab demo` gives you a first lab with no hypervisor at all —
 downloading a gigabyte to avoid one command would make no sense.
 
+What this recipe produces, imported into VirtualBox and left to configure
+itself:
+
+![dsoxlab provisioning a lab's machines from the appliance's
+terminal](../docs/assets/appliance-lab-vm.png)
+
+`dsoxlab start` on a `vm` lab, inside the appliance: the required checks green,
+then Terraform bringing up the lab's machines — VMs inside the VM. The
+user-facing page is [docs/appliance.md](../docs/appliance.md); this one is the
+recipe.
+
 ## What the image does and does not pin
 
 It **does not pin a dsoxlab version.** The first boot installs the latest
@@ -83,5 +94,12 @@ Reduce them if you only play `shell` labs — you now know what it costs.
 | `scripts/10-base.sh` | the system: packages every lab machine needs |
 | `scripts/20-outils.sh` | `uv`, Terraform, `ansible-core` |
 | `scripts/30-premier-demarrage.sh` | what happens on the user's first boot |
+| `scripts/40-reseau-portable.sh` | the network, named by description and not by interface name |
 | `scripts/90-nettoyage.sh` | what decides the final weight |
+
+`40-reseau-portable.sh` runs next to last on purpose. It switches the resolver
+to `systemd-resolved`, and `20-outils.sh` is still downloading before it; after
+it, nothing needs the network. It exists because Debian's installer freezes the
+interface name it saw — `enp0s2` under the building QEMU, `enp0s17` under
+VirtualBox — which left the imported appliance with no network at all.
 | `faire-ova.sh` | derives the importable OVA from the qcow2 |

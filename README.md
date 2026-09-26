@@ -35,6 +35,31 @@ locally, per catalog.
 
 ---
 
+## Two ways in
+
+| | **Install the tool** | **Download the appliance** |
+| --- | --- | --- |
+| For | Linux, and macOS or Windows with Python at hand | Windows and macOS, or anyone who prefers a throwaway machine |
+| You need | Python 3.11+ and `uv` or `pipx` | VirtualBox or VMware, and 8 GB of RAM to spare |
+| You get | one command, a few megabytes | a Debian 13 VM with desktop, Ansible and Terraform, ~450 MB to download |
+| Read | the section right below | **[The appliance](docs/appliance.md)** |
+
+On Linux, installing the tool is the right answer: downloading half a gigabyte
+to avoid one command makes no sense, and this README says so rather than
+selling both equally.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/stephrobert/dsoxlab/main/docs/assets/appliance-bureau.png" alt="dsoxlab doctor in a terminal on the appliance's desktop, under VirtualBox" width="820">
+</p>
+
+<p align="center">
+  <em>The appliance a few minutes after import: the desktop, 86 labs
+  discovered, and the only choice left named with the command that settles
+  it.</em>
+</p>
+
+---
+
 ## Install and play, in five minutes
 
 Requires **Python 3.11+** and either [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
@@ -63,6 +88,7 @@ Three readers, three doors. Every page names its audience in its first lines.
 | I want to… | Read |
 | --- | --- |
 | Install dsoxlab, play labs, understand my score | **[For the learner](docs/learner.md)** |
+| Play labs on Windows or macOS, without installing anything | **[The appliance](docs/appliance.md)**, a ready-to-play VM |
 | Write my own catalog of labs | **[For the catalog author](docs/catalog-author.md)**, then [the v1 contract](docs/contract-v1.md) field by field |
 | Run the machines the labs need | **[For the trainer](docs/trainer.md)** |
 | Know where dsoxlab writes on my disk | [Where dsoxlab writes](docs/files.md) |
