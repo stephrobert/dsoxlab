@@ -57,14 +57,22 @@ guide in the terminal, `dsoxlab fullhelp`.
 
 <!-- END COMMANDES -->
 
-## Exit codes worth knowing
+## Exit codes
+
+Every code the CLI returns, what it means and the gesture it calls for, is on
+[its own page](./exit-codes.md), held in step with `src/dsoxlab/exit_codes.py`
+by a test. The table below is the short list; it is not the whole one, and a
+script should branch on the page rather than on this excerpt.
 
 | Code | Meaning |
 | --- | --- |
+| `1` | The command ran, and the answer is no: a failing test, an unknown lab id |
+| `2` | The command could not run: no infrastructure, a fixture missing. Something has to be prepared, and the message says what |
 | `5` | `provision` found machines a failed provisioning left outside the Terraform state. The message names the command that removes them |
 | `6` | `destroy` could not remove those machines |
+| `7` | Another dsoxlab command already holds this catalog's write lock. The message names it — the only code worth retrying |
 | `8` | `provision` gave up waiting for hosts that never answered: the infrastructure exists, but it is not usable as it stands |
-| `7` | Another dsoxlab command already holds this catalog's write lock. The message names it |
+| `9` / `10` | `doctor --strict`: a required check failed, or could not be measured. The first is repaired, the second is measured again |
 | `130` | The command was interrupted (Ctrl-C), and says how to resume |
 
 Every one of them exists because a failure that does not announce itself is

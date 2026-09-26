@@ -23,8 +23,17 @@ Tout ce qui suit concerne les catalogues qui déclarent `runtime.type: vm`.
 
 Les modules Terraform (`kvm`, `incus`, `outscale`) et les templates cloud-init
 (AlmaLinux, Ubuntu, Debian) vivent **dans dsoxlab**. Un catalogue ne livre
-**aucun** Terraform ni cloud-init : il déclare `infra:` dans son `meta.yml` et
-pose sa clé publique dans `ssh/id_ed25519.pub`.
+**aucun** Terraform ni cloud-init : il déclare `infra:` dans son `meta.yml`, et
+c'est tout ce qu'il livre.
+
+**La clé SSH est par clone, pas par catalogue.** `provision` déploie
+`<catalogue>/ssh/id_ed25519.pub` sur chaque nœud, et refuse de démarrer sans la
+moitié privée à côté. Les deux viennent de `dsoxlab instructor bootstrap`, qui
+régénère la paire dès qu'une moitié manque. Une clé publique commitée par
+l'auteur ne servirait à personne — sa moitié privée reste sur son disque — et
+les catalogues publiés ignorent tout le répertoire `ssh/`. Chaque machine qui
+provisionne un catalogue joue donc `instructor bootstrap` une fois, apprenants
+compris : le mot « instructor » nomme la commande, pas son public.
 
 `dsoxlab provision` recopie les templates vers
 `~/.local/state/dsoxlab/<catalog-id>/`, génère
@@ -227,7 +236,11 @@ qu'un formateur a intérêt à garder en tête :
   (`~/.cache/dsoxlab/<catalog-id>/`). Il se régénère à la demande, mais il se
   purge aussi : ce qui pointerait dessus (un `Include`, un profil d'IDE) doit
   survivre à sa disparition. Le fragment écrit dans
-  `~/.ssh/config.d/<catalog-id>.conf` est celui qui est stable.
+  `~/.ssh/config.d/<catalog-id>.conf` est celui qui est stable — à condition
+  que `~/.ssh/config` porte un `Include` de ce répertoire avant tout bloc
+  `Host`. dsoxlab n'écrit pas cette ligne à votre place et le signale à chaque
+  `provision` tant qu'elle manque : sans elle, le fragment est écrit et jamais
+  lu, et `ssh alma-1.lab` continue d'échouer.
 - **Un catalogue, un verrou.** Une seconde commande concurrente qui écrit sort
   en code `7` et nomme la première. Deux clones du même catalogue partagent le
   verrou, parce qu'ils partagent le state Terraform.

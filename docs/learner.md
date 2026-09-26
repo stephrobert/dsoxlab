@@ -48,22 +48,57 @@ No VM, no container, no Docker: it runs anywhere dsoxlab runs.
 ## Then, a real catalog
 
 Labs live in their own repositories, published separately from the engine.
-Clone one, then run `dsoxlab` from inside it — the catalog you are in is the
-catalog dsoxlab serves.
+Install one by name — the tool knows `linux`, `ansible` and `terraform` — or by
+any git URL. `catalog add` clones it under
+`~/.local/share/dsoxlab/catalogs/` and makes it the **active** catalog, the one
+dsoxlab serves when you are not standing in a catalog directory. A plain
+`git clone` works too, and then the catalog you are in is the one it serves.
 
 ```bash
-git clone https://github.com/stephrobert/linux-dsoxlab-training.git
-cd linux-dsoxlab-training
-
+dsoxlab catalog add linux       # or a git URL, or: git clone … && cd …
 dsoxlab doctor                  # what this catalog needs, and what is missing
 dsoxlab list-labs
 dsoxlab show <lab-id>
-dsoxlab run <lab-id>
+dsoxlab start <lab-id>          # context, prerequisites, infrastructure, session
 ```
+
+`start` is the command to learn first. A lab needs steps in an order nothing
+tells you — set the context, check the prerequisites, bring machines up when
+the lab needs some, prepare and open the session — and `start` plays them
+**announcing each one with the single command that replays it alone**. When a
+step fails, the message names it and its command, and nothing beyond it is
+attempted: you are never left guessing which of `use`, `doctor`, `provision`
+or `run` you skipped.
 
 `dsoxlab doctor` only reports what *this* catalog needs: a catalog made of
 shell labs never asks for a hypervisor. `dsoxlab doctor --fix` repairs what can
 be repaired safely.
+
+### What a `vm` lab needs from your machine
+
+Two kinds of labs, and only the first is free. A **`shell`** lab runs in a
+directory on your own machine: the demonstration lab is one, and so is every
+lab of the Terraform catalog. A **`vm`** lab starts real virtual machines next
+to you — 66 of the Linux catalog's 86 labs do — and for that your machine has
+to be able to run them:
+
+- **Linux, with KVM.** The packaged hypervisors are KVM/libvirt and Incus, and
+  neither exists on Windows or macOS: there, `vm` labs mean
+  [the appliance](./appliance.md). Inside a virtual machine they also need
+  nested virtualization, which is enabled on the host and not in the guest.
+- **libvirt and QEMU.** `dsoxlab doctor --fix` installs them where the remedy
+  is an `apt install`, the only package manager the remedies know today, and
+  adds you to the `kvm` group — which takes effect at your next login.
+- **Terraform.** `doctor` names it and links its install page but cannot
+  install it: HashiCorp ships it through its own repository. Ansible needs
+  nothing, it comes with dsoxlab.
+- **An SSH key pair for the catalog**, from `dsoxlab instructor bootstrap`. The
+  name says instructor; run it anyway. A catalog you clone carries no key — its
+  `.gitignore` excludes the whole `ssh/` directory, since a private key has no
+  business in a repository — and `provision` refuses to start without one.
+
+None of this is guesswork: `dsoxlab doctor` sorts it into what this catalog
+requires and what is merely informational, and says what to do about each.
 
 ---
 
@@ -170,12 +205,16 @@ The full list of locations is on [Where dsoxlab writes](./files.md).
   find out what it did. `-v`, `-vv` and `--debug` only change what reaches your
   terminal.
 
-Two exit codes are worth recognising:
+Four exit codes are worth recognising:
 
 | Code | Meaning |
 | --- | --- |
+| `1` | The command ran, and the answer is no: a failing test, an unknown lab id. It is about your work, not your setup |
+| `2` | The command could not run: no infrastructure yet, a fixture missing from the lab. Something has to be prepared, and the message says what |
 | `7` | Another dsoxlab command is already writing in this catalog. The message names it. Wait for it, or close the other terminal |
 | `130` | You interrupted the command (Ctrl-C). The message says how to resume |
+
+[The full list](./exit-codes.md) matters to a script, not to you.
 
 ---
 
@@ -196,3 +235,5 @@ DSOXLAB_NO_UPDATE_CHECK=1 …        # silence the check
 - [Every command, generated from the CLI itself](./commands.md)
 - [Where dsoxlab writes](./files.md)
 - [Writing your own catalog](./catalog-author.md)
+- [Running the machines a `vm` lab needs](./trainer.md)
+- [The appliance](./appliance.md), if installing the tool is not an option

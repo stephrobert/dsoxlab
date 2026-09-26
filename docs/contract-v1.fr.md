@@ -56,7 +56,8 @@ la validation sans un mot. Celui-ci le voit.
 
 ## `meta.yml`, à la racine du dépôt
 
-Seuls `repo.id` et `repo.category` sont obligatoires. Un dépôt dont tous les
+Seul `repo.id` est obligatoire. `repo.category` est devenu optionnel en 0.1.88,
+et `validate-structure` le réclame dès qu'un `lab.yaml` existe. Un dépôt dont tous les
 labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 
 ### `repo` (obligatoire)

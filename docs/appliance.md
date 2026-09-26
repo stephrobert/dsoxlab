@@ -2,6 +2,8 @@
 
 **Audience:** anyone on Windows or macOS who wants to play labs without
 installing anything, and anyone who prefers a throwaway machine to their own.
+**No knowledge of virtualization is assumed**: this page goes from the download
+to the first lab, step by step.
 
 **Language:** [English](./appliance.md) · [Français](./appliance.fr.md)
 
@@ -19,91 +21,191 @@ the hypervisor — named together with the command that settles it.*
 half a gigabyte to avoid `uv tool install dsoxlab` makes no sense. It exists for
 the systems where that command is not an option.
 
-## Download
+---
 
-The images are attached to the GitHub Releases of **minor versions** (0.2.0,
-0.3.0…), not to every patch: republishing half a gigabyte to change one line
-would cost a lot and gain nothing. The one attached to the latest minor release
-is the current one — the image itself pins no version of dsoxlab, and installs
-the latest at first boot.
+## What you need
+
+| | Minimum | Comfortable |
+| --- | --- | --- |
+| Memory | 4 GB **free** for the VM | 8 GB, required for `vm` labs |
+| Disk | 25 GB free | 40 GB |
+| CPU | 2 cores | 4 cores |
+| Software | VirtualBox (free) | — |
+| Network | a connection, for the first boot | — |
+
+The first boot downloads about 1.5 GB (dsoxlab, the hypervisors, the desktop).
+That is deliberate: nothing is pinned in the image, so nothing in it is stale.
+
+---
+
+## Step 1 — Install VirtualBox
+
+Go to <https://www.virtualbox.org/wiki/Downloads> and take the package for your
+system:
+
+- **Windows**: *Windows hosts*. Double-click, follow the wizard, and accept the
+  network driver installation when Windows asks.
+- **macOS Intel**: *macOS / Intel hosts*. After installing, macOS may block the
+  extension: open **System Settings → Privacy & Security** and click *Allow*
+  for Oracle.
+- **Linux**: your package manager, or the package on that page.
+
+The *Extension Pack* it offers is **not needed** here.
+
+---
+
+## Step 2 — Download the image
+
+The images are attached to the [project's
+Releases](https://github.com/stephrobert/dsoxlab/releases), on **every**
+published version. Which means: take the latest, there is nothing to check.
 
 | File | For | Tested |
 | --- | --- | --- |
 | `dsoxlab-appliance-<version>.ova` | VirtualBox — Windows, Linux, Intel Mac | yes: import, boot, desktop |
-| the same `.ova` | VMware Workstation and Fusion | not directly; the OVF validates against the DMTF schema and declares what VMware expects (`vmx-13`, LsiLogic, E1000, `streamOptimized`) |
+| the same `.ova` | VMware Workstation and Fusion | not directly; the OVF validates against the DMTF schema and declares what VMware expects |
 | `dsoxlab-appliance-<version>.qcow2` | QEMU/KVM, libvirt, Proxmox | yes |
 | `SHA256SUMS` | checking what you downloaded | — |
 
+`<version>` is the release number, exactly as the Releases page shows it
+without its `v`: the file on release `v0.2.3` is
+`dsoxlab-appliance-0.2.3.ova`.
+
+If you are starting out, take the **`.ova`**.
+
+**Check the digest** before importing half a gigabyte from the internet.
+Download `SHA256SUMS` next to the image, then:
+
+```powershell
+# Windows, in PowerShell
+Get-FileHash .\dsoxlab-appliance-<version>.ova -Algorithm SHA256
+```
+
+```bash
+# macOS and Linux
+shasum -a 256 dsoxlab-appliance-<version>.ova
+```
+
+The value printed must match the one `SHA256SUMS` gives for that file. If it
+differs, the download is incomplete or tampered with: start it again.
+
 Both images are **x86-64**. See [Apple Silicon](#apple-silicon-m1-m4) below.
 
-**Only the last two sets of images are kept.** Older minor releases keep their
-page, their changelog and their Python distributions, but their `.ova` and
-`.qcow2` are removed — roughly 900 MB each, for images that pin no dsoxlab
-version and therefore offer nothing but weight once the next one exists. Take
-the latest; there is no reason to want an older one.
+**Only the last two sets of images are kept.** Older releases keep their page,
+their changelog and their Python distributions, but their `.ova` and `.qcow2`
+are removed — roughly 900 MB each, for images that pin no dsoxlab version and
+install the latest at first boot. An old image offers nothing but its weight.
 
-## Import and start
+---
 
-In VirtualBox: **File → Import Appliance**, pick the `.ova`, accept. On the
-command line, `VBoxManage import dsoxlab-appliance-<version>.ova`.
+## Step 3 — Import the image
 
-The machine advertises 4 vCPU and 8 GB. Lower it if your machine is smaller — 2
-vCPU and 4 GB are enough for `shell` labs — in **Settings → System**.
+In VirtualBox: **File → Import Appliance**, pick the `.ova` file, then
+**Next**. Double-clicking the `.ova` opens the same window.
 
-For `vm` labs, though, **keep the 8 GB**: the lab machines run *inside* the
-appliance, and `dsoxlab doctor` compares the memory available to what the
-catalog declares. Measured with the Linux catalog, which declares 5120 MB: at
-4 GB, `doctor` refuses to start and says exactly what is missing.
+The next screen lists what the machine advertises: **4 CPUs** and **8192 MB**
+of memory. Both can be changed right here, and this is the moment to do it:
 
-First login, on the console or in the desktop:
+- your machine has **8 GB of RAM in total**: bring the VM down to **4096 MB**.
+  `shell` labs will work, `vm` labs will not — and `dsoxlab doctor` will say so
+  rather than leave you guessing;
+- your machine has **16 GB or more**: leave 8192 MB.
+
+Click **Finish**. The import takes one to three minutes, while VirtualBox
+decompresses the disk.
+
+---
+
+## Step 4 — For `vm` labs: enable nested virtualization
+
+Skip this if you only want `shell` labs.
+
+A `vm` lab starts real machines *inside* the appliance. Your computer therefore
+has to allow a virtual machine to launch others, which is set **outside** the
+appliance, with it powered off.
+
+In VirtualBox, select the machine, then **Settings → System → Processor**, and
+tick **Enable Nested VT-x/AMD-V**. On the command line:
+
+```bash
+VBoxManage modifyvm "dsoxlab-appliance-<version>" --nested-hw-virt on
+```
+
+If the box is greyed out, your CPU or your BIOS does not expose it: `shell`
+labs remain entirely playable.
+
+---
+
+## Step 5 — Start it, and let it work
+
+Select the machine and click **Start**. Here is what you will see, in three
+acts, with nothing to type:
+
+1. a few seconds of white text on black — Debian booting;
+2. **several minutes** where the machine appears to sit at a login prompt. It
+   is not idle: it is installing dsoxlab, the hypervisors and the desktop.
+   Count five to fifteen minutes depending on your connection;
+3. the machine **reboots on its own** and shows the login screen.
+
+![The appliance's login screen](./assets/appliance-connexion.png)
+
+That reboot is not a failure: group membership and the desktop only take effect
+at the next boot.
+
+**If something fails**, the machine says so and **starts over at the next
+boot**: it never marks itself configured when it is not. The usual cause is no
+network in the virtual machine — check its adapter under **Settings →
+Network**, then restart it.
+
+---
+
+## Step 6 — Log in
 
 | | |
 | --- | --- |
 | user | `student` |
 | password | `dsoxlab` |
 
-**The password must be changed at that first login**: the build password is
-public, it lives in this repository. The machine asks for it on its own.
+**The machine requires you to change that password immediately.** That is
+expected: the build password is public, it is written in this repository. It
+asks for the old one (`dsoxlab`), then the new one twice.
 
-## What the first boot does
+You land on an XFCE desktop. The terminal is in the bottom bar, second icon.
 
-The image pins nothing, so the first boot builds what would have gone stale:
+---
 
-1. it installs the **latest published dsoxlab**;
-2. it installs the **hypervisors** (KVM, libvirt, Incus) — *only* if the host
-   exposes nested virtualization, which it checks rather than assumes;
-3. it installs the **XFCE desktop** and Firefox;
-4. it **reboots**, because group membership and the graphical target only take
-   effect at the next boot.
+## Step 7 — Play a first lab
 
-Count a few minutes, depending on your connection. The console shows every step.
+In the terminal:
 
-**If something fails, the machine says so and starts over at the next boot.** It
-does not mark itself as configured: a half-installed appliance that believes it
-is complete is worse than one that admits it is not. The usual cause is no
-network in the virtual machine — check its network adapter, then restart it.
+```bash
+dsoxlab demo                 # installs a one-lab demonstration catalog
+cd ~/.local/share/dsoxlab/demo
 
-## Playing `vm` labs: nested virtualization
-
-Labs of type `shell` work everywhere. Labs of type `vm` start real machines
-*inside* the appliance, which requires the host to allow it:
-
-- **VirtualBox**: `VBoxManage modifyvm <name> --nested-hw-virt on`, appliance
-  powered off. In the interface, **Settings → System → Processor → Enable
-  Nested VT-x/AMD-V**.
-- **VMware**: *Virtualize Intel VT-x/EPT or AMD-V/RVI*.
-- **QEMU/libvirt**: the host's `kvm_intel`/`kvm_amd` module must have
-  `nested=1`, and the CPU model must be passed through (`host-passthrough`).
-
-You do not have to guess whether it worked:
-
-```console
-$ dsoxlab doctor
+dsoxlab course premiers-pas     # the lesson
+dsoxlab run premiers-pas        # drops you into the lab's work directory
+dsoxlab challenge premiers-pas  # the mission
+dsoxlab check premiers-pas      # the tests, and the score
 ```
 
-names what this machine can do and what is missing, and says in so many words
-that nested virtualization is enabled on the **host** hypervisor, this machine
-powered off.
+That demonstration lab needs no VM and no container: it proves the whole loop
+works before you invest in a full catalog.
+
+Then install a real catalog:
+
+```bash
+dsoxlab catalog add https://github.com/stephrobert/linux-dsoxlab-training
+dsoxlab doctor                  # what this machine can do, and what is missing
+dsoxlab list-labs               # the catalog's 86 labs
+```
+
+`doctor` will tell you whether a choice is still pending — the hypervisor, for
+instance, when the catalog offers several:
+
+```bash
+dsoxlab use --provider kvm
+dsoxlab start <lab-id>          # context, prerequisites, infrastructure, session
+```
 
 ![dsoxlab provisioning a lab's machines from the appliance's
 terminal](./assets/appliance-lab-vm.png)
@@ -111,6 +213,23 @@ terminal](./assets/appliance-lab-vm.png)
 *`dsoxlab start` on a `vm` lab, inside the appliance: sixteen required checks
 green, then Terraform bringing up the lab's three machines — VMs inside the
 VM.*
+
+---
+
+## When something goes wrong
+
+| Symptom | Most likely cause | What to do |
+| --- | --- | --- |
+| The machine stays on a console, no desktop | the first boot did not complete | it starts over at the next boot: check the VM's network, then restart it |
+| "Temporary failure in name resolution" | the VM has no network | **Settings → Network**, adapter 1 enabled, attached to **NAT** |
+| `dsoxlab doctor` reports missing nested virtualization | it is enabled on **your** computer, not inside the VM | [step 4](#step-4--for-vm-labs-enable-nested-virtualization), appliance powered off |
+| `doctor` says "RAM: … available for … declared" | the VM is too small for this catalog | give it more memory, or play `shell` labs |
+| The import fails on an OVF error | incomplete download | check the SHA256 digest again |
+
+A report beats a workaround: `dsoxlab support --issue` fills in the diagnosis
+and opens the issue in the right place.
+
+---
 
 ## Apple Silicon (M1-M4)
 
@@ -134,6 +253,8 @@ Until then, on an Apple Silicon Mac, install the tool:
 `uv tool install dsoxlab`. Every `shell` lab works, which is the whole
 Terraform catalog and a good part of the others.
 
+---
+
 ## What is inside
 
 Debian 13, minimal, plus what a lab workstation needs: `git`, `curl`, `vim`,
@@ -151,5 +272,6 @@ runner. It is reproducible: nothing is hand-made in the image.
   trainer serving several learners wants [the trainer's page](./trainer.md).
 - **The disk is 20 GB.** Enough for a catalog and a few lab VMs, not for a
   Kubernetes cluster of three nodes. Enlarge it in your hypervisor if needed.
-- **No automatic update.** `uv tool upgrade dsoxlab` updates the tool; the image
-  itself is only rebuilt at minor versions.
+- **No automatic update.** `uv tool upgrade dsoxlab` updates the tool inside an
+  appliance you already run. Importing a newer image only brings you an updated
+  system: dsoxlab itself is installed fresh at every machine's first boot.

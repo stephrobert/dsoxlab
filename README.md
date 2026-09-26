@@ -81,9 +81,42 @@ and no Docker: it runs anywhere dsoxlab runs.
 
 ---
 
+## Or: the appliance, in four steps
+
+For Windows and macOS, where `uv tool install` is not an option. No knowledge
+of virtualization required.
+
+1. **Install VirtualBox** from <https://www.virtualbox.org/wiki/Downloads>. The
+   *Extension Pack* it offers is not needed.
+2. **Download the `.ova`** from the latest
+   [release](https://github.com/stephrobert/dsoxlab/releases) that carries one,
+   and check its digest against the `SHA256SUMS` published next to it.
+3. **Import and start**: in VirtualBox, *File → Import Appliance*, pick the
+   `.ova`, *Finish*, then *Start*. The first boot installs dsoxlab, the
+   hypervisors and the desktop, then **reboots on its own**: count five to
+   fifteen minutes, with nothing to type.
+4. **Log in** with `student` / `dsoxlab` — the machine requires you to change
+   that password, which is public — then, in the desktop's terminal:
+
+   ```bash
+   dsoxlab demo && cd ~/.local/share/dsoxlab/demo
+   dsoxlab course premiers-pas
+   ```
+
+`vm` labs need one more step, **nested virtualization**, which is enabled on
+your computer and not inside the machine: *Settings → System → Processor →
+Enable Nested VT-x/AMD-V*, appliance powered off. `dsoxlab doctor` says so when
+it is missing.
+
+Every step in detail, the actual requirements and a troubleshooting table are
+on **[the appliance page](docs/appliance.md)**.
+
+---
+
 ## Documentation
 
-Three readers, three doors. Every page names its audience in its first lines.
+Every page names its audience in its first lines, and
+[the index](docs/README.md) lists them all.
 
 | I want to… | Read |
 | --- | --- |
@@ -91,6 +124,8 @@ Three readers, three doors. Every page names its audience in its first lines.
 | Play labs on Windows or macOS, without installing anything | **[The appliance](docs/appliance.md)**, a ready-to-play VM |
 | Write my own catalog of labs | **[For the catalog author](docs/catalog-author.md)**, then [the v1 contract](docs/contract-v1.md) field by field |
 | Run the machines the labs need | **[For the trainer](docs/trainer.md)** |
+| Get throwaway VMs, with no exercise to write | [Infrastructure without labs](docs/infra-only.md) |
+| Call dsoxlab from a script or a CI, and branch on the result | [Exit codes](docs/exit-codes.md), then [the machine output](docs/machine-output.md) for `--json` |
 | Know where dsoxlab writes on my disk | [Where dsoxlab writes](docs/files.md) |
 | See every command | [Command reference](docs/commands.md), generated from the CLI |
 
@@ -179,6 +214,13 @@ persistent, and four releases come from his reports:
   virtual machine does not have (0.1.95). That came out of his work on a
   ready-to-use appliance, discussed in
   [#91](https://github.com/stephrobert/dsoxlab/issues/91).
+
+**And the appliance itself is his idea.** He did not ask for it: he had already
+**built one end to end**, then documented it in
+[#91](https://github.com/stephrobert/dsoxlab/issues/91). The one dsoxlab ships
+today is directly inspired by his — the idea and the approach both. It is the
+contribution a changelog shows least and the product owes most: without it,
+there would be nothing to offer anyone working on Windows or macOS.
 
 **[@Gedd18](https://github.com/Gedd18)** found that the lab catalog's
 `conftest.py` failed to load whenever no infrastructure provider was resolved,

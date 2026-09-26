@@ -47,23 +47,62 @@ Ni VM, ni conteneur, ni Docker : il tourne partout où dsoxlab tourne.
 
 ## Ensuite, un vrai catalogue
 
-Les labs vivent dans leurs propres dépôts, publiés séparément du moteur. Clonez
-en un, puis lancez `dsoxlab` depuis l'intérieur : le catalogue où vous êtes est
-celui que dsoxlab sert.
+Les labs vivent dans leurs propres dépôts, publiés séparément du moteur.
+Installez-en un par son nom — l'outil connaît `linux`, `ansible` et
+`terraform` — ou par n'importe quelle URL git. `catalog add` le clone sous
+`~/.local/share/dsoxlab/catalogs/` et le rend **actif**, c'est-à-dire celui que
+dsoxlab sert quand vous n'êtes pas dans un répertoire de catalogue. Un simple
+`git clone` fonctionne aussi, et alors le catalogue où vous êtes est celui
+qu'il sert.
 
 ```bash
-git clone https://github.com/stephrobert/linux-dsoxlab-training.git
-cd linux-dsoxlab-training
-
+dsoxlab catalog add linux       # ou une URL git, ou : git clone … && cd …
 dsoxlab doctor                  # ce que ce catalogue exige, et ce qui manque
 dsoxlab list-labs
 dsoxlab show <lab-id>
-dsoxlab run <lab-id>
+dsoxlab start <lab-id>          # contexte, prérequis, infrastructure, session
 ```
+
+`start` est la commande à apprendre en premier. Un lab demande des étapes dans
+un ordre que rien ne vous dit — poser le contexte, vérifier les prérequis,
+monter les machines quand le lab en veut, préparer puis ouvrir la session — et
+`start` les joue **en annonçant chacune avec la seule commande qui la rejoue
+seule**. Quand une étape échoue, le message la nomme avec sa commande, et rien
+au-delà n'est tenté : vous ne cherchez jamais laquelle de `use`, `doctor`,
+`provision` ou `run` vous avez sautée.
 
 `dsoxlab doctor` ne rapporte que ce dont *ce* catalogue a besoin : un catalogue
 fait de labs shell ne réclame jamais d'hyperviseur. `dsoxlab doctor --fix`
 répare ce qui peut l'être sans risque.
+
+### Ce qu'un lab `vm` demande à votre machine
+
+Deux sortes de labs, et seule la première est gratuite. Un lab **`shell`** se
+joue dans un répertoire de votre machine : le lab de démonstration en est un,
+et tout le catalogue Terraform aussi. Un lab **`vm`** démarre de vraies
+machines virtuelles à côté de vous — 66 des 86 labs du catalogue Linux le
+font — et votre machine doit donc pouvoir les faire tourner :
+
+- **Linux, avec KVM.** Les hyperviseurs packagés sont KVM/libvirt et Incus, et
+  aucun des deux n'existe sous Windows ou macOS : là-bas, les labs `vm`
+  passent par [l'appliance](./appliance.fr.md). Dans une machine virtuelle,
+  ils réclament en plus la virtualisation imbriquée, qui s'active sur l'hôte
+  et non dans l'invité.
+- **libvirt et QEMU.** `dsoxlab doctor --fix` les installe là où le remède est
+  un `apt install`, le seul gestionnaire de paquets que les remèdes
+  connaissent aujourd'hui, et vous ajoute au groupe `kvm` — ce qui prend effet
+  à votre prochaine connexion.
+- **Terraform.** `doctor` le nomme et renvoie à sa page d'installation, mais ne
+  peut pas l'installer : HashiCorp le distribue par son propre dépôt. Ansible
+  ne demande rien, il vient avec dsoxlab.
+- **Une paire de clés SSH pour le catalogue**, produite par `dsoxlab instructor
+  bootstrap`. Le mot « instructor » nomme la commande, lancez-la quand même :
+  un catalogue que vous clonez ne porte aucune clé — son `.gitignore` exclut
+  tout le répertoire `ssh/`, une clé privée n'ayant rien à faire dans un
+  dépôt — et `provision` refuse de démarrer sans elle.
+
+Rien de tout cela ne se devine : `dsoxlab doctor` le range entre ce que ce
+catalogue exige et ce qui est informatif, et dit quoi faire de chaque ligne.
 
 ---
 
@@ -173,12 +212,16 @@ copie votre historique avec lui. La liste complète des emplacements est sur
   savoir ce qu'elle a fait : `-v`, `-vv` et `--debug` ne changent que ce qui
   arrive à votre terminal.
 
-Deux codes de sortie méritent d'être reconnus :
+Quatre codes de sortie méritent d'être reconnus :
 
 | Code | Sens |
 | --- | --- |
+| `1` | La commande s'est exécutée, et la réponse est non : un test qui échoue, un identifiant de lab inconnu. Cela concerne votre travail, pas votre installation |
+| `2` | La commande n'a pas pu s'exécuter : pas encore d'infrastructure, une fixture absente du lab. Quelque chose est à préparer, et le message dit quoi |
 | `7` | Une autre commande dsoxlab écrit déjà dans ce catalogue. Le message la nomme : l'attendre, ou fermer l'autre terminal |
 | `130` | Vous avez interrompu la commande (Ctrl-C). Le message indique comment reprendre |
+
+[La liste complète](./exit-codes.fr.md) intéresse un script, pas vous.
 
 ---
 
@@ -199,3 +242,5 @@ DSOXLAB_NO_UPDATE_CHECK=1 …        # couper l'avis
 - [Toutes les commandes, produites par la CLI elle-même](./commands.fr.md)
 - [Où dsoxlab écrit](./files.fr.md)
 - [Écrire son propre catalogue](./catalog-author.fr.md)
+- [Monter les machines qu'un lab `vm` demande](./trainer.fr.md)
+- [L'appliance](./appliance.fr.md), si installer l'outil n'est pas une option

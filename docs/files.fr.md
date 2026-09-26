@@ -24,9 +24,11 @@ Les deux sont à ignorer dans le `.gitignore` du catalogue. Aucun des deux ne se
 déplace : ils **sont** le dépôt, et c'est ce qui fait suivre la progression au
 catalogue plutôt qu'à la machine.
 
-Un catalogue qui déclare des labs `vm` porte aussi sa propre paire de clés SSH,
-sous `<catalogue>/ssh/id_ed25519` et son `.pub`, produite par
-`dsoxlab instructor bootstrap`. La moitié privée ne se commite jamais.
+Un catalogue qui déclare des labs `vm` porte aussi une paire de clés SSH, sous
+`<catalogue>/ssh/id_ed25519` et son `.pub`, produite par `dsoxlab instructor
+bootstrap` sur chaque machine qui le provisionne. Aucune des deux moitiés n'est
+commitée : la privée ne doit jamais l'être, et la publique ne sert à rien sans
+elle.
 
 ---
 

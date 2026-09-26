@@ -58,14 +58,23 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 
 <!-- END COMMANDES -->
 
-## Les codes de sortie qui veulent dire quelque chose
+## Les codes de sortie
+
+Tous les codes que rend la CLI, ce qu'ils signifient et le geste qu'ils
+appellent vivent sur [leur propre page](./exit-codes.fr.md), tenue en accord
+avec `src/dsoxlab/exit_codes.py` par un test. La table ci-dessous en est un
+extrait, pas la liste complète : un script décide sur la page, pas sur cet
+extrait.
 
 | Code | Sens |
 | --- | --- |
+| `1` | La commande s'est exécutée, et la réponse est non : un test qui échoue, un identifiant de lab inconnu |
+| `2` | La commande n'a pas pu s'exécuter : pas d'infrastructure, une fixture absente. Quelque chose est à préparer, et le message dit quoi |
 | `5` | `provision` a trouvé des machines qu'un provisioning en échec a laissées hors du state Terraform. Le message nomme la commande qui les retire |
 | `6` | `destroy` n'a pas pu retirer ces machines |
+| `7` | Une autre commande dsoxlab tient déjà le verrou d'écriture de ce catalogue. Le message la nomme — le seul code qui vaille une nouvelle tentative |
 | `8` | `provision` a renoncé à attendre des hôtes qui ne répondaient pas : l'infrastructure existe, mais elle n'est pas utilisable en l'état |
-| `7` | Une autre commande dsoxlab tient déjà le verrou d'écriture de ce catalogue. Le message la nomme |
+| `9` / `10` | `doctor --strict` : un contrôle requis a échoué, ou n'a pas pu être mesuré. Le premier se répare, le second se remesure |
 | `130` | La commande a été interrompue (Ctrl-C), et dit comment reprendre |
 
 Chacun existe pour la même raison : un échec qui ne se dit pas est pire qu'un

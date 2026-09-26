@@ -9,6 +9,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-26
+
+### Fixed
+
+- **The appliance workflow had never run, and died four hundredths of a second
+  in.** `mkdir: cannot create directory '/mnt/appliance': Permission denied` —
+  on a GitHub runner `/mnt` belongs to root, and that is where the disk space
+  is (~70 GB against ~14 on `/`). No local build could show it, since the
+  directory exists and is writable on a developer's machine. A dedicated step
+  now creates it with `sudo` and hands it to the runner.
+
+- **The image is published on every release, not only on minor ones.** The old
+  rule saved bandwidth and cost more than it saved: the documentation announced
+  an appliance the latest release did not carry, and the reader had to work out
+  which earlier release did. "The latest release carries the image" is the only
+  sentence that needs no caveat, and nothing accumulates since the retention
+  step keeps the last two sets. The two workflows now start from the same tag,
+  so the upload waits for the Release to exist instead of assuming it — and
+  says which workflow to look at if it never does.
+
+### Changed
+
+- **The documentation is a path now, not a pile of pages.** Read end to end
+  against the code, it had breaks that no single page could reveal:
+
+  `learner.md` promised `run` right after cloning a catalog, while **66 of the
+  Linux catalog's 86 labs** are `vm` labs: that `run` exits 2, the `provision`
+  it suggests exits 1 for want of an SSH key, and neither `instructor
+  bootstrap`, nor `start`, nor the word Terraform appeared anywhere on the
+  page. It now names what a `vm` lab asks of a machine, and puts `start` first
+  — the command that plays the whole order and announces each step with the
+  command that replays it alone.
+
+  `catalog-author.md` listed a lab's files without saying what goes in them.
+  The scale that `validate-structure` enforces (`### … (20 pts)` against a
+  `N tasks, M points` header, and one point per test), the format of
+  `hints.yaml`, and where `conftest.py` lives — pytest runs from the catalog
+  root — were documented nowhere.
+
+  The README reached neither the index nor `exit-codes.md`,
+  `machine-output.md` and `infra-only.md`: three reference pages unreachable
+  from the front door.
+
+  The SSH key was described as something a catalog ships. It is not: published
+  catalogs ignore the whole `ssh/` directory, and `provision` refuses to start
+  without the private half. It is generated **per clone**, by `instructor
+  bootstrap`, learners included.
+
+  `contract-v1.md` contradicted itself nine lines apart on whether
+  `repo.category` is required.
+
+- **`docs/appliance.md` is a step-by-step**, from installing VirtualBox to the
+  first lab, with the digest check, the memory to give the machine depending on
+  the host's, what the first boot looks like in three acts, and a
+  troubleshooting table. Both READMEs open on the two ways in, each with its
+  own four-step path.
+
+### Added
+
+- **Credit where it is due**: the appliance is [@cedric-ribier]'s idea, and it
+  exists because he had already built one end to end and documented it in
+  [#91](https://github.com/stephrobert/dsoxlab/issues/91). The one shipped here
+  is directly inspired by his.
+
+[@cedric-ribier]: https://github.com/cedric-ribier
+
 ## [0.2.2] - 2026-09-26
 
 ### Added
@@ -27,8 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The image **pins nothing**. The first boot installs the latest dsoxlab, and the
   hypervisors only if the host exposes nested virtualization — checked live, never
-  assumed. Which is why it is rebuilt on **minor tags only**: republishing half a
-  gigabyte for every patch would cost a lot and change nothing.
+  assumed. It is rebuilt on **every published version**, patches included: the
+  latest release carries the image, which is the only sentence that needs no
+  caveat. Nothing accumulates — only the last two sets are kept.
 
   Measured, not estimated: **461 MiB** for the qcow2 and **446 MiB** for the OVA,
   built in 4 min 50 s, against a budget the workflow enforces at 800 MiB. A
@@ -39,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selling them as equals.
 
 - **Only the last two sets of images are kept on the Releases.** Roughly 900 MB
-  per minor version, forever, for images that pin no dsoxlab version and
+  per version, forever, for images that pin no dsoxlab version and
   install the latest at first boot: an old one offers no reproducibility, only
   weight. Two rather than one, so a broken image has a fallback. The Releases,
   their changelog and the Python distributions are untouched.
