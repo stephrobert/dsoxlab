@@ -9,16 +9,23 @@
 #   2. un build d'image de vingt minutes ne doit ni retarder une publication PyPI,
 #      ni pouvoir la faire échouer.
 #
-# Sur les tags, il ne se déclenche que sur les **mineurs** (`v0.3.0`, `v0.4.0`) :
-# l'image n'épingle pas la version de dsoxlab, elle installe la dernière au
-# premier démarrage, donc republier un gigaoctet à chaque correctif coûterait
-# cher pour ne rien changer.
+# Il se déclenche sur **toute** version publiée, correctifs compris. La règle
+# précédente — les seuls tags mineurs — économisait de la bande passante et
+# coûtait plus cher que ça : elle laissait la doc annoncer une appliance que la
+# dernière release ne portait pas, et obligeait le lecteur à chercher laquelle
+# des releases précédentes en avait une. « La dernière release porte l'image »
+# est la seule phrase qu'on n'a pas à nuancer.
+#
+# Ce que ça ne coûte pas : de l'espace qui s'accumule. Seuls les deux derniers
+# jeux d'images sont conservés (voir l'étape de rétention), et l'image
+# n'épinglant aucune version de dsoxlab, une ancienne n'offre rien d'autre que
+# son poids.
 
 name: Appliance
 
 on:
   push:
-    tags: ["v[0-9]+.[0-9]+.0"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
     inputs:
       tag:
@@ -97,6 +104,18 @@ jobs:
           echo "sum=$sum" >> "$GITHUB_OUTPUT"
           echo "ISO : $name"
 
+      - name: Prepare the build directory on /mnt
+        # `/mnt` has the space (~70 GB against ~14 on `/`), but it belongs to
+        # root: the runner cannot create anything there. The first real run of
+        # this workflow died on exactly that, four hundredths of a second in —
+        # a defect no local build could show, since the directory exists and is
+        # writable on a developer's machine.
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "${BUILD_DIR}/out" "${BUILD_DIR}/tmp"
+          sudo chown -R "$(id -u):$(id -g)" "${BUILD_DIR}"
+          df -h "${BUILD_DIR}"
+
       - name: packer init && validate
         working-directory: packer
         env:
@@ -104,7 +123,6 @@ jobs:
           ISO_SUM: ${{ steps.iso.outputs.sum }}
         run: |
           set -euo pipefail
-          mkdir -p "${BUILD_DIR}/out" "${BUILD_DIR}/tmp"
           packer init .
           packer validate \
             -var "image_version=${GITHUB_REF_NAME#v}" \
@@ -206,6 +224,24 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          # Les deux workflows partent du même tag : celui-ci construit pendant
+          # vingt minutes, `release.yml` publie en deux. La Release existe donc
+          # en pratique bien avant qu'on arrive ici — mais « en pratique » n'est
+          # pas une garantie, et un upload sur une Release absente échouerait
+          # sur un message qui ne dirait pas pourquoi. On attend, et on le dit.
+          restants=30                      # 30 × 20 s = dix minutes
+          until gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; do
+            restants=$((restants - 1))
+            if [ "$restants" -le 0 ]; then
+              echo "::error::La Release $TAG n'existe toujours pas après dix minutes."
+              echo "::error::Regardez release.yml : s'il a échoué, les images n'ont rien où s'attacher."
+              exit 1
+            fi
+            echo "En attente de la Release $TAG…"
+            sleep 20
+          done
+
           gh release upload "$TAG" --repo "$REPO" --clobber \
             "${BUILD_DIR}"/out/*.ova \
             "${BUILD_DIR}"/out/*.qcow2 \

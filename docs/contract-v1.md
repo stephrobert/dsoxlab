@@ -56,7 +56,8 @@ without a word. This one sees it.
 
 ## `meta.yml` — repository root
 
-Only `repo.id` and `repo.category` are required. A repository whose labs are all
+Only `repo.id` is required. `repo.category` became optional in 0.1.88, and
+`validate-structure` asks for it as soon as one `lab.yaml` exists. A repository whose labs are all
 `shell` has no `infra:` block at all, and that is a supported case, not an
 omission.
 

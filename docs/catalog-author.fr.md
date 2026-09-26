@@ -23,7 +23,7 @@ c'est lui qui garde le moteur neutre vis-à-vis du domaine.
 ma-formation/
 ├── meta.yml                    ← catalogue : identité, topologie, ordre des sections
 ├── meta.fr.yml                 ← optionnel : titres et descriptions en français
-├── ssh/id_ed25519.pub          ← seulement si le catalogue déclare des labs vm
+├── ssh/id_ed25519.pub          ← produite par instructor bootstrap, jamais commitée
 └── labs/
     └── mon-domaine/l1/premier-lab/
         ├── lab.yaml            ← obligatoire
@@ -44,6 +44,68 @@ validator exige. Rien n'interdit d'en poser d'autres à côté : pytest collecte
 répertoire.
 
 ---
+
+## Ce que contient chaque fichier
+
+Trois fichiers Markdown, et le moteur lit chacun à un moment différent :
+
+| Fichier | Lu par | Contient |
+| --- | --- | --- |
+| `README.md` | `dsoxlab course`, d'un bloc avec `scenario.md` sauf si un `course.yaml` le découpe | le cours : ce que le lab enseigne, et ce qu'il suppose connu |
+| `scenario.md` | `dsoxlab course` | la situation : où se trouve l'apprenant et ce qui ne va pas — pas les gestes qui le corrigent |
+| `challenge/README.md` | `dsoxlab challenge` ; affiché par `run` avant l'ouverture de la session SSH d'un lab `vm`, l'hôte n'ayant pas dsoxlab ; lu par `validate-structure` pour le barème | la mission, sous forme de tâches notées |
+
+Seuls les deux premiers sont exigés par le validator de structure. Sans
+`challenge/README.md`, `dsoxlab challenge` affiche *Aucun fichier
+challenge/README.md pour ce lab*. `dsoxlab new lab` ne le crée pas — il écrit
+`README.md`, `scenario.md` et `test_functional.py`, rien d'autre — ce fichier
+est donc à vous.
+
+**Le barème.** dsoxlab note **par test** : cinq `def test_` dans
+`test_functional.py`, c'est vingt points chacun, les indices déduits ensuite.
+La mission annonce ce barème, et `validate-structure` tient les deux ensemble —
+ajouter un test à un lab décale silencieusement tout son barème, et ce contrôle
+est la seule chose qui s'en aperçoit :
+
+```markdown
+5 tâches, 100 points, 20 minutes
+
+### Tâche 1 — Créer le groupe (20 pts)
+```
+
+Un titre `### ` portant `(N pts)` ou `(N points)` est une tâche notée ; une
+ligne annonçant *N tâches* et *M points* est l'annonce. Les titres `##` ne sont
+pas comptés, si bien qu'un examen blanc peut grouper ses tâches en sections
+sans doubler son propre total. Le validator échoue quand les tâches ne
+totalisent pas le barème annoncé (`content_scoring_points_mismatch`), quand
+leur nombre diffère de celui annoncé (`content_scoring_count_mismatch`), ou du
+nombre de tests (`content_scoring_tasks_vs_tests`). Une mission qui n'annonce
+aucun point par tâche n'est pas contrôlée du tout : un examen blanc qui vérifie
+plusieurs choses par tâche a fait un autre choix, tout aussi valable.
+`challenge/README.fr.md` est lu en premier lorsqu'il existe.
+
+**Les indices.** `challenge/hints.yaml` porte le barème et les indices, dans
+l'ordre où ils seront donnés :
+
+```yaml
+points: 100            # le barème du lab ; 100 quand le fichier est absent
+hints:
+  - text_en: "The group must exist before the user does."
+    text_fr: "Le groupe doit exister avant l'utilisateur."
+    cost: 10           # points retirés quand l'apprenant le prend (défaut 10)
+```
+
+Une clé unique `text`, héritée, est encore lue, et une valeur en base64 est
+décodée pour qu'un indice ne ressorte pas dans un `git grep` ; ni l'une ni
+l'autre n'est nécessaire dans un lab neuf.
+
+**Les tests.** pytest s'exécute depuis la **racine du catalogue**, donc un
+`conftest.py` posé là est collecté pour tous les labs : c'est là que va
+l'import de `build_inventory` décrit plus bas, et là qu'un catalogue de labs
+`shell` résout `<lab>/challenge/work` depuis l'emplacement du fichier de test.
+`dsoxlab new catalog` n'en écrit aucun ; les catalogues Linux et Terraform en
+portent chacun un à leur racine, et l'un ou l'autre est un bon point de départ.
+
 
 ## `validate-structure` voit les labs qu'il ne peut pas charger
 

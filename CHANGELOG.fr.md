@@ -9,6 +9,75 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.3] - 2026-09-26
+
+### Corrigé
+
+- **Le workflow de l'appliance n'avait jamais tourné, et il est mort au bout de
+  quatre centièmes de seconde.** `mkdir: cannot create directory
+  '/mnt/appliance': Permission denied` — sur un runner GitHub, `/mnt`
+  appartient à root, et c'est là qu'est la place (environ 70 Go contre 14 sur
+  `/`). Aucun build local ne pouvait le montrer : sur une machine de
+  développement, ce répertoire existe et s'écrit. Une étape dédiée le crée
+  désormais en `sudo` et le remet au runner.
+
+- **L'image est publiée à chaque release, et plus seulement aux mineures.**
+  L'ancienne règle économisait de la bande passante et coûtait plus qu'elle
+  n'économisait : la documentation annonçait une appliance que la dernière
+  release ne portait pas, et le lecteur devait deviner laquelle des
+  précédentes l'avait. « La dernière release porte l'image » est la seule
+  phrase qui n'appelle aucune nuance, et rien ne s'accumule puisque l'étape de
+  rétention garde les deux derniers jeux. Les deux workflows partant désormais
+  du même tag, l'upload attend que la Release existe au lieu de le supposer —
+  et dit quel workflow regarder si elle n'arrive jamais.
+
+### Modifié
+
+- **La documentation est un parcours, plus une pile de pages.** Relue de bout
+  en bout contre le code, elle portait des ruptures qu'aucune page seule ne
+  pouvait révéler :
+
+  `learner.fr.md` promettait `run` juste après le clonage d'un catalogue, alors
+  que **66 des 86 labs du catalogue Linux** sont des labs `vm` : ce `run` sort
+  en 2, le `provision` qu'il suggère sort en 1 faute de clé SSH, et ni
+  `instructor bootstrap`, ni `start`, ni le mot Terraform n'apparaissaient sur
+  la page. Elle nomme maintenant ce qu'un lab `vm` demande à une machine, et
+  met `start` en premier — la commande qui joue tout l'ordre en annonçant
+  chaque étape avec la commande qui la rejoue seule.
+
+  `catalog-author.fr.md` listait les fichiers d'un lab sans dire ce qu'on y
+  met. Le barème que `validate-structure` impose (`### … (20 pts)` face à un
+  en-tête `N tâches, M points`, et un point par test), le format de
+  `hints.yaml`, et l'emplacement de `conftest.py` — pytest s'exécute depuis la
+  racine du catalogue — n'étaient documentés nulle part.
+
+  Le README n'atteignait ni l'index, ni `exit-codes.fr.md`,
+  `machine-output.fr.md` et `infra-only.fr.md` : trois pages de référence
+  inaccessibles depuis la porte d'entrée.
+
+  La clé SSH était décrite comme quelque chose que le catalogue livre. Il ne la
+  livre pas : les catalogues publiés ignorent tout le répertoire `ssh/`, et
+  `provision` refuse de démarrer sans la moitié privée. Elle se génère **par
+  clone**, avec `instructor bootstrap`, apprenants compris.
+
+  `contract-v1.fr.md` se contredisait à neuf lignes d'intervalle sur le
+  caractère obligatoire de `repo.category`.
+
+- **`docs/appliance.fr.md` est un pas-à-pas**, de l'installation de VirtualBox
+  au premier lab, avec la vérification d'empreinte, la mémoire à donner à la
+  machine selon celle de l'hôte, ce que montre le premier démarrage en trois
+  temps, et un tableau de dépannage. Les deux README ouvrent sur les deux
+  façons d'entrer, chacune avec son parcours en quatre étapes.
+
+### Ajouté
+
+- **Rendre à César** : l'appliance est l'idée de [@cedric-ribier], et elle
+  existe parce qu'il en avait déjà construit une de bout en bout, documentée
+  dans [#91](https://github.com/stephrobert/dsoxlab/issues/91). Celle qui est
+  livrée ici s'en inspire directement.
+
+[@cedric-ribier]: https://github.com/cedric-ribier
+
 ## [0.2.2] - 2026-09-26
 
 ### Ajouté
@@ -28,9 +97,10 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
   L'image **n'épingle rien**. Le premier démarrage installe le dernier dsoxlab, et
   les hyperviseurs seulement si l'hôte expose la virtualisation imbriquée, vérifiée
-  en direct et jamais supposée. D'où sa reconstruction sur les **tags mineurs
-  seulement** : republier un demi-gigaoctet à chaque correctif coûterait cher pour
-  ne rien changer.
+  en direct et jamais supposée. Elle est reconstruite à **chaque version
+  publiée**, correctifs compris : la dernière release porte l'image, et c'est la
+  seule phrase qui n'appelle aucune nuance. Rien ne s'accumule pour autant —
+  seuls les deux derniers jeux sont conservés.
 
   Mesuré, non estimé : **461 Mio** pour le qcow2 et **446 Mio** pour l'OVA,
   construits en 4 min 50 s, contre un budget que le workflow impose à 800 Mio. Une
@@ -41,7 +111,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   bonne sous Linux, plutôt que de les vendre à égalité.
 
 - **Seuls les deux derniers jeux d'images sont conservés sur les Releases.**
-  Environ 900 Mo par version mineure, pour toujours, pour des images qui
+  Environ 900 Mo par version, pour toujours, pour des images qui
   n'épinglent aucune version de dsoxlab et installent la dernière au premier
   démarrage : une ancienne n'offre aucune reproductibilité, seulement son
   poids. Deux plutôt qu'une, pour qu'une image cassée ait un recours. Les

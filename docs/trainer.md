@@ -23,8 +23,17 @@ Everything below applies to catalogs that declare `runtime.type: vm`.
 
 Terraform modules (`kvm`, `incus`, `outscale`) and cloud-init templates
 (AlmaLinux, Ubuntu, Debian) live **inside dsoxlab**. A catalog ships **no**
-Terraform and **no** cloud-init: it declares `infra:` in its `meta.yml` and puts
-its public key in `ssh/id_ed25519.pub`.
+Terraform and **no** cloud-init: it declares `infra:` in its `meta.yml`, and
+that is all it ships.
+
+**The SSH key is per clone, not per catalog.** `provision` deploys
+`<catalog>/ssh/id_ed25519.pub` on every node, and refuses to start without the
+private half next to it. Both come from `dsoxlab instructor bootstrap`, which
+regenerates the pair whenever either half is missing. A public key committed by
+the author would serve nobody — its private half stays on the author's disk —
+and the published catalogs ignore the whole `ssh/` directory. Every machine
+that provisions a catalog runs `instructor bootstrap` once, learners included:
+the name is the command's, not its audience's.
 
 `dsoxlab provision` copies the templates to
 `~/.local/state/dsoxlab/<catalog-id>/`, generates
@@ -220,7 +229,11 @@ should keep in mind:
 - **The generated `ssh_config` is a cache** (`~/.cache/dsoxlab/<catalog-id>/`).
   It is regenerated on demand, but also purgeable: anything pointing at it (an
   `Include`, an IDE profile) must survive its disappearance. The fragment
-  written to `~/.ssh/config.d/<catalog-id>.conf` is the stable one.
+  written to `~/.ssh/config.d/<catalog-id>.conf` is the stable one — provided
+  `~/.ssh/config` carries an `Include` of that directory before any `Host`
+  block. dsoxlab does not write that line for you, and warns at every
+  `provision` while it is missing: without it the fragment is written and never
+  read, and `ssh alma-1.lab` keeps failing.
 - **One catalog, one lock.** A second concurrent command that writes exits with
   code `7` and names the first. Two clones of the same catalog share the lock,
   because they share the Terraform state.

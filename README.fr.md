@@ -80,10 +80,43 @@ conteneur, ni Docker : il tourne partout où dsoxlab tourne.
 
 ---
 
+## Ou : l'appliance, en quatre étapes
+
+Pour Windows et macOS, où `uv tool install` n'est pas une option. Aucune
+connaissance de la virtualisation n'est nécessaire.
+
+1. **Installez VirtualBox** depuis
+   <https://www.virtualbox.org/wiki/Downloads>. L'*Extension Pack* proposé
+   n'est pas nécessaire.
+2. **Téléchargez le fichier `.ova`** de la dernière
+   [release](https://github.com/stephrobert/dsoxlab/releases) qui en porte un,
+   et vérifiez son empreinte avec le `SHA256SUMS` publié à côté.
+3. **Importez et démarrez** : dans VirtualBox, *Fichier → Importer un appareil
+   virtuel*, choisissez le `.ova`, *Terminer*, puis *Démarrer*. Le premier
+   démarrage installe dsoxlab, les hyperviseurs et le bureau, puis **redémarre
+   tout seul** : comptez cinq à quinze minutes, sans rien taper.
+4. **Connectez-vous** avec `student` / `dsoxlab` — la machine exige de changer
+   ce mot de passe, qui est public — puis, dans le terminal du bureau :
+
+   ```bash
+   dsoxlab demo && cd ~/.local/share/dsoxlab/demo
+   dsoxlab course premiers-pas
+   ```
+
+Les labs `vm` demandent une étape de plus, la **virtualisation imbriquée**, qui
+s'active sur votre ordinateur et non dans la machine : *Configuration → Système
+→ Processeur → Activer VT-x/AMD-V imbriqué*, appliance éteinte. `dsoxlab
+doctor` le dit s'il manque.
+
+Le détail de chaque étape, les prérequis chiffrés et un tableau de dépannage
+sont dans **[la page de l'appliance](docs/appliance.fr.md)**.
+
+---
+
 ## Documentation
 
-Trois lecteurs, trois portes. Chaque page nomme son public dès ses premières
-lignes.
+Chaque page nomme son public dès ses premières lignes, et
+[l'index](docs/README.fr.md) les répertorie toutes.
 
 | Je veux… | Lire |
 | --- | --- |
@@ -91,6 +124,8 @@ lignes.
 | Jouer des labs sous Windows ou macOS, sans rien installer | **[L'appliance](docs/appliance.fr.md)**, une VM prête à jouer |
 | Écrire mon propre catalogue de labs | **[Pour l'auteur de catalogue](docs/catalog-author.fr.md)**, puis [le contrat v1](docs/contract-v1.fr.md) champ par champ |
 | Monter les machines dont les labs ont besoin | **[Pour le formateur](docs/trainer.fr.md)** |
+| Obtenir des VM jetables, sans aucun exercice à écrire | [L'infrastructure sans labs](docs/infra-only.fr.md) |
+| Appeler dsoxlab depuis un script ou une CI, et décider sur le résultat | [Les codes de sortie](docs/exit-codes.fr.md), puis [la sortie machine](docs/machine-output.fr.md) pour `--json` |
 | Savoir où dsoxlab écrit sur mon disque | [Où dsoxlab écrit](docs/files.fr.md) |
 | Voir toutes les commandes | [Référence des commandes](docs/commands.fr.md), produite par la CLI |
 
@@ -185,6 +220,14 @@ et quatre versions viennent de ses remontées :
   BIOS qu'une machine virtuelle n'a pas (0.1.95). Cela vient de son travail sur
   une image prête à l'emploi, discuté dans
   [#91](https://github.com/stephrobert/dsoxlab/issues/91).
+
+**Et l'appliance elle-même est son idée.** Il ne l'a pas demandée : il l'avait
+déjà **construite de bout en bout**, puis documentée dans
+[#91](https://github.com/stephrobert/dsoxlab/issues/91). Celle que dsoxlab
+publie aujourd'hui s'inspire directement de la sienne — l'idée comme la
+démarche. C'est la contribution la moins visible dans un journal des
+modifications et la plus structurante pour le produit : sans elle, il n'y
+aurait rien à proposer à qui travaille sous Windows ou macOS.
 
 **[@Gedd18](https://github.com/Gedd18)** a trouvé que le `conftest.py` du
 catalogue de labs ne se chargeait plus dès qu'aucun provider d'infrastructure

@@ -30,8 +30,12 @@ Without it, `shell` labs work and `vm` labs cannot — and `dsoxlab doctor` says
 naming the detected hypervisor instead of pointing at a BIOS a virtual machine
 does not have.
 
-That is why the image is rebuilt on **minor tags only** (`v0.3.0`, `v0.4.0`), not
-on every patch release.
+The image is rebuilt on **every published version**, patches included. Limiting
+it to minor tags saved bandwidth and cost more than it saved: the documentation
+announced an appliance the latest release did not carry, and the reader had to
+work out which earlier release did. "The latest release carries the image" is
+the only sentence that needs no caveat — and nothing accumulates, since the
+retention step keeps the last two sets only.
 
 ## Building it
 
