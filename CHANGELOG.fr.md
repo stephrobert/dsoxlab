@@ -11,6 +11,43 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Après `submit`, un lien qui porte le résultat au portail du catalogue**
+  (issue #270). Un apprenant ne devrait pas avoir à exporter puis importer à la
+  main. Le mécanisme doit rester valable dans WSL, dans VirtualBox, sur une VM
+  distante en SSH et sur une instance cloud — où le navigateur n'est en général
+  pas sur la même machine et le portail pas joignable depuis là où l'outil
+  tourne. Un pont `localhost` ne marche dans aucun de ces cas ; un lien dans tous.
+
+  ```text
+  Portail déclaré par ce catalogue :
+    formation.example.org
+
+  Rien n'a été envoyé par dsoxlab. Ouvrez ou copiez ce lien pour ajouter le résultat :
+  https://formation.example.org/mon-apprentissage/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+  ```
+
+  **dsoxlab n'envoie rien, et des tests l'exigent** : pas de `webbrowser.open`,
+  pas de `xdg-open`, aucune requête, aucun nom résolu. La preuve voyage dans un
+  **fragment**, jamais dans une query string, donc elle n'apparaît dans aucun
+  journal de serveur, de reverse proxy ni de CDN — et l'hôte s'affiche sur sa
+  propre ligne, parce que ce qu'on lit d'une URL de 600 caractères, c'est son
+  début.
+
+  base64url sans remplissage, **aucune compression** : la preuve pèse moins d'un
+  kilo-octet (mesuré : 434 caractères de JSON, 579 encodés, pour un plafond de
+  32 Ko), et un décompresseur à l'arrivée serait une surface d'attaque pour rien.
+  C'est le **même** document Evidence v1 que `export --lab`, avec `count: 1` — un
+  seul format, donc qui sait lire le fichier sait lire le lien.
+
+  Deux décisions que l'issue demandait de trancher et de documenter. Le lien
+  s'affiche **après une tentative ratée aussi** : une preuve atteste ce qui s'est
+  passé, un portail sait en faire une file de révision, et ne montrer que les
+  réussites fabriquerait un historique flatteur. Et **sans portail, rien du
+  tout** — aucun avertissement, aucune adresse par défaut, parce qu'un catalogue
+  sans portail est un cas normal.
+
+  Un portail qui ne passe pas la politique n'affiche **aucun lien**, seulement la
+  raison, et renvoie vers `export --out`.
 - **Une preuve pour un seul lab, en fichier ou en copier-coller** (issue #271).
   Le lien vers un portail est la façon la plus directe de remettre un résultat,
   et elle ne suffit pas : un terminal qui ne rend pas les URL cliquables, un

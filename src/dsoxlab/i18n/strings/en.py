@@ -137,6 +137,17 @@ STRINGS: dict[str, str] = {
         "Write the document to this file instead of standard output",
     "opt_export_force":
         "Overwrite the output file if it already exists",
+    "remise_portail_declare":
+        "Portal declared by this catalog:",
+    "remise_rien_envoye":
+        "Nothing has been sent by dsoxlab. Open or copy this link to add the "
+        "result:",
+    "remise_portail_refuse":
+        "This catalog declares a learning portal that cannot be used: {reason}. "
+        "No link is shown; dsoxlab export writes the same proof to a file.",
+    "remise_charge_trop_grande":
+        "The proof does not fit in a URL fragment ({size} characters, {max} "
+        "allowed). Use dsoxlab export --lab <id> --out proof.json instead.",
     "preuve_sans_tentative":
         "No result recorded for {lab_id}: there is no proof to hand over yet. "
         "Run dsoxlab submit {lab_id} first.",

@@ -18,13 +18,17 @@ l'un sait lire l'autre.
 
 from __future__ import annotations
 
+import base64
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from ..models.lab import LabDefinition
 from ..reporting import machine
 from ..security import identifiant_sur
+from ..security.urls import url_de_portail
 from ..sessions.store import get_all_results
 from ..utils.shell import run_command
 
@@ -149,3 +153,98 @@ def construire_document(
         "results": lignes,
         "count": len(lignes),
     }
+
+
+# ── le lien de remise ────────────────────────────────────────────────────────
+
+#: Ce qu'un portail accepte dans un fragment, encodé. Mesuré côté site, pas
+#: deviné, et contrôlé **avant** tout décodage par le consommateur. Une preuve
+#: unitaire pèse quelques centaines de caractères : cette borne n'est pas là
+#: pour le cas courant, elle est là pour dire le jour où il cesse de l'être.
+LIMITE_FRAGMENT = 32 * 1024
+
+#: Le nom du paramètre dans le fragment. Un nom, pas un verbe : le portail lit
+#: une donnée, il ne reçoit pas un ordre.
+CLE_FRAGMENT = "dsoxlab"
+
+
+class ChargeTropGrande(ValueError):
+    """La preuve ne tient pas dans un fragment d'URL.
+
+    Le lien n'est alors pas affiché : un lien tronqué par un navigateur ou par
+    un serveur est pire qu'un lien absent, parce qu'il échoue chez le
+    destinataire, longtemps après le geste. ``dsoxlab export --out`` reste le
+    chemin universel, et c'est lui que la commande propose.
+    """
+
+    def __init__(self, taille: int) -> None:
+        self.taille = taille
+        self.limite = LIMITE_FRAGMENT
+        super().__init__(f"{taille} > {LIMITE_FRAGMENT}")
+
+
+def charge_utile(document: dict[str, Any]) -> str:
+    """Le document en **base64url sans remplissage**, prêt pour un fragment.
+
+    Chaque décision de cet encodage répond à une contrainte du consommateur, et
+    aucune n'est esthétique :
+
+    - **base64url** (RFC 4648 §5) parce que le base64 standard emploie ``+`` et
+      ``/``, qui ne traversent pas une URL sans être réencodés ;
+    - **sans remplissage**, parce qu'un ``=`` en fin de fragment se fait ronger
+      par les outils qui recopient des liens ;
+    - **JSON compact**, séparateurs serrés : l'indentation n'a aucun lecteur ici ;
+    - **aucune compression**. Une preuve unitaire tient en moins d'un kilo-octet
+      — mesuré : 434 caractères de JSON, 579 encodés. Un décompresseur chez le
+      destinataire ajouterait une surface d'attaque (une charge pathologique se
+      décompresse en gigaoctets) pour ne rien gagner.
+
+    Lève :class:`ChargeTropGrande` au-delà de :data:`LIMITE_FRAGMENT`.
+    """
+    compact = json.dumps(document, ensure_ascii=False, separators=(",", ":"))
+    charge = base64.urlsafe_b64encode(compact.encode("utf-8")).decode("ascii").rstrip("=")
+    if len(charge) > LIMITE_FRAGMENT:
+        raise ChargeTropGrande(len(charge))
+    return charge
+
+
+def lien_de_remise(portal_url: str, document: dict[str, Any]) -> str:
+    """L'URL à afficher pour remettre cette preuve, et rien de plus.
+
+    **Un fragment, jamais une query string.** Le fragment reste côté navigateur :
+    il ne part pas dans la requête HTTP, donc ni dans les journaux du serveur, ni
+    dans ceux d'un reverse proxy, ni dans un CDN. Avec ``?dsoxlab=…``, les
+    résultats d'un apprenant seraient écrits dans des fichiers que personne n'a
+    décidé de garder.
+
+    Ce choix ne rend pas le portail digne de confiance pour autant : son
+    JavaScript lit le fragment. C'est pourquoi la preuve ne porte que des données
+    pédagogiques — c'est la liste blanche d'Evidence v1, et c'est ce qui rend ce
+    lien anodin.
+
+    Un fragment déjà présent dans l'URL déclarée est **remplacé** : une URL n'en
+    porte qu'un, et un catalogue qui en déclarerait un ne dirait rien d'utile ici.
+
+    L'URL passe par :func:`dsoxlab.security.urls.url_de_portail`, donc par la
+    politique unique du projet. Rien ici n'ouvre de navigateur, n'appelle
+    ``xdg-open``, ne résout le nom du portail ni ne l'interroge : la commande
+    affiche un lien, et l'apprenant décide. Lève
+    :class:`~dsoxlab.security.urls.URLRefusee` sur une URL que la politique
+    refuse.
+    """
+    valide = url_de_portail(portal_url)
+    parties = urlparse(valide)
+    return urlunparse(parties._replace(
+        fragment=f"{CLE_FRAGMENT}={charge_utile(document)}"
+    ))
+
+
+def hote_du_portail(portal_url: str) -> str:
+    """Le nom d'hôte du portail, pour l'afficher à part du lien.
+
+    Un lien long finit tronqué par l'œil : ce qu'on lit d'une URL de plusieurs
+    centaines de caractères, c'est son début, et c'est précisément ce qu'un
+    attaquant contrôle le moins mal. Nommer l'hôte séparément, en clair, est ce
+    qui permet à l'apprenant de voir **où** il enverrait sa preuve.
+    """
+    return urlparse(url_de_portail(portal_url)).hostname or ""

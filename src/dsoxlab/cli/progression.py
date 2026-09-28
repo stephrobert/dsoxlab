@@ -37,6 +37,7 @@ from ..i18n import _
 from ..interrupt import (
     Interrupted,
 )
+from ..models.lab import LabDefinition
 from ..reporting import (
     console,
     error,
@@ -46,6 +47,7 @@ from ..reporting import (
     print_progress_table,
     print_scores_table,
     success,
+    warn,
 )
 from ..security.terminal import texte_affichable
 from ..services import (
@@ -167,6 +169,8 @@ def submit(
             threshold=lab.exam_passing_score,
         ))
 
+    _proposer_la_remise(root, lab)
+
     set_active_lab(root, None)
     console.print()
     # CTA "tape exit" uniquement si on est dans le sous-shell ouvert
@@ -177,6 +181,84 @@ def submit(
         console.print(_("submit_exit_cta"))
     else:
         console.print(_("submit_done"))
+
+
+def _proposer_la_remise(root: Path, lab: LabDefinition) -> None:
+    """Affiche le lien de remise, si ce catalogue déclare un portail.
+
+    Trois conditions, et aucune n'est devinée : la tentative vient d'être
+    **enregistrée**, le catalogue **déclare** un portail, et la preuve **tient**
+    dans un fragment d'URL. Faute de portail, on ne dit rien du tout — pas
+    d'avertissement, pas d'adresse par défaut, parce qu'un catalogue sans portail
+    est un cas normal et non une configuration manquante.
+
+    **Réussie ou non.** Le lien s'affiche après une tentative ratée aussi : une
+    preuve atteste ce qui s'est passé, et un portail sait en faire une file de
+    révision (« non validée, 3 tentatives, dernière 6/8 »). Ne montrer que les
+    réussites fabriquerait une progression flatteuse, et l'export complet, lui,
+    porte déjà les échecs.
+
+    **Rien n'est envoyé.** Pas de navigateur ouvert, pas de requête, pas de nom
+    résolu : l'adresse s'affiche, l'hôte est nommé à part, et l'apprenant décide.
+    C'est aussi ce que le texte dit, en toutes lettres, parce qu'un lien qui
+    apparaît après un test laisse spontanément croire qu'une transmission a eu
+    lieu.
+
+    Aucune de ces situations ne fait échouer `submit` : la tentative est
+    enregistrée, et un défaut de portail est un défaut de catalogue.
+    """
+    from ..discovery.repo import read_repo_metadata
+    from ..security import IdentifiantRefuse
+    from ..security.urls import URLRefusee
+    from ..services.evidence import (
+        ChargeTropGrande,
+        PreuveIntrouvable,
+        construire_document,
+        hote_du_portail,
+        identifiant_de_catalogue,
+        lien_de_remise,
+    )
+
+    try:
+        repo_meta = read_repo_metadata(root)
+    except Exception:  # noqa: BLE001 — un meta.yml illisible n'est pas le sujet
+        return
+    if repo_meta is None:
+        return
+    portail = repo_meta.learning.portal_url.strip()
+    if not portail:
+        return
+
+    try:
+        catalog_id = identifiant_de_catalogue(root, repo_meta.id)
+        document = construire_document(
+            root, {lab.id: lab}, catalog_id=catalog_id, lab_id=lab.id
+        )
+        lien = lien_de_remise(portail, document)
+        hote = hote_du_portail(portail)
+    except URLRefusee as refus:
+        # L'adresse vient du catalogue : on dit pourquoi elle ne sert pas, sans
+        # recopier la chaîne fautive, et on n'affiche aucun lien.
+        warn(_("remise_portail_refuse", reason=_(refus.cle, **refus.params)))
+        return
+    except ChargeTropGrande as trop:
+        warn(_("remise_charge_trop_grande", size=trop.taille, max=trop.limite))
+        return
+    except (IdentifiantRefuse, PreuveIntrouvable):
+        # Un identifiant hors contrat est déjà dit par `export`, et une preuve
+        # introuvable juste après l'avoir enregistrée ne peut venir que d'un lab
+        # `validation`, qui n'atteste rien.
+        return
+
+    console.print()
+    # `markup=False` partout : l'hôte comme le lien viennent du catalogue.
+    console.print(_("remise_portail_declare"))
+    console.print(f"  {hote}", markup=False)
+    console.print()
+    console.print(_("remise_rien_envoye"))
+    # soft_wrap : une URL coupée sur deux lignes n'est plus copiable, et celle-ci
+    # est longue par construction.
+    console.print(lien, soft_wrap=True, markup=False)
 
 
 # ── scores ────────────────────────────────────────────────────────────────────
