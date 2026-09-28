@@ -966,6 +966,10 @@ hors ligne, elle se tait.
     "content_target_host_unknown":
         "la target « {target} » vise l'hôte « {host} », absent de infra.hosts "
         "du meta.yml",
+    "content_prerequisite_unknown":
+        "le prérequis « {prerequisite} » ne nomme aucun lab de ce catalogue",
+    "content_prerequisite_self":
+        "le prérequis « {lab} » est le lab lui-même",
     "content_role_host_unknown":
         "le rôle « {role} » vise « {host} », absent de infra.hosts du meta.yml",
     # ── fixtures : le répertoire et la déclaration doivent coïncider ────────

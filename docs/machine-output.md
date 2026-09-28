@@ -85,6 +85,7 @@ same lab object. It is described once here.
 | `estimated_time` | string or null | free-form, e.g. `"30m"` |
 | `skills` | array of strings | never empty; the validator requires it |
 | `distros` | array of strings | never empty; same |
+| `prerequisites` | array of strings | lab ids this one assumes already played — empty for most labs, meaningful on a capstone, which crosses several lessons and can only name one in `doc_url` |
 | `doc_url` | string | the online guide, `http` or `https` |
 | `path` | string | **absolute** path of the lab directory, so an editor can open its files |
 | `runtime.type` | string | `shell` or `vm` |

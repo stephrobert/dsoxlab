@@ -39,6 +39,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   niveau du dépôt forcerait une réponse unique pour l'ensemble. Les trois
   catalogues publiés ne déclarent la valeur nulle part : aucun ne change de
   comportement.
+- **`prerequisites` : ce qu'un capstone suppose, et que `doc_url` ne sait pas
+  dire** (issue #222). Un lab porte un seul `doc_url` — la leçon qu'il éprouve
+  — et c'est exactement ce qu'il faut pour un micro-lab. Un capstone croise
+  plusieurs sujets et ne peut en nommer qu'un : le champ est honnêtement
+  renseigné et sous-annonce quand même ce que le lab couvre. Un lecteur conclut
+  que le capstone CKA porte sur le dépannage, alors qu'il exige aussi de
+  corriger une réserve CPU, d'apparier un volume et d'exposer un Service.
+
+  ```yaml
+  lab_type: capstone
+  prerequisites:
+    - cka-node-affinity
+    - cka-pv-pvc-storageclass
+  ```
+
+  Une liste de `doc_url` multiples répondrait à moitié : elle dirait « ce lab
+  éprouve ces sept leçons », ce qui est vrai et peu utile. Les prérequis disent
+  l'**ordre**, qui est la vraie information.
+
+  `validate-structure` vérifie que chaque identifiant nomme un lab du même
+  catalogue, et signale un lab qui se nomme lui-même. Ce contrôle est tout
+  l'intérêt : un prérequis qui pointe dans le vide ne casse aucun test et
+  n'empêche aucun run — il affiche un ordre qui ne mène nulle part, c'est-à-dire
+  le genre d'erreur qu'un auteur ne découvre jamais. Le champ est aussi exposé
+  dans `--json` : un champ que personne ne peut lire ne sert à personne.
 
 ### Corrigé
 
