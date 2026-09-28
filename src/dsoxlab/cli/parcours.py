@@ -55,6 +55,7 @@ from ..reporting import (
     print_lab_welcome,
     success,
 )
+from ..security.urls import URLRefusee
 from ..services import (
     guide_url,
     open_lab_session,
@@ -271,6 +272,7 @@ def challenge_cmd(
 def guide(
     lab_id: Annotated[str | None, typer.Argument(help=_("cmd_guide_arg"), autocompletion=_complete_lab_id)] = None,
     print_only: Annotated[bool, typer.Option("--print", help=_("cmd_guide_opt_print"))] = False,
+    ouvrir: Annotated[bool, typer.Option("--open", help=_("cmd_guide_opt_open"))] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     """Ouvre le guide en ligne du lab dans le navigateur.
@@ -284,7 +286,16 @@ def guide(
     lang = _lang(root)
     lab = _resolve_lab(root, lab_id, lang)
 
-    url = guide_url(lab)
+    try:
+        url = guide_url(lab)
+    except URLRefusee as refus:
+        # Le `doc_url` vient du catalogue. Une valeur refusée n'est pas un
+        # `doc_url` absent : le dire, et ne rien afficher de la chaîne
+        # fautive — elle peut porter du markup ou des séquences de terminal.
+        error(_("url_refusee", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("url_refusee_suite"))
+        raise typer.Exit(1) from None
     if url is None:
         error(_("guide_no_url", lab_id=lab.id))
         raise typer.Exit(1)
@@ -292,14 +303,21 @@ def guide(
     # soft_wrap : une URL coupée sur deux lignes n'est plus copiable ni
     # exploitable dans un pipe. Elle doit sortir d'un seul tenant, même
     # au-delà de la largeur du terminal.
-    if print_only:
-        console.print(url, soft_wrap=True)
+    #
+    # `markup=False` : l'URL est validée, donc sans caractère de contrôle,
+    # mais elle peut encore contenir des crochets que Rich lirait comme des
+    # balises. Une chaîne de catalogue ne pilote pas l'affichage.
+    console.print(url, soft_wrap=True, markup=False)
+    if print_only or not ouvrir:
+        # Le défaut. Une URL syntaxiquement sûre n'est pas une destination
+        # approuvée : la valeur vient du catalogue, et c'est l'utilisateur qui
+        # décide d'aller là où elle mène. Ouvrir sans le lui demander, c'est
+        # laisser un dépôt tiers choisir ce que son navigateur affiche.
         return
 
     info(_("guide_opening", lab_id=lab.id))
-    console.print(url, soft_wrap=True)
-    # L'URL reste affichée : sur une machine sans navigateur (session SSH,
-    # serveur), webbrowser rend False sans rien ouvrir, et l'apprenant doit
-    # pouvoir la copier.
+    # L'URL reste affichée au-dessus : sur une machine sans navigateur
+    # (session SSH, serveur), webbrowser rend False sans rien ouvrir, et
+    # l'apprenant doit pouvoir la copier.
     if not webbrowser.open(url):
         error(_("guide_no_browser"))

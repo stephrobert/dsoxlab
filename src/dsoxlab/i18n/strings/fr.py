@@ -991,6 +991,27 @@ hors ligne, elle se tait.
     "content_target_host_unknown":
         "la target « {target} » vise l'hôte « {host} », absent de infra.hosts "
         "du meta.yml",
+    # ── sécurité : ce qu'un catalogue ne peut pas faire faire au moteur ─────
+    "securite_url_vide": "une URL vide",
+    "securite_url_caractere":
+        "un caractère de contrôle ({code}), qui n'a rien à faire dans une URL",
+    "securite_url_illisible": "une URL que cet outil ne sait pas analyser",
+    "securite_url_schema":
+        "le schéma « {scheme} », alors que seuls {allowed} sont acceptés",
+    "securite_url_sans_hote": "aucun hôte",
+    "securite_url_identifiants":
+        "des identifiants avant l'hôte : l'œil lit le premier nom, le "
+        "navigateur va au second",
+    "cmd_guide_opt_open":
+        "Ouvrir l'URL dans un navigateur. Désactivé par défaut : l'adresse "
+        "vient du catalogue, et c'est vous qui décidez d'y aller",
+    "url_refusee":
+        "{field} a été refusée : {reason}",
+    "url_refusee_suite":
+        "Cette valeur vient du catalogue, que dsoxlab traite comme une entrée "
+        "non fiable. Elle n'est ni affichée ni utilisée tant qu'elle n'est pas "
+        "corrigée.",
+
     "content_prerequisite_unknown":
         "le prérequis « {prerequisite} » ne nomme aucun lab de ce catalogue",
     "content_prerequisite_self":

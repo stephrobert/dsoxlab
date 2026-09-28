@@ -977,6 +977,26 @@ silent.
     "content_missing_english": "no English counterpart ({name})",
     "content_target_host_unknown":
         "target '{target}' aims at host '{host}', missing from infra.hosts in meta.yml",
+    # ── security: what a catalog may not make the engine do ─────────────────
+    "securite_url_vide": "an empty URL",
+    "securite_url_caractere":
+        "a control character ({code}), which has no place in a URL",
+    "securite_url_illisible": "a URL this tool cannot parse",
+    "securite_url_schema":
+        "scheme '{scheme}', where only {allowed} are accepted",
+    "securite_url_sans_hote": "no host",
+    "securite_url_identifiants":
+        "credentials before the host: the eye reads the first name, the "
+        "browser goes to the second",
+    "cmd_guide_opt_open":
+        "Open the URL in a browser. Off by default: the address comes from the "
+        "catalog, and you decide where to go",
+    "url_refusee":
+        "{field} was refused: {reason}",
+    "url_refusee_suite":
+        "This value comes from the catalog, which dsoxlab treats as untrusted "
+        "input. It is displayed and used nowhere until it is corrected.",
+
     "content_prerequisite_unknown":
         "prerequisite '{prerequisite}' names no lab of this catalog",
     "content_prerequisite_self":

@@ -15,6 +15,7 @@ from __future__ import annotations
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from ..models.lab import LabDefinition
+from ..security.urls import PolitiqueURL, url_sure
 
 DEFAULT_SOURCE = "dsoxlab"
 DEFAULT_MEDIUM = "lab"
@@ -45,7 +46,15 @@ def guide_url(
     if not lab.doc_url:
         return None
 
-    parts = urlparse(lab.doc_url)
+    # AVANT d'y greffer quoi que ce soit. Le `doc_url` vient du catalogue, et
+    # un catalogue est une entrée non fiable : `javascript:…` transformé en
+    # `javascript:…?utm_source=dsoxlab` reste `javascript:`, et y ajouter des
+    # paramètres de campagne ne fait que lui donner l'air d'une URL. Lever
+    # plutôt que rendre None : un `doc_url` refusé n'est pas un `doc_url`
+    # absent, et l'appelant doit pouvoir le dire.
+    valide = url_sure(lab.doc_url, champ="doc_url", politique=PolitiqueURL.DOCUMENTATION)
+
+    parts = urlparse(valide)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
     query.update(
         {
