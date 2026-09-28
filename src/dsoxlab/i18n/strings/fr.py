@@ -134,6 +134,31 @@ STRINGS: dict[str, str] = {
         "Exporter tous les résultats en un document JSON, pour les relire ailleurs",
     "opt_export_json":
         "Accepté par cohérence ; cette commande rend toujours du JSON",
+    "opt_export_lab":
+        "La dernière tentative enregistrée de ce lab seulement, dans le même "
+        "document avec count: 1",
+    "opt_export_out":
+        "Écrire le document dans ce fichier au lieu de la sortie standard",
+    "opt_export_force":
+        "Écraser le fichier de sortie s'il existe déjà",
+    "preuve_sans_tentative":
+        "Aucun résultat enregistré pour {lab_id} : il n'y a pas encore de "
+        "preuve à remettre. Jouez d'abord dsoxlab submit {lab_id}.",
+    "preuve_lab_validation":
+        "{lab_id} défend un guide publié et ne note personne : il ne produit "
+        "aucune preuve de pratique.",
+    "export_fichier_existe":
+        "{path} existe déjà.",
+    "export_fichier_existe_suite":
+        "Une preuve remplacée en silence est une preuve perdue. Passez --force "
+        "pour l'écraser, ou choisissez un autre nom.",
+    "export_fichier_lien":
+        "{path} est un lien symbolique : écrire là écrirait ailleurs, à un "
+        "endroit que vous n'avez pas nommé.",
+    "export_fichier_erreur":
+        "Impossible d'écrire {path} : {error}",
+    "export_fichier_ecrit":
+        "{count} résultat(s) écrit(s) dans {path}",
     "cmd_scores_help":    "Affiche l'historique des scores enregistrés.",
     "cmd_reset_help":     "Remet le lab à l'état initial (clean + redémarrage).",
     "cmd_reset_arg":      "Identifiant du lab",
@@ -647,6 +672,11 @@ Chaque lab déclare :
                        Contrairement à [bold]scores[/bold], qui est un affichage, il
                        n'est jamais tronqué, et chaque ligne porte le catalogue, le
                        type du lab et un verdict [bold]validated[/bold] explicite.
+    [dim]--lab <id>[/dim]           La dernière tentative de ce lab seulement, même
+                       document, [bold]count: 1[/bold]. Ce qu'attend un portail ou un
+                       formateur.
+    [dim]--out <fichier>[/dim]      L'écrire dans un fichier ; la sortie standard reste
+                       vide. N'écrase jamais sans [bold]--force[/bold].
 
   [cyan]reset <id>[/cyan]           Nettoie et redémarre le lab depuis zéro.
 

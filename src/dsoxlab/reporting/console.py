@@ -490,6 +490,17 @@ def info(msg: str) -> None:
     console.print(f"[cyan]ℹ[/cyan] {msg}")
 
 
+def note(msg: str) -> None:
+    """Une confirmation qui ne doit jamais atterrir dans la sortie standard.
+
+    `dsoxlab export --out fichier.json` écrit un document et le dit ; mais un
+    appelant qui redirige la sortie standard attend du JSON et rien d'autre.
+    D'où stderr, et le même canal discret que l'avis de nouvelle version : ce
+    n'est ni une erreur ni une donnée, c'est un mot à un humain.
+    """
+    update_console.print(f"ℹ {msg}")
+
+
 def warn(msg: str) -> None:
     console.print(f"[yellow]⚠[/yellow] {msg}")
 

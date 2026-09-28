@@ -130,6 +130,31 @@ STRINGS: dict[str, str] = {
         "Export every result as a JSON document, for reading elsewhere",
     "opt_export_json":
         "Accepted for consistency; this command always emits JSON",
+    "opt_export_lab":
+        "Only this lab's last recorded attempt, as the same document with "
+        "count: 1",
+    "opt_export_out":
+        "Write the document to this file instead of standard output",
+    "opt_export_force":
+        "Overwrite the output file if it already exists",
+    "preuve_sans_tentative":
+        "No result recorded for {lab_id}: there is no proof to hand over yet. "
+        "Run dsoxlab submit {lab_id} first.",
+    "preuve_lab_validation":
+        "{lab_id} defends a published guide and grades nobody: it produces no "
+        "proof of practice.",
+    "export_fichier_existe":
+        "{path} already exists.",
+    "export_fichier_existe_suite":
+        "A proof replaced in silence is a proof lost. Pass --force to overwrite "
+        "it, or choose another name.",
+    "export_fichier_lien":
+        "{path} is a symbolic link: writing there would write somewhere you did "
+        "not name.",
+    "export_fichier_erreur":
+        "Cannot write {path}: {error}",
+    "export_fichier_ecrit":
+        "{count} result(s) written to {path}",
     "cmd_scores_help":   "Show recorded scores history.",
     "cmd_reset_help":    "Reset the lab to its initial state (clean + restart).",
     "cmd_reset_arg":     "Lab identifier",
@@ -636,6 +661,10 @@ Each lab declares:
                        Unlike [bold]scores[/bold], which is a display, it is never
                        truncated, and each line carries the catalog, the lab type
                        and an explicit [bold]validated[/bold] verdict.
+    [dim]--lab <id>[/dim]           Only that lab's last attempt, same document,
+                       [bold]count: 1[/bold]. What a portal or a trainer expects.
+    [dim]--out <file>[/dim]         Write it to a file; standard output stays empty.
+                       Never overwrites without [bold]--force[/bold].
 
   [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch.
 
