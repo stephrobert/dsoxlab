@@ -41,7 +41,6 @@ class TestLeDocument:
         assert document["producer"]["version"]
         assert document["generated_at"].endswith("+00:00"), "UTC, pas l'heure locale"
         assert document["catalog"]["id"]
-        assert document["catalog"]["path"] == str(catalogue)
 
     def test_un_historique_vide_reste_un_document(self, catalogue: Path) -> None:
         """Rien joué n'est pas rien à dire : le consommateur doit pouvoir lire."""
@@ -206,3 +205,82 @@ class TestLeContratNeBougePasEnSilence:
 
         assert "http://" not in brut
         assert "https://" not in brut
+
+
+class TestCeQueLaPreuveNeDoitJamaisPorter:
+    """Le modèle de menace, tenu par des tests négatifs.
+
+    Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>`
+    clone un dépôt git arbitraire. Et ce document est fait pour sortir de la
+    machine — vers un portail, un LMS, un fichier qu'on transfère. Les deux
+    ensemble imposent une règle simple : la preuve ne transporte que des
+    données pédagogiques, construites par **allowlist positive**, jamais par
+    sérialisation d'un objet interne dont on retirerait ensuite des clés.
+
+    Ces tests disent ce qui ne doit jamais s'y trouver. Ils échoueront le jour
+    où quelqu'un ajoutera un champ « utile pour déboguer ».
+    """
+
+    def _document_brut(self, catalogue: Path) -> str:
+        record_result(
+            catalogue, lab_id="premier", section="domaine", score=100,
+            max_score=100, passed_tests=5, total_tests=5, hints_used=0,
+        )
+        return json.dumps(_exporter(catalogue))
+
+    def test_aucun_chemin_absolu(self, catalogue: Path) -> None:
+        """Un chemin publie un nom d'utilisateur, parfois un nom de famille."""
+        brut = self._document_brut(catalogue)
+
+        assert str(catalogue) not in brut
+        assert "/home/" not in brut
+        assert "/Users/" not in brut
+        assert "C:\\" not in brut
+
+    def test_aucune_identite_de_machine(self, catalogue: Path) -> None:
+        """Ni hostname, ni utilisateur : la preuve décrit un travail, pas un poste."""
+        import getpass
+        import socket
+
+        brut = self._document_brut(catalogue)
+
+        assert socket.gethostname() not in brut
+        assert getpass.getuser() not in brut
+
+    def test_aucune_variable_d_environnement(self, catalogue: Path) -> None:
+        """Un environnement complet est un réservoir à secrets."""
+        import os
+
+        brut = self._document_brut(catalogue)
+        interessantes = [
+            v for v in os.environ.values() if len(v) > 12 and "/" not in v
+        ]
+
+        for valeur in interessantes[:40]:
+            assert valeur not in brut
+
+    def test_aucune_sortie_de_test_brute(self, catalogue: Path) -> None:
+        """La sortie de pytest contient des chemins, des noms, parfois des secrets.
+
+        Le document porte des compteurs — combien de tests, combien réussis —
+        et jamais le texte qui les a produits.
+        """
+        document = json.loads(self._document_brut(catalogue))
+        (ligne,) = document["results"]
+
+        assert "output" not in ligne
+        assert "stdout" not in ligne
+        assert "stderr" not in ligne
+
+    def test_rien_de_l_infrastructure(self, catalogue: Path) -> None:
+        """Ni provider, ni cible, ni inventaire : un portail n'en a que faire.
+
+        Et ce sont précisément les champs qui désignent des machines et des
+        accès.
+        """
+        document = json.loads(self._document_brut(catalogue))
+        (ligne,) = document["results"]
+
+        for interdit in ("provider", "target", "host", "inventory", "ssh"):
+            assert interdit not in ligne
+            assert interdit not in document["catalog"]

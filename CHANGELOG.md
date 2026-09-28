@@ -61,6 +61,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verdict when there is one, and `attempted_at` — a name that no longer
   presumes the outcome.
 
+  **The catalog is untrusted input** — `dsoxlab catalog add <url>` clones an
+  arbitrary git repository — and this document leaves the machine. It is
+  therefore built from a **positive allowlist**, never by serialising an
+  internal object and removing keys, and five negative tests pin what must
+  never appear: absolute paths, `$HOME`, hostname, username, environment
+  variables, raw pytest output, provider, target, inventory, SSH. `catalog.path`
+  was in the first draft and was removed for exactly that reason — a path
+  publishes a username, sometimes a surname.
+
   **No domain, site or URL appears in it**, and a test asserts it: dsoxlab
   produces a proof, it does not decide who consumes it. That is what lets a
   trainer other than this catalog's author use it, and what the issues on the

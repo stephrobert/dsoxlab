@@ -274,7 +274,14 @@ def export(
         # un dépôt git, et ce pourrait être autre chose ailleurs. Le
         # consommateur n'a pas à savoir laquelle, seulement à distinguer deux
         # états du même catalogue.
-        "catalog": {"id": catalog_id, "path": str(root), "version": commit},
+        #
+        # Le chemin local N'Y EST PAS. Ce document est fait pour être transmis :
+        # `/home/marie/Projets/…` y publierait un nom d'utilisateur, parfois un
+        # nom de famille, et l'arborescence d'une machine — à un destinataire
+        # qui n'en a aucun usage, puisque `id` et `version` identifient déjà le
+        # catalogue. C'est la règle que `support` applique à son rapport depuis
+        # 0.1.86, pour exactement la même raison.
+        "catalog": {"id": catalog_id, "version": commit},
         "results": lignes,
         "count": len(lignes),
     })

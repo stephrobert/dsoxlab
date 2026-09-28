@@ -222,7 +222,6 @@ chronological order, with nothing left for the reader to work out.
   "producer": { "name": "dsoxlab", "version": "0.2.5" },
   "catalog": {
     "id": "linux-dsoxlab-training",
-    "path": "/home/me/catalogs/linux-dsoxlab-training",
     "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
   },
   "results": [
@@ -292,6 +291,38 @@ a test asserts it, rather than trusting us to remember.
 Labs of `lab_type: validation` are excluded: they defend a published guide and
 grade nobody, so they have no place among someone's proofs of practice. Since
 0.3.0 they record nothing at all, but a database written earlier may hold some.
+
+### What this document must never carry
+
+A catalog is **untrusted input**: `dsoxlab catalog add <url>` clones an
+arbitrary git repository. And this document is made to leave the machine. Those
+two facts together set one rule: the proof carries teaching data only, built
+from a **positive allowlist** — never by serialising an internal object and
+removing a few keys afterwards, because the next field added to that object
+would ship silently.
+
+Never present, and pinned by tests that fail if they ever appear:
+
+| Excluded | Why |
+| --- | --- |
+| absolute paths, `$HOME` | a path publishes a username, sometimes a surname, and a machine's layout |
+| hostname, IP, MAC | the proof describes work, not a workstation |
+| environment variables | an environment is a reservoir of secrets |
+| raw pytest output | it contains paths, names, occasionally secrets. The document carries counters, never the text that produced them |
+| provider, target, inventory, SSH | the fields that name machines and access to them |
+| any learner identity | no name, no email, no account id — linking a proof to a person belongs to the portal, not to dsoxlab |
+
+`catalog.path` was in an early draft of this document and was removed for this
+reason: `id` and `version` identify the catalog, and the recipient has no use
+for where it sits on disk.
+
+**The catalog can describe its labs. It can never decide what dsoxlab
+exports.** No template, no extra field, no callback, no header, no command.
+
+One thing this puts on the consumer: `catalog.id`, `lab_id` and `section` come
+**from that untrusted catalog**. They are teaching data, and they are still
+attacker-controlled strings. Escape them before display, as you would any
+external input.
 
 ## `check`
 

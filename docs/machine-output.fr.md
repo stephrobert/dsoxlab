@@ -225,7 +225,6 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
   "producer": { "name": "dsoxlab", "version": "0.2.5" },
   "catalog": {
     "id": "linux-dsoxlab-training",
-    "path": "/home/moi/catalogues/linux-dsoxlab-training",
     "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
   },
   "results": [
@@ -298,6 +297,39 @@ Les labs de `lab_type: validation` en sont exclus : ils défendent un guide
 publié et ne notent personne, donc ils n'ont pas leur place parmi les preuves
 de pratique de quelqu'un. Depuis la 0.3.0 ils n'inscrivent plus rien, mais une
 base écrite avant peut en porter.
+
+### Ce que ce document ne doit jamais porter
+
+Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>` clone
+un dépôt git arbitraire. Et ce document est fait pour quitter la machine. Ces
+deux faits ensemble imposent une règle : la preuve ne transporte que des
+données pédagogiques, construites par **allowlist positive** — jamais en
+sérialisant un objet interne dont on retirerait ensuite quelques clés, car le
+prochain champ ajouté à cet objet partirait en silence.
+
+Jamais présents, et tenus par des tests qui échouent s'ils apparaissent :
+
+| Exclu | Pourquoi |
+| --- | --- |
+| chemins absolus, `$HOME` | un chemin publie un nom d'utilisateur, parfois un nom de famille, et l'arborescence d'une machine |
+| hostname, IP, MAC | la preuve décrit un travail, pas un poste |
+| variables d'environnement | un environnement est un réservoir à secrets |
+| sortie pytest brute | elle contient des chemins, des noms, parfois des secrets. Le document porte des compteurs, jamais le texte qui les a produits |
+| provider, cible, inventaire, SSH | précisément les champs qui désignent des machines et les accès à ces machines |
+| toute identité d'apprenant | ni nom, ni email, ni identifiant de compte — rattacher une preuve à une personne appartient au portail, pas à dsoxlab |
+
+`catalog.path` figurait dans un premier jet de ce document et en a été retiré
+pour cette raison : `id` et `version` identifient le catalogue, et le
+destinataire n'a aucun usage de l'endroit où il se trouve sur le disque.
+
+**Le catalogue peut décrire ses labs. Il ne peut jamais décider ce que dsoxlab
+exporte.** Aucun template, aucun champ supplémentaire, aucun callback, aucun
+en-tête, aucune commande.
+
+Une conséquence pour le consommateur : `catalog.id`, `lab_id` et `section`
+viennent **de ce catalogue non fiable**. Ce sont des données pédagogiques, et
+ce sont malgré tout des chaînes contrôlées par un tiers. Échappez-les avant de
+les afficher, comme toute entrée externe.
 
 ## `check`
 

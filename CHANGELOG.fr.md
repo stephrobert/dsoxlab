@@ -65,6 +65,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `validated` explicite, le verdict d'examen quand il y en a un, et
   `attempted_at` — un nom qui ne préjuge plus du résultat.
 
+  **Le catalogue est une entrée non fiable** — `dsoxlab catalog add <url>`
+  clone un dépôt git arbitraire — et ce document quitte la machine. Il est donc
+  construit par **allowlist positive**, jamais en sérialisant un objet interne
+  dont on retirerait des clés, et cinq tests négatifs tiennent ce qui ne doit
+  jamais y apparaître : chemins absolus, `$HOME`, hostname, nom d'utilisateur,
+  variables d'environnement, sortie pytest brute, provider, cible, inventaire,
+  SSH. `catalog.path` figurait dans le premier jet et en a été retiré pour
+  cette raison même — un chemin publie un nom d'utilisateur, parfois un nom de
+  famille.
+
   **Aucun domaine, site ou URL n'y figure**, et un test l'affirme : dsoxlab
   produit une preuve, il ne décide pas qui la consomme. C'est ce qui permet à
   un formateur autre que l'auteur du catalogue de s'en servir, et ce sur quoi
