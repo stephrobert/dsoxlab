@@ -113,6 +113,23 @@ STRINGS: dict[str, str] = {
     "cmd_check_arg":     "Lab identifier (optional if a lab is active in session)",
     "cmd_submit_help":   "Final submission: run tests, record score, then type 'exit' to leave the session.",
     "cmd_submit_arg":    "Lab identifier (optional if a lab is active in session)",
+    "securite_identifiant_vide": "an empty value",
+    "securite_identifiant_trop_long":
+        "{length} characters, more than the {max} allowed",
+    "securite_identifiant_caractere":
+        "a forbidden character ({code}): a control, a direction override or a "
+        "zero-width character",
+    "export_identifiant_refuse":
+        "Cannot export: {field} carries {reason}.",
+    "export_identifiant_refuse_suite":
+        "This document is meant to be handed to a portal, which will reject "
+        "such an identifier. Fix it in the catalog rather than send something "
+        "nobody can read: an id is 1 to 128 characters, with no control "
+        "character, no direction override and no zero-width character.",
+    "cmd_export_help":
+        "Export every result as a JSON document, for reading elsewhere",
+    "opt_export_json":
+        "Accepted for consistency; this command always emits JSON",
     "cmd_scores_help":   "Show recorded scores history.",
     "cmd_reset_help":    "Reset the lab to its initial state (clean + restart).",
     "cmd_reset_arg":     "Lab identifier",
@@ -612,6 +629,11 @@ Each lab declares:
     [dim]--top     / -n[/dim]       Limit number of results.
     [dim]--json[/dim]               The history and each exam verdict, as a document.
 
+  [cyan]export[/cyan]               Every result as a JSON document, for reading elsewhere.
+                       Unlike [bold]scores[/bold], which is a display, it is never
+                       truncated, and each line carries the catalog, the lab type
+                       and an explicit [bold]validated[/bold] verdict.
+
   [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch.
 
   [cyan]clean <id>[/cyan]           Destroy environment resources (with confirmation).
@@ -782,7 +804,9 @@ silent.
   Score starts at [green]100 pts[/green].
   Each hint used costs points (defined per lab in [dim]hints.yaml[/dim]).
   [bold]dsoxlab check[/bold] calculates the final score and saves it.
-  [bold]dsoxlab scores[/bold] shows your history.""",
+  [bold]dsoxlab scores[/bold] shows your history.
+  [bold]dsoxlab export[/bold] writes every result as a JSON document, with no
+  limit and an explicit verdict per lab — for reading it elsewhere.""",
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installed: {path}  →  {source}",

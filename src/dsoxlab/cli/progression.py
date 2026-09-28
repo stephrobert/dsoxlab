@@ -207,6 +207,110 @@ def scores(
     print_scores_table(results, seuils)
 
 
+# ── export ────────────────────────────────────────────────────────────────────
+
+@app.command("export", help=_("cmd_export_help"))
+def export(
+    lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_export_json"))] = False,
+) -> None:
+    """Le document complet des résultats, pour qui veut les relire ailleurs.
+
+    Une commande à part plutôt qu'une option de ``scores``, et la raison tient
+    en une phrase : ``scores`` est un **affichage**, borné à vingt lignes par
+    défaut et cinquante par la base. Un export borné est pire qu'absent, parce
+    que celui qui le lit croit tout avoir.
+
+    ``--json`` est accepté sans rien changer : ce document est machine par
+    nature, il n'a pas de forme terminal. L'option existe parce que la
+    cohérence de la CLI le suggère et qu'un utilisateur la tapera.
+    """
+    del as_json  # accepté pour la cohérence, sans effet : voir la docstring
+    from ..discovery.repo import read_repo_metadata
+    from ..security import IdentifiantRefuse, identifiant_sur
+    from ..sessions.store import _now, get_all_results
+    from ..utils.shell import run_command
+
+    def _version() -> str:
+        from .. import __version__
+
+        return __version__
+
+    root = _root(lab_home)
+    labs = {lab.id: lab for lab in _catalogue(root, _lang(root), quiet=True)}
+
+    try:
+        repo_meta = read_repo_metadata(root)
+    except Exception:  # noqa: BLE001 — un meta.yml illisible ne doit pas priver
+        repo_meta = None                # l'apprenant de son propre historique
+    # Le repli sur le nom du répertoire mérite autant de méfiance que le
+    # `repo.id` du catalogue : un nom de dossier est libre, il peut porter des
+    # espaces, un retour chariot ou une surcharge de direction. Les deux
+    # traversent la même frontière de confiance, donc les deux se valident —
+    # et le consommateur qui reçoit ce document refuse déjà ces caractères.
+    try:
+        catalog_id = identifiant_sur(
+            repo_meta.id if repo_meta else root.name, champ="catalog.id"
+        )
+    except IdentifiantRefuse as refus:
+        error(_("export_identifiant_refuse", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("export_identifiant_refuse_suite"))
+        raise typer.Exit(1) from None
+
+    # Le commit du catalogue, quand il y en a un : un score obtenu sur une
+    # version antérieure d'un lab se reconnaît alors, au lieu d'être comparé à
+    # un énoncé qui a changé depuis. Absent d'un répertoire qui n'est pas un
+    # dépôt git, et ce n'est pas une anomalie.
+    revision = run_command(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=False, timeout=5,
+    )
+    commit = revision.stdout.strip() if revision.ok else None
+
+    try:
+        for row in get_all_results(root):
+            identifiant_sur(row["lab_id"], champ="lab_id")
+            identifiant_sur(row["section"], champ="section", vide_permis=True)
+    except IdentifiantRefuse as refus:
+        error(_("export_identifiant_refuse", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("export_identifiant_refuse_suite"))
+        raise typer.Exit(1) from None
+
+    lignes = [
+        machine.export_result_dict(row, labs.get(row["lab_id"]), catalog_id)
+        for row in get_all_results(root)
+        # Un lab `validation` défend un guide : sa place n'est pas dans les
+        # preuves de pratique de quelqu'un. Depuis 0.3.0 il n'inscrit plus
+        # rien, mais une base antérieure peut en porter.
+        if (lab := labs.get(row["lab_id"])) is None or lab.is_exercise
+    ]
+    machine.emit({
+        # Une chaîne, pas un entier, et c'est le seul endroit du projet où
+        # c'est le cas : ce document quitte dsoxlab. Il atterrit dans un
+        # navigateur, un LMS, un outil de suivi, un fichier qu'on retrouve
+        # trois mois plus tard — des endroits où `{"schema": 1}` ne dit pas de
+        # quoi il est le schéma 1. Un document portable se nomme lui-même.
+        "schema": "dsoxlab-evidence-v1",
+        "generated_at": _now(),
+        "producer": {"name": "dsoxlab", "version": _version()},
+        # `version` et non `commit` : c'est la révision quand le catalogue est
+        # un dépôt git, et ce pourrait être autre chose ailleurs. Le
+        # consommateur n'a pas à savoir laquelle, seulement à distinguer deux
+        # états du même catalogue.
+        #
+        # Le chemin local N'Y EST PAS. Ce document est fait pour être transmis :
+        # `/home/marie/Projets/…` y publierait un nom d'utilisateur, parfois un
+        # nom de famille, et l'arborescence d'une machine — à un destinataire
+        # qui n'en a aucun usage, puisque `id` et `version` identifient déjà le
+        # catalogue. C'est la règle que `support` applique à son rapport depuis
+        # 0.1.86, pour exactement la même raison.
+        "catalog": {"id": catalog_id, "version": commit},
+        "results": lignes,
+        "count": len(lignes),
+    })
+
+
 # ── progress ──────────────────────────────────────────────────────────────────
 
 # ── progress ──────────────────────────────────────────────────────────────────

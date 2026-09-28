@@ -116,6 +116,24 @@ STRINGS: dict[str, str] = {
     "cmd_check_arg":      "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_submit_help":    "Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session.",
     "cmd_submit_arg":     "Identifiant du lab (optionnel si un lab est actif en session)",
+    "securite_identifiant_vide": "une valeur vide",
+    "securite_identifiant_trop_long":
+        "{length} caractères, soit plus que les {max} permis",
+    "securite_identifiant_caractere":
+        "un caractère interdit ({code}) : une commande, une surcharge de "
+        "direction ou un caractère de largeur nulle",
+    "export_identifiant_refuse":
+        "Export impossible : {field} porte {reason}.",
+    "export_identifiant_refuse_suite":
+        "Ce document est fait pour être remis à un portail, qui refusera un "
+        "tel identifiant. Corrigez-le dans le catalogue plutôt que d'envoyer "
+        "quelque chose que personne ne pourra lire : un identifiant fait de 1 "
+        "à 128 caractères, sans caractère de contrôle, sans surcharge de "
+        "direction et sans caractère de largeur nulle.",
+    "cmd_export_help":
+        "Exporter tous les résultats en un document JSON, pour les relire ailleurs",
+    "opt_export_json":
+        "Accepté par cohérence ; cette commande rend toujours du JSON",
     "cmd_scores_help":    "Affiche l'historique des scores enregistrés.",
     "cmd_reset_help":     "Remet le lab à l'état initial (clean + redémarrage).",
     "cmd_reset_arg":      "Identifiant du lab",
@@ -622,6 +640,11 @@ Chaque lab déclare :
     [dim]--top     / -n[/dim]       Limite le nombre de résultats.
     [dim]--json[/dim]               L'historique et chaque verdict d'examen, en document.
 
+  [cyan]export[/cyan]               Tous les résultats en document JSON, pour les relire ailleurs.
+                       Contrairement à [bold]scores[/bold], qui est un affichage, il
+                       n'est jamais tronqué, et chaque ligne porte le catalogue, le
+                       type du lab et un verdict [bold]validated[/bold] explicite.
+
   [cyan]reset <id>[/cyan]           Nettoie et redémarre le lab depuis zéro.
 
   [cyan]clean <id>[/cyan]           Détruit les ressources de l'environnement (avec confirmation).
@@ -793,7 +816,9 @@ hors ligne, elle se tait.
   Le score démarre à [green]100 pts[/green].
   Chaque indice utilisé coûte des points (défini par lab dans [dim]hints.yaml[/dim]).
   [bold]dsoxlab check[/bold] calcule le score final et le sauvegarde.
-  [bold]dsoxlab scores[/bold] affiche votre historique.""",
+  [bold]dsoxlab scores[/bold] affiche votre historique.
+  [bold]dsoxlab export[/bold] écrit tous les résultats en un document JSON, sans
+  limite et avec un verdict explicite par lab — pour les relire ailleurs.""",
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installé : {path}  →  {source}",

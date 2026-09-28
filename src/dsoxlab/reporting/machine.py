@@ -182,6 +182,65 @@ def issue_dict(
     }
 
 
+def export_result_dict(
+    row: dict[str, Any],
+    lab: LabDefinition | None,
+    catalog_id: str,
+) -> dict[str, Any]:
+    """Une ligne de l'export : un résultat qui dit lui-même ce qu'il vaut.
+
+    Trois différences avec :func:`score_dict`, et chacune répond à une chose
+    qu'un consommateur devait deviner.
+
+    ``validated`` est **explicite**. Une tentative mesurée mais ratée est
+    inscrite elle aussi — c'est voulu, un échec fait partie de l'historique —
+    et le champ de la base s'appelle pourtant ``validated_at``. Le lecteur
+    devait donc déduire la validation de ``passed_tests == total_tests``, règle
+    qui n'était écrite nulle part. Elle l'est ici, une fois, et le document
+    porte le verdict.
+
+    ``catalog`` et ``lab_type`` sont **joints**. Les identifiants de labs sont
+    distincts d'un catalogue à l'autre aujourd'hui, mais aucun contrat ne le
+    garantit, et un consommateur qui fusionne plusieurs catalogues ne peut pas
+    s'appuyer là-dessus. Quant au type, il décide si la ligne se range en
+    pratique (``lab``) ou en preuve (``challenge``, ``capstone``) : le joindre
+    depuis son propre catalogue ne marche que tant que les versions coïncident.
+
+    ``attempted_at`` plutôt que ``validated_at`` : l'horodatage dit quand
+    l'apprenant a tenté, pas que sa tentative vaut validation. Le nom ne
+    préjuge plus du verdict, et le verdict a son champ.
+
+    ``lab_type`` vaut ``null`` quand le lab n'existe plus dans le catalogue —
+    renommé, déplacé, supprimé. Le résultat reste exporté : il a eu lieu.
+    """
+    from ..services.progress_service import exam_percentage, exam_verdict
+
+    passing_score = lab.exam_passing_score if lab and lab.exam_passing_score else None
+    verdict = exam_verdict(row["score"], row["max_score"], passing_score or 0)
+    return {
+        "catalog": catalog_id,
+        "lab_id": row["lab_id"],
+        "lab_type": lab.lab_type if lab else None,
+        "section": row["section"],
+        # La règle, écrite une fois : tous les tests passés, et au moins un
+        # test joué. Sans la seconde moitié, un lab dont rien n'a pu tourner
+        # serait « validé » à 0 sur 0.
+        "validated": row["total_tests"] > 0
+        and row["passed_tests"] == row["total_tests"],
+        "score": row["score"],
+        "max_score": row["max_score"],
+        "passed_tests": row["passed_tests"],
+        "total_tests": row["total_tests"],
+        "hints_used": row["hints_used"],
+        "attempted_at": row["validated_at"],
+        "exam": None if verdict is None else {
+            "passing_score": passing_score,
+            "percentage": exam_percentage(row["score"], row["max_score"]),
+            "passed": verdict,
+        },
+    }
+
+
 def score_dict(row: dict[str, Any], passing_score: int | None) -> dict[str, Any]:
     """Une note de l'historique, et le verdict quand le lab est un examen.
 

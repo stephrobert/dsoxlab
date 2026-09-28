@@ -61,6 +61,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nowhere, which is the kind of mistake an author never finds. The field is
   also exposed in `--json`, since a field nobody can read serves nobody.
 
+- **`dsoxlab export`: every result as a document, with nothing left to guess**
+  (issue #265). The site will show what a learner has practised and proved,
+  with no account and no server: results are exported from their machine and
+  imported into their browser. That needs a document dsoxlab produces and the
+  site reads without deriving anything.
+
+  `scores --json` was a good base and left four things to guess. **The verdict
+  was implicit** — a measured but failed attempt is recorded too, and the
+  column is nevertheless called `validated_at`, so consumers had to derive
+  validation from `passed_tests == total_tests`, a rule written nowhere. **The
+  catalog was not named**, though ids are only distinct across catalogs by
+  luck. **`lab_type` was missing**, though it decides whether a line reads as
+  practice or as proof. And **the export was truncated** at twenty lines by
+  default, fifty by the database, without saying so.
+
+  `export` is a separate command rather than an option of `scores`, because
+  `scores` is a display and this is a document. It is the **Evidence v1 contract**: `"schema":
+  "dsoxlab-evidence-v1"` — a name, not a number, because this document leaves
+  dsoxlab and `{"schema": 1}` does not say what it is the first schema *of*. It
+  carries the producer and its version, the catalog's id and revision, and one
+  line per result with `catalog`, `lab_type`, an explicit `validated`, the exam
+  verdict when there is one, and `attempted_at` — a name that no longer
+  presumes the outcome.
+
+  **The catalog is untrusted input** — `dsoxlab catalog add <url>` clones an
+  arbitrary git repository — and this document leaves the machine. It is
+  therefore built from a **positive allowlist**, never by serialising an
+  internal object and removing keys, and five negative tests pin what must
+  never appear: absolute paths, `$HOME`, hostname, username, environment
+  variables, raw pytest output, provider, target, inventory, SSH. `catalog.path`
+  was in the first draft and was removed for exactly that reason — a path
+  publishes a username, sometimes a surname.
+
+  **The catalog's own identifiers are checked before they leave.**
+  `catalog.id` comes from the catalog, and falls back to the directory name
+  when `meta.yml` cannot be read — a directory name being free-form. Both cross
+  the same trust boundary, so both are validated: 1 to 128 characters, no
+  control character, no direction override, no zero-width character. A
+  `catalog\u202egnp.exe` reads as `catalogexe.png` in a terminal while the data
+  says otherwise, and the consuming portal rejects such ids anyway. The export
+  **refuses** rather than sanitises: cleaning an id would break the link
+  between a proof and the lab it attests.
+
+  **No domain, site or URL appears in it**, and a test asserts it: dsoxlab
+  produces a proof, it does not decide who consumes it. That is what lets a
+  trainer other than this catalog's author use it, and what the issues on the
+  handoff link and the single-lab proof will build on. Labs of `lab_type: validation` are excluded: they grade nobody.
+
+  Measured on a real catalog: **179 lines exported out of 179 in the database**,
+  where `scores` would have shown twenty.
+
 ### Fixed
 
 - **A network outage was reported as a lab defect, and the same URL was

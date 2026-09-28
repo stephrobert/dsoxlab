@@ -32,6 +32,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab demo` | Installe un catalogue de démonstration et joue un premier lab, sans rien cloner ni provisionner. |
 | `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises. |
 | `dsoxlab doctor` | Diagnostique l'environnement (runtimes, outils, labs détectés). |
+| `dsoxlab export` | Exporter tous les résultats en un document JSON, pour les relire ailleurs |
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
 | `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |

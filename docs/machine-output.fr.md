@@ -213,6 +213,125 @@ fêterait un parcours qui n'a jamais commencé.
 `passed` se fait en entiers, jamais sur un pourcentage arrondi : un seuil
 d'examen ne s'arrondit pas en faveur du candidat.
 
+## `export`
+
+`scores` est un **affichage** : il montre les résultats les plus récents,
+bornés par `--top` et par la base à cinquante. `export` est un **document** :
+tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
+
+```json
+{
+  "schema": "dsoxlab-evidence-v1",
+  "generated_at": "2026-09-28T09:03:07.929397+00:00",
+  "producer": { "name": "dsoxlab", "version": "0.2.5" },
+  "catalog": {
+    "id": "linux-dsoxlab-training",
+    "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
+  },
+  "results": [
+    {
+      "catalog": "linux-dsoxlab-training",
+      "lab_id": "l2-swap-management",
+      "lab_type": "lab",
+      "section": "l2",
+      "validated": true,
+      "score": 100,
+      "max_score": 100,
+      "passed_tests": 5,
+      "total_tests": 5,
+      "hints_used": 0,
+      "attempted_at": "2026-09-14T08:12:44.102931+00:00",
+      "exam": null
+    }
+  ],
+  "count": 1
+}
+```
+
+| Champ | Type | Sens |
+| --- | --- | --- |
+| `generated_at` | chaîne | quand le document a été produit, ISO 8601, UTC |
+| `producer.version` | chaîne | le dsoxlab qui l'a produit |
+| `catalog.id` | chaîne | le `repo.id` du catalogue, ou le nom du répertoire si le `meta.yml` est illisible |
+| `catalog.version` | chaîne ou null | la révision du catalogue — son commit git aujourd'hui, `null` hors d'un dépôt git. Avec elle, un score obtenu sur une version antérieure d'un lab se reconnaît |
+| `results[].catalog` | chaîne | répété sur chaque ligne, pour que des lignes de plusieurs catalogues puissent se fondre |
+| `results[].lab_type` | chaîne ou null | `lab`, `challenge` ou `capstone` ; `null` quand le lab n'existe plus dans le catalogue |
+| `results[].validated` | booléen | **le verdict, énoncé** — voir plus bas |
+| `results[].attempted_at` | chaîne | quand l'apprenant a tenté le lab, ISO 8601, UTC |
+| `results[].exam` | objet ou null | comme dans `scores` |
+| `count` | entier | le nombre de lignes, toujours égal à la longueur de `results` |
+
+Quatre choses que ce document dit, et que `scores --json` laissait deviner :
+
+**`validated` est explicite.** Une tentative mesurée mais ratée est inscrite
+elle aussi — c'est voulu, un échec fait partie de l'historique — et la colonne
+de la base s'appelle pourtant `validated_at`. Le consommateur devait déduire la
+validation de `passed_tests == total_tests`, règle qui n'était écrite nulle
+part. Elle l'est désormais une fois, dans le moteur : tous les tests passés
+**et au moins un test joué**. Sans cette seconde moitié, un lab dont rien n'a
+pu tourner serait « validé » à 0 sur 0.
+
+**Le catalogue est nommé, sur chaque ligne.** Les identifiants de labs sont
+distincts d'un catalogue à l'autre aujourd'hui, mais aucun contrat ne le
+garantit, et un consommateur qui en fusionne plusieurs ne peut pas s'appuyer
+là-dessus.
+
+**`lab_type` est joint.** Il décide si la ligne se lit comme une pratique
+(`lab`) ou comme une preuve (`challenge`, `capstone`). Le joindre depuis sa
+propre copie du catalogue ne marche que tant que les versions coïncident.
+
+**Rien n'est tronqué.** Un document qui s'arrête sans le dire est pire qu'un
+document absent, parce que celui qui le lit croit tout avoir.
+
+**Le schéma est un nom, pas un numéro.** `"dsoxlab-evidence-v1"` plutôt que
+`1`, et c'est le seul endroit du projet où c'est le cas : ce document **quitte**
+dsoxlab. Il atterrit dans un navigateur, un LMS, un outil de suivi, un fichier
+qu'on rouvre trois mois plus tard — des endroits où `{"schema": 1}` ne dit pas
+de quoi il est le schéma 1. Un document portable se nomme lui-même.
+
+**Et il ne nomme aucun portail.** Aucun domaine, aucun site, aucune URL n'y
+figure. dsoxlab produit une preuve, il ne décide pas qui la consomme. C'est la
+condition pour qu'un formateur autre que l'auteur du catalogue s'en serve — et
+un test l'affirme, plutôt que de nous faire confiance pour y penser.
+
+Les labs de `lab_type: validation` en sont exclus : ils défendent un guide
+publié et ne notent personne, donc ils n'ont pas leur place parmi les preuves
+de pratique de quelqu'un. Depuis la 0.3.0 ils n'inscrivent plus rien, mais une
+base écrite avant peut en porter.
+
+### Ce que ce document ne doit jamais porter
+
+Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>` clone
+un dépôt git arbitraire. Et ce document est fait pour quitter la machine. Ces
+deux faits ensemble imposent une règle : la preuve ne transporte que des
+données pédagogiques, construites par **allowlist positive** — jamais en
+sérialisant un objet interne dont on retirerait ensuite quelques clés, car le
+prochain champ ajouté à cet objet partirait en silence.
+
+Jamais présents, et tenus par des tests qui échouent s'ils apparaissent :
+
+| Exclu | Pourquoi |
+| --- | --- |
+| chemins absolus, `$HOME` | un chemin publie un nom d'utilisateur, parfois un nom de famille, et l'arborescence d'une machine |
+| hostname, IP, MAC | la preuve décrit un travail, pas un poste |
+| variables d'environnement | un environnement est un réservoir à secrets |
+| sortie pytest brute | elle contient des chemins, des noms, parfois des secrets. Le document porte des compteurs, jamais le texte qui les a produits |
+| provider, cible, inventaire, SSH | précisément les champs qui désignent des machines et les accès à ces machines |
+| toute identité d'apprenant | ni nom, ni email, ni identifiant de compte — rattacher une preuve à une personne appartient au portail, pas à dsoxlab |
+
+`catalog.path` figurait dans un premier jet de ce document et en a été retiré
+pour cette raison : `id` et `version` identifient le catalogue, et le
+destinataire n'a aucun usage de l'endroit où il se trouve sur le disque.
+
+**Le catalogue peut décrire ses labs. Il ne peut jamais décider ce que dsoxlab
+exporte.** Aucun template, aucun champ supplémentaire, aucun callback, aucun
+en-tête, aucune commande.
+
+Une conséquence pour le consommateur : `catalog.id`, `lab_id` et `section`
+viennent **de ce catalogue non fiable**. Ce sont des données pédagogiques, et
+ce sont malgré tout des chaînes contrôlées par un tiers. Échappez-les avant de
+les afficher, comme toute entrée externe.
+
 ## `check`
 
 ```json

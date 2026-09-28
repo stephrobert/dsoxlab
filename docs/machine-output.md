@@ -210,6 +210,121 @@ ordinary lab is not a failed exam. The comparison behind `passed` is done in
 integers, never on a rounded percentage — a pass mark does not round in the
 candidate's favour.
 
+## `export`
+
+`scores` is a **display**: it shows the most recent results, capped by `--top`
+and by the database at fifty. `export` is a **document**: everything, in
+chronological order, with nothing left for the reader to work out.
+
+```json
+{
+  "schema": "dsoxlab-evidence-v1",
+  "generated_at": "2026-09-28T09:03:07.929397+00:00",
+  "producer": { "name": "dsoxlab", "version": "0.2.5" },
+  "catalog": {
+    "id": "linux-dsoxlab-training",
+    "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
+  },
+  "results": [
+    {
+      "catalog": "linux-dsoxlab-training",
+      "lab_id": "l2-swap-management",
+      "lab_type": "lab",
+      "section": "l2",
+      "validated": true,
+      "score": 100,
+      "max_score": 100,
+      "passed_tests": 5,
+      "total_tests": 5,
+      "hints_used": 0,
+      "attempted_at": "2026-09-14T08:12:44.102931+00:00",
+      "exam": null
+    }
+  ],
+  "count": 1
+}
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `generated_at` | string | when the document was produced, ISO 8601, UTC |
+| `producer.version` | string | the dsoxlab that produced it |
+| `catalog.id` | string | the catalog's `repo.id`, or the directory name if `meta.yml` cannot be read |
+| `catalog.version` | string or null | the catalog's revision — its git commit today, `null` outside a git repository. With it, a score earned on an earlier version of a lab can be told apart |
+| `results[].catalog` | string | repeated on every line, so lines from several catalogs can be merged |
+| `results[].lab_type` | string or null | `lab`, `challenge` or `capstone`; `null` when the lab no longer exists in the catalog |
+| `results[].validated` | bool | **the verdict, stated** — see below |
+| `results[].attempted_at` | string | when the learner attempted the lab, ISO 8601, UTC |
+| `results[].exam` | object or null | as in `scores` |
+| `count` | int | the number of lines, which always equals `results.length` |
+
+Four things this document says that `scores --json` left the reader to guess:
+
+**`validated` is explicit.** A measured but failed attempt is recorded too —
+that is deliberate, a failure is part of the history — and the database column
+is nevertheless called `validated_at`. Consumers had to derive validation from
+`passed_tests == total_tests`, a rule written nowhere. It is written once, in
+the engine: all tests passed **and at least one test ran**. Without that second
+half, a lab where nothing could run would be "validated" at 0 of 0.
+
+**The catalog is named, on every line.** Lab ids are distinct across catalogs
+today, but no contract guarantees it, and a consumer merging several cannot
+rely on that.
+
+**`lab_type` is joined in.** It decides whether a line reads as practice
+(`lab`) or as proof (`challenge`, `capstone`). Joining it from the consumer's
+own copy of the catalog works only while the versions match.
+
+**Nothing is truncated.** A document that stops without saying so is worse than
+a missing one, because whoever reads it believes they have everything.
+
+**The schema is a name, not a number.** `"dsoxlab-evidence-v1"` rather than
+`1`, and it is the only place in this project where that is so: this document
+**leaves** dsoxlab. It lands in a browser, an LMS, a tracking tool, a file
+someone opens three months later — places where `{"schema": 1}` does not say
+what it is the first schema *of*. A portable document names itself.
+
+**And it names no portal.** No domain, no site, no URL of any kind appears in
+it. dsoxlab produces a proof; it does not decide who consumes it. That is the
+condition for a trainer other than this catalog's author to use it at all — and
+a test asserts it, rather than trusting us to remember.
+
+Labs of `lab_type: validation` are excluded: they defend a published guide and
+grade nobody, so they have no place among someone's proofs of practice. Since
+0.3.0 they record nothing at all, but a database written earlier may hold some.
+
+### What this document must never carry
+
+A catalog is **untrusted input**: `dsoxlab catalog add <url>` clones an
+arbitrary git repository. And this document is made to leave the machine. Those
+two facts together set one rule: the proof carries teaching data only, built
+from a **positive allowlist** — never by serialising an internal object and
+removing a few keys afterwards, because the next field added to that object
+would ship silently.
+
+Never present, and pinned by tests that fail if they ever appear:
+
+| Excluded | Why |
+| --- | --- |
+| absolute paths, `$HOME` | a path publishes a username, sometimes a surname, and a machine's layout |
+| hostname, IP, MAC | the proof describes work, not a workstation |
+| environment variables | an environment is a reservoir of secrets |
+| raw pytest output | it contains paths, names, occasionally secrets. The document carries counters, never the text that produced them |
+| provider, target, inventory, SSH | the fields that name machines and access to them |
+| any learner identity | no name, no email, no account id — linking a proof to a person belongs to the portal, not to dsoxlab |
+
+`catalog.path` was in an early draft of this document and was removed for this
+reason: `id` and `version` identify the catalog, and the recipient has no use
+for where it sits on disk.
+
+**The catalog can describe its labs. It can never decide what dsoxlab
+exports.** No template, no extra field, no callback, no header, no command.
+
+One thing this puts on the consumer: `catalog.id`, `lab_id` and `section` come
+**from that untrusted catalog**. They are teaching data, and they are still
+attacker-controlled strings. Escape them before display, as you would any
+external input.
+
 ## `check`
 
 ```json
