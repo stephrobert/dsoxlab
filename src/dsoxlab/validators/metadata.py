@@ -15,7 +15,11 @@ from urllib.parse import urlparse
 
 from ..models.lab import LabDefinition
 
-_VALID_LAB_TYPES = {"lab", "challenge", "capstone"}
+#: Les trois premières formes supposent un apprenant qui fait ; ``validation``
+#: non — c'est une suite d'assertions qui défend un guide publié. Étendre
+#: l'énuméré plutôt qu'ajouter un champ : le lab est le bon grain, puisque le
+#: même dépôt peut porter les deux (une stack d'infra et ses assertions).
+_VALID_LAB_TYPES = {"lab", "challenge", "capstone", "validation"}
 
 
 @dataclass

@@ -144,6 +144,21 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
     used = hints_used_count(root, lab.id)
     score = compute_score(result.passed, result.total, max_score, hints_cost)
 
+    if not lab.is_exercise:
+        # Un lab `validation` défend un guide publié : ses tests mesurent des
+        # FAITS, pas une personne. Inscrire une note reviendrait à noter le
+        # guide, et à faire entrer dans la progression d'un apprenant une
+        # avancée qui n'est pas la sienne. Les tests tournent — c'est tout
+        # l'objet du lab — et rien n'en sort.
+        return ScoreResult(
+            check=result,
+            score=score,
+            max_score=max_score,
+            hints_used=used,
+            hints_cost=hints_cost,
+            enregistre=False,
+        )
+
     if not a_mesure(result):
         # Rien n'a été mesuré : pytest n'a pas pu collecter, faute d'un
         # conftest qui lève, d'une machine injoignable ou d'une dépendance

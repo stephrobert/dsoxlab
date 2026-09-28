@@ -845,6 +845,13 @@ silent.
     "challenge_workdir":   "Working directory: {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────
+    "check_validation_sans_note":
+        "This lab defends a published guide: its tests measure facts, not you. "
+        "Nothing is recorded, and no score is given — a red test means the "
+        "guide needs refreshing.",
+    "hint_sans_objet":
+        "No hint here: this lab defends a published guide rather than teaching "
+        "you something. There is nothing to find, and nothing to deduct.",
     "no_hints":       "No hints available for this lab.",
     "all_hints_used": "All hints used ({count}/{total}).",
 

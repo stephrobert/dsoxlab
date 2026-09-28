@@ -205,7 +205,7 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `difficulty` | no | string | `beginner` | Never validated, only displayed. |
 | `estimated_time` | no | string | `30m` | Only displayed. |
 | `certification_tags` | no | list of strings | `[]` | Free-form: the tool stays domain-agnostic. |
-| `lab_type` | no | enum | `lab` | `lab`, `challenge` or `capstone`. |
+| `lab_type` | no | enum | `lab` | `lab`, `challenge`, `capstone` or `validation`. The first three assume a learner doing the work; the fourth does not — see below. |
 | `exam_passing_score` | no | integer | `0` | Pass mark of a mock exam, as a **percentage** of the lab scale. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
@@ -218,6 +218,30 @@ is not a lab at all. `skills`, `distros` and `doc_url` are required by
 publishable.
 
 ### `exam_passing_score`
+
+### `lab_type: validation` — a lab that defends a guide
+
+The first three kinds differ in scope; `validation` differs in **nature**. It
+is not an exercise: it is a set of assertions that defends the facts published
+in a guide. A red test there means the guide needs refreshing, not that a
+learner got something wrong.
+
+Everything that measures a person therefore loses its object, and dsoxlab stops
+applying it:
+
+| What | On a `validation` lab |
+| --- | --- |
+| `check` | **unchanged** — running the tests is the whole point |
+| the score | not computed into a grade, and **nothing is written** to `<catalog>/.dsoxlab.db` |
+| `scores`, `progress`, `next` | ignore it; `next` never proposes it |
+| `hint` | says there is nothing to find, instead of charging a hint against a grade that does not exist |
+| `validate-structure` | stops requiring the scale to add up, which only makes sense for a graded exercise |
+| `run` | **unchanged** — a `vm` lab still needs its machine, a `shell` lab still needs its work directory |
+
+The value is carried by the **lab**, not by the repository, and that is
+deliberate: a catalog can perfectly well hold an infrastructure stack and, next
+to it, two suites of assertions. A repository-level flag would force one answer
+for the whole.
 
 A `lab_type: capstone` is a mock exam, and an exam without a pass mark is not
 one. Declare the bar, and dsoxlab renders a verdict:
@@ -344,7 +368,7 @@ names the lab for whoever opens the file.
 
 | Field | Values |
 | --- | --- |
-| `lab_type` | `lab`, `challenge`, `capstone` |
+| `lab_type` | `lab`, `challenge`, `capstone`, `validation` |
 | `runtime.type` | `shell`, `vm`, `kvm`, `incus` |
 | `runtime.session` | `target`, `local` |
 | `schema_version` | `1` |

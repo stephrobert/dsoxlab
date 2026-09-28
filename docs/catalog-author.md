@@ -143,8 +143,15 @@ matches one of those targets. A `shell` lab needs a non-empty `runtime.workdir`.
 
 **Metadata.** `id`, `title`, `level` and `doc_url` non-empty, `skills` and
 `distros` non-empty, `doc_url` in `http(s)`, `lab_type` within
-`lab | challenge | capstone`, and `exam_passing_score` within 1..100 when
-declared.
+`lab | challenge | capstone | validation`, and `exam_passing_score` within
+1..100 when declared.
+
+A word on the last value, because it changes what dsoxlab does rather than how
+big the lab is: a `validation` lab is **not an exercise**. It is a set of
+assertions defending a published guide, so it records no score, takes no place
+in progress, and offers no hints — `check` alone is what it exists for. The
+scale is not checked either, since there is nobody to grade. See
+[the contract](./contract-v1.md#lab_type-validation--a-lab-that-defends-a-guide).
 
 **Content.** Every relative link in the lab's Markdown resolves to a file that
 exists; the announced total matches the score actually computed; a document

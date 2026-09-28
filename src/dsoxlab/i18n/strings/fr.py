@@ -856,6 +856,13 @@ hors ligne, elle se tait.
     "challenge_workdir":   "Répertoire de travail : {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────
+    "check_validation_sans_note":
+        "Ce lab défend un guide publié : ses tests mesurent des faits, pas "
+        "vous. Rien n'est enregistré et aucune note n'est donnée — un test "
+        "rouge signale un guide à rafraîchir.",
+    "hint_sans_objet":
+        "Pas d'indice ici : ce lab défend un guide publié plutôt que de vous "
+        "apprendre quelque chose. Il n'y a rien à trouver, et rien à déduire.",
     "no_hints":       "Aucun indice disponible pour ce lab.",
     "all_hints_used": "Tous les indices ont été utilisés ({count}/{total}).",
 

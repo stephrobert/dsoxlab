@@ -155,6 +155,12 @@ def next_pending_lab(
     score reste possible, mais ce n'est plus l'étape *suivante*.
     """
     for lab in sorted(labs, key=pedagogical_sort_key):
+        # Un lab `validation` n'est l'étape suivante de personne : il défend un
+        # guide, il n'apprend rien. Il n'entre jamais dans `scores` non plus,
+        # donc sans ce filtre il serait proposé indéfiniment — et proposé en
+        # premier, puisqu'il ne peut jamais être « validé ».
+        if not lab.is_exercise:
+            continue
         if lab.id not in scores:
             return lab
     return None

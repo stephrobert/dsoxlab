@@ -9,6 +9,37 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- **`lab_type: validation` — un lab qui défend un guide, et ne note personne**
+  (issue #232). Une quatrième forme tournait déjà en production sans avoir de
+  nom : une suite d'assertions qui défend les faits publiés par un guide, où un
+  test rouge signale un guide à rafraîchir et non un apprenant en faute. Un
+  catalogue le dit exactement ainsi dans son propre en-tête, deux lignes avant
+  de déclarer `category: validation` parce qu'il fallait bien déclarer quelque
+  chose.
+
+  dsoxlab leur appliquait pourtant tout l'appareil pédagogique : une note dans
+  la base, une place dans la progression, des indices facturés contre un score.
+  Rien de tout cela ne veut dire quoi que ce soit quand le rouge accuse un
+  **guide**.
+
+  | Quoi | Sur un lab `validation` |
+  | --- | --- |
+  | `check` | **inchangé** — jouer les tests est tout l'objet du lab |
+  | la note | **rien** n'est écrit dans `<catalogue>/.dsoxlab.db` |
+  | `scores`, `progress`, `next` | l'ignorent ; `next` ne le propose jamais |
+  | `hint` | dit qu'il n'y a rien à trouver |
+  | `validate-structure` | cesse d'exiger que le barème tombe juste |
+  | `run` | **inchangé** — la machine et le répertoire de travail restent nécessaires |
+
+  Étendre l'énuméré existant plutôt qu'ajouter un champ, et le porter sur le
+  **lab** plutôt que sur le dépôt : un catalogue peut porter une stack
+  d'infrastructure et, à côté, deux suites d'assertions — un indicateur au
+  niveau du dépôt forcerait une réponse unique pour l'ensemble. Les trois
+  catalogues publiés ne déclarent la valeur nulle part : aucun ne change de
+  comportement.
+
 ### Corrigé
 
 - **Une coupure de réseau était rendue comme un défaut de lab, et la même URL

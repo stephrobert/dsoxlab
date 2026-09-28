@@ -72,6 +72,14 @@ def hint(
         error(str(exc))
         raise typer.Exit(1) from None
 
+    if not lab.is_exercise:
+        # Un indice aide quelqu'un à trouver. Ici personne ne cherche : les
+        # tests défendent un guide publié, et un rouge accuse ce guide. Le
+        # dire, plutôt que de facturer un indice contre une note qui n'existe
+        # pas.
+        info(_("hint_sans_objet"))
+        return
+
     hint_file = HintFile.load(lab.path / "challenge")
     if not hint_file.hints:
         info(_("no_hints"))
