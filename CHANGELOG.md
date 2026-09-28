@@ -53,11 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default, fifty by the database, without saying so.
 
   `export` is a separate command rather than an option of `scores`, because
-  `scores` is a display and this is a document. It carries its own `schema`,
-  the dsoxlab version, the catalog's id and git revision, and one line per
-  result with `catalog`, `lab_type`, an explicit `validated`, the exam verdict
-  when there is one, and `recorded_at` — a name that no longer presumes the
-  outcome. Labs of `lab_type: validation` are excluded: they grade nobody.
+  `scores` is a display and this is a document. It is the **Evidence v1 contract**: `"schema":
+  "dsoxlab-evidence-v1"` — a name, not a number, because this document leaves
+  dsoxlab and `{"schema": 1}` does not say what it is the first schema *of*. It
+  carries the producer and its version, the catalog's id and revision, and one
+  line per result with `catalog`, `lab_type`, an explicit `validated`, the exam
+  verdict when there is one, and `attempted_at` — a name that no longer
+  presumes the outcome.
+
+  **No domain, site or URL appears in it**, and a test asserts it: dsoxlab
+  produces a proof, it does not decide who consumes it. That is what lets a
+  trainer other than this catalog's author use it, and what the issues on the
+  handoff link and the single-lab proof will build on. Labs of `lab_type: validation` are excluded: they grade nobody.
 
   Measured on a real catalog: **179 lines exported out of 179 in the database**,
   where `scores` would have shown twenty.

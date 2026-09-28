@@ -199,9 +199,9 @@ def export_result_dict(
     pratique (``lab``) ou en preuve (``challenge``, ``capstone``) : le joindre
     depuis son propre catalogue ne marche que tant que les versions coïncident.
 
-    ``recorded_at`` plutôt que ``validated_at`` : l'horodatage dit quand le
-    résultat a été inscrit, pas qu'il vaut validation. Le nom ne préjuge plus
-    du verdict.
+    ``attempted_at`` plutôt que ``validated_at`` : l'horodatage dit quand
+    l'apprenant a tenté, pas que sa tentative vaut validation. Le nom ne
+    préjuge plus du verdict, et le verdict a son champ.
 
     ``lab_type`` vaut ``null`` quand le lab n'existe plus dans le catalogue —
     renommé, déplacé, supprimé. Le résultat reste exporté : il a eu lieu.
@@ -225,7 +225,7 @@ def export_result_dict(
         "passed_tests": row["passed_tests"],
         "total_tests": row["total_tests"],
         "hints_used": row["hints_used"],
-        "recorded_at": row["validated_at"],
+        "attempted_at": row["validated_at"],
         "exam": None if verdict is None else {
             "passing_score": passing_score,
             "percentage": exam_percentage(row["score"], row["max_score"]),

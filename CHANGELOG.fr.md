@@ -57,11 +57,18 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   tronqué** à vingt lignes par défaut, cinquante par la base, sans le dire.
 
   `export` est une commande à part plutôt qu'une option de `scores`, parce que
-  `scores` est un affichage et que ceci est un document. Il porte son propre
-  `schema`, la version de dsoxlab, l'identifiant et la révision git du
-  catalogue, et une ligne par résultat avec `catalog`, `lab_type`, un
+  `scores` est un affichage et que ceci est un document. C'est le **contrat Evidence v1** :
+  `"schema": "dsoxlab-evidence-v1"` — un nom, pas un numéro, parce que ce
+  document quitte dsoxlab et que `{"schema": 1}` ne dit pas de quoi il est le
+  schéma 1. Il porte le producteur et sa version, l'identifiant et la révision
+  du catalogue, et une ligne par résultat avec `catalog`, `lab_type`, un
   `validated` explicite, le verdict d'examen quand il y en a un, et
-  `recorded_at` — un nom qui ne préjuge plus du résultat. Les labs de
+  `attempted_at` — un nom qui ne préjuge plus du résultat.
+
+  **Aucun domaine, site ou URL n'y figure**, et un test l'affirme : dsoxlab
+  produit une preuve, il ne décide pas qui la consomme. C'est ce qui permet à
+  un formateur autre que l'auteur du catalogue de s'en servir, et ce sur quoi
+  s'appuieront les issues du lien de remise et de la preuve unitaire. Les labs de
   `lab_type: validation` en sont exclus : ils ne notent personne.
 
   Mesuré sur un vrai catalogue : **179 lignes exportées sur 179 en base**, là

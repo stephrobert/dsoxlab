@@ -262,10 +262,19 @@ def export(
         if (lab := labs.get(row["lab_id"])) is None or lab.is_exercise
     ]
     machine.emit({
-        "schema": 1,
+        # Une chaîne, pas un entier, et c'est le seul endroit du projet où
+        # c'est le cas : ce document quitte dsoxlab. Il atterrit dans un
+        # navigateur, un LMS, un outil de suivi, un fichier qu'on retrouve
+        # trois mois plus tard — des endroits où `{"schema": 1}` ne dit pas de
+        # quoi il est le schéma 1. Un document portable se nomme lui-même.
+        "schema": "dsoxlab-evidence-v1",
         "generated_at": _now(),
-        "tool": {"name": "dsoxlab", "version": _version()},
-        "catalog": {"id": catalog_id, "path": str(root), "commit": commit},
+        "producer": {"name": "dsoxlab", "version": _version()},
+        # `version` et non `commit` : c'est la révision quand le catalogue est
+        # un dépôt git, et ce pourrait être autre chose ailleurs. Le
+        # consommateur n'a pas à savoir laquelle, seulement à distinguer deux
+        # états du même catalogue.
+        "catalog": {"id": catalog_id, "path": str(root), "version": commit},
         "results": lignes,
         "count": len(lignes),
     })

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 from typer.testing import CliRunner
 
@@ -33,9 +34,11 @@ class TestLeDocument:
         """Un document lu ailleurs doit dire d'où il vient et ce qu'il est."""
         document = _exporter(catalogue)
 
-        assert document["schema"] == 1
-        assert document["tool"]["name"] == "dsoxlab"
-        assert document["tool"]["version"]
+        assert document["schema"] == "dsoxlab-evidence-v1", (
+            "le document se nomme lui-même : il sera lu loin d'ici"
+        )
+        assert document["producer"]["name"] == "dsoxlab"
+        assert document["producer"]["version"]
         assert document["generated_at"].endswith("+00:00"), "UTC, pas l'heure locale"
         assert document["catalog"]["id"]
         assert document["catalog"]["path"] == str(catalogue)
@@ -131,7 +134,7 @@ class TestCeQueChaqueLigneDoitPorter:
         )
         (ligne,) = _exporter(catalogue)["results"]
 
-        assert "recorded_at" in ligne
+        assert "attempted_at" in ligne
         assert "validated_at" not in ligne
         assert ligne["validated"] is False
 
@@ -152,3 +155,54 @@ class TestAucuneTroncature:
 
         assert document["count"] == 60
         assert len(document["results"]) == 60
+
+
+class TestLeContratNeBougePasEnSilence:
+    """Le document quitte dsoxlab : en changer les clés casse ailleurs.
+
+    Un consommateur — portail de formation, LMS statique, extension d'éditeur,
+    outil de suivi local — lit ce document sans rien savoir de nos internes.
+    Renommer un champ, en retirer un, ou en ajouter un sans le documenter se
+    voit ici, et pas trois semaines plus tard chez quelqu'un d'autre.
+    """
+
+    ENVELOPPE: ClassVar[frozenset[str]] = frozenset({
+        "schema", "generated_at", "producer", "catalog", "results", "count",
+    })
+    LIGNE: ClassVar[frozenset[str]] = frozenset({
+        "catalog", "lab_id", "lab_type", "section", "validated", "score",
+        "max_score", "passed_tests", "total_tests", "hints_used",
+        "attempted_at", "exam",
+    })
+
+    def test_les_cles_de_l_enveloppe_restent_figees(self, catalogue: Path) -> None:
+        assert set(_exporter(catalogue)) == self.ENVELOPPE
+
+    def test_les_cles_d_une_ligne_sont_figees(self, catalogue: Path) -> None:
+        record_result(
+            catalogue, lab_id="premier", section="domaine", score=100,
+            max_score=100, passed_tests=5, total_tests=5, hints_used=0,
+        )
+        (ligne,) = _exporter(catalogue)["results"]
+
+        assert set(ligne) == self.LIGNE
+
+    def test_le_nom_du_schema_est_le_contrat(self, catalogue: Path) -> None:
+        """Une chaîne auto-descriptive, pas un entier.
+
+        `{"schema": 1}` ne dit pas de quoi il est le schéma 1, et ce fichier
+        se retrouvera dans un navigateur, un LMS, ou un répertoire de
+        téléchargements trois mois plus tard.
+        """
+        assert _exporter(catalogue)["schema"] == "dsoxlab-evidence-v1"
+
+    def test_aucun_domaine_n_est_code_en_dur(self, catalogue: Path) -> None:
+        """Le document ne suppose aucun portail, aucun site, aucun domaine.
+
+        C'est la condition pour qu'un formateur tiers l'utilise : dsoxlab
+        produit une preuve, il ne désigne pas qui la consomme.
+        """
+        brut = json.dumps(_exporter(catalogue))
+
+        assert "http://" not in brut
+        assert "https://" not in brut

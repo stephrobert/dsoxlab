@@ -220,13 +220,13 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
 
 ```json
 {
-  "schema": 1,
+  "schema": "dsoxlab-evidence-v1",
   "generated_at": "2026-09-28T09:03:07.929397+00:00",
-  "tool": { "name": "dsoxlab", "version": "0.2.5" },
+  "producer": { "name": "dsoxlab", "version": "0.2.5" },
   "catalog": {
     "id": "linux-dsoxlab-training",
     "path": "/home/moi/catalogues/linux-dsoxlab-training",
-    "commit": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
+    "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
   },
   "results": [
     {
@@ -240,7 +240,7 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
       "passed_tests": 5,
       "total_tests": 5,
       "hints_used": 0,
-      "recorded_at": "2026-09-14T08:12:44.102931+00:00",
+      "attempted_at": "2026-09-14T08:12:44.102931+00:00",
       "exam": null
     }
   ],
@@ -251,13 +251,13 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
 | Champ | Type | Sens |
 | --- | --- | --- |
 | `generated_at` | chaîne | quand le document a été produit, ISO 8601, UTC |
-| `tool.version` | chaîne | le dsoxlab qui l'a produit |
+| `producer.version` | chaîne | le dsoxlab qui l'a produit |
 | `catalog.id` | chaîne | le `repo.id` du catalogue, ou le nom du répertoire si le `meta.yml` est illisible |
-| `catalog.commit` | chaîne ou null | la révision git du catalogue, `null` hors d'un dépôt git — avec elle, un score obtenu sur une version antérieure d'un lab se reconnaît |
+| `catalog.version` | chaîne ou null | la révision du catalogue — son commit git aujourd'hui, `null` hors d'un dépôt git. Avec elle, un score obtenu sur une version antérieure d'un lab se reconnaît |
 | `results[].catalog` | chaîne | répété sur chaque ligne, pour que des lignes de plusieurs catalogues puissent se fondre |
 | `results[].lab_type` | chaîne ou null | `lab`, `challenge` ou `capstone` ; `null` quand le lab n'existe plus dans le catalogue |
 | `results[].validated` | booléen | **le verdict, énoncé** — voir plus bas |
-| `results[].recorded_at` | chaîne | quand le résultat a été inscrit, ISO 8601, UTC |
+| `results[].attempted_at` | chaîne | quand l'apprenant a tenté le lab, ISO 8601, UTC |
 | `results[].exam` | objet ou null | comme dans `scores` |
 | `count` | entier | le nombre de lignes, toujours égal à la longueur de `results` |
 
@@ -282,6 +282,17 @@ propre copie du catalogue ne marche que tant que les versions coïncident.
 
 **Rien n'est tronqué.** Un document qui s'arrête sans le dire est pire qu'un
 document absent, parce que celui qui le lit croit tout avoir.
+
+**Le schéma est un nom, pas un numéro.** `"dsoxlab-evidence-v1"` plutôt que
+`1`, et c'est le seul endroit du projet où c'est le cas : ce document **quitte**
+dsoxlab. Il atterrit dans un navigateur, un LMS, un outil de suivi, un fichier
+qu'on rouvre trois mois plus tard — des endroits où `{"schema": 1}` ne dit pas
+de quoi il est le schéma 1. Un document portable se nomme lui-même.
+
+**Et il ne nomme aucun portail.** Aucun domaine, aucun site, aucune URL n'y
+figure. dsoxlab produit une preuve, il ne décide pas qui la consomme. C'est la
+condition pour qu'un formateur autre que l'auteur du catalogue s'en serve — et
+un test l'affirme, plutôt que de nous faire confiance pour y penser.
 
 Les labs de `lab_type: validation` en sont exclus : ils défendent un guide
 publié et ne notent personne, donc ils n'ont pas leur place parmi les preuves

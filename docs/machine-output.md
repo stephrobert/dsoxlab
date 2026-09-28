@@ -217,13 +217,13 @@ chronological order, with nothing left for the reader to work out.
 
 ```json
 {
-  "schema": 1,
+  "schema": "dsoxlab-evidence-v1",
   "generated_at": "2026-09-28T09:03:07.929397+00:00",
-  "tool": { "name": "dsoxlab", "version": "0.2.5" },
+  "producer": { "name": "dsoxlab", "version": "0.2.5" },
   "catalog": {
     "id": "linux-dsoxlab-training",
     "path": "/home/me/catalogs/linux-dsoxlab-training",
-    "commit": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
+    "version": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
   },
   "results": [
     {
@@ -237,7 +237,7 @@ chronological order, with nothing left for the reader to work out.
       "passed_tests": 5,
       "total_tests": 5,
       "hints_used": 0,
-      "recorded_at": "2026-09-14T08:12:44.102931+00:00",
+      "attempted_at": "2026-09-14T08:12:44.102931+00:00",
       "exam": null
     }
   ],
@@ -248,13 +248,13 @@ chronological order, with nothing left for the reader to work out.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `generated_at` | string | when the document was produced, ISO 8601, UTC |
-| `tool.version` | string | the dsoxlab that produced it |
+| `producer.version` | string | the dsoxlab that produced it |
 | `catalog.id` | string | the catalog's `repo.id`, or the directory name if `meta.yml` cannot be read |
-| `catalog.commit` | string or null | the catalog's git revision, `null` outside a git repository — with it, a score earned on an earlier version of a lab can be told apart |
+| `catalog.version` | string or null | the catalog's revision — its git commit today, `null` outside a git repository. With it, a score earned on an earlier version of a lab can be told apart |
 | `results[].catalog` | string | repeated on every line, so lines from several catalogs can be merged |
 | `results[].lab_type` | string or null | `lab`, `challenge` or `capstone`; `null` when the lab no longer exists in the catalog |
 | `results[].validated` | bool | **the verdict, stated** — see below |
-| `results[].recorded_at` | string | when the result was recorded, ISO 8601, UTC |
+| `results[].attempted_at` | string | when the learner attempted the lab, ISO 8601, UTC |
 | `results[].exam` | object or null | as in `scores` |
 | `count` | int | the number of lines, which always equals `results.length` |
 
@@ -277,6 +277,17 @@ own copy of the catalog works only while the versions match.
 
 **Nothing is truncated.** A document that stops without saying so is worse than
 a missing one, because whoever reads it believes they have everything.
+
+**The schema is a name, not a number.** `"dsoxlab-evidence-v1"` rather than
+`1`, and it is the only place in this project where that is so: this document
+**leaves** dsoxlab. It lands in a browser, an LMS, a tracking tool, a file
+someone opens three months later — places where `{"schema": 1}` does not say
+what it is the first schema *of*. A portable document names itself.
+
+**And it names no portal.** No domain, no site, no URL of any kind appears in
+it. dsoxlab produces a proof; it does not decide who consumes it. That is the
+condition for a trainer other than this catalog's author to use it at all — and
+a test asserts it, rather than trusting us to remember.
 
 Labs of `lab_type: validation` are excluded: they defend a published guide and
 grade nobody, so they have no place among someone's proofs of practice. Since
