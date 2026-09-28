@@ -71,6 +71,43 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | `description` | non | chaîne | Un paragraphe. |
 | `issues_url` | non | chaîne | Où déposer une issue qui concerne **ce catalogue** et non le moteur. Lu par `dsoxlab support --issue`. Sans lui, l'outil retombe sur le remote `origin` du dépôt, ce qui suppose un remote portant ce nom et un hébergeur dont les issues vivent sous `<dépôt>/issues`. Comme `doc_url`, il passe par [la politique d'URL](./security.fr.md) : `http`/`https` seulement, un hôte, pas de `utilisateur:motdepasse@`. Une valeur refusée retombe sur le remote. |
 
+### `learning` (optionnel)
+
+Où ce catalogue attend qu'on remette une preuve d'apprentissage. Un bloc racine
+plutôt qu'un champ de plus sous `repo:` : la remise n'est pas l'identité du
+dépôt, et ce qui viendra ensuite — une page de reprise, un format attendu —
+tiendra ici sans étaler `repo.*` davantage.
+
+| Champ | Obligatoire | Type | Remarques |
+| --- | --- | --- | --- |
+| `portal_url` | non | chaîne | URL de remise, en `https`. Voir [la politique du portail](./security.fr.md). |
+
+```yaml
+learning:
+  portal_url: https://formation.example.org/mon-apprentissage/
+```
+
+**Ce que cette URL ne dit pas.** Elle ne dit pas que dsoxlab envoie quoi que ce
+soit — il n'envoie rien, jamais. Elle ne dit pas que le portail est joignable
+depuis la machine où l'outil tourne, ni que le navigateur y tourne aussi : un
+apprenant dans WSL, dans une VM ou derrière SSH lit un lien et décide. Et elle ne
+dit pas que ce portail est approuvé par qui que ce soit — il est *déclaré par ce
+catalogue*, et c'est ainsi que la CLI le présente.
+
+Un catalogue sans ce bloc continue de fonctionner, et rien ne s'affiche. Deux
+catalogues peuvent déclarer deux portails différents ; le moteur ne porte aucune
+adresse par défaut et aucun domaine qui lui soit propre.
+
+`https` seulement. L'exception, pour qui écrit un portail : avec
+`DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
+`[::1]` est acceptée — et rien d'autre, même la variable posée. Cette décision
+appartient à la machine qui joue le lab, jamais au catalogue.
+
+**Rien d'autre n'a sa place dans `learning`** : pas de jeton, de clé d'API, de
+cookie, d'en-tête d'autorisation, de secret client, de webhook ni de commande. Un
+dépôt versionné n'est pas un endroit où poser un secret, et un catalogue ne donne
+pas d'ordres au moteur.
+
 ### `infra` (optionnel, exigé par `runtime: vm`)
 
 | Champ | Obligatoire | Type | Défaut | Remarques |

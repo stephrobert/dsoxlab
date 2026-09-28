@@ -60,6 +60,13 @@ repo:
   description: |
     À remplir : ce que ce catalogue apprend, et à qui.
 
+# Où remettre une preuve d'apprentissage, si ce catalogue a un portail. En
+# `https` : le lien porte les résultats d'un apprenant. dsoxlab n'envoie rien —
+# il affiche une adresse, et l'apprenant décide.
+#
+# learning:
+#   portal_url: https://formation.example.org/mon-apprentissage/
+
 # Un catalogue sans lab `vm` n'a pas besoin de bloc `infra:`. Décommente-le le
 # jour où un lab déclare `runtime.type: vm`.
 #

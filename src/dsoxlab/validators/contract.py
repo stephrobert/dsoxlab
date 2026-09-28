@@ -37,11 +37,13 @@ from typing import Any
 import yaml
 
 from ..discovery.scanner import compter_fichiers_labs
+from ..i18n import _
 from ..models._contract import ContractError
 from ..models.schema_version import (
     UnsupportedSchemaVersion,
     read_schema_version,
 )
+from ..security.urls import URLRefusee, url_de_portail
 
 
 @dataclass(frozen=True)
@@ -289,7 +291,8 @@ KNOWN_LAB_KEYS: frozenset[str] = frozenset({
 
 KNOWN_META_KEYS: frozenset[str] = frozenset({
     "schema_version",
-    "repo", "infra", "sections",
+    "repo", "infra", "learning", "sections",
+    "learning.portal_url",
     "repo.id", "repo.category", "repo.title", "repo.blog_url", "repo.description",
     "repo.issues_url",
     "infra.provider", "infra.network", "infra.cidr", "infra.hosts", "infra.providers",
@@ -400,7 +403,13 @@ def _keyed_documents(root: Path) -> list[tuple[Path, frozenset[str]]]:
 
 
 def validate_repo_fields(root: Path) -> ContractReport:
-    """Réclame ``repo.category`` aux dépôts qui portent des labs, à eux seuls.
+    """Les champs du dépôt que le parseur ne peut pas juger seul.
+
+    Deux contrôles, et la même raison de vivre ici : le parseur du contrat v1 ne
+    refuse pas un catalogue, il le charge. Ce qui se juge sans le refuser se dit
+    donc à l'auteur, ici.
+
+    **``repo.category``**, réclamée aux dépôts qui portent des labs, à eux seuls.
 
     Le parseur ne l'exige plus (issue #231) : ce champ ne sert qu'à donner sa
     ``section`` par défaut à un lab, et un dépôt qui ne provisionne que de
@@ -427,6 +436,8 @@ def validate_repo_fields(root: Path) -> ContractReport:
     if not isinstance(data, dict):
         return report
 
+    report.issues += _anomalies_du_portail(data, meta)
+
     repo = data.get("repo")
     if not isinstance(repo, dict) or str(repo.get("category") or "").strip():
         return report
@@ -437,6 +448,41 @@ def validate_repo_fields(root: Path) -> ContractReport:
             path=meta, key="category_absente_avec_labs", params={"labs": labs},
         ))
     return report
+
+
+def _anomalies_du_portail(data: dict[str, Any], meta: Path) -> list[ContractIssue]:
+    """``learning.portal_url`` respecte-t-elle la politique du portail ?
+
+    Le contrôle est **syntaxique et de politique, jamais réseau** : rien ne
+    résout le nom ni ne frappe la page. Sinon un catalogue ferait émettre une
+    requête depuis la CI de son auteur vers l'adresse de son choix, et
+    `validate-structure` deviendrait l'outil de cette requête.
+
+    Un portail absent n'est pas une anomalie : c'est le cas par défaut.
+    """
+    learning = data.get("learning")
+    if not isinstance(learning, dict):
+        # Un `learning:` qui n'est pas un mapping est déjà dit par le parseur,
+        # via `as_mapping`. Le redire ici doublerait la ligne rouge.
+        return []
+    declaree = str(learning.get("portal_url") or "").strip()
+    if not declaree:
+        return []
+
+    try:
+        url_de_portail(declaree, champ="learning.portal_url")
+    except URLRefusee as refus:
+        # Deux formes de la même raison : `reason_key` ne bouge ni avec la
+        # langue ni avec la formulation — c'est sur elle qu'une intégration
+        # filtre — et `reason` est la phrase que l'auteur lit.
+        return [ContractIssue(
+            path=meta, key="portail_refuse",
+            params={
+                "reason_key": refus.cle,
+                "reason": _(refus.cle, **refus.params),
+            },
+        )]
+    return []
 
 
 def validate_unknown_keys(root: Path) -> ContractReport:

@@ -11,6 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A catalogue declares its own learning portal** (issue #269). The portal that
+  consumes a learner's results is not necessarily the site of dsoxlab's author:
+  it may be a trainer's site, an internal platform, a static site, an LMS, a
+  local portal — or none. The engine therefore carries **no training domain**,
+  and the address is declared where the rest of the catalogue's identity lives.
+
+  A root block rather than one more `repo.*` field, so that what comes next — a
+  resume page, an expected format — fits without spreading `repo.*`:
+
+  ```yaml
+  learning:
+    portal_url: https://formation.example.org/my-learning/
+  ```
+
+  **What the field does not say**: that dsoxlab sends anything — it never does —
+  that the portal is reachable from the machine running the tool, that the
+  browser runs there too, or that anyone approved it. It is *declared by this
+  catalogue*, and that is how the CLI presents it. A catalogue without the block
+  keeps working and nothing is displayed; two catalogues may declare two
+  different portals.
+
+  `https` only, through the single policy of #273 — no second parser, no second
+  list of schemes. One documented exception, for whoever is writing a portal:
+  with `DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL **towards localhost** is
+  accepted, and nothing else even with the variable set. Two guards rather than
+  one, and an environment variable rather than a contract field: the machine
+  playing the lab decides, never the catalogue.
+
+  `validate-structure` says it to the author, with the reason and without
+  echoing the offending string. **Nothing touches the network** — no name
+  resolved, no HEAD, no GET: otherwise a catalogue would make its author's CI
+  reach the address of its choice. And nothing else belongs in `learning`: no
+  token, API key, header, webhook or command. A versioned repository is no place
+  for a secret.
 - **`lab_type: validation` — a lab that defends a guide, and grades nobody**
   (issue #232). A fourth kind was already running in production without a name:
   a set of assertions defending the facts published in a guide, where a red

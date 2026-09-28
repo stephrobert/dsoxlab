@@ -72,6 +72,41 @@ omission.
 | `description` | no | string | One paragraph. |
 | `issues_url` | no | string | Where to file an issue about **this catalogue** rather than about the engine. Read by `dsoxlab support --issue`. Without it, the tool falls back to the repository's `origin` remote, which assumes a remote by that name and a host whose issues live under `<repo>/issues`. Like `doc_url`, it goes through [the URL policy](./security.md): `http`/`https` only, a hostname, no `user:password@`. A rejected value falls back to the remote. |
 
+### `learning` (optional)
+
+Where this catalogue expects a proof of practice to be handed in. A root block
+rather than one more `repo.*` field: handing in is not the repository's identity,
+and what comes next — a resume page, an expected format — will fit here without
+spreading `repo.*` any further.
+
+| Field | Required | Type | Notes |
+| --- | --- | --- | --- |
+| `portal_url` | no | string | Hand-in URL, in `https`. See [the portal policy](./security.md). |
+
+```yaml
+learning:
+  portal_url: https://formation.example.org/my-learning/
+```
+
+**What this URL does not say.** It does not say dsoxlab sends anything — it never
+does. It does not say the portal is reachable from the machine running dsoxlab,
+nor that the browser runs there too: a learner in WSL, in a VM or behind SSH
+reads a link and decides. And it does not say the portal is approved by anyone —
+it is *declared by this catalogue*, which is how the CLI presents it.
+
+A catalogue without the block keeps working, and nothing is displayed. Two
+catalogues may declare two different portals; the engine carries no default
+address and no domain of its own.
+
+`https` only. The exception, for whoever is writing a portal: with
+`DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
+`[::1]` is accepted — and nothing else, even with the variable set. That
+decision belongs to the machine playing the lab, never to the catalogue.
+
+**Nothing else belongs in `learning`**: no token, API key, cookie, authorization
+header, client secret, webhook or command. A versioned repository is no place
+for a secret, and a catalogue gives the engine no orders.
+
 ### `infra` (optional — required by `runtime: vm`)
 
 | Field | Required | Type | Default | Notes |

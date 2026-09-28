@@ -6,6 +6,7 @@ from .lab import LabDefinition, ValidationConfig
 from .repo import (
     HostDefinition,
     InfraDefinition,
+    LearningDefinition,
     ProviderUnresolved,
     RepoMetadata,
     SectionDefinition,
@@ -28,6 +29,7 @@ __all__ = [
     "InfraDefinition",
     "LabDefinition",
     "LabYamlError",
+    "LearningDefinition",
     "ProviderUnresolved",
     "RepoMetadata",
     "RuntimeConfig",

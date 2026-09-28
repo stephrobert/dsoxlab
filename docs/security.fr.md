@@ -74,7 +74,15 @@ validateur :
 | Politique | Schémas | Employée par |
 | --- | --- | --- |
 | `DOCUMENTATION` | `http`, `https` | `doc_url`, URL d'issues. Le `http` reste accepté : des catalogues et des forges en publient, la valeur est affichée et non transmise avec un secret, et le refuser casserait des catalogues existants sans rien protéger de plus |
-| `PORTAIL` | `https` seul | Destination d'une preuve. Le lien portera des résultats ; en clair, ils s'exposent en chemin |
+| `PORTAIL` | `https` seul | Destination d'une preuve (`learning.portal_url`). Le lien portera des résultats ; en clair, ils s'exposent en chemin |
+
+Le portail porte une exception documentée, pour qui écrit un portail : avec
+`DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
+`[::1]` est acceptée. Deux gardes plutôt qu'un — la variable **et** un hôte local
+— parce que `http` vers un hôte distant est autre chose, et parce qu'une variable
+qui voudrait dire « fais-moi confiance pour tout » ne garderait rien. C'est une
+variable d'environnement, jamais un champ du contrat : la machine qui joue le lab
+décide, pas le catalogue.
 
 Commun aux deux : l'URL est réellement analysée, un hôte est exigé,
 `utilisateur:motdepasse@` est refusé, les caractères de contrôle sont refusés,

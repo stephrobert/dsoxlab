@@ -104,6 +104,7 @@ ne les cherche à nouveau :
 | `DSOXLAB_LOG` | `DSOXLAB_LOG=debug` équivaut à `-vv` |
 | `DSOXLAB_HOST_READY_TIMEOUT` | Secondes d'attente d'un hôte fraîchement provisionné (défaut 180) |
 | `DSOXLAB_NO_UPDATE_CHECK` | À `1`, coupe l'avis quotidien de nouvelle version |
+| `DSOXLAB_PORTAIL_LOCAL` | À `1`, accepte une `learning.portal_url` en `http` **vers localhost seulement**, pour qui écrit un portail. Désactivé par défaut, et jamais une décision du catalogue |
 | `DSOXLAB_OUTSCALE_PROFILE`, `DSOXLAB_AWS_PROFILE` | Profil d'identifiants de ces providers |
 
 Deux autres sont **posées par dsoxlab** pour que les tests d'un lab les lisent,

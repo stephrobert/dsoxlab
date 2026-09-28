@@ -981,12 +981,15 @@ silent.
     "content_target_host_unknown":
         "target '{target}' aims at host '{host}', missing from infra.hosts in meta.yml",
     # ── security: what a catalog may not make the engine do ─────────────────
+    "portail_refuse":
+        "learning.portal_url cannot be used: {reason}. A learning portal is "
+        "declared in https, because the link carries a learner's results",
     "securite_url_vide": "an empty URL",
     "securite_url_caractere":
         "a control character ({code}), which has no place in a URL",
     "securite_url_illisible": "a URL this tool cannot parse",
     "securite_url_schema":
-        "scheme '{scheme}', where only {allowed} are accepted",
+        "scheme '{scheme}', outside the accepted schemes ({allowed})",
     "securite_url_sans_hote": "no host",
     "securite_url_identifiants":
         "credentials before the host: the eye reads the first name, the "
@@ -1055,6 +1058,7 @@ silent.
 
     # ── contract version (schema_version) ─────────────────────────────────────
     "contract_issues_header": "\n[bold red]Contract version:[/bold red]",
+    "repo_fields_header": "\n[bold red]The meta.yml of this repository:[/bold red]",
     "schema_version_invalid":
         "'schema_version' must be a YAML integer of at least 1, and no greater "
         "than {supported}, the latest contract this dsoxlab reads (got: {got}). "
