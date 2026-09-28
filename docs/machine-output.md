@@ -293,6 +293,58 @@ Labs of `lab_type: validation` are excluded: they defend a published guide and
 grade nobody, so they have no place among someone's proofs of practice. Since
 0.3.0 they record nothing at all, but a database written earlier may hold some.
 
+### One lab, one proof — `--lab`, `--out`
+
+The link to a portal is the most direct way to hand a result over, and it is not
+enough: a terminal that does not make URLs clickable, a browser on another
+machine, an isolated environment, a trainer collecting proofs their own way, a
+learner archiving their own. Three transports, then — link, file, copy-paste —
+and **one format**, so that no consumer has to handle two of them to read the
+same thing.
+
+```bash
+dsoxlab export --lab lvm-extend-persist              # the document, on stdout
+dsoxlab export --lab lvm-extend-persist -o proof.json
+dsoxlab export -o history.json                       # or the whole history
+```
+
+`--lab` yields the **last recorded attempt** for that lab — what happened, not
+the best-looking result — in the same document, with `count: 1`. The envelope is
+identical, and a test asserts it: whoever can read one can read the other.
+
+| Situation | What happens |
+| --- | --- |
+| the lab is unknown | exit 1, the message says the lab, stdout stays empty |
+| the lab was never attempted | exit 1, a **different** message: an unknown lab is looked up, a missing proof is earned |
+| the lab is `lab_type: validation` | exit 1: it defends a guide and grades nobody, so it attests nothing |
+
+`--out` writes the document to a file and leaves **standard output empty**, so a
+caller that redirects it gets JSON and nothing else; the confirmation goes to
+stderr. Three precautions, each for an accident seen elsewhere: nothing is
+overwritten without `--force` (a proof replaced in silence is a proof lost), a
+symbolic link is never followed (writing "into" a link writes somewhere you did
+not name), and the write is atomic (a Ctrl-C leaves no JSON cut mid-brace, which
+reads as a valid file until you parse it).
+
+### If you consume these proofs
+
+It is a **local result**, not a certificate. It attests that a test suite passed
+on a machine at a moment; it says nothing about who was at the keyboard, about
+the integrity of that machine, or about the file not having been edited
+afterwards. A portal that treats it as an identity claim is building on sand.
+
+So, on your side:
+
+- **validate the schema** before reading anything, starting with the `schema`
+  string;
+- **impose a maximum size** before decoding — 32 KB is what one portal settled
+  on for a URL fragment, 1 MB for a file;
+- **reject unknown fields** if your policy calls for it (new fields are additive
+  here, so this is a choice, not a requirement);
+- **never interpret a value as HTML or as a command**: `catalog.id`, `lab_id`
+  and `section` come from an untrusted catalog. Render them as text;
+- **confirm with the user** rather than importing silently.
+
 ### What this document must never carry
 
 A catalog is **untrusted input**: `dsoxlab catalog add <url>` clones an

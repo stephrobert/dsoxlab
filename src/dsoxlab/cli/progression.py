@@ -21,9 +21,11 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Any
 
 import typer
 
@@ -40,6 +42,7 @@ from ..reporting import (
     error,
     info,
     machine,
+    note,
     print_progress_table,
     print_scores_table,
     success,
@@ -56,6 +59,7 @@ from ..sessions.store import (
     get_results,
     reset_hints,
 )
+from ..utils.fichiers import ecrire_atomiquement
 from ._barres import (
     _run_ansible_with_progress,
 )
@@ -213,14 +217,31 @@ def scores(
 @app.command("export", help=_("cmd_export_help"))
 def export(
     lab_home: LabHomeOption = None,
+    lab: Annotated[str | None, typer.Option(
+        "--lab", help=_("opt_export_lab"), autocompletion=_complete_lab_id,
+    )] = None,
+    sortie: Annotated[Path | None, typer.Option(
+        "--out", "-o", help=_("opt_export_out"),
+    )] = None,
+    force: Annotated[bool, typer.Option("--force", help=_("opt_export_force"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_export_json"))] = False,
 ) -> None:
-    """Le document complet des résultats, pour qui veut les relire ailleurs.
+    """Les résultats en un document, entier ou réduit à un seul lab.
 
     Une commande à part plutôt qu'une option de ``scores``, et la raison tient
     en une phrase : ``scores`` est un **affichage**, borné à vingt lignes par
     défaut et cinquante par la base. Un export borné est pire qu'absent, parce
     que celui qui le lit croit tout avoir.
+
+    ``--lab`` rend la **dernière tentative** enregistrée pour ce lab, dans le
+    même document, avec ``count: 1``. Un second format aurait obligé chaque
+    consommateur à en gérer deux, pour dire la même chose.
+
+    ``--out`` écrit le document dans un fichier et laisse la sortie standard
+    **vide** : c'est le repli universel quand le terminal ne rend pas les liens
+    cliquables, quand le navigateur est sur une autre machine, ou quand un
+    formateur collecte les preuves autrement. Le fichier n'est pas écrasé sans
+    ``--force`` — une preuve remplacée en silence est une preuve perdue.
 
     ``--json`` est accepté sans rien changer : ce document est machine par
     nature, il n'a pas de forme terminal. L'option existe parce que la
@@ -228,91 +249,102 @@ def export(
     """
     del as_json  # accepté pour la cohérence, sans effet : voir la docstring
     from ..discovery.repo import read_repo_metadata
-    from ..security import IdentifiantRefuse, identifiant_sur
-    from ..sessions.store import _now, get_all_results
-    from ..utils.shell import run_command
-
-    def _version() -> str:
-        from .. import __version__
-
-        return __version__
+    from ..security import IdentifiantRefuse
+    from ..services.evidence import (
+        PreuveIntrouvable,
+        construire_document,
+        identifiant_de_catalogue,
+    )
 
     root = _root(lab_home)
-    labs = {lab.id: lab for lab in _catalogue(root, _lang(root), quiet=True)}
+    labs = {definition.id: definition for definition in _catalogue(root, _lang(root), quiet=True)}
+
+    if lab is not None and lab not in labs:
+        # Un lab inconnu se cherche, une preuve absente se gagne : deux messages.
+        error(_("err_lab_not_found", lab_id=texte_affichable(lab)))
+        raise typer.Exit(1)
 
     try:
         repo_meta = read_repo_metadata(root)
     except Exception:  # noqa: BLE001 — un meta.yml illisible ne doit pas priver
         repo_meta = None                # l'apprenant de son propre historique
-    # Le repli sur le nom du répertoire mérite autant de méfiance que le
-    # `repo.id` du catalogue : un nom de dossier est libre, il peut porter des
-    # espaces, un retour chariot ou une surcharge de direction. Les deux
-    # traversent la même frontière de confiance, donc les deux se valident —
-    # et le consommateur qui reçoit ce document refuse déjà ces caractères.
+
     try:
-        catalog_id = identifiant_sur(
-            repo_meta.id if repo_meta else root.name, champ="catalog.id"
+        catalog_id = identifiant_de_catalogue(root, repo_meta.id if repo_meta else None)
+        document = construire_document(root, labs, catalog_id=catalog_id, lab_id=lab)
+    except IdentifiantRefuse as refus:
+        error(_("export_identifiant_refuse", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("export_identifiant_refuse_suite"))
+        raise typer.Exit(1) from None
+    except PreuveIntrouvable as absence:
+        error(_(absence.cle, lab_id=texte_affichable(absence.lab_id)))
+        raise typer.Exit(1) from None
+
+    if sortie is None:
+        machine.emit(document)
+        return
+
+    _ecrire_preuve(sortie, document, force=force)
+
+
+def _ecrire_preuve(sortie: Path, document: dict[str, Any], *, force: bool) -> None:
+    """Écrit le document dans un fichier, sans surprise et sans écrasement muet.
+
+    Trois précautions, chacune pour un accident déjà vu ailleurs :
+
+    - **rien n'est écrasé sans ``--force``**, pas même un fichier que dsoxlab a
+      écrit lui-même. Une preuve remplacée en silence est une preuve perdue, et
+      l'apprenant ne s'en aperçoit qu'en la remettant ;
+    - **un lien symbolique n'est jamais suivi** sans le dire. Écrire « dans »
+      un lien écrit en réalité ailleurs, à un endroit que l'utilisateur n'a pas
+      nommé ;
+    - **l'écriture est atomique** (``utils/fichiers.py``) : un Ctrl-C ne laisse
+      pas un JSON coupé au milieu d'une accolade, qui se lit comme un fichier
+      valide jusqu'à ce qu'on le parse.
+
+    La sortie standard reste vide : c'est le contrat de la sortie machine, et un
+    appelant qui redirige `--out` ne veut rien voir passer dans le tube.
+    """
+    if sortie.is_symlink():
+        error(_("export_fichier_lien", path=str(sortie)))
+        raise typer.Exit(1)
+    if sortie.exists() and not force:
+        error(_("export_fichier_existe", path=str(sortie)))
+        info(_("export_fichier_existe_suite"))
+        raise typer.Exit(1)
+
+    try:
+        ecrire_atomiquement(
+            sortie,
+            json.dumps(document, ensure_ascii=False, indent=2) + "\n",
+            mode=_mode_de_fichier(),
         )
-    except IdentifiantRefuse as refus:
-        error(_("export_identifiant_refuse", field=refus.champ,
-                reason=_(refus.cle, **refus.params)))
-        info(_("export_identifiant_refuse_suite"))
+    except OSError as exc:
+        error(_("export_fichier_erreur", path=str(sortie), error=str(exc)))
         raise typer.Exit(1) from None
 
-    # Le commit du catalogue, quand il y en a un : un score obtenu sur une
-    # version antérieure d'un lab se reconnaît alors, au lieu d'être comparé à
-    # un énoncé qui a changé depuis. Absent d'un répertoire qui n'est pas un
-    # dépôt git, et ce n'est pas une anomalie.
-    revision = run_command(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], check=False, timeout=5,
-    )
-    commit = revision.stdout.strip() if revision.ok else None
-
-    try:
-        for row in get_all_results(root):
-            identifiant_sur(row["lab_id"], champ="lab_id")
-            identifiant_sur(row["section"], champ="section", vide_permis=True)
-    except IdentifiantRefuse as refus:
-        error(_("export_identifiant_refuse", field=refus.champ,
-                reason=_(refus.cle, **refus.params)))
-        info(_("export_identifiant_refuse_suite"))
-        raise typer.Exit(1) from None
-
-    lignes = [
-        machine.export_result_dict(row, labs.get(row["lab_id"]), catalog_id)
-        for row in get_all_results(root)
-        # Un lab `validation` défend un guide : sa place n'est pas dans les
-        # preuves de pratique de quelqu'un. Depuis 0.3.0 il n'inscrit plus
-        # rien, mais une base antérieure peut en porter.
-        if (lab := labs.get(row["lab_id"])) is None or lab.is_exercise
-    ]
-    machine.emit({
-        # Une chaîne, pas un entier, et c'est le seul endroit du projet où
-        # c'est le cas : ce document quitte dsoxlab. Il atterrit dans un
-        # navigateur, un LMS, un outil de suivi, un fichier qu'on retrouve
-        # trois mois plus tard — des endroits où `{"schema": 1}` ne dit pas de
-        # quoi il est le schéma 1. Un document portable se nomme lui-même.
-        "schema": "dsoxlab-evidence-v1",
-        "generated_at": _now(),
-        "producer": {"name": "dsoxlab", "version": _version()},
-        # `version` et non `commit` : c'est la révision quand le catalogue est
-        # un dépôt git, et ce pourrait être autre chose ailleurs. Le
-        # consommateur n'a pas à savoir laquelle, seulement à distinguer deux
-        # états du même catalogue.
-        #
-        # Le chemin local N'Y EST PAS. Ce document est fait pour être transmis :
-        # `/home/marie/Projets/…` y publierait un nom d'utilisateur, parfois un
-        # nom de famille, et l'arborescence d'une machine — à un destinataire
-        # qui n'en a aucun usage, puisque `id` et `version` identifient déjà le
-        # catalogue. C'est la règle que `support` applique à son rapport depuis
-        # 0.1.86, pour exactement la même raison.
-        "catalog": {"id": catalog_id, "version": commit},
-        "results": lignes,
-        "count": len(lignes),
-    })
+    # Sur stderr : un `--out` redirigé ne doit rien recevoir sur stdout, et la
+    # confirmation reste utile à un humain.
+    note(_("export_fichier_ecrit", path=str(sortie), count=document["count"]))
 
 
-# ── progress ──────────────────────────────────────────────────────────────────
+def _mode_de_fichier() -> int:
+    """Les permissions d'un fichier ordinaire sur cette machine.
+
+    `ecrire_atomiquement` passe par `tempfile.mkstemp`, qui crée en `0600` —
+    juste pour un `ssh_config`, trop pour une preuve. Ce document ne porte aucun
+    secret (c'est l'invariant de son contrat), et un formateur doit pouvoir le
+    lire sans commencer par un `chmod`.
+
+    L'umask est lu en le reposant aussitôt : POSIX n'offre pas de lecture seule,
+    et c'est ce que fait n'importe quelle création de fichier. On rend donc ce
+    que `open()` aurait produit, ni plus permissif ni moins.
+    """
+    umask = os.umask(0o022)
+    os.umask(umask)
+    return 0o666 & ~umask
+
 
 # ── progress ──────────────────────────────────────────────────────────────────
 

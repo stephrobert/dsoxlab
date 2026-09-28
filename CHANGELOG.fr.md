@@ -11,6 +11,40 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Une preuve pour un seul lab, en fichier ou en copier-coller** (issue #271).
+  Le lien vers un portail est la façon la plus directe de remettre un résultat,
+  et elle ne suffit pas : un terminal qui ne rend pas les URL cliquables, un
+  navigateur sur une autre machine, un environnement isolé, un formateur qui
+  collecte à sa manière, un apprenant qui archive la sienne.
+
+  ```bash
+  dsoxlab export --lab lvm-extend-persist              # sur stdout
+  dsoxlab export --lab lvm-extend-persist -o preuve.json
+  ```
+
+  `--lab` rend la **dernière tentative enregistrée** — ce qui s'est passé, pas le
+  résultat le plus flatteur — dans le **même** document Evidence v1, avec
+  `count: 1`. Un test exige que l'enveloppe soit identique : un second format
+  aurait obligé chaque consommateur à en gérer deux pour lire la même chose.
+  Mesuré sur une tentative réelle : 434 caractères de JSON compact, 579 encodés
+  en base64url, là où le portail accepte 32 Ko.
+
+  Trois situations, trois réponses : un lab inconnu sort en 1 en le nommant, un
+  lab jamais tenté sort en 1 avec un message **différent** (un lab inconnu se
+  cherche, une preuve absente se gagne), et un lab en `lab_type: validation` ne
+  produit rien — il défend un guide et ne note personne.
+
+  `--out` écrit le document dans un fichier et laisse la **sortie standard
+  vide**, pour qu'un appelant qui la redirige reçoive du JSON et rien d'autre.
+  Rien n'est écrasé sans `--force` — une preuve remplacée en silence est une
+  preuve perdue —, un lien symbolique n'est jamais suivi, et l'écriture est
+  atomique. Le fichier n'est pas un secret non plus : `0600` convient à un
+  `ssh_config` et pas à une preuve qu'un formateur doit pouvoir lire sans
+  commencer par un `chmod`.
+
+  Même liste blanche que l'export complet, et les mêmes tests sur ce chemin-ci :
+  un second producteur d'un même document est un second endroit par où un champ
+  peut fuir.
 - **Un catalogue déclare son propre portail de formation** (issue #269). Le
   portail qui consomme les résultats d'un apprenant n'est pas forcément le site
   de l'auteur de dsoxlab : ce peut être celui d'un formateur, une plateforme

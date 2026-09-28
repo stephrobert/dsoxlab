@@ -299,6 +299,62 @@ publié et ne notent personne, donc ils n'ont pas leur place parmi les preuves
 de pratique de quelqu'un. Depuis la 0.3.0 ils n'inscrivent plus rien, mais une
 base écrite avant peut en porter.
 
+### Un lab, une preuve — `--lab`, `--out`
+
+Le lien vers un portail est la façon la plus directe de remettre un résultat, et
+elle ne suffit pas : un terminal qui ne rend pas les URL cliquables, un
+navigateur sur une autre machine, un environnement isolé, un formateur qui
+collecte à sa manière, un apprenant qui archive la sienne. Trois transports donc
+— lien, fichier, copier-coller — et **un seul format**, pour qu'aucun
+consommateur n'ait à en gérer deux pour lire la même chose.
+
+```bash
+dsoxlab export --lab lvm-extend-persist              # le document, sur stdout
+dsoxlab export --lab lvm-extend-persist -o preuve.json
+dsoxlab export -o historique.json                    # ou tout l'historique
+```
+
+`--lab` rend la **dernière tentative enregistrée** de ce lab — ce qui s'est
+passé, pas le résultat le plus flatteur — dans le même document, avec
+`count: 1`. L'enveloppe est identique, et un test l'exige : qui sait lire l'un
+sait lire l'autre.
+
+| Situation | Ce qui se passe |
+| --- | --- |
+| le lab est inconnu | sortie 1, le message nomme le lab, stdout reste vide |
+| le lab n'a jamais été tenté | sortie 1, un message **différent** : un lab inconnu se cherche, une preuve absente se gagne |
+| le lab est en `lab_type: validation` | sortie 1 : il défend un guide et ne note personne, donc il n'atteste rien |
+
+`--out` écrit le document dans un fichier et laisse la **sortie standard vide**,
+pour qu'un appelant qui la redirige reçoive du JSON et rien d'autre ; la
+confirmation part sur stderr. Trois précautions, chacune pour un accident déjà vu
+ailleurs : rien n'est écrasé sans `--force` (une preuve remplacée en silence est
+une preuve perdue), un lien symbolique n'est jamais suivi (écrire « dans » un
+lien écrit ailleurs, à un endroit qu'on n'a pas nommé), et l'écriture est
+atomique (un Ctrl-C ne laisse pas un JSON coupé au milieu d'une accolade, qui se
+lit comme un fichier valide jusqu'à ce qu'on le parse).
+
+### Si vous consommez ces preuves
+
+C'est un **résultat local**, pas un certificat. Il atteste qu'une suite de tests
+est passée sur une machine à un instant ; il ne dit rien de qui était au clavier,
+de l'intégrité de cette machine, ni du fait que le fichier n'a pas été modifié
+ensuite. Un portail qui le traiterait comme une preuve d'identité bâtirait sur du
+sable.
+
+Donc, de votre côté :
+
+- **validez le schéma** avant de lire quoi que ce soit, en commençant par la
+  chaîne `schema` ;
+- **imposez une taille maximale** avant tout décodage — 32 Ko est ce qu'un
+  portail a retenu pour un fragment d'URL, 1 Mo pour un fichier ;
+- **refusez les champs inconnus** si votre politique le demande (les ajouts de
+  champs sont compatibles ici : c'est donc un choix, pas une obligation) ;
+- **n'interprétez jamais une valeur comme du HTML ou une commande** :
+  `catalog.id`, `lab_id` et `section` viennent d'un catalogue non fiable.
+  Affichez-les comme du texte ;
+- **demandez confirmation** plutôt que d'importer en silence.
+
 ### Ce que ce document ne doit jamais porter
 
 Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>` clone

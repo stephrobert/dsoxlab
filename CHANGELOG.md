@@ -11,6 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A proof for one lab, as a file or a copy-paste** (issue #271). The link to a
+  portal is the most direct way to hand a result over, and it is not enough: a
+  terminal that does not make URLs clickable, a browser on another machine, an
+  isolated environment, a trainer collecting proofs their own way, a learner
+  archiving their own.
+
+  ```bash
+  dsoxlab export --lab lvm-extend-persist              # on stdout
+  dsoxlab export --lab lvm-extend-persist -o proof.json
+  ```
+
+  `--lab` yields the **last recorded attempt** — what happened, not the
+  best-looking result — in the **same** Evidence v1 document, with `count: 1`. A
+  test asserts the envelope is identical: a second format would have forced every
+  consumer to handle two of them to read the same thing. Measured on a real
+  attempt: 434 characters of compact JSON, 579 encoded in base64url, where the
+  portal accepts 32 KB.
+
+  Three situations, three answers: an unknown lab exits 1 naming it, a lab never
+  attempted exits 1 with a **different** message (an unknown lab is looked up, a
+  missing proof is earned), and a `lab_type: validation` lab produces nothing —
+  it defends a guide and grades nobody.
+
+  `--out` writes the document to a file and leaves **standard output empty**, so
+  a caller that redirects it gets JSON and nothing else. Nothing is overwritten
+  without `--force` — a proof replaced in silence is a proof lost — a symbolic
+  link is never followed, and the write is atomic. The file is not a secret
+  either: `0600` is right for an `ssh_config` and wrong for a proof a trainer
+  must be able to read without a `chmod` first.
+
+  Same allowlist as the full export, and the same tests on this path too: a
+  second producer of one document is a second place a field can leak from.
 - **A catalogue declares its own learning portal** (issue #269). The portal that
   consumes a learner's results is not necessarily the site of dsoxlab's author:
   it may be a trainer's site, an internal platform, a static site, an LMS, a
