@@ -433,6 +433,7 @@ went wrong.
   "ok": false,
   "labs_checked": 87,
   "doc_urls_checked": false,
+  "doc_urls_unreachable": [],
   "issues": [
     {
       "kind": "structure",
@@ -456,8 +457,23 @@ went wrong.
 | `ok` | bool | the verdict, matching the exit code: `false` means exit 1 |
 | `labs_checked` | int | labs actually discovered and validated |
 | `doc_urls_checked` | bool | whether `--check-urls` was passed — without it, `doc_url: 0` means *not looked at*, not *all alive* |
+| `doc_urls_unreachable` | array | guides the network did not answer for, after three attempts. **Not anomalies**, and they do not affect `ok` — see below |
 | `issues` | array | every anomaly, in the order the checks run |
 | `counts` | object | one entry per family, **always all of them**, zero included |
+
+**`doc_urls_unreachable` is separate from `issues`, and that separation is the
+point.** A guide answering 404 is a defect of the lab: it lands in `issues`,
+counts in `doc_url`, and fails the command. A guide the network never answered
+for is neither a defect nor a success — it is a check that could not look. It
+is reported, because a lasting outage must not be indistinguishable from a
+healthy catalog, but it does not fail the command: a lab's structure is not
+wrong because a third-party site reset the connection. Each entry carries
+`lab`, `url` and `key`.
+
+The distinction was paid for. A catalog's CI failed on four guides declared
+unreachable; all four answered 200 from a workstation, and a plain rerun of the
+same commit went green. A red build nobody believes teaches people to rerun
+without reading, which is how a real 404 eventually slips through.
 
 Each issue:
 

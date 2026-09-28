@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A network outage was reported as a lab defect, and the same URL was
+  requested once per lab** (issue #224). `validate-structure --check-urls`
+  turned a green CI red on four guides declared unreachable; all four answered
+  200 from a workstation, and a plain `gh run rerun --failed` on the same commit
+  went green. Nothing in those labs had changed.
+
+  Three things were wrong, and the third is the one that matters.
+
+  **It never retried.** A `Connection reset by peer` on a URL that answered a
+  minute earlier is an incident, not a dead page. The check now tries three
+  times with a short growing wait — and only for network errors: a 404 does not
+  become a 200 because you insist, so an HTTP status is never retried.
+
+  **It asked the same question 58 times for 35 answers.** Several labs pair the
+  same lesson, by design — one skill per lab, one guide covering several. One
+  page was requested four times in the same second, and the catalog had just
+  grown from 53 to 58 labs the day the check started failing. URLs are now
+  deduplicated before being requested, and each verdict is attached back to
+  every lab concerned.
+
+  **And it confused two verdicts.** A guide answering 404 is a defect of the
+  lab: it fails the command. A guide the network never answered for is neither
+  a defect nor a success — it is a check that could not look. It is now
+  reported separately, in its own section and in a `doc_urls_unreachable` field
+  of the JSON document, and it **no longer fails the command**. A red build
+  nobody believes teaches people to rerun without reading, which is how a real
+  404 eventually slips through.
+
+
 ## [0.2.5] - 2026-09-26
 
 ### Fixed

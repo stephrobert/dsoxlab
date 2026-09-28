@@ -140,8 +140,86 @@ class TestDocUrl:
             raise urllib.error.URLError("network is unreachable")
 
         monkeypatch.setattr(content.urllib.request, "urlopen", _boum)
-        souci = content.check_doc_url(_lab(tmp_path))
+        souci = content.check_doc_url(_lab(tmp_path), attente=0)
         assert souci is not None and souci.key == "content_doc_url_unreachable"
+
+    def test_une_coupure_passagere_donne_lieu_a_un_reessai(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Le cas mesuré sur la CI Kubernetes : la deuxième tentative répond.
+
+        Quatre guides y ont été déclarés injoignables sur un `Connection reset
+        by peer`, les quatre rendaient 200 depuis un poste, et un simple
+        `rerun` du même commit est passé au vert. Sans réessai, ce faux rouge
+        apprend surtout à relancer la CI sans lire le message.
+        """
+        appels: list[int] = []
+
+        def _selon_appel(*_a: object, **_k: object) -> object:
+            appels.append(1)
+            if len(appels) == 1:
+                raise urllib.error.URLError("connection reset by peer")
+            return _Reponse(200)
+
+        monkeypatch.setattr(content.urllib.request, "urlopen", _selon_appel)
+        assert content.check_doc_url(_lab(tmp_path), attente=0) is None
+        assert len(appels) == 2
+
+    def test_un_statut_n_est_jamais_reessaye(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Un 404 ne devient pas un 200 parce qu'on insiste."""
+        appels: list[int] = []
+
+        def _quatre_cent_quatre(*_a: object, **_k: object) -> None:
+            appels.append(1)
+            raise urllib.error.HTTPError("u", 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(content.urllib.request, "urlopen", _quatre_cent_quatre)
+        souci = content.check_doc_url(_lab(tmp_path), attente=0)
+        assert souci is not None and souci.key == "content_doc_url_status"
+        assert len(appels) == 1, "un statut est une réponse, pas un incident"
+
+
+class TestDocUrlsDedupliquees:
+    """Plusieurs labs jumellent la même leçon : une seule requête suffit."""
+
+    def test_une_seule_requete_pour_une_url_partagee(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mesuré sur kubernetes-dsoxlab-training : 58 requêtes pour 35 URL.
+
+        Une page y était demandée quatre fois dans la même seconde, ce qui est
+        le suspect le plus probable de la coupure qu'on a subie le jour où le
+        catalogue est passé de 53 à 58 labs.
+        """
+        appels: list[str] = []
+
+        def _compter(requete: object, **_k: object) -> _Reponse:
+            appels.append(getattr(requete, "full_url", ""))
+            return _Reponse(200)
+
+        monkeypatch.setattr(content.urllib.request, "urlopen", _compter)
+        labs = [_lab(tmp_path / f"l{i}") for i in range(4)]
+        assert content.check_doc_urls(labs, attente=0) == []
+        assert len(appels) == 1, "quatre labs, une leçon, une requête"
+
+    def test_le_verdict_est_rattache_a_chaque_lab(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Dédupliquer les requêtes, pas les résultats : chaque lab est nommé."""
+
+        def _quatre_cent_quatre(*_a: object, **_k: object) -> None:
+            raise urllib.error.HTTPError("u", 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(content.urllib.request, "urlopen", _quatre_cent_quatre)
+        labs = [_lab(tmp_path / f"l{i}") for i in range(3)]
+        resultats = content.check_doc_urls(labs, attente=0)
+
+        assert len(resultats) == 3
+        # Et le chemin désigne le lab concerné, pas celui qui a payé la requête.
+        for (_lab_id, _url, souci), lab in zip(resultats, labs, strict=True):
+            assert souci.path == lab.path / "lab.yaml"
 
     def test_schema_inattendu(self, tmp_path: Path) -> None:
         souci = content.check_doc_url(_lab(tmp_path, doc_url="ftp://exemple/guide"))

@@ -875,8 +875,17 @@ silent.
         "Also check that every doc_url answers (hits the network).",
     "content_issues_header":
         "\n[bold]Content:[/bold]",
+    # Deux titres, parce que ce sont deux verdicts : le site a répondu et sa
+    # réponse est mauvaise (défaut du lab), ou il n'a pas répondu du tout
+    # (incident de réseau, qui ne fait pas échouer).
     "doc_url_issues_header":
-        "\n[bold]Unreachable guides:[/bold]",
+        "\n[bold red]Guides answering with an error:[/bold red]",
+    "doc_url_unreachable_header":
+        "\n[bold yellow]Guides that could not be reached:[/bold yellow]",
+    "doc_url_unreachable_note":
+        "Not counted as a failure: after three attempts, this says the network "
+        "did not answer, not that the lab is wrong. A page that answers 404 is "
+        "listed above instead, and does fail the check.",
     "checking_doc_urls":
         "Checking doc_url for {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Metadata issues:[/bold red]",

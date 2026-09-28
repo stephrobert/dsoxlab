@@ -63,7 +63,7 @@ def validate_structure_cmd(
     from ..discovery.scanner import discover_labs
     from ..validators.content import (
         ContentIssue,
-        check_doc_url,
+        check_doc_urls,
         validate_fixtures,
         validate_internal_links,
         validate_language_parity,
@@ -232,15 +232,19 @@ def validate_structure_cmd(
     ])
 
     url_issues: list[tuple[str, str, ContentIssue]] = []
+    url_injoignables: list[tuple[str, str, ContentIssue]] = []
     if check_urls:
         # Sur stdout : tue en mode machine, où un « ℹ » suffit à rendre le
         # document illisible.
         if not as_json:
             info(_("checking_doc_urls", count=len(labs)))
-        for lab in labs:
-            injoignable = check_doc_url(lab)
-            if injoignable is not None:
-                url_issues.append((lab.id, lab.doc_url, injoignable))
+        # Une requête par URL distincte, pas par lab : plusieurs labs jumellent
+        # la même leçon, et les interroger tous n'apprend rien de plus.
+        for lab_id, url, souci in check_doc_urls(labs):
+            if souci.key == "content_doc_url_unreachable":
+                url_injoignables.append((lab_id, url, souci))
+            else:
+                url_issues.append((lab_id, url, souci))
         documents += [
             # L'URL entre dans les paramètres : c'est le fait que l'appelant
             # veut, et il n'a pas à relire le catalogue pour l'obtenir.
@@ -253,6 +257,18 @@ def validate_structure_cmd(
             f"  [red]✘[/red] {lab_id} — {url} — {_(r.key, **r.params)}"
             for lab_id, url, r in url_issues
         ])
+        # Un guide injoignable après trois tentatives n'est PAS un défaut du
+        # lab : c'est un contrôle qui n'a pas pu regarder. Il se dit — sinon
+        # une panne durable passerait pour un succès — mais il ne fait pas
+        # échouer la validation, parce que la structure des labs, elle, est
+        # parfaite. Rendre rouge pour une coupure de réseau apprend surtout à
+        # relancer la CI sans lire le message.
+        _rendre("doc_url_unreachable_header", [
+            f"  [yellow]―[/yellow] {lab_id} — {url} — {_(r.key, **r.params)}"
+            for lab_id, url, r in url_injoignables
+        ])
+        if url_injoignables and not as_json:
+            info(_("doc_url_unreachable_note"))
 
     issues = [r for r in metadata_reports if not r.ok]
     documents += [
@@ -286,6 +302,14 @@ def validate_structure_cmd(
             # distinguer « aucune URL morte » de « les URL n'ont pas été
             # regardées ».
             "doc_urls_checked": check_urls,
+            # Séparé des `issues` à dessein : un guide injoignable n'est pas un
+            # défaut du lab, et un appelant qui bloque sur `issues` ne doit pas
+            # bloquer sur une coupure de réseau. Il est rendu quand même, sinon
+            # une panne durable serait indistinguable d'un catalogue sain.
+            "doc_urls_unreachable": [
+                {"lab": lab_id, "url": url, "key": r.key}
+                for lab_id, url, r in url_injoignables
+            ],
             "issues": documents,
             "counts": _compter(documents),
         })
