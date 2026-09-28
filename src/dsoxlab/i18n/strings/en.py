@@ -47,9 +47,9 @@ STRINGS: dict[str, str] = {
     "cmd_next_help":     "Recommend the next lab or challenge to complete in the active context.",
     "cmd_show_help":     "Show details and status of a lab.",
     "cmd_show_arg":      "Lab identifier (e.g.: l1-01-navigation-fichiers)",
-    "cmd_guide_help":    "Open the lab's online guide in your web browser.",
+    "cmd_guide_help":    "Show the URL of the lab's online guide.",
     "cmd_guide_arg":     "Lab identifier (optional if a lab is active)",
-    "cmd_guide_opt_print": "Print the URL instead of opening a browser.",
+    "cmd_guide_opt_print": "Print the URL. Kept for scripts: it is what the command does by default.",
     "guide_opening":     "Opening the guide for {lab_id} in your browser…",
     "guide_no_url":      "Lab {lab_id} declares no doc_url: no guide to open.",
     "guide_no_browser":  "No browser could be opened. Copy the URL above.",
@@ -590,11 +590,14 @@ Each lab declares:
     [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
-  [cyan]guide[/cyan] [dim][<id>][/dim]         Open the lab's online guide in your web browser.
-                       The course lives on the trainer's site: the page opens in a
-                       real tab, so it renders exactly as published.
-    [dim]--print[/dim]              Print the URL instead of opening a browser
-                       (useful over SSH, where no browser is available).
+  [cyan]guide[/cyan] [dim][<id>][/dim]         Show the URL of the lab's online guide.
+                       The course lives on the trainer's site, so the page renders
+                       exactly as published. The address is [bold]printed[/bold], not
+                       opened: it comes from the catalog, and where you go is
+                       your call.
+    [dim]--open[/dim]               Open it in a browser. Off by default.
+    [dim]--print[/dim]              Print the URL. Kept for scripts: it is what the
+                       command does by default.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md).
@@ -991,6 +994,7 @@ silent.
     "cmd_guide_opt_open":
         "Open the URL in a browser. Off by default: the address comes from the "
         "catalog, and you decide where to go",
+    "url_refusee_inline": "rejected ({reason})",
     "url_refusee":
         "{field} was refused: {reason}",
     "url_refusee_suite":

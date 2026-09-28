@@ -69,7 +69,7 @@ labs sont `shell` n'a aucun bloc `infra:`, et c'est un cas prévu, pas un oubli.
 | `title` | non | chaîne | Nom lisible. |
 | `blog_url` | non | chaîne | Page d'accueil du cours en ligne. |
 | `description` | non | chaîne | Un paragraphe. |
-| `issues_url` | non | chaîne | Où déposer une issue qui concerne **ce catalogue** et non le moteur. Lu par `dsoxlab support --issue`. Sans lui, l'outil retombe sur le remote `origin` du dépôt, ce qui suppose un remote portant ce nom et un hébergeur dont les issues vivent sous `<dépôt>/issues`. |
+| `issues_url` | non | chaîne | Où déposer une issue qui concerne **ce catalogue** et non le moteur. Lu par `dsoxlab support --issue`. Sans lui, l'outil retombe sur le remote `origin` du dépôt, ce qui suppose un remote portant ce nom et un hébergeur dont les issues vivent sous `<dépôt>/issues`. Comme `doc_url`, il passe par [la politique d'URL](./security.fr.md) : `http`/`https` seulement, un hôte, pas de `utilisateur:motdepasse@`. Une valeur refusée retombe sur le remote. |
 
 ### `infra` (optionnel, exigé par `runtime: vm`)
 
@@ -202,7 +202,7 @@ validate-structure` le signale.
 | `level` | **oui** | chaîne | | Libre, jamais validé contre une liste. |
 | `skills` | **oui** | liste de chaînes | | Ne doit pas être vide. |
 | `distros` | **oui** | liste de chaînes | | Ne doit pas être vide. |
-| `doc_url` | **oui** | chaîne | | `http(s)` uniquement. |
+| `doc_url` | **oui** | chaîne | | `http(s)` uniquement, et recontrôlée à l'affichage : voir [la politique d'URL](./security.fr.md). |
 | `section` | non | chaîne | `repo.category` | Déclarée, elle est **toujours** conservée — y compris quand sa valeur se trouve nommer un domaine technique. |
 | `description` | non | chaîne | `""` | |
 | `track` | non | liste de chaînes | `[]` | |

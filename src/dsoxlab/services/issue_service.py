@@ -36,6 +36,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import yaml
 
+from ..security.urls import PolitiqueURL, URLRefusee, url_sure
 from ..utils.shell import run_command
 
 if TYPE_CHECKING:  # pragma: no cover - import de typage seulement
@@ -199,12 +200,41 @@ def _normaliser_remote(brut: str) -> tuple[str, str] | None:
     return f"https://{hote}/{chemin}", chemin
 
 
+def _url_de_catalogue(brute: str, *, champ: str) -> str:
+    """L'URL si elle passe la politique, la chaîne vide sinon. Ne lève jamais.
+
+    Un catalogue est une entrée non fiable, et cette adresse finit dans un
+    navigateur : elle passe donc par la primitive unique de
+    ``security/urls.py``, comme ``doc_url``. Le parseur du contrat, lui, reste
+    tolérant par garantie de v1 — il coule toute valeur en ``str``, si bien
+    qu'une liste arrive ici en « ['a', 'b'] ».
+
+    Un refus n'est pas une erreur dure : on rend la chaîne vide, et l'appelant
+    retombe sur le repli qu'il a déjà — le remote git, puis rien. Un rapport de
+    diagnostic ne doit pas être perdu parce que le catalogue a mal déclaré où
+    l'envoyer, et le journal (en anglais, comme tout le journal) dit ce qui a
+    été ignoré.
+    """
+    brute = brute.strip()
+    if not brute:
+        return ""
+    try:
+        return url_sure(brute, champ=champ, politique=PolitiqueURL.DOCUMENTATION)
+    except URLRefusee as refus:
+        logger.warning("ignoring %s, rejected by the URL policy (%s)", champ, refus.cle)
+        return ""
+
+
 def _url_issues_depuis_remote(racine: Path) -> tuple[str, str] | None:
     """L'URL d'issues déduite du remote ``origin`` du dépôt de labs.
 
     C'est le repli, pas le contrat : il suppose un remote nommé ``origin`` et un
     hébergeur dont les issues vivent sous ``<dépôt>/issues``. Un catalogue qui
     veut être sûr déclare ``repo.issues_url``.
+
+    Cette adresse-là n'est pas plus fiable que la déclarée : le ``.git/config``
+    d'un dépôt cloné vient de celui qui l'a publié. Elle passe donc par la même
+    politique.
     """
     resultat = run_command(
         ["git", "-C", str(racine), "remote", "get-url", "origin"],
@@ -217,7 +247,8 @@ def _url_issues_depuis_remote(racine: Path) -> tuple[str, str] | None:
     if normalise is None:
         return None
     url, libelle = normalise
-    return f"{url}/issues", libelle
+    sure = _url_de_catalogue(f"{url}/issues", champ="git remote origin")
+    return (sure, libelle) if sure else None
 
 
 def _url_issues_moteur() -> tuple[str, str] | None:
@@ -244,9 +275,17 @@ def _url_issues_moteur() -> tuple[str, str] | None:
     if not brut:
         return None
 
-    normalise = _normaliser_remote(brut.removesuffix("/issues"))
+    # Les métadonnées du paquet ne franchissent pas la frontière du catalogue :
+    # elles viennent du `pyproject.toml` de cet outil. On les passe quand même
+    # par la politique, parce qu'une adresse qui finit dans un navigateur se
+    # contrôle au point d'usage, quelle que soit sa provenance — et parce qu'un
+    # seul chemin validé vaut mieux qu'une exception à retenir.
+    sure = _url_de_catalogue(brut.rstrip("/"), champ="package metadata")
+    if not sure:
+        return None
+    normalise = _normaliser_remote(sure.removesuffix("/issues"))
     libelle = normalise[1] if normalise else "dsoxlab"
-    return brut.rstrip("/"), libelle
+    return sure, libelle
 
 
 def _ids_formulaire(chemin: Path) -> frozenset[str]:
@@ -324,14 +363,9 @@ def resoudre_destination(
             champs=CHAMPS_MOTEUR,
         )
 
-    declaree = (repo_meta.issues_url if repo_meta is not None else "").strip()
-    # Le parseur du contrat est tolérant par garantie de v1 : il coule toute
-    # valeur en `str`, si bien qu'une liste arrive ici en « ['a', 'b'] ». Cette
-    # adresse finirait dans un navigateur, donc on exige qu'elle en soit une, et
-    # on retombe sur le remote plutôt que d'ouvrir n'importe quoi.
-    if declaree and not declaree.startswith(("http://", "https://")):
-        logger.warning("ignoring repo.issues_url, not an http(s) address: %r", declaree)
-        declaree = ""
+    declaree = _url_de_catalogue(
+        (repo_meta.issues_url if repo_meta is not None else ""), champ="repo.issues_url"
+    )
 
     if declaree:
         normalise = _normaliser_remote(declaree.removesuffix("/issues"))

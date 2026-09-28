@@ -33,6 +33,13 @@ Please include:
 We will acknowledge your report as soon as possible, keep you informed about the
 progress toward a fix, and credit you in the release notes if you wish.
 
+## The threat model
+
+Where the trust boundary runs — a catalog is untrusted input — and what the
+engine refuses to do about it: [docs/security.md](./docs/security.md). It also
+states plainly what dsoxlab does **not** protect you from, a lab's playbooks and
+tests running with your privileges being the main one.
+
 ## Scope
 
 `dsoxlab` drives external tooling (SSH, Terraform, libvirt/Incus, `pytest`) and

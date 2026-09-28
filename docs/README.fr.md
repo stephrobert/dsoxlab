@@ -34,6 +34,7 @@ Windows et macOS.
 | [L'infrastructure sans labs](./infra-only.fr.md) | Se servir de dsoxlab comme fournisseur de VM jetables, sans écrire le moindre exercice |
 | [La sortie machine](./machine-output.fr.md) | Ce que rend `--json`, champ par champ, et ce sur quoi on peut bâtir |
 | [Les codes de sortie](./exit-codes.fr.md) | Chaque code que la CLI rend, ce qu'il signifie et le geste qu'il appelle |
+| [Le modèle de menace](./security.fr.md) | Où passe la frontière de confiance, ce que le moteur refuse de faire, et ce dont il ne protège pas |
 | [La marque](./brand.fr.md) | Nom, logo et conditions d'usage |
 
 Les contributeurs ont [CONTRIBUTING.fr.md](../CONTRIBUTING.fr.md) : installation,

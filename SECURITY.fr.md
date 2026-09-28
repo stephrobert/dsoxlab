@@ -34,6 +34,14 @@ Nous accuserons réception de votre signalement dès que possible, vous tiendron
 informé de l'avancement du correctif, et vous créditerons dans les notes de
 version si vous le souhaitez.
 
+## Le modèle de menace
+
+Où passe la frontière de confiance — un catalogue est une entrée non fiable — et
+ce que le moteur refuse de faire en conséquence :
+[docs/security.fr.md](./docs/security.fr.md). La page dit aussi clairement ce
+dont dsoxlab ne protège **pas**, à commencer par les playbooks et les tests d'un
+lab, qui tournent avec vos privilèges.
+
 ## Périmètre
 
 `dsoxlab` pilote des outils externes (SSH, Terraform, libvirt/Incus, `pytest`)

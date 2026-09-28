@@ -43,6 +43,7 @@ from ..reporting import (
     success,
     warn,
 )
+from ..security.terminal import texte_affichable
 from ..services import (
     Fix,
     FixKind,
@@ -587,7 +588,9 @@ def _ouvrir_issue(
 
     info(_(
         "issue_destination",
-        depot=destination.libelle,
+        # Le libellé est tiré de l'URL du catalogue : il s'affiche, il ne
+        # met pas Rich en forme.
+        depot=texte_affichable(destination.libelle),
         cible=_(destination.cible.cle_i18n),
         origine=_(destination.origine.cle_i18n),
     ))
@@ -599,14 +602,23 @@ def _ouvrir_issue(
     if print_only:
         # soft_wrap : une URL coupée sur deux lignes n'est plus copiable. Même
         # raison que pour `guide --print`, et même geste.
-        console.print(lien.url, soft_wrap=True)
+        #
+        # markup=False : l'URL est validée par la politique de
+        # `security/urls.py`, donc sans caractère de contrôle, mais le corps
+        # pré-rempli porte le rapport de diagnostic et le nom du dépôt vient du
+        # catalogue. Rien de tout cela n'a à piloter l'affichage.
+        console.print(lien.url, soft_wrap=True, markup=False)
         return
 
-    if not assume_yes and not typer.confirm(_("issue_confirmer", depot=destination.libelle)):
+    demande = _("issue_confirmer", depot=texte_affichable(destination.libelle))
+    if not assume_yes and not typer.confirm(demande):
         info(_("issue_abandon"))
         return
 
-    console.print(lien.url, soft_wrap=True)
+    console.print(lien.url, soft_wrap=True, markup=False)
+    # L'ouverture reste demandée : la confirmation ci-dessus nomme le dépôt
+    # visé, et `--yes` est un accord donné d'avance par l'utilisateur. Une
+    # valeur du catalogue ne déclenche à elle seule aucune navigation.
     if not webbrowser.open(lien.url):
         error(_("issue_sans_navigateur"))
 

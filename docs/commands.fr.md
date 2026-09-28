@@ -34,7 +34,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab doctor` | Diagnostique l'environnement (runtimes, outils, labs détectés). |
 | `dsoxlab export` | Exporter tous les résultats en un document JSON, pour les relire ailleurs |
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
-| `dsoxlab guide` | Ouvre le guide en ligne du lab dans le navigateur. |
+| `dsoxlab guide` | Affiche l'URL du guide en ligne du lab. |
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
 | `dsoxlab infra status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
 | `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |

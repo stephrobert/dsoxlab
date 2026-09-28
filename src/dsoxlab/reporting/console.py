@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.errors import MarkupError
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -22,6 +23,8 @@ from ..i18n import _
 from ..models.course import CourseManifest, CourseSection
 from ..models.lab import LabDefinition
 from ..models.runtime import RuntimeType
+from ..security.terminal import neutraliser, texte_affichable
+from ..security.urls import URLRefusee, url_sure
 from ..services.catalog import CatalogueConnu, CatalogueInstalle
 from ..services.doctor import (
     STATE_CHOICE_REQUIRED,
@@ -33,11 +36,44 @@ from ..services.lab_state import LabState
 from ..services.progress_service import build_progress, exam_verdict
 from ..validators.structure import StructureReport
 
-console = Console()
-err_console = Console(stderr=True, style="bold red")
+
+class ConsoleSure(Console):
+    """Une console où un balisage illisible ne fait pas échouer la commande.
+
+    Le filet, pas la protection : les valeurs du contrat s'échappent au point où
+    on les rend (``security/terminal.py``). Mais l'échappement est un geste qu'on
+    oublie, et l'oubli coûtait cher — mesuré avant correction, un titre de lab
+    valant ``Titre [red]x[/red] et [/] non apparié`` faisait sortir ``list-labs``
+    et ``show`` en ``MarkupError``, c'est-à-dire en trace Python. Un catalogue
+    tiers rendait le catalogue entier inaffichable avec un caractère.
+
+    Alors on rejoue le rendu sans analyser le balisage : le panneau s'affiche
+    littéralement, les balises voulues comprises. C'est moins joli, et c'est
+    lisible — un affichage dégradé vaut mieux qu'une commande de lecture qui
+    échoue sur la donnée qu'elle devait montrer.
+    """
+
+    def print(self, *objects: Any, **kwargs: Any) -> None:
+        try:
+            super().print(*objects, **kwargs)
+        except MarkupError:
+            # `markup=False` ne suffit pas : il ne gouverne que les chaînes
+            # passées ici, pas le contenu d'un Panel ou d'une Table, qui
+            # interroge la console au moment de son propre rendu. D'où la
+            # bascule de l'attribut, restaurée dans tous les cas.
+            precedent = self._markup
+            self._markup = False
+            try:
+                super().print(*objects, **{**kwargs, "markup": False})
+            finally:
+                self._markup = precedent
+
+
+console = ConsoleSure()
+err_console = ConsoleSure(stderr=True, style="bold red")
 #: Avis de mise a jour : sur stderr comme les erreurs, pour ne jamais
 #: polluer un document JSON, mais sans le rouge qui ferait croire a un echec.
-update_console = Console(stderr=True, style="dim", highlight=False)
+update_console = ConsoleSure(stderr=True, style="dim", highlight=False)
 
 
 # ── Pager ────────────────────────────────────────────────────────────────────
@@ -172,12 +208,18 @@ def _section_color(section: str | None) -> str:
 
 
 def _type_badge(lab_type: str) -> str:
-    """Short coloured badge for the lab type."""
+    """Short coloured badge for the lab type.
+
+    Le repli échappe la valeur : le parseur du contrat est tolérant par
+    garantie de v1, donc ``lab_type`` arrive ici tel que le catalogue l'a écrit,
+    y compris avec des crochets. ``validate-structure`` le refuserait, mais il
+    n'est pas joué avant d'afficher un catalogue.
+    """
     return {
         "lab":       "[bold green]lab[/bold green]",
         "challenge": "[bold yellow]challenge[/bold yellow]",
         "capstone":  "[bold red]capstone[/bold red]",
-    }.get(lab_type, f"[dim]{lab_type}[/dim]")
+    }.get(lab_type, f"[dim]{texte_affichable(lab_type)}[/dim]")
 
 
 # ── list-labs ─────────────────────────────────────────────────────────────────
@@ -199,7 +241,10 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
 
     current_section = ""
     for lab in labs:
-        level_text = Text(lab.level, style=_level_color(lab.level))
+        # `Text` rend les crochets littéralement, mais pas une séquence
+        # d'échappement : d'où `neutraliser` ici, et `texte_affichable` sur ce
+        # qui part dans une chaîne de balisage.
+        level_text = Text(neutraliser(lab.level), style=_level_color(lab.level))
         runtime_text = lab.runtime.type.value
 
         # Une seule section affichée par groupe : les lignes suivantes du
@@ -208,7 +253,7 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
         section = lab.section or ""
         if section != current_section:
             current_section = section
-            section_display = Text(section, style=_section_color(section))
+            section_display = Text(neutraliser(section), style=_section_color(section))
 
         if scores and lab.id in scores:
             best, max_s = scores[lab.id]
@@ -220,12 +265,12 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
 
         table.add_row(
             section_display,
-            lab.id,
-            lab.title,
+            texte_affichable(lab.id),
+            texte_affichable(lab.title),
             _type_badge(lab.lab_type),
             level_text,
             runtime_text,
-            lab.estimated_time,
+            texte_affichable(lab.estimated_time),
             score_cell,
         )
 
@@ -234,28 +279,49 @@ def print_labs_table(labs: list[LabDefinition], scores: dict[str, tuple[int, int
 
 # ── show ──────────────────────────────────────────────────────────────────────
 
+def _doc_affichable(lab: LabDefinition) -> str:
+    """Le ``doc_url`` tel qu'on peut le montrer, ou la raison de son refus.
+
+    Pas d'hyperlien cliquable : la cible d'un ``[link=…]`` n'est pas ce que
+    l'œil lit, et cette cible vient du catalogue. L'adresse s'affiche en clair,
+    et ``dsoxlab guide --open`` reste le geste qui l'ouvre — demandé, jamais
+    déclenché par une valeur déclarée.
+    """
+    if not lab.doc_url:
+        return "—"
+    try:
+        return texte_affichable(url_sure(lab.doc_url, champ="doc_url"))
+    except URLRefusee as refus:
+        # La chaîne fautive n'est pas affichée : on dit pourquoi, pas quoi.
+        return f"[red]{_('url_refusee_inline', reason=_(refus.cle, **refus.params))}[/red]"
+
+
 def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
+    couleur_section = _section_color(lab.section)
+    couleur_niveau = _level_color(lab.level)
     lines = [
-        f"{_('field_section')}    [{_section_color(lab.section)}]{lab.section or ''}[/{_section_color(lab.section)}]",
-        f"{_('field_title')}      {lab.title}",
+        f"{_('field_section')}    [{couleur_section}]{texte_affichable(lab.section or '')}[/{couleur_section}]",
+        f"{_('field_title')}      {texte_affichable(lab.title)}",
         f"{_('field_type')}       {_type_badge(lab.lab_type)}"
         + (f"  —  bloc {lab.bloc}" if lab.bloc else ""),
-        f"{_('field_level')}     [{_level_color(lab.level)}]{lab.level}[/{_level_color(lab.level)}]",
+        f"{_('field_level')}     [{couleur_niveau}]{texte_affichable(lab.level)}[/{couleur_niveau}]",
         f"{_('field_runtime')}    {lab.runtime.type.value} / {lab.runtime.topology}",
-        f"{_('field_duration')}      {lab.estimated_time}",
-        f"{_('field_difficulty')} {_difficulty_label(lab.difficulty)}",
-        f"{_('field_distros')}    {', '.join(lab.distros)}",
-        f"{_('field_skills')}     {', '.join(lab.skills)}",
-        f"{_('field_doc')}        [link={lab.doc_url}]{lab.doc_url}[/link]",
+        f"{_('field_duration')}      {texte_affichable(lab.estimated_time)}",
+        f"{_('field_difficulty')} {texte_affichable(_difficulty_label(lab.difficulty))}",
+        f"{_('field_distros')}    {texte_affichable(', '.join(lab.distros))}",
+        f"{_('field_skills')}     {texte_affichable(', '.join(lab.skills))}",
+        f"{_('field_doc')}        {_doc_affichable(lab)}",
     ]
     # Le seuil d'un examen blanc se lit AVANT de le passer, pas après : c'est
     # la barre que l'apprenant vise. Un lab ordinaire n'en déclare pas.
     if lab.exam_passing_score:
         lines.append(f"{_('field_exam_score')} {lab.exam_passing_score} %")
     if lab.track:
-        lines.append(f"{_('field_track')}   {', '.join(lab.track)}")
+        lines.append(f"{_('field_track')}   {texte_affichable(', '.join(lab.track))}")
     if lab.certification_tags:
-        lines.append(f"{_('field_certifs')}    {', '.join(lab.certification_tags)}")
+        lines.append(
+            f"{_('field_certifs')}    {texte_affichable(', '.join(lab.certification_tags))}"
+        )
     if status:
         lines.append(f"{_('field_status')}     {status}")
 
@@ -269,7 +335,8 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
         val_parts.append(f"[cyan]{_('val_persistence')}[/cyan]")
     lines.append(f"{_('field_validation')} {', '.join(val_parts)}")
 
-    console.print(Panel("\n".join(lines), title=f"[bold]{lab.id}[/bold]", expand=False))
+    console.print(Panel("\n".join(lines), title=f"[bold]{texte_affichable(lab.id)}[/bold]",
+                        expand=False))
 
 
 # ── validate-structure ────────────────────────────────────────────────────────
@@ -278,9 +345,9 @@ def print_structure_reports(reports: list[StructureReport]) -> None:
     tree = Tree(_('tree_structure_title'))
     for report in reports:
         if report.ok:
-            branch = tree.add(f"[green]✔[/green] {report.lab_id}")
+            branch = tree.add(f"[green]✔[/green] {texte_affichable(report.lab_id)}")
         else:
-            branch = tree.add(f"[red]✘[/red] {report.lab_id}")
+            branch = tree.add(f"[red]✘[/red] {texte_affichable(report.lab_id)}")
             for issue in report.issues:
                 branch.add(f"[red]{_(issue.key, **issue.params)}[/red]")
     console.print(tree)
@@ -343,7 +410,11 @@ def print_catalogues(
         table.add_column(_("catalog_col_description"))
         table.add_column(_("catalog_col_depot"), style="dim")
         for connu in connus:
-            table.add_row(connu.id, connu.description(lang), connu.depot)
+            table.add_row(
+                texte_affichable(connu.id),
+                texte_affichable(connu.description(lang)),
+                texte_affichable(connu.depot),
+            )
         console.print(table)
 
     if not installes:
@@ -355,7 +426,13 @@ def print_catalogues(
     table.add_column(_("catalog_col_actif"), justify="center")
     table.add_column(_("catalog_col_chemin"), style="dim")
     for pose in installes:
-        table.add_row(pose.id, "✔" if pose.actif else "", str(pose.racine))
+        # `pose.id` est un nom de répertoire posé par `catalog add`, et la
+        # racine un chemin : deux valeurs venues du dehors.
+        table.add_row(
+            texte_affichable(pose.id),
+            "✔" if pose.actif else "",
+            texte_affichable(str(pose.racine)),
+        )
     console.print(table)
 
 
@@ -374,8 +451,9 @@ def print_lab_state(etat: LabState) -> None:
         "degraded": "red",
     }
     teinte = couleurs.get(etat.state, "white")
-    corps = f"[bold {teinte}]{etat.label}[/bold {teinte}]\n{etat.detail}"
-    console.print(Panel(corps, title=f"{_('status_titre')} — {etat.lab_id}",
+    corps = f"[bold {teinte}]{etat.label}[/bold {teinte}]\n{texte_affichable(etat.detail)}"
+    console.print(Panel(corps,
+                        title=f"{_('status_titre')} — {texte_affichable(etat.lab_id)}",
                         border_style=teinte, expand=False))
 
 
@@ -453,7 +531,7 @@ def print_check_result(
     console.print(
         Panel(
             "\n".join(lines),
-            title=f"[bold]{_('check_result_title', lab_id=lab_id)}[/bold]",
+            title=f"[bold]{_('check_result_title', lab_id=texte_affichable(lab_id))}[/bold]",
             expand=False,
         )
     )
@@ -519,7 +597,7 @@ def print_progress_table(
             avg_text = f"[{avg_color}]{avg} %[/{avg_color}]"
 
         table.add_row(
-            bloc.label or "?",
+            texte_affichable(bloc.label) if bloc.label else "?",
             done_text,
             avg_text,
             _status(bloc.challenge_validated),
@@ -569,8 +647,8 @@ def print_scores_table(
         validated_at = r["validated_at"][:16].replace("T", " ")
 
         cellules: list[str | Text] = [
-            r["lab_id"],
-            Text(r["section"], style=_section_color(r["section"])),
+            texte_affichable(r["lab_id"]),
+            Text(neutraliser(r["section"]), style=_section_color(r["section"])),
             score_text,
         ]
         if avec_verdict:
@@ -604,9 +682,9 @@ def print_course_list(labs: list[LabDefinition]) -> None:
         has_course = (lab.path / "scenario.md").exists()
         status = Text("✔", style="green") if has_course else Text("✗", style="dim red")
         table.add_row(
-            lab.id,
-            lab.title,
-            Text(lab.level, style=_level_color(lab.level)),
+            texte_affichable(lab.id),
+            texte_affichable(lab.title),
+            Text(neutraliser(lab.level), style=_level_color(lab.level)),
             status,
         )
 
@@ -615,16 +693,21 @@ def print_course_list(labs: list[LabDefinition]) -> None:
 
 def print_course_toc(lab: LabDefinition, manifest: CourseManifest) -> None:
     """Display the table of contents from a course.yaml."""
-    table = Table(title=_("course_toc_title", title=manifest.title), show_lines=True)
+    table = Table(
+        title=_("course_toc_title", title=texte_affichable(manifest.title)),
+        show_lines=True,
+    )
     table.add_column(_("course_toc_col_n"), style="bold", justify="right", width=4)
     table.add_column(_("course_toc_col_id"), style="cyan", no_wrap=True)
     table.add_column(_("course_toc_col_title"))
 
     for i, section in enumerate(manifest.sections, 1):
-        table.add_row(str(i), section.id, section.title)
+        table.add_row(
+            str(i), texte_affichable(section.id), texte_affichable(section.title)
+        )
 
     console.print(table)
-    console.print(f"[dim]{_('course_toc_tip', id=lab.id)}[/dim]")
+    console.print(f"[dim]{_('course_toc_tip', id=texte_affichable(lab.id))}[/dim]")
 
 
 def print_course_section(
@@ -639,7 +722,10 @@ def print_course_section(
     from rich.rule import Rule
 
     section_file = lab.path / section.file
-    console.print(Rule(f"[bold cyan]{section.id} — {section.title}[/bold cyan]"))
+    console.print(Rule(
+        f"[bold cyan]{texte_affichable(section.id)} — "
+        f"{texte_affichable(section.title)}[/bold cyan]"
+    ))
     if section_file.exists():
         text = section_file.read_text(encoding="utf-8")
         # Strip the leading H1 (already shown in the Rule above)
@@ -652,7 +738,7 @@ def print_course_section(
             text = "\n".join(lines[start:])
         console.print(Markdown(text))
     else:
-        msg = _("course_section_file_missing", file=section.file)
+        msg = _("course_section_file_missing", file=texte_affichable(section.file))
         console.print(f"[yellow]{msg}[/yellow]")
     console.print(Rule())
 
@@ -661,9 +747,9 @@ def print_course_section(
         progress = _("course_nav_progress", pos=pos, total=total)
         parts: list[str] = []
         if pos > 1:
-            parts.append(_("course_nav_prev", id=lab.id))
+            parts.append(_("course_nav_prev", id=texte_affichable(lab.id)))
         if pos < total:
-            parts.append(_("course_nav_next", id=lab.id))
+            parts.append(_("course_nav_next", id=texte_affichable(lab.id)))
         console.print(f"[dim]{progress}[/dim]")
         if parts:
             console.print("[dim]" + "   |   ".join(parts) + "[/dim]")
@@ -674,11 +760,11 @@ def print_course_end(lab: LabDefinition, manifest: CourseManifest) -> None:
     from rich.panel import Panel
 
     total = len(manifest.sections)
-    body = _("course_end_body", total=total, id=lab.id)
+    body = _("course_end_body", total=total, id=texte_affichable(lab.id))
     console.print(
         Panel(
             body,
-            title=_("course_end_title", id=lab.id),
+            title=_("course_end_title", id=texte_affichable(lab.id)),
             border_style="green",
             padding=(1, 4),
         )
@@ -709,7 +795,7 @@ def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
     from rich.markdown import Markdown
     from rich.rule import Rule
 
-    console.print(Rule(f"[bold cyan]{lab.id}[/bold cyan]"))
+    console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)}[/bold cyan]"))
     parties = [
         f for f in (_localised(lab.path, "scenario", lang),
                     _localised(lab.path, "README", lang))
@@ -724,7 +810,7 @@ def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
         msg = _("course_missing")
         console.print(f"[yellow]{msg}[/yellow]")
     console.print(Rule())
-    tip = _("course_tip", id=lab.id)
+    tip = _("course_tip", id=texte_affichable(lab.id))
     console.print(f"[dim]{tip}[/dim]")
 
 
@@ -789,7 +875,7 @@ def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
         if lang != "en" and localised.exists()
         else lab.path / "challenge" / "README.md"
     )
-    console.print(Rule(f"[bold cyan]{lab.id} — challenge[/bold cyan]"))
+    console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)} — challenge[/bold cyan]"))
     if challenge_file.exists():
         console.print(Markdown(challenge_file.read_text()))
     else:

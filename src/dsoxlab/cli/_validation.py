@@ -28,6 +28,7 @@ from ..reporting import (
     info,
     print_check_result,
 )
+from ..security.terminal import texte_affichable
 from ..services import (
     CheckResult,
     check_lab,
@@ -106,7 +107,7 @@ def _run_check_with_progress(
                 total = event.get("total", 0) or None
                 progress.update(
                     task,
-                    description=_("progress_tests_running", lab_id=lab.id),
+                    description=_("progress_tests_running", lab_id=texte_affichable(lab.id)),
                     total=total,
                 )
             elif etype == "verdict":
@@ -128,7 +129,10 @@ def _run_check_with_progress(
             # result.output et imprimées seulement si le check échoue.
 
         result = check_lab(lab, target=target, on_event=on_event)
-        progress.update(task, description=_("progress_tests_done", lab_id=lab.id))
+        progress.update(
+            task,
+            description=_("progress_tests_done", lab_id=texte_affichable(lab.id)),
+        )
 
     return result
 
@@ -208,7 +212,7 @@ def _valider(
     _ensure_services(lab, root, quiet=quiet)
 
     if not quiet:
-        info(_("validating", lab_id=lab.id))
+        info(_("validating", lab_id=texte_affichable(lab.id)))
     result = _run_check_with_progress(lab, target, quiet=quiet)
     if not result.ok and not quiet:
         # En cas d'échec, dump l'output brut (tracebacks, summary pytest)
