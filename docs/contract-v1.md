@@ -207,6 +207,7 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `certification_tags` | no | list of strings | `[]` | Free-form: the tool stays domain-agnostic. |
 | `lab_type` | no | enum | `lab` | `lab`, `challenge`, `capstone` or `validation`. The first three assume a learner doing the work; the fourth does not — see below. |
 | `exam_passing_score` | no | integer | `0` | Pass mark of a mock exam, as a **percentage** of the lab scale. See below. |
+| `prerequisites` | no | list of strings | `[]` | Ids of labs this one assumes already played. Written for capstones. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
 | `runtime` | no | mapping | shell defaults | See below. |
@@ -242,6 +243,35 @@ The value is carried by the **lab**, not by the repository, and that is
 deliberate: a catalog can perfectly well hold an infrastructure stack and, next
 to it, two suites of assertions. A repository-level flag would force one answer
 for the whole.
+### `prerequisites` — what a capstone assumes, which `doc_url` cannot say
+
+A lab carries a single `doc_url`: the lesson it proves. That is exactly right
+for a micro-lab — one skill, one lesson, a pairing you can verify.
+
+A **capstone** does not fit that mould. It crosses several subjects and can
+only name one, so the field is honestly filled and still **under-announces what
+the lab covers**: a reader concludes the CKA capstone is about troubleshooting,
+when it also requires fixing a CPU request, matching a volume and exposing a
+Service.
+
+```yaml
+lab_type: capstone
+prerequisites:
+  - cka-node-affinity
+  - cka-pv-pvc-storageclass
+  - cka-troubleshoot-networking
+```
+
+A list of several `doc_url` would answer half the question — "this lab proves
+these seven lessons", which is true and not very useful. Prerequisites say the
+**order**, which is the real information: a catalog can show a capstone's true
+coverage without a human retyping it, and a site consuming the catalog can
+offer it at the end of a chapter instead of burying it in a list.
+
+Each id must name a lab of the same catalog, and `validate-structure` checks
+it: a prerequisite pointing at nothing breaks no test and fails no run — it
+simply shows an order that leads nowhere, which is the kind of mistake an
+author never finds. A lab naming itself is reported too.
 
 A `lab_type: capstone` is a mock exam, and an exam without a pass mark is not
 one. Declare the bar, and dsoxlab renders a verdict:

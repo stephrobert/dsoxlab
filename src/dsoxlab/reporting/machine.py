@@ -79,6 +79,13 @@ def lab_dict(
         "estimated_time": lab.estimated_time or None,
         "skills": list(lab.skills),
         "distros": list(lab.distros),
+        # Les labs que celui-ci suppose joués. Le champ existe pour les
+        # capstones, qui croisent plusieurs sujets et ne peuvent en nommer
+        # qu'un dans `doc_url` : sans lui, un consommateur conclut qu'un
+        # capstone porte sur le dépannage alors qu'il exige aussi de corriger
+        # une réserve CPU et d'exposer un service. Déclaré mais non exposé, le
+        # champ ne servirait à personne.
+        "prerequisites": list(lab.prerequisites),
         "doc_url": lab.doc_url,
         "path": str(lab.path),
         "runtime": {

@@ -58,6 +58,26 @@ class LabDefinition:
     estimated_time: str = "30m"
     certification_tags: list[str] = field(default_factory=list)
 
+    prerequisites: list[str] = field(default_factory=list)
+    """Identifiants des labs que celui-ci suppose déjà joués.
+
+    ``doc_url`` dit quelle leçon un lab éprouve, et c'est exactement ce qu'il
+    faut pour un micro-lab : une compétence, une leçon, un jumelage
+    vérifiable. Un **capstone** n'entre pas dans ce moule — il croise sept
+    sujets et ne peut en nommer qu'un, si bien qu'un lecteur du catalogue
+    conclut qu'il porte sur le dépannage alors qu'il exige aussi de corriger
+    une réserve CPU et d'exposer un service.
+
+    Une liste de ``doc_url`` répondrait à moitié : elle dirait « ce lab éprouve
+    ces sept leçons », ce qui est vrai et peu utile. Les prérequis disent
+    l'**ordre**, qui est la vraie information — et un site qui consomme le
+    catalogue peut alors proposer le capstone à la fin d'un chapitre au lieu de
+    le noyer dans une liste.
+
+    Les identifiants sont ceux d'autres labs du même catalogue.
+    ``validate-structure`` vérifie qu'ils existent : un prérequis qui nomme un
+    lab absent est exactement le genre d'erreur qu'un auteur ne voit jamais."""
+
     schema_version: int = DEFAULT_SCHEMA_VERSION
     """Version du contrat d'entrée que ce ``lab.yaml`` déclare respecter.
 
@@ -254,6 +274,9 @@ class LabDefinition:
             estimated_time=data.get("estimated_time", "30m"),
             certification_tags=as_str_list(
                 data.get("certification_tags"), "certification_tags", lab_yaml
+            ),
+            prerequisites=as_str_list(
+                data.get("prerequisites"), "prerequisites", lab_yaml
             ),
             lab_type=data.get("lab_type", "lab"),
             exam_passing_score=as_int(

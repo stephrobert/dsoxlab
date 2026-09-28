@@ -88,6 +88,7 @@ le même objet lab. Il est décrit une fois, ici.
 | `estimated_time` | chaîne ou null | libre, par exemple `"30m"` |
 | `skills` | liste de chaînes | jamais vide : le validator l'exige |
 | `distros` | liste de chaînes | jamais vide, de même |
+| `prerequisites` | liste de chaînes | les identifiants des labs que celui-ci suppose joués — vide pour la plupart, parlant sur un capstone, qui croise plusieurs leçons et ne peut en nommer qu'une dans `doc_url` |
 | `doc_url` | chaîne | le guide en ligne, en `http` ou `https` |
 | `path` | chaîne | chemin **absolu** du répertoire du lab, pour qu'un éditeur puisse ouvrir ses fichiers |
 | `runtime.type` | chaîne | `shell` ou `vm` |

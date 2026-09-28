@@ -75,6 +75,11 @@
       "items": { "type": "string" },
       "description": "Free-form certification tags. Never validated against a list: the tool stays domain-agnostic."
     },
+    "prerequisites": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ids of labs this one assumes already played. Written for capstones, which cross several lessons and can only name one in doc_url. Says the order, which a list of doc_urls would not. validate-structure checks that each id names a lab of the same catalog."
+    },
     "lab_type": {
       "type": "string",
       "enum": ["lab", "challenge", "capstone", "validation"],

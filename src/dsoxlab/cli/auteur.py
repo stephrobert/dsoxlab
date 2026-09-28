@@ -67,6 +67,7 @@ def validate_structure_cmd(
         validate_fixtures,
         validate_internal_links,
         validate_language_parity,
+        validate_prerequisites,
         validate_scoring,
         validate_solutions_encrypted,
         validate_targets,
@@ -198,6 +199,10 @@ def validate_structure_cmd(
     except Exception:  # noqa: BLE001 - meta.yml illisible : les autres contrôles restent utiles
         host_names = set()
 
+    # Les prérequis se valident contre le catalogue entier : c'est le seul
+    # endroit où la liste complète des identifiants existe.
+    identifiants = {lab.id for lab in labs}
+
     content_issues: list[tuple[str, Path, ContentIssue]] = []
     for lab in labs:
         rapports = [
@@ -206,6 +211,7 @@ def validate_structure_cmd(
             validate_scoring(lab),
             validate_language_parity(lab),
             validate_targets(lab, host_names),
+            validate_prerequisites(lab, identifiants),
         ]
         # « solution/<chemin du lab depuis labs/> » : convention respectée par
         # les dépôts qui tiennent leurs corrigés hors des labs. Absent = pas
