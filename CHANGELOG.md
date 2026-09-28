@@ -70,6 +70,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was in the first draft and was removed for exactly that reason — a path
   publishes a username, sometimes a surname.
 
+  **The catalog's own identifiers are checked before they leave.**
+  `catalog.id` comes from the catalog, and falls back to the directory name
+  when `meta.yml` cannot be read — a directory name being free-form. Both cross
+  the same trust boundary, so both are validated: 1 to 128 characters, no
+  control character, no direction override, no zero-width character. A
+  `catalog\u202egnp.exe` reads as `catalogexe.png` in a terminal while the data
+  says otherwise, and the consuming portal rejects such ids anyway. The export
+  **refuses** rather than sanitises: cleaning an id would break the link
+  between a proof and the lab it attests.
+
   **No domain, site or URL appears in it**, and a test asserts it: dsoxlab
   produces a proof, it does not decide who consumes it. That is what lets a
   trainer other than this catalog's author use it, and what the issues on the

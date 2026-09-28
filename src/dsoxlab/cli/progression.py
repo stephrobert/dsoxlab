@@ -227,6 +227,7 @@ def export(
     """
     del as_json  # accepté pour la cohérence, sans effet : voir la docstring
     from ..discovery.repo import read_repo_metadata
+    from ..security import IdentifiantRefuse, identifiant_sur
     from ..sessions.store import _now, get_all_results
     from ..utils.shell import run_command
 
@@ -242,7 +243,20 @@ def export(
         repo_meta = read_repo_metadata(root)
     except Exception:  # noqa: BLE001 — un meta.yml illisible ne doit pas priver
         repo_meta = None                # l'apprenant de son propre historique
-    catalog_id = repo_meta.id if repo_meta else root.name
+    # Le repli sur le nom du répertoire mérite autant de méfiance que le
+    # `repo.id` du catalogue : un nom de dossier est libre, il peut porter des
+    # espaces, un retour chariot ou une surcharge de direction. Les deux
+    # traversent la même frontière de confiance, donc les deux se valident —
+    # et le consommateur qui reçoit ce document refuse déjà ces caractères.
+    try:
+        catalog_id = identifiant_sur(
+            repo_meta.id if repo_meta else root.name, champ="catalog.id"
+        )
+    except IdentifiantRefuse as refus:
+        error(_("export_identifiant_refuse", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("export_identifiant_refuse_suite"))
+        raise typer.Exit(1) from None
 
     # Le commit du catalogue, quand il y en a un : un score obtenu sur une
     # version antérieure d'un lab se reconnaît alors, au lieu d'être comparé à
@@ -252,6 +266,16 @@ def export(
         ["git", "-C", str(root), "rev-parse", "HEAD"], check=False, timeout=5,
     )
     commit = revision.stdout.strip() if revision.ok else None
+
+    try:
+        for row in get_all_results(root):
+            identifiant_sur(row["lab_id"], champ="lab_id")
+            identifiant_sur(row["section"], champ="section", vide_permis=True)
+    except IdentifiantRefuse as refus:
+        error(_("export_identifiant_refuse", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("export_identifiant_refuse_suite"))
+        raise typer.Exit(1) from None
 
     lignes = [
         machine.export_result_dict(row, labs.get(row["lab_id"]), catalog_id)

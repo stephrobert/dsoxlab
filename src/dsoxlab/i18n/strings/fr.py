@@ -116,6 +116,20 @@ STRINGS: dict[str, str] = {
     "cmd_check_arg":      "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_submit_help":    "Soumission finale : lance les tests, enregistre le score, puis tapez 'exit' pour quitter la session.",
     "cmd_submit_arg":     "Identifiant du lab (optionnel si un lab est actif en session)",
+    "securite_identifiant_vide": "une valeur vide",
+    "securite_identifiant_trop_long":
+        "{length} caractères, soit plus que les {max} permis",
+    "securite_identifiant_caractere":
+        "un caractère interdit ({code}) : une commande, une surcharge de "
+        "direction ou un caractère de largeur nulle",
+    "export_identifiant_refuse":
+        "Export impossible : {field} porte {reason}.",
+    "export_identifiant_refuse_suite":
+        "Ce document est fait pour être remis à un portail, qui refusera un "
+        "tel identifiant. Corrigez-le dans le catalogue plutôt que d'envoyer "
+        "quelque chose que personne ne pourra lire : un identifiant fait de 1 "
+        "à 128 caractères, sans caractère de contrôle, sans surcharge de "
+        "direction et sans caractère de largeur nulle.",
     "cmd_export_help":
         "Exporter tous les résultats en un document JSON, pour les relire ailleurs",
     "opt_export_json":

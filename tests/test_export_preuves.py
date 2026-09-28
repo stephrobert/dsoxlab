@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import ClassVar
 
+import pytest
 from typer.testing import CliRunner
 
 from dsoxlab.cli import app
@@ -284,3 +285,40 @@ class TestCeQueLaPreuveNeDoitJamaisPorter:
         for interdit in ("provider", "target", "host", "inventory", "ssh"):
             assert interdit not in ligne
             assert interdit not in document["catalog"]
+
+
+class TestUnIdentifiantHostileNeSortPas:
+    """Le repli `catalog.id = root.name` méritait sa propre méfiance.
+
+    Quand le `meta.yml` est illisible, l'identifiant du catalogue devient le
+    nom du répertoire — une chaîne libre, qui peut porter un retour chariot ou
+    une surcharge de direction. Le consommateur les refuse ; autant ne pas les
+    émettre, et le dire là où l'on sait quel champ est en cause.
+    """
+
+    def test_un_nom_de_repertoire_hostile_arrete_l_export(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        racine = tmp_path / "catalogue\u202egnp.exe"
+        racine.mkdir()
+        # Un `repo.id` que le catalogue déclare lui-même, et qui porte la
+        # surcharge de direction : `labexe.png` s'affiche là où la donnée dit
+        # autre chose. C'est exactement ce qu'un catalogue hostile écrirait,
+        # et c'est ce que le portail destinataire refuse.
+        (racine / "meta.yml").write_text(
+            'repo:\n  id: "catalogue\u202egnp.exe"\n  category: domaine\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("LAB_HOME", str(racine))
+        for variable in ("XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME"):
+            monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
+
+        resultat = runner.invoke(app, ["export"])
+
+        assert resultat.exit_code == 1
+        assert "catalog.id" in resultat.stdout + resultat.stderr
+
+    def test_un_identifiant_ordinaire_passe(self, catalogue: Path) -> None:
+        """Le contre-exemple : sans lui, le test précédent passerait aussi
+        si l'export refusait tout."""
+        assert _exporter(catalogue)["catalog"]["id"]

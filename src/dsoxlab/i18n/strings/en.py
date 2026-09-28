@@ -113,6 +113,19 @@ STRINGS: dict[str, str] = {
     "cmd_check_arg":     "Lab identifier (optional if a lab is active in session)",
     "cmd_submit_help":   "Final submission: run tests, record score, then type 'exit' to leave the session.",
     "cmd_submit_arg":    "Lab identifier (optional if a lab is active in session)",
+    "securite_identifiant_vide": "an empty value",
+    "securite_identifiant_trop_long":
+        "{length} characters, more than the {max} allowed",
+    "securite_identifiant_caractere":
+        "a forbidden character ({code}): a control, a direction override or a "
+        "zero-width character",
+    "export_identifiant_refuse":
+        "Cannot export: {field} carries {reason}.",
+    "export_identifiant_refuse_suite":
+        "This document is meant to be handed to a portal, which will reject "
+        "such an identifier. Fix it in the catalog rather than send something "
+        "nobody can read: an id is 1 to 128 characters, with no control "
+        "character, no direction override and no zero-width character.",
     "cmd_export_help":
         "Export every result as a JSON document, for reading elsewhere",
     "opt_export_json":

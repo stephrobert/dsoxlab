@@ -75,6 +75,17 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   cette raison même — un chemin publie un nom d'utilisateur, parfois un nom de
   famille.
 
+  **Les identifiants du catalogue sont contrôlés avant de sortir.**
+  `catalog.id` vient du catalogue, et retombe sur le nom du répertoire quand le
+  `meta.yml` est illisible — un nom de dossier étant libre. Les deux traversent
+  la même frontière de confiance, donc les deux sont validés : de 1 à 128
+  caractères, sans caractère de contrôle, sans surcharge de direction, sans
+  caractère de largeur nulle. Un `catalogue\u202egnp.exe` se lit
+  `catalogueexe.png` dans un terminal alors que la donnée dit autre chose, et
+  le portail destinataire refuse de toute façon ces identifiants. L'export
+  **refuse** plutôt qu'il n'assainit : nettoyer un identifiant romprait le
+  rattachement entre une preuve et le lab qu'elle atteste.
+
   **Aucun domaine, site ou URL n'y figure**, et un test l'affirme : dsoxlab
   produit une preuve, il ne décide pas qui la consomme. C'est ce qui permet à
   un formateur autre que l'auteur du catalogue de s'en servir, et ce sur quoi
