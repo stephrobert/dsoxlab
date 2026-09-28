@@ -296,7 +296,9 @@ grade nobody, so they have no place among someone's proofs of practice. Since
 ### What this document must never carry
 
 A catalog is **untrusted input**: `dsoxlab catalog add <url>` clones an
-arbitrary git repository. And this document is made to leave the machine. Those
+arbitrary git repository — the rule and its consequences are stated once, in
+[the security model](./security.md). And this document is made to leave the
+machine. Those
 two facts together set one rule: the proof carries teaching data only, built
 from a **positive allowlist** — never by serialising an internal object and
 removing a few keys afterwards, because the next field added to that object

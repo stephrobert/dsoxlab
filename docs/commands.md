@@ -33,7 +33,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab doctor` | Diagnose the environment (runtimes, tools, detected labs). |
 | `dsoxlab export` | Export every result as a JSON document, for reading elsewhere |
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
-| `dsoxlab guide` | Open the lab's online guide in your web browser. |
+| `dsoxlab guide` | Show the URL of the lab's online guide. |
 | `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
 | `dsoxlab infra status` | Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent. |
 | `dsoxlab install` | Deprecated: use `dsoxlab completion install`. Installs shell completion. |

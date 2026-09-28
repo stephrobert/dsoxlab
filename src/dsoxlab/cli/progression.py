@@ -44,6 +44,7 @@ from ..reporting import (
     print_scores_table,
     success,
 )
+from ..security.terminal import texte_affichable
 from ..services import (
     clean_lab,
     next_pending_lab,
@@ -399,7 +400,8 @@ def next_lab(
     if upcoming is None:
         success(_("next_all_done"))
         return
-    success(_("next_suggestion", lab_id=upcoming.id, title=upcoming.title))
+    success(_("next_suggestion", lab_id=texte_affichable(upcoming.id),
+                title=texte_affichable(upcoming.title)))
 
 
 # ── reset ─────────────────────────────────────────────────────────────────────
@@ -423,7 +425,7 @@ def reset(
         raise typer.Exit(1) from None
 
     ctx.call_on_close(_verrou(root, "reset").release)
-    info(_("resetting", lab_id=lab.id))
+    info(_("resetting", lab_id=texte_affichable(lab.id)))
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
             _run_ansible_with_progress(
@@ -463,13 +465,13 @@ def clean(
         raise typer.Exit(1) from None
 
     if not yes:
-        typer.confirm(_("confirm_clean", lab_id=lab.id), abort=True)
+        typer.confirm(_("confirm_clean", lab_id=texte_affichable(lab.id)), abort=True)
 
     # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
     # attend une réponse au clavier bloquerait l'autre terminal sur une
     # question que personne ne voit.
     ctx.call_on_close(_verrou(root, "clean").release)
-    info(_("cleaning", lab_id=lab.id))
+    info(_("cleaning", lab_id=texte_affichable(lab.id)))
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
             _run_ansible_with_progress(

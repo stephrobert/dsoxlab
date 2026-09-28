@@ -302,7 +302,9 @@ base écrite avant peut en porter.
 ### Ce que ce document ne doit jamais porter
 
 Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>` clone
-un dépôt git arbitraire. Et ce document est fait pour quitter la machine. Ces
+un dépôt git arbitraire — la règle et ses conséquences sont écrites une fois,
+dans [le modèle de menace](./security.fr.md). Et ce document est fait pour
+quitter la machine. Ces
 deux faits ensemble imposent une règle : la preuve ne transporte que des
 données pédagogiques, construites par **allowlist positive** — jamais en
 sérialisant un objet interne dont on retirerait ensuite quelques clés, car le

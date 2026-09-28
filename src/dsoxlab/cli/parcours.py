@@ -55,6 +55,8 @@ from ..reporting import (
     print_lab_welcome,
     success,
 )
+from ..security.terminal import texte_affichable
+from ..security.urls import URLRefusee
 from ..services import (
     guide_url,
     open_lab_session,
@@ -98,7 +100,8 @@ def run(
         error(str(exc))
         raise typer.Exit(1) from None
 
-    info(_("lab_starting", lab_id=lab.id, runtime=lab.runtime.type.value))
+    info(_("lab_starting", lab_id=texte_affichable(lab.id),
+           runtime=lab.runtime.type.value))
     # Le verrou ne couvre QUE la phase qui écrit : services, playbook de setup,
     # contexte. Il est rendu avant la session interactive, sinon le `dsoxlab
     # check` que l'apprenant tape dans ce sous-shell serait refusé par sa
@@ -130,13 +133,14 @@ def run(
     # qui ouvre une session SSH ou, désormais, un shell à la racine du dépôt.
     if lab.runtime.type.value in ("vm", "kvm", "incus"):
         if lab.runtime.session == "local":
-            success(_("lab_ready_local", lab_id=lab.id))
+            success(_("lab_ready_local", lab_id=texte_affichable(lab.id)))
         else:
             resolved = lab.runtime.target(target)
-            success(_("lab_ready_target", lab_id=lab.id,
+            success(_("lab_ready_target", lab_id=texte_affichable(lab.id),
                       host=resolved.host if resolved else "?"))
     else:
-        success(_("lab_ready", lab_id=lab.id, workdir=lab.runtime.workdir))
+        success(_("lab_ready", lab_id=texte_affichable(lab.id),
+                 workdir=texte_affichable(lab.runtime.workdir)))
     # La session SSH s'ouvre sur un hôte dépourvu de dsoxlab : une fois dedans,
     # l'apprenant ne peut plus afficher sa mission. On la lui met sous les yeux
     # avant d'entrer, elle reste dans le défilement du terminal.
@@ -158,9 +162,9 @@ def run(
     # « retour » n'aurait aucun sens. Ce qui compte alors, c'est que le travail
     # reste là et que check puisse être relancé.
     if lab.runtime.session == "local":
-        success(_("lab_session_ended_local", lab_id=lab.id))
+        success(_("lab_session_ended_local", lab_id=texte_affichable(lab.id)))
     else:
-        success(_("lab_session_ended", lab_id=lab.id))
+        success(_("lab_session_ended", lab_id=texte_affichable(lab.id)))
 
 
 
@@ -205,7 +209,8 @@ def course(
     elif section is not None:
         found = manifest.resolve_section(section)
         if found is None:
-            error(_("course_section_not_found", name=section, id=lab.id))
+            error(_("course_section_not_found", name=texte_affichable(section),
+                    id=texte_affichable(lab.id)))
             raise typer.Exit(1)
         # Retrouver l'index 1-based de la section
         target_pos = next(
@@ -263,14 +268,13 @@ def challenge_cmd(
         print_lab_challenge(lab, lang=_lang(root))
 
 
-# ── hint ──────────────────────────────────────────────────────────────────────
-
-# ── hint ──────────────────────────────────────────────────────────────────────
+# ── guide ─────────────────────────────────────────────────────────────────────
 
 @app.command("guide", help=_("cmd_guide_help"))
 def guide(
     lab_id: Annotated[str | None, typer.Argument(help=_("cmd_guide_arg"), autocompletion=_complete_lab_id)] = None,
     print_only: Annotated[bool, typer.Option("--print", help=_("cmd_guide_opt_print"))] = False,
+    ouvrir: Annotated[bool, typer.Option("--open", help=_("cmd_guide_opt_open"))] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     """Ouvre le guide en ligne du lab dans le navigateur.
@@ -284,22 +288,38 @@ def guide(
     lang = _lang(root)
     lab = _resolve_lab(root, lab_id, lang)
 
-    url = guide_url(lab)
+    try:
+        url = guide_url(lab)
+    except URLRefusee as refus:
+        # Le `doc_url` vient du catalogue. Une valeur refusée n'est pas un
+        # `doc_url` absent : le dire, et ne rien afficher de la chaîne
+        # fautive — elle peut porter du markup ou des séquences de terminal.
+        error(_("url_refusee", field=refus.champ,
+                reason=_(refus.cle, **refus.params)))
+        info(_("url_refusee_suite"))
+        raise typer.Exit(1) from None
     if url is None:
-        error(_("guide_no_url", lab_id=lab.id))
+        error(_("guide_no_url", lab_id=texte_affichable(lab.id)))
         raise typer.Exit(1)
 
     # soft_wrap : une URL coupée sur deux lignes n'est plus copiable ni
     # exploitable dans un pipe. Elle doit sortir d'un seul tenant, même
     # au-delà de la largeur du terminal.
-    if print_only:
-        console.print(url, soft_wrap=True)
+    #
+    # `markup=False` : l'URL est validée, donc sans caractère de contrôle,
+    # mais elle peut encore contenir des crochets que Rich lirait comme des
+    # balises. Une chaîne de catalogue ne pilote pas l'affichage.
+    console.print(url, soft_wrap=True, markup=False)
+    if print_only or not ouvrir:
+        # Le défaut. Une URL syntaxiquement sûre n'est pas une destination
+        # approuvée : la valeur vient du catalogue, et c'est l'utilisateur qui
+        # décide d'aller là où elle mène. Ouvrir sans le lui demander, c'est
+        # laisser un dépôt tiers choisir ce que son navigateur affiche.
         return
 
-    info(_("guide_opening", lab_id=lab.id))
-    console.print(url, soft_wrap=True)
-    # L'URL reste affichée : sur une machine sans navigateur (session SSH,
-    # serveur), webbrowser rend False sans rien ouvrir, et l'apprenant doit
-    # pouvoir la copier.
+    info(_("guide_opening", lab_id=texte_affichable(lab.id)))
+    # L'URL reste affichée au-dessus : sur une machine sans navigateur
+    # (session SSH, serveur), webbrowser rend False sans rien ouvrir, et
+    # l'apprenant doit pouvoir la copier.
     if not webbrowser.open(url):
         error(_("guide_no_browser"))

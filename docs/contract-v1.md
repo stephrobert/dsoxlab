@@ -70,7 +70,7 @@ omission.
 | `title` | no | string | Human-readable name. |
 | `blog_url` | no | string | Home page of the online course. |
 | `description` | no | string | One paragraph. |
-| `issues_url` | no | string | Where to file an issue about **this catalogue** rather than about the engine. Read by `dsoxlab support --issue`. Without it, the tool falls back to the repository's `origin` remote, which assumes a remote by that name and a host whose issues live under `<repo>/issues`. |
+| `issues_url` | no | string | Where to file an issue about **this catalogue** rather than about the engine. Read by `dsoxlab support --issue`. Without it, the tool falls back to the repository's `origin` remote, which assumes a remote by that name and a host whose issues live under `<repo>/issues`. Like `doc_url`, it goes through [the URL policy](./security.md): `http`/`https` only, a hostname, no `user:password@`. A rejected value falls back to the remote. |
 
 ### `infra` (optional — required by `runtime: vm`)
 
@@ -198,7 +198,7 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `level` | **yes** | string | — | Free-form, never validated against a list. |
 | `skills` | **yes** | list of strings | — | Must not be empty. |
 | `distros` | **yes** | list of strings | — | Must not be empty. |
-| `doc_url` | **yes** | string | — | `http(s)` only. |
+| `doc_url` | **yes** | string | — | `http(s)` only, and re-checked when displayed: see [the URL policy](./security.md). |
 | `section` | no | string | `repo.category` | Declared, it is **always** kept — including when the value happens to name a technical domain. |
 | `description` | no | string | `""` | |
 | `track` | no | list of strings | `[]` | |
