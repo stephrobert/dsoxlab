@@ -77,9 +77,9 @@
     },
     "lab_type": {
       "type": "string",
-      "enum": ["lab", "challenge", "capstone"],
+      "enum": ["lab", "challenge", "capstone", "validation"],
       "default": "lab",
-      "description": "Kind of exercise. Enumerated and enforced by validate-structure."
+      "description": "What this lab is. The first three assume a learner doing the work and differ in scope; 'validation' does not — it is a set of assertions defending a published guide, so it records no score, takes no place in progress, and offers no hints. Enumerated and enforced by validate-structure."
     },
     "exam_passing_score": {
       "type": "integer",

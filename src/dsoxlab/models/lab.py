@@ -64,7 +64,14 @@ class LabDefinition:
     Absent du fichier = 1, la seule valeur possible aujourd'hui. Voir
     :mod:`dsoxlab.models.schema_version`."""
 
-    lab_type: str = "lab"       # "lab" | "challenge" | "capstone"
+    lab_type: str = "lab"
+    """Ce que ce lab est : ``lab``, ``challenge``, ``capstone`` ou ``validation``.
+
+    Les trois premiers supposent un **apprenant qui fait**, et se distinguent
+    par leur ampleur. Le quatrième non : un ``validation`` est une suite
+    d'assertions qui défend les faits publiés par un guide. Un test rouge y
+    signale un guide à rafraîchir, pas un apprenant en faute — et tout ce qui
+    mesure une personne perd alors son objet. Voir :attr:`is_exercise`."""
 
     exam_passing_score: int = 0
     """Pourcentage du barème à atteindre pour réussir, ou 0 s'il n'y a pas de seuil.
@@ -84,6 +91,22 @@ class LabDefinition:
 
     # Translatable fields — overridden by lab.<lang>.yaml when available
     _TRANSLATABLE = ("title", "description")
+
+    @property
+    def is_exercise(self) -> bool:
+        """Ce lab mesure-t-il quelqu'un ?
+
+        La question commande tout ce qui suit un ``check`` : une note dans la
+        base, une place dans la progression, un indice facturé. Pour un
+        ``lab_type: validation``, la réponse est non, et ce n'est pas un détail
+        de présentation — inscrire un score reviendrait à noter un **guide**,
+        et la progression mesurerait une avancée qui n'existe pas.
+
+        Une propriété plutôt qu'un test d'égalité répété : le jour où une
+        cinquième forme apparaît, c'est ici qu'on tranche, et nulle part
+        ailleurs.
+        """
+        return self.lab_type != "validation"
 
     @classmethod
     def from_yaml(cls, lab_yaml: Path, lang: str = "en") -> LabDefinition:

@@ -147,8 +147,16 @@ vide.
 
 **Métadonnées.** `id`, `title`, `level` et `doc_url` non vides, `skills` et
 `distros` non vides, `doc_url` en `http(s)`, `lab_type` parmi
-`lab | challenge | capstone`, et `exam_passing_score` entre 1 et 100 quand il est
-déclaré.
+`lab | challenge | capstone | validation`, et `exam_passing_score` entre 1 et
+100 quand il est déclaré.
+
+Un mot sur la dernière valeur, parce qu'elle change ce que fait dsoxlab et non
+l'ampleur du lab : un lab `validation` n'est **pas un exercice**. C'est une
+suite d'assertions qui défend un guide publié, donc il n'inscrit aucune note,
+ne prend aucune place dans la progression et n'offre pas d'indice — `check`
+seul est sa raison d'être. Le barème n'est pas contrôlé non plus, puisqu'il n'y
+a personne à noter. Voir
+[le contrat](./contract-v1.fr.md#lab_type-validation--un-lab-qui-défend-un-guide).
 
 **Contenu.** Tout lien relatif d'un Markdown du lab pointe sur un fichier
 existant ; le barème annoncé correspond à la note réellement calculée ; un

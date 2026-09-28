@@ -346,6 +346,12 @@ def validate_scoring(lab: LabDefinition) -> ContentReport:
     afficher de barème détaillé fait un autre choix, tout aussi valable.
     """
     report = ContentReport(lab_id=lab.id)
+    if not lab.is_exercise:
+        # Un lab `validation` n'a pas de barème parce qu'il ne note personne.
+        # Exiger que ses tâches totalisent ses points, et que leur nombre
+        # colle au nombre de tests, reviendrait à lui imposer la forme d'un
+        # exercice qu'il n'est pas.
+        return report
     enonce = lab.path / "challenge" / "README.fr.md"
     if not enonce.is_file():
         enonce = lab.path / "challenge" / "README.md"

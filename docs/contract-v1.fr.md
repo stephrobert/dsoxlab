@@ -209,7 +209,7 @@ validate-structure` le signale.
 | `difficulty` | non | chaîne | `beginner` | Jamais validé, seulement affiché. |
 | `estimated_time` | non | chaîne | `30m` | Seulement affiché. |
 | `certification_tags` | non | liste de chaînes | `[]` | Libre : l'outil reste agnostique du domaine. |
-| `lab_type` | non | énuméré | `lab` | `lab`, `challenge` ou `capstone`. |
+| `lab_type` | non | énuméré | `lab` | `lab`, `challenge`, `capstone` ou `validation`. Les trois premiers supposent un apprenant qui fait ; le quatrième non — voir plus bas. |
 | `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
@@ -222,6 +222,30 @@ n'est pas un lab. `skills`, `distros` et `doc_url` sont exigés par
 publiable.
 
 ### `exam_passing_score`
+
+### `lab_type: validation` — un lab qui défend un guide
+
+Les trois premières formes diffèrent par leur ampleur ; `validation` diffère
+par sa **nature**. Ce n'est pas un exercice : c'est une suite d'assertions qui
+défend les faits publiés par un guide. Un test rouge y signale un guide à
+rafraîchir, pas un apprenant en faute.
+
+Tout ce qui mesure une personne perd donc son objet, et dsoxlab cesse de
+l'appliquer :
+
+| Quoi | Sur un lab `validation` |
+| --- | --- |
+| `check` | **inchangé** — jouer les tests est tout l'objet du lab |
+| la note | pas calculée en score, et **rien n'est écrit** dans `<catalogue>/.dsoxlab.db` |
+| `scores`, `progress`, `next` | l'ignorent ; `next` ne le propose jamais |
+| `hint` | dit qu'il n'y a rien à trouver, au lieu de facturer un indice contre une note qui n'existe pas |
+| `validate-structure` | cesse d'exiger que le barème tombe juste, ce qui n'a de sens que pour un exercice noté |
+| `run` | **inchangé** — un lab `vm` a toujours besoin de sa machine, un lab `shell` de son répertoire de travail |
+
+La valeur est portée par le **lab**, pas par le dépôt, et c'est délibéré : un
+catalogue peut parfaitement porter une stack d'infrastructure et, à côté, deux
+suites d'assertions. Un indicateur au niveau du dépôt forcerait une réponse
+unique pour l'ensemble.
 
 Un `lab_type: capstone` est un examen blanc, et un examen sans seuil de
 réussite n'en est pas un. Déclare la barre, et dsoxlab rend un verdict :
@@ -350,7 +374,7 @@ lab pour qui ouvre le fichier.
 
 | Champ | Valeurs |
 | --- | --- |
-| `lab_type` | `lab`, `challenge`, `capstone` |
+| `lab_type` | `lab`, `challenge`, `capstone`, `validation` |
 | `runtime.type` | `shell`, `vm`, `kvm`, `incus` |
 | `runtime.session` | `target`, `local` |
 | `schema_version` | `1` |

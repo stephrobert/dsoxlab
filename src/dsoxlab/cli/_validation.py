@@ -222,6 +222,14 @@ def _valider(
         console.print(result.output)
 
     evaluation = evaluate_lab(root, lab, result)
+    if not lab.is_exercise:
+        # AVANT le cas « rien mesuré », qu'il ne faut surtout pas confondre
+        # avec celui-ci : ici les tests ont parfaitement tourné, et leur
+        # verdict porte sur un guide, pas sur quelqu'un. Dire « rien n'a été
+        # mesuré » serait faux et inquiétant.
+        if not quiet:
+            info(_("check_validation_sans_note"))
+        return result, evaluation.score, evaluation.max_score
     if not evaluation.enregistre and not quiet:
         # Rien n'a été mesuré : le dire, plutôt que d'afficher un 0 que
         # l'apprenant lirait comme un exercice raté.

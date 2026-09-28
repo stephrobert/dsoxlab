@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`lab_type: validation` — a lab that defends a guide, and grades nobody**
+  (issue #232). A fourth kind was already running in production without a name:
+  a set of assertions defending the facts published in a guide, where a red
+  test means the guide needs refreshing, not that a learner got something
+  wrong. One such catalog says exactly that in its own header, two lines before
+  declaring `category: validation` because it had to declare something.
+
+  dsoxlab applied the whole teaching apparatus to them anyway — a score in the
+  database, a place in the progression, hints billed against a grade. None of
+  it means anything when the red accuses a **guide**.
+
+  | What | On a `validation` lab |
+  | --- | --- |
+  | `check` | **unchanged** — running the tests is the whole point |
+  | the score | **nothing** is written to `<catalog>/.dsoxlab.db` |
+  | `scores`, `progress`, `next` | ignore it; `next` never proposes it |
+  | `hint` | says there is nothing to find |
+  | `validate-structure` | stops requiring the scale to add up |
+  | `run` | **unchanged** — the machine and the work directory are still needed |
+
+  Extending the existing enum rather than adding a field, and carrying it on
+  the **lab** rather than the repository: a catalog can hold an infrastructure
+  stack and, next to it, two suites of assertions — a repository-level flag
+  would force one answer for the whole. The three published catalogs declare
+  the value nowhere, so none of them changes behaviour.
+
 ### Fixed
 
 - **A network outage was reported as a lab defect, and the same URL was
