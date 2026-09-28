@@ -247,8 +247,11 @@ def test_l_hote_est_nomme_a_part_du_lien(
     _proposer_la_remise(catalogue, _lab(catalogue))
     sortie = capsys.readouterr().out
 
-    assert "formation.example.org" in sortie
-    assert "#dsoxlab=" in sortie.replace("\n", "")
+    # Sur sa propre ligne, et par égalité : chercher l'hôte comme sous-chaîne
+    # du lien serait la forme même de la validation d'URL que ce projet refuse.
+    lignes = [ligne.strip() for ligne in sortie.splitlines()]
+    assert "formation.example.org" in lignes, sortie
+    assert urlparse(_lien_dans(sortie)).hostname == "formation.example.org"
 
 
 def test_le_texte_dit_que_rien_n_est_envoye(
@@ -389,8 +392,9 @@ def test_le_lien_apparait_apres_un_vrai_submit(catalogue: Path) -> None:
     resultat = runner.invoke(app, ["submit", "premier"], env={"COLUMNS": "400"})
 
     assert resultat.exit_code == 0, resultat.output
-    assert "formation.example.org" in resultat.output
-    assert "#dsoxlab=" in resultat.output.replace("\n", "")
+    lien = _lien_dans(resultat.output)
+    assert urlparse(lien).hostname == "formation.example.org"
+    assert urlparse(lien).fragment.startswith("dsoxlab=")
 
 
 def test_l_hote_se_lit_seul(catalogue: Path) -> None:
