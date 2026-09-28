@@ -18,6 +18,7 @@ seule façon de prouver que les avis partent bien du bon côté.
 from __future__ import annotations
 
 import json
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -392,6 +393,57 @@ def test_validate_structure_rend_ok(catalogue: Path) -> None:
         "metadata",
     }
     assert document["doc_urls_checked"] is False
+
+
+def test_un_guide_injoignable_ne_fait_pas_echouer(
+    catalogue: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Une coupure de réseau n'est pas un défaut de lab, et ne rend pas rouge.
+
+    Le cas vécu : la CI d'un catalogue échoue sur quatre guides « injoignables »
+    qui répondent 200 depuis un poste, et un `rerun` du même commit passe au
+    vert. Rendre rouge là-dessus apprend à relancer sans lire le message, et
+    finit par masquer les vrais 404.
+
+    Le contrôle le dit quand même — `doc_urls_unreachable` n'est jamais vide
+    pour rien — mais il le dit à part des anomalies.
+    """
+    from dsoxlab.validators import content as validateur
+
+    def _coupure(*_a: object, **_k: object) -> None:
+        raise urllib.error.URLError("connection reset by peer")
+
+    monkeypatch.setattr(validateur.urllib.request, "urlopen", _coupure)
+    monkeypatch.setattr(validateur.time, "sleep", lambda _s: None)
+
+    resultat = runner.invoke(app, ["validate-structure", "--check-urls", "--json"])
+    document = json.loads(resultat.stdout)
+
+    assert resultat.exit_code == 0, "le réseau n'a pas répondu, les labs sont sains"
+    assert document["ok"] is True
+    assert document["counts"]["doc_url"] == 0, "aucune anomalie de guide"
+    assert len(document["doc_urls_unreachable"]) == 2, "mais les deux sont dits"
+    assert {u["lab"] for u in document["doc_urls_unreachable"]} == {"premier", "second"}
+
+
+def test_un_guide_qui_rend_404_fait_bien_echouer(
+    catalogue: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L'autre moitié du verdict : une page morte reste un défaut du lab."""
+    from dsoxlab.validators import content as validateur
+
+    def _quatre_cent_quatre(*_a: object, **_k: object) -> None:
+        raise urllib.error.HTTPError("u", 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(validateur.urllib.request, "urlopen", _quatre_cent_quatre)
+
+    resultat = runner.invoke(app, ["validate-structure", "--check-urls", "--json"])
+    document = json.loads(resultat.stdout)
+
+    assert resultat.exit_code == 1
+    assert document["ok"] is False
+    assert document["counts"]["doc_url"] == 2
+    assert document["doc_urls_unreachable"] == []
 
 
 def test_une_anomalie_porte_sa_regle(catalogue: Path) -> None:

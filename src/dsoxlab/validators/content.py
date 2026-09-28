@@ -25,8 +25,10 @@ paramètres, que ``validate-structure`` rend dans la langue de l'auteur.
 from __future__ import annotations
 
 import re
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -184,7 +186,11 @@ def validate_solutions_encrypted(
 
 
 def check_doc_url(
-    lab: LabDefinition, *, timeout: float = _TIMEOUT_HTTP
+    lab: LabDefinition,
+    *,
+    timeout: float = _TIMEOUT_HTTP,
+    essais: int = 3,
+    attente: float = 0.5,
 ) -> ContentIssue | None:
     """Vérifie que le `doc_url` du lab répond. Rend l'anomalie, ou None.
 
@@ -195,6 +201,16 @@ def check_doc_url(
     Rend une :class:`ContentIssue` plutôt qu'un motif rédigé : le motif était
     la dernière phrase française que ce module composait lui-même, et elle
     s'affichait telle quelle sous ``DSOXLAB_LANG=en``.
+
+    **On réessaie avant de conclure à l'injoignable**, et seulement dans ce
+    cas : un `Connection reset by peer` sur une URL qui répondait la minute
+    d'avant est un incident de réseau, pas une page morte. Mesuré sur la CI de
+    `kubernetes-dsoxlab-training` le 2026-09-16, où quatre guides ont été
+    déclarés injoignables, où les quatre rendaient 200 depuis un poste, et où
+    un simple `gh run rerun --failed` sur le même commit est passé au vert.
+
+    Un statut HTTP, lui, n'est jamais réessayé : un 404 ne devient pas un 200
+    parce qu'on insiste, et le lab a bien un défaut.
     """
     url = lab.doc_url
     if not url:
@@ -212,38 +228,85 @@ def check_doc_url(
     requete = urllib.request.Request(  # noqa: S310 - schéma vérifié
         url, method="HEAD", headers=_ENTETES
     )
-    try:
-        with urllib.request.urlopen(requete, timeout=timeout) as reponse:  # noqa: S310
-            code = reponse.status
-    except urllib.error.HTTPError as exc:
-        # Certains sites refusent HEAD mais servent GET : on retente avant
-        # de déclarer une page morte.
-        if exc.code in (403, 405):
-            try:
-                repli = urllib.request.Request(url, headers=_ENTETES)  # noqa: S310
-                with urllib.request.urlopen(repli, timeout=timeout) as reponse:  # noqa: S310
-                    code = reponse.status
-            except (urllib.error.URLError, OSError) as exc2:
+    derniere: Exception | None = None
+    for tentative in range(max(1, essais)):
+        if tentative:
+            # Court, et croissant : la coupure qu'on rattrape dure une seconde,
+            # pas une minute. Au-delà, insister ne sert qu'à charger un site
+            # tiers qui a déjà dit non.
+            time.sleep(attente * tentative)
+        try:
+            with urllib.request.urlopen(requete, timeout=timeout) as reponse:  # noqa: S310
+                code = reponse.status
+        except urllib.error.HTTPError as exc:
+            # Certains sites refusent HEAD mais servent GET : on retente avant
+            # de déclarer une page morte.
+            if exc.code in (403, 405):
+                try:
+                    repli = urllib.request.Request(url, headers=_ENTETES)  # noqa: S310
+                    with urllib.request.urlopen(repli, timeout=timeout) as reponse:  # noqa: S310
+                        code = reponse.status
+                except (urllib.error.URLError, OSError) as exc2:
+                    derniere = exc2
+                    continue
+            else:
+                # Un statut est une réponse du site : elle ne changera pas.
                 return ContentIssue(
                     path=chemin,
-                    key="content_doc_url_unreachable",
-                    params={"error": exc2},
+                    key="content_doc_url_status",
+                    params={"code": exc.code},
                 )
-        else:
-            return ContentIssue(
-                path=chemin,
-                key="content_doc_url_status",
-                params={"code": exc.code},
-            )
-    except (urllib.error.URLError, OSError) as exc:
+        except (urllib.error.URLError, OSError) as exc:
+            derniere = exc
+            continue
+        if 200 <= code < 400:
+            return None
         return ContentIssue(
-            path=chemin, key="content_doc_url_unreachable", params={"error": exc}
+            path=chemin, key="content_doc_url_status", params={"code": code}
         )
-    if 200 <= code < 400:
-        return None
     return ContentIssue(
-        path=chemin, key="content_doc_url_status", params={"code": code}
+        path=chemin, key="content_doc_url_unreachable", params={"error": derniere}
     )
+
+
+def check_doc_urls(
+    labs: Sequence[LabDefinition], **kwargs: Any
+) -> list[tuple[str, str, ContentIssue]]:
+    """Contrôle les `doc_url` de plusieurs labs en n'interrogeant chaque URL **qu'une fois**.
+
+    Plusieurs labs jumellent la même leçon, et c'est voulu : une compétence par
+    lab, un guide qui en couvre plusieurs. Interroger l'URL une fois par lab
+    multiplie donc les requêtes sans rien vérifier de plus. Mesuré sur
+    `kubernetes-dsoxlab-training` : **58 requêtes pour 35 URL distinctes**, et
+    une page demandée quatre fois dans la même seconde.
+
+    Ce n'est pas seulement du gaspillage. Le catalogue était passé de 53 à 58
+    labs le jour où le contrôle a commencé à échouer, et la rafale est le
+    suspect le plus probable : un site tiers qui coupe la connexion a
+    parfaitement le droit de le faire.
+
+    Le résultat est rattaché à chaque lab concerné, donc la sortie ne change
+    pas : c'est le nombre de requêtes qui change.
+    """
+    par_url: dict[str, ContentIssue | None] = {}
+    resultats: list[tuple[str, str, ContentIssue]] = []
+    for lab in labs:
+        url = lab.doc_url
+        if url not in par_url:
+            par_url[url] = check_doc_url(lab, **kwargs)
+        souci = par_url[url]
+        if souci is not None:
+            # Le chemin doit désigner CE lab, pas celui qui a payé la requête.
+            resultats.append((
+                lab.id,
+                url,
+                ContentIssue(
+                    path=lab.path / "lab.yaml",
+                    key=souci.key,
+                    params=souci.params,
+                ),
+            ))
+    return resultats
 
 
 #: `### Tâche 3 — … (20 pts)` : un titre de tâche qui annonce ses points.

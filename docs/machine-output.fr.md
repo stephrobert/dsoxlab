@@ -440,6 +440,7 @@ lire ce qui n'allait pas.
   "ok": false,
   "labs_checked": 87,
   "doc_urls_checked": false,
+  "doc_urls_unreachable": [],
   "issues": [
     {
       "kind": "structure",
@@ -463,8 +464,23 @@ lire ce qui n'allait pas.
 | `ok` | booléen | le verdict, aligné sur le code de retour : `false` veut dire code 1 |
 | `labs_checked` | entier | labs réellement découverts et validés |
 | `doc_urls_checked` | booléen | `--check-urls` a-t-il été passé ; sans lui, `doc_url: 0` veut dire *non regardé*, pas *toutes vivantes* |
+| `doc_urls_unreachable` | liste | les guides auxquels le réseau n'a pas répondu, après trois tentatives. **Ce ne sont pas des anomalies**, et ils n'entrent pas dans `ok` : voir plus bas |
 | `issues` | liste | chaque anomalie, dans l'ordre où les contrôles sont joués |
 | `counts` | objet | une entrée par famille, **toujours toutes**, y compris à zéro |
+
+**`doc_urls_unreachable` est séparé de `issues`, et c'est tout l'intérêt.** Un
+guide qui rend 404 est un défaut du lab : il entre dans `issues`, compte dans
+`doc_url`, et fait échouer la commande. Un guide auquel le réseau n'a jamais
+répondu n'est ni un défaut ni un succès : c'est un contrôle qui n'a pas pu
+regarder. Il est rapporté, parce qu'une panne durable ne doit pas être
+indistinguable d'un catalogue sain, mais il ne fait pas échouer la commande :
+la structure d'un lab n'est pas fautive parce qu'un site tiers a coupé la
+connexion. Chaque entrée porte `lab`, `url` et `key`.
+
+La distinction a été payée. La CI d'un catalogue a échoué sur quatre guides
+déclarés injoignables ; les quatre rendaient 200 depuis un poste, et une simple
+relance du même commit est passée au vert. Un rouge auquel personne ne croit
+apprend à relancer sans lire, et c'est ainsi qu'un vrai 404 finit par passer.
 
 Chaque anomalie :
 

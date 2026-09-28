@@ -886,8 +886,17 @@ hors ligne, elle se tait.
         "Vérifier aussi que chaque doc_url répond (sort sur le réseau).",
     "content_issues_header":
         "\n[bold]Contenu :[/bold]",
+    # Deux titres, parce que ce sont deux verdicts : le site a répondu et sa
+    # réponse est mauvaise (défaut du lab), ou il n'a pas répondu du tout
+    # (incident de réseau, qui ne fait pas échouer).
     "doc_url_issues_header":
-        "\n[bold]Guides injoignables :[/bold]",
+        "\n[bold red]Guides qui répondent en erreur :[/bold red]",
+    "doc_url_unreachable_header":
+        "\n[bold yellow]Guides qu'on n'a pas pu joindre :[/bold yellow]",
+    "doc_url_unreachable_note":
+        "Non compté comme un échec : après trois tentatives, cela dit que le "
+        "réseau n'a pas répondu, pas que le lab est fautif. Une page qui rend "
+        "404 est listée au-dessus, elle, et fait bien échouer le contrôle.",
     "checking_doc_urls":
         "Vérification des doc_url de {count} lab(s)…",
     "metadata_issues_header": "\n[bold red]Problèmes de métadonnées :[/bold red]",

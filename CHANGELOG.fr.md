@@ -9,6 +9,38 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Une coupure de réseau était rendue comme un défaut de lab, et la même URL
+  était demandée une fois par lab** (issue #224). `validate-structure
+  --check-urls` a fait passer une CI verte au rouge sur quatre guides déclarés
+  injoignables ; les quatre rendaient 200 depuis un poste, et une simple
+  relance du même commit est passée au vert. Rien n'avait bougé dans ces labs.
+
+  Trois choses n'allaient pas, et c'est la troisième qui compte.
+
+  **Il ne réessayait jamais.** Un « Connection reset by peer » sur une URL qui
+  répondait la minute d'avant est un incident, pas une page morte. Le contrôle
+  tente désormais trois fois, avec une courte attente croissante — et seulement
+  sur une erreur réseau : un 404 ne devient pas un 200 parce qu'on insiste,
+  donc un statut HTTP n'est jamais réessayé.
+
+  **Il posait 58 fois la même question pour 35 réponses.** Plusieurs labs
+  jumellent la même leçon, et c'est voulu : une compétence par lab, un guide
+  qui en couvre plusieurs. Une page était demandée quatre fois dans la même
+  seconde, et le catalogue venait de passer de 53 à 58 labs le jour où le
+  contrôle a commencé à échouer. Les URL sont maintenant dédupliquées avant
+  d'être interrogées, et chaque verdict est rattaché à tous les labs concernés.
+
+  **Et il confondait deux verdicts.** Un guide qui rend 404 est un défaut du
+  lab : il fait échouer la commande. Un guide auquel le réseau n'a jamais
+  répondu n'est ni un défaut ni un succès : c'est un contrôle qui n'a pas pu
+  regarder. Il est désormais rapporté à part, dans sa propre section et dans un
+  champ `doc_urls_unreachable` du document JSON, et il **ne fait plus échouer
+  la commande**. Un rouge auquel personne ne croit apprend à relancer sans
+  lire, et c'est ainsi qu'un vrai 404 finit par passer.
+
+
 ## [0.2.5] - 2026-09-26
 
 ### Corrigé
