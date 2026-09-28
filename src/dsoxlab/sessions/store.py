@@ -138,6 +138,26 @@ def get_results(
         return [dict(r) for r in conn.execute(query, params).fetchall()]
 
 
+def get_all_results(root: Path) -> list[dict[str, Any]]:
+    """Tous les résultats du dépôt, sans limite ni troncature.
+
+    ``get_results`` plafonne à cinquante lignes, ce qui convient à un affichage
+    et **pas** à un export : un document qui s'arrête sans le dire est pire
+    qu'un document absent, parce que celui qui le lit croit tout avoir. La
+    limite n'est donc pas relevée ici, elle n'existe pas.
+
+    Ordre chronologique croissant, contrairement à l'affichage : un export se
+    lit comme un historique, du premier résultat au dernier.
+    """
+    with _get_db(root) as conn:
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM results ORDER BY validated_at ASC, id ASC"
+            ).fetchall()
+        ]
+
+
 def get_best_scores(
     root: Path,
     lab_ids: list[str] | None = None,

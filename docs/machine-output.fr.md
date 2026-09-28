@@ -212,6 +212,82 @@ fêterait un parcours qui n'a jamais commencé.
 `passed` se fait en entiers, jamais sur un pourcentage arrondi : un seuil
 d'examen ne s'arrondit pas en faveur du candidat.
 
+## `export`
+
+`scores` est un **affichage** : il montre les résultats les plus récents,
+bornés par `--top` et par la base à cinquante. `export` est un **document** :
+tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
+
+```json
+{
+  "schema": 1,
+  "generated_at": "2026-09-28T09:03:07.929397+00:00",
+  "tool": { "name": "dsoxlab", "version": "0.2.5" },
+  "catalog": {
+    "id": "linux-dsoxlab-training",
+    "path": "/home/moi/catalogues/linux-dsoxlab-training",
+    "commit": "ed1ee568c866f38a4ccee04b356902e32c38de6b"
+  },
+  "results": [
+    {
+      "catalog": "linux-dsoxlab-training",
+      "lab_id": "l2-swap-management",
+      "lab_type": "lab",
+      "section": "l2",
+      "validated": true,
+      "score": 100,
+      "max_score": 100,
+      "passed_tests": 5,
+      "total_tests": 5,
+      "hints_used": 0,
+      "recorded_at": "2026-09-14T08:12:44.102931+00:00",
+      "exam": null
+    }
+  ],
+  "count": 1
+}
+```
+
+| Champ | Type | Sens |
+| --- | --- | --- |
+| `generated_at` | chaîne | quand le document a été produit, ISO 8601, UTC |
+| `tool.version` | chaîne | le dsoxlab qui l'a produit |
+| `catalog.id` | chaîne | le `repo.id` du catalogue, ou le nom du répertoire si le `meta.yml` est illisible |
+| `catalog.commit` | chaîne ou null | la révision git du catalogue, `null` hors d'un dépôt git — avec elle, un score obtenu sur une version antérieure d'un lab se reconnaît |
+| `results[].catalog` | chaîne | répété sur chaque ligne, pour que des lignes de plusieurs catalogues puissent se fondre |
+| `results[].lab_type` | chaîne ou null | `lab`, `challenge` ou `capstone` ; `null` quand le lab n'existe plus dans le catalogue |
+| `results[].validated` | booléen | **le verdict, énoncé** — voir plus bas |
+| `results[].recorded_at` | chaîne | quand le résultat a été inscrit, ISO 8601, UTC |
+| `results[].exam` | objet ou null | comme dans `scores` |
+| `count` | entier | le nombre de lignes, toujours égal à la longueur de `results` |
+
+Quatre choses que ce document dit, et que `scores --json` laissait deviner :
+
+**`validated` est explicite.** Une tentative mesurée mais ratée est inscrite
+elle aussi — c'est voulu, un échec fait partie de l'historique — et la colonne
+de la base s'appelle pourtant `validated_at`. Le consommateur devait déduire la
+validation de `passed_tests == total_tests`, règle qui n'était écrite nulle
+part. Elle l'est désormais une fois, dans le moteur : tous les tests passés
+**et au moins un test joué**. Sans cette seconde moitié, un lab dont rien n'a
+pu tourner serait « validé » à 0 sur 0.
+
+**Le catalogue est nommé, sur chaque ligne.** Les identifiants de labs sont
+distincts d'un catalogue à l'autre aujourd'hui, mais aucun contrat ne le
+garantit, et un consommateur qui en fusionne plusieurs ne peut pas s'appuyer
+là-dessus.
+
+**`lab_type` est joint.** Il décide si la ligne se lit comme une pratique
+(`lab`) ou comme une preuve (`challenge`, `capstone`). Le joindre depuis sa
+propre copie du catalogue ne marche que tant que les versions coïncident.
+
+**Rien n'est tronqué.** Un document qui s'arrête sans le dire est pire qu'un
+document absent, parce que celui qui le lit croit tout avoir.
+
+Les labs de `lab_type: validation` en sont exclus : ils défendent un guide
+publié et ne notent personne, donc ils n'ont pas leur place parmi les preuves
+de pratique de quelqu'un. Depuis la 0.3.0 ils n'inscrivent plus rien, mais une
+base écrite avant peut en porter.
+
 ## `check`
 
 ```json

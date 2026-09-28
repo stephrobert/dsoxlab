@@ -31,6 +31,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab demo` | Install a demonstration catalog and play a first lab, with nothing to clone and nothing to provision. |
 | `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy), including machines left outside the state. |
 | `dsoxlab doctor` | Diagnose the environment (runtimes, tools, detected labs). |
+| `dsoxlab export` | Export every result as a JSON document, for reading elsewhere |
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
 | `dsoxlab guide` | Open the lab's online guide in your web browser. |
 | `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |

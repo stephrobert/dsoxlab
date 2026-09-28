@@ -37,6 +37,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would force one answer for the whole. The three published catalogs declare
   the value nowhere, so none of them changes behaviour.
 
+- **`dsoxlab export`: every result as a document, with nothing left to guess**
+  (issue #265). The site will show what a learner has practised and proved,
+  with no account and no server: results are exported from their machine and
+  imported into their browser. That needs a document dsoxlab produces and the
+  site reads without deriving anything.
+
+  `scores --json` was a good base and left four things to guess. **The verdict
+  was implicit** — a measured but failed attempt is recorded too, and the
+  column is nevertheless called `validated_at`, so consumers had to derive
+  validation from `passed_tests == total_tests`, a rule written nowhere. **The
+  catalog was not named**, though ids are only distinct across catalogs by
+  luck. **`lab_type` was missing**, though it decides whether a line reads as
+  practice or as proof. And **the export was truncated** at twenty lines by
+  default, fifty by the database, without saying so.
+
+  `export` is a separate command rather than an option of `scores`, because
+  `scores` is a display and this is a document. It carries its own `schema`,
+  the dsoxlab version, the catalog's id and git revision, and one line per
+  result with `catalog`, `lab_type`, an explicit `validated`, the exam verdict
+  when there is one, and `recorded_at` — a name that no longer presumes the
+  outcome. Labs of `lab_type: validation` are excluded: they grade nobody.
+
+  Measured on a real catalog: **179 lines exported out of 179 in the database**,
+  where `scores` would have shown twenty.
+
 ### Fixed
 
 - **A network outage was reported as a lab defect, and the same URL was

@@ -83,7 +83,7 @@ _ORDRE_COMMANDES = (
     "install",
     "use", "list-labs", "show",
     "start", "run", "course", "challenge", "guide", "hint",
-    "check", "submit", "scores", "progress", "next", "reset", "clean",
+    "check", "submit", "scores", "export", "progress", "next", "reset", "clean",
     "validate-structure",
     "doctor",
     "provision", "destroy", "status", "ssh",

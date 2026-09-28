@@ -40,6 +40,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   catalogues publiés ne déclarent la valeur nulle part : aucun ne change de
   comportement.
 
+- **`dsoxlab export` : tous les résultats en un document, sans rien à deviner**
+  (issue #265). Le site affichera ce qu'un apprenant a pratiqué et prouvé, sans
+  compte ni serveur : les résultats s'exportent depuis sa machine et s'importent
+  dans son navigateur. Il faut pour cela un document que dsoxlab produit et que
+  le site lit sans rien déduire.
+
+  `scores --json` était une bonne base et laissait deviner quatre choses. **Le
+  verdict n'était pas explicite** — une tentative mesurée mais ratée est
+  inscrite elle aussi, et la colonne s'appelle pourtant `validated_at`, si bien
+  que le consommateur devait déduire la validation de
+  `passed_tests == total_tests`, règle écrite nulle part. **Le catalogue n'était
+  pas nommé**, alors que les identifiants ne sont distincts d'un catalogue à
+  l'autre que par chance. **`lab_type` manquait**, alors qu'il décide si une
+  ligne se lit comme une pratique ou comme une preuve. Et **l'export était
+  tronqué** à vingt lignes par défaut, cinquante par la base, sans le dire.
+
+  `export` est une commande à part plutôt qu'une option de `scores`, parce que
+  `scores` est un affichage et que ceci est un document. Il porte son propre
+  `schema`, la version de dsoxlab, l'identifiant et la révision git du
+  catalogue, et une ligne par résultat avec `catalog`, `lab_type`, un
+  `validated` explicite, le verdict d'examen quand il y en a un, et
+  `recorded_at` — un nom qui ne préjuge plus du résultat. Les labs de
+  `lab_type: validation` en sont exclus : ils ne notent personne.
+
+  Mesuré sur un vrai catalogue : **179 lignes exportées sur 179 en base**, là
+  où `scores` en aurait montré vingt.
+
 ### Corrigé
 
 - **Une coupure de réseau était rendue comme un défaut de lab, et la même URL

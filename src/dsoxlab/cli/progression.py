@@ -207,6 +207,70 @@ def scores(
     print_scores_table(results, seuils)
 
 
+# ── export ────────────────────────────────────────────────────────────────────
+
+@app.command("export", help=_("cmd_export_help"))
+def export(
+    lab_home: LabHomeOption = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_export_json"))] = False,
+) -> None:
+    """Le document complet des résultats, pour qui veut les relire ailleurs.
+
+    Une commande à part plutôt qu'une option de ``scores``, et la raison tient
+    en une phrase : ``scores`` est un **affichage**, borné à vingt lignes par
+    défaut et cinquante par la base. Un export borné est pire qu'absent, parce
+    que celui qui le lit croit tout avoir.
+
+    ``--json`` est accepté sans rien changer : ce document est machine par
+    nature, il n'a pas de forme terminal. L'option existe parce que la
+    cohérence de la CLI le suggère et qu'un utilisateur la tapera.
+    """
+    del as_json  # accepté pour la cohérence, sans effet : voir la docstring
+    from ..discovery.repo import read_repo_metadata
+    from ..sessions.store import _now, get_all_results
+    from ..utils.shell import run_command
+
+    def _version() -> str:
+        from .. import __version__
+
+        return __version__
+
+    root = _root(lab_home)
+    labs = {lab.id: lab for lab in _catalogue(root, _lang(root), quiet=True)}
+
+    try:
+        repo_meta = read_repo_metadata(root)
+    except Exception:  # noqa: BLE001 — un meta.yml illisible ne doit pas priver
+        repo_meta = None                # l'apprenant de son propre historique
+    catalog_id = repo_meta.id if repo_meta else root.name
+
+    # Le commit du catalogue, quand il y en a un : un score obtenu sur une
+    # version antérieure d'un lab se reconnaît alors, au lieu d'être comparé à
+    # un énoncé qui a changé depuis. Absent d'un répertoire qui n'est pas un
+    # dépôt git, et ce n'est pas une anomalie.
+    revision = run_command(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=False, timeout=5,
+    )
+    commit = revision.stdout.strip() if revision.ok else None
+
+    lignes = [
+        machine.export_result_dict(row, labs.get(row["lab_id"]), catalog_id)
+        for row in get_all_results(root)
+        # Un lab `validation` défend un guide : sa place n'est pas dans les
+        # preuves de pratique de quelqu'un. Depuis 0.3.0 il n'inscrit plus
+        # rien, mais une base antérieure peut en porter.
+        if (lab := labs.get(row["lab_id"])) is None or lab.is_exercise
+    ]
+    machine.emit({
+        "schema": 1,
+        "generated_at": _now(),
+        "tool": {"name": "dsoxlab", "version": _version()},
+        "catalog": {"id": catalog_id, "path": str(root), "commit": commit},
+        "results": lignes,
+        "count": len(lignes),
+    })
+
+
 # ── progress ──────────────────────────────────────────────────────────────────
 
 # ── progress ──────────────────────────────────────────────────────────────────
