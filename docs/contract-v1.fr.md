@@ -211,6 +211,7 @@ validate-structure` le signale.
 | `certification_tags` | non | liste de chaînes | `[]` | Libre : l'outil reste agnostique du domaine. |
 | `lab_type` | non | énuméré | `lab` | `lab`, `challenge` ou `capstone`. |
 | `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
+| `prerequisites` | non | liste de chaînes | `[]` | Identifiants des labs que celui-ci suppose joués. Écrit pour les capstones. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
 | `runtime` | non | mapping | défauts shell | Voir ci-dessous. |
@@ -222,6 +223,39 @@ n'est pas un lab. `skills`, `distros` et `doc_url` sont exigés par
 publiable.
 
 ### `exam_passing_score`
+
+### `prerequisites` — ce qu'un capstone suppose, et que `doc_url` ne sait pas dire
+
+Un lab porte un seul `doc_url` : la leçon qu'il éprouve. C'est exactement ce
+qu'il faut pour un micro-lab — une compétence, une leçon, un jumelage
+vérifiable.
+
+Un **capstone** n'entre pas dans ce moule. Il croise plusieurs sujets et ne
+peut en nommer qu'un : le champ est honnêtement renseigné, et il
+**sous-annonce quand même ce que le lab couvre**. Un lecteur conclut que le
+capstone CKA porte sur le dépannage, alors qu'il exige aussi de corriger une
+réserve CPU, d'apparier un volume et d'exposer un Service.
+
+```yaml
+lab_type: capstone
+prerequisites:
+  - cka-node-affinity
+  - cka-pv-pvc-storageclass
+  - cka-troubleshoot-networking
+```
+
+Une liste de `doc_url` multiples répondrait à moitié : elle dirait « ce lab
+éprouve ces sept leçons », ce qui est vrai et peu utile. Les prérequis disent
+l'**ordre**, qui est la vraie information : un catalogue peut rendre la
+couverture réelle d'un capstone sans qu'un humain la recopie, et un site qui
+consomme le catalogue peut le proposer à la fin d'un chapitre au lieu de le
+noyer dans une liste.
+
+Chaque identifiant doit nommer un lab du même catalogue, et
+`validate-structure` le vérifie : un prérequis qui pointe dans le vide ne casse
+aucun test et n'empêche aucun run — il affiche simplement un ordre qui ne mène
+nulle part, c'est-à-dire le genre d'erreur qu'un auteur ne découvre jamais. Un
+lab qui se nomme lui-même est signalé aussi.
 
 Un `lab_type: capstone` est un examen blanc, et un examen sans seuil de
 réussite n'en est pas un. Déclare la barre, et dsoxlab rend un verdict :

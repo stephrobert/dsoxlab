@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`prerequisites`: what a capstone assumes, which `doc_url` cannot say**
+  (issue #222). A lab carries a single `doc_url` — the lesson it proves — and
+  that is exactly right for a micro-lab. A capstone crosses several subjects
+  and can only name one, so the field is honestly filled and still
+  under-announces what the lab covers: a reader concludes the CKA capstone is
+  about troubleshooting, when it also requires fixing a CPU request, matching a
+  volume and exposing a Service.
+
+  ```yaml
+  lab_type: capstone
+  prerequisites:
+    - cka-node-affinity
+    - cka-pv-pvc-storageclass
+  ```
+
+  A list of several `doc_url` would answer half the question — "this lab proves
+  these seven lessons", true and not very useful. Prerequisites say the
+  **order**, which is the real information.
+
+  `validate-structure` checks each id names a lab of the same catalog, and
+  reports a lab naming itself. That check is the point: a prerequisite pointing
+  at nothing breaks no test and fails no run — it shows an order that leads
+  nowhere, which is the kind of mistake an author never finds. The field is
+  also exposed in `--json`, since a field nobody can read serves nobody.
+
 ### Fixed
 
 - **A network outage was reported as a lab defect, and the same URL was

@@ -946,6 +946,10 @@ silent.
     "content_missing_english": "no English counterpart ({name})",
     "content_target_host_unknown":
         "target '{target}' aims at host '{host}', missing from infra.hosts in meta.yml",
+    "content_prerequisite_unknown":
+        "prerequisite '{prerequisite}' names no lab of this catalog",
+    "content_prerequisite_self":
+        "prerequisite '{lab}' is the lab itself",
     "content_role_host_unknown":
         "role '{role}' aims at '{host}', missing from infra.hosts in meta.yml",
     # ── fixtures: the directory and the declaration must agree ──────────────

@@ -406,6 +406,39 @@ def validate_language_parity(lab: LabDefinition) -> ContentReport:
     return report
 
 
+def validate_prerequisites(
+    lab: LabDefinition, known_ids: set[str]
+) -> ContentReport:
+    """Les prérequis d'un lab doivent nommer des labs qui existent.
+
+    Un prérequis faux ne se voit nulle part : il n'empêche pas le lab de se
+    jouer, il ne casse aucun test, et le catalogue affiche simplement un ordre
+    qui ne mène à rien. C'est exactement le genre d'erreur qu'un auteur ne
+    découvre jamais — d'où le contrôle ici, au moment où l'on a la liste
+    complète des identifiants sous la main.
+
+    Un lab qui se déclare son propre prérequis est signalé au même titre : la
+    boucle est plus évidente à lire ici qu'à débusquer dans un parcours.
+    """
+    report = ContentReport(lab_id=lab.id)
+    if not lab.prerequisites:
+        return report
+    for requis in lab.prerequisites:
+        if requis == lab.id:
+            report.issues.append(ContentIssue(
+                path=lab.path / "lab.yaml",
+                key="content_prerequisite_self",
+                params={"lab": requis},
+            ))
+        elif requis not in known_ids:
+            report.issues.append(ContentIssue(
+                path=lab.path / "lab.yaml",
+                key="content_prerequisite_unknown",
+                params={"prerequisite": requis},
+            ))
+    return report
+
+
 def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
     """Les cibles d'un lab vm doivent exister dans `infra.hosts` du meta.yml.
 

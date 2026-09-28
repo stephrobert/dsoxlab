@@ -180,6 +180,8 @@ step with the code: adding a check without documenting it here fails the suite.
 | `content_scoring_tasks_vs_tests` | graded tasks and tests do not line up |
 | `content_target_host_unknown` | a target's host is absent from `infra.hosts[]` |
 | `content_role_host_unknown` | a `roles` entry names an unknown host |
+| `content_prerequisite_unknown` | a `prerequisites` entry names no lab of this catalog |
+| `content_prerequisite_self` | a lab declares itself as its own prerequisite |
 | `content_solution_plaintext` | a file under `solution/` is readable in the clear |
 | `content_fixture_missing` | a fixture is declared but absent from `fixtures/` |
 | `content_fixture_undeclared` | a file sits in `fixtures/` without being declared |

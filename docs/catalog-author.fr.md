@@ -185,6 +185,8 @@ la suite.
 | `content_scoring_tasks_vs_tests` | tâches notées et tests ne se correspondent pas |
 | `content_target_host_unknown` | l'hôte d'une target est absent de `infra.hosts[]` |
 | `content_role_host_unknown` | une entrée de `roles` nomme un hôte inconnu |
+| `content_prerequisite_unknown` | une entrée de `prerequisites` ne nomme aucun lab de ce catalogue |
+| `content_prerequisite_self` | un lab se déclare son propre prérequis |
 | `content_solution_plaintext` | un fichier de `solution/` est lisible en clair |
 | `content_fixture_missing` | une fixture est déclarée mais absente de `fixtures/` |
 | `content_fixture_undeclared` | un fichier est dans `fixtures/` sans être déclaré |
