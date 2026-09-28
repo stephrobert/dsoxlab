@@ -172,7 +172,10 @@ def validate_structure_cmd(
         machine.issue_dict("contract", a.key, a.params, path=a.path)
         for a in champs_repo.issues
     ]
-    _rendre("contract_issues_header", [
+    # Sa propre rubrique : ces anomalies ne parlent pas de la version du
+    # contrat mais de ce que le `meta.yml` déclare, et les ranger sous le même
+    # titre faisait chercher une histoire de version là où il n'y en a pas.
+    _rendre("repo_fields_header", [
         f"  [red]✘[/red] {_rendu(a.path)}: {_(a.key, **a.params)}"
         for a in champs_repo.issues
     ])

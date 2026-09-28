@@ -11,6 +11,42 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un catalogue déclare son propre portail de formation** (issue #269). Le
+  portail qui consomme les résultats d'un apprenant n'est pas forcément le site
+  de l'auteur de dsoxlab : ce peut être celui d'un formateur, une plateforme
+  interne, un site statique, un LMS, un portail local — ou aucun. Le moteur ne
+  porte donc **aucun domaine de formation**, et l'adresse se déclare là où vit
+  le reste de l'identité du catalogue.
+
+  Un bloc racine plutôt qu'un champ de plus sous `repo:`, pour que ce qui viendra
+  ensuite — une page de reprise, un format attendu — tienne sans étaler
+  `repo.*` :
+
+  ```yaml
+  learning:
+    portal_url: https://formation.example.org/mon-apprentissage/
+  ```
+
+  **Ce que le champ ne dit pas** : que dsoxlab envoie quoi que ce soit — il
+  n'envoie rien, jamais —, que le portail est joignable depuis la machine où
+  l'outil tourne, que le navigateur y tourne aussi, ou que quiconque l'a
+  approuvé. Il est *déclaré par ce catalogue*, et c'est ainsi que la CLI le
+  présente. Un catalogue sans ce bloc continue de fonctionner et rien ne
+  s'affiche ; deux catalogues peuvent déclarer deux portails différents.
+
+  `https` seulement, par la politique unique de #273 — pas de second parseur, pas
+  de seconde liste de schémas. Une exception documentée, pour qui écrit un
+  portail : avec `DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` **vers localhost**
+  est acceptée, et rien d'autre même la variable posée. Deux gardes plutôt qu'un,
+  et une variable d'environnement plutôt qu'un champ du contrat : la machine qui
+  joue le lab décide, jamais le catalogue.
+
+  `validate-structure` le dit à l'auteur, avec la raison et sans recopier la
+  chaîne fautive. **Rien ne touche au réseau** — aucun nom résolu, aucun HEAD,
+  aucun GET : sinon un catalogue ferait frapper la CI de son auteur à l'adresse
+  de son choix. Et rien d'autre n'a sa place dans `learning` : pas de jeton, de
+  clé d'API, d'en-tête, de webhook ni de commande. Un dépôt versionné n'est pas
+  un endroit où poser un secret.
 - **`lab_type: validation` — un lab qui défend un guide, et ne note personne**
   (issue #232). Une quatrième forme tournait déjà en production sans avoir de
   nom : une suite d'assertions qui défend les faits publiés par un guide, où un

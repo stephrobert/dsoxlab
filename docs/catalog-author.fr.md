@@ -206,6 +206,7 @@ la suite.
 | `lab_yaml_illisible_position` | le même cas, quand le parseur donne une ligne et une colonne |
 | `lab_declare_absent` | le `meta.yml` déclare un lab et aucun `lab.yaml` ne s'y trouve |
 | `category_absente_avec_labs` | le dépôt porte des labs mais ne déclare pas `repo.category` |
+| `portail_refuse` | `learning.portal_url` ne passe pas [la politique du portail](./security.fr.md) — `https`, un hôte, pas d'identifiants, pas de caractère de contrôle |
 
 **Ce qu'il vérifie et qu'il laissait passer :** un lab listé dans `meta.yml` sans
 rien sur le disque, et un `lab.yaml` que le moteur ne sait pas charger. Les deux

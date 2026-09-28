@@ -38,6 +38,18 @@
       }
     },
 
+    "learning": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where this catalogue expects a proof of practice to be handed in. Optional, and a catalogue without it keeps working: dsoxlab then shows no link and invents no address. Nothing else belongs here \u2014 no token, API key, authorization header, webhook or command: a versioned repository is no place for a secret, and a catalogue gives the engine no orders.",
+      "properties": {
+        "portal_url": {
+          "type": "string",
+          "description": "Hand-in URL, in https. It does NOT mean dsoxlab sends anything (it never does), nor that the portal is reachable from the machine running dsoxlab, nor that it is approved by anyone: it is declared by this catalogue, and the CLI says so. http is refused, except towards localhost with DSOXLAB_PORTAIL_LOCAL set \u2014 a decision of the machine playing the lab, never of the catalogue."
+        }
+      }
+    },
+
     "infra": {
       "type": "object",
       "additionalProperties": false,

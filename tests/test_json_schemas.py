@@ -69,6 +69,7 @@ NOEUDS_META: dict[str, tuple[str, ...]] = {
     "data": (),
     "repo": ("properties", "repo"),
     "infra_data": ("properties", "infra"),
+    "learning_data": ("properties", "learning"),
     "h": ("properties", "infra", "properties", "hosts", "items"),
     "s": ("properties", "sections", "items"),
 }

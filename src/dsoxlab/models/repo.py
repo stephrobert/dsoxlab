@@ -335,6 +335,34 @@ class SectionDefinition:
 
 
 @dataclass
+class LearningDefinition:
+    """Où ce catalogue attend qu'on remette une preuve d'apprentissage.
+
+    Un bloc racine plutôt qu'un champ de plus sous ``repo:`` : la remise n'est
+    pas l'identité du dépôt, et ce qui viendra ensuite (une page de reprise, un
+    format attendu) tiendra ici sans étaler ``repo.*``.
+
+    **Ce que cette URL ne dit pas.** Elle ne dit pas que dsoxlab envoie quoi que
+    ce soit — il n'envoie rien, jamais —, ni que le portail est joignable depuis
+    la machine où l'outil tourne, ni que le navigateur y tourne aussi. Un
+    apprenant dans WSL, dans une VM ou derrière SSH lit un lien et décide. Elle
+    ne dit pas non plus que ce portail est approuvé par qui que ce soit : il est
+    **déclaré par ce catalogue**, et c'est ainsi que la CLI le présente.
+
+    Rien d'autre n'a sa place ici : pas de jeton, pas de clé d'API, pas d'en-tête
+    d'autorisation, pas de webhook, pas de commande. Un dépôt versionné n'est pas
+    un endroit où poser un secret, et un catalogue ne donne pas d'ordres au
+    moteur.
+    """
+
+    portal_url: str = ""
+    """URL de remise, en ``https`` — voir :func:`dsoxlab.security.urls.url_de_portail`.
+
+    Vide veut dire « aucun portail », et c'est le cas par défaut : dsoxlab
+    n'affiche alors aucun lien et n'invente aucune adresse."""
+
+
+@dataclass
 class RepoMetadata:
     """Contrat déclaratif du dépôt fournisseur (`meta.yml` racine).
 
@@ -365,6 +393,9 @@ class RepoMetadata:
     ``<dépôt>/issues``. Le déclarer lève cette supposition."""
 
     infra: InfraDefinition = field(default_factory=InfraDefinition)
+    learning: LearningDefinition = field(default_factory=LearningDefinition)
+    """Où remettre une preuve d'apprentissage, si ce catalogue le déclare."""
+
     sections: list[SectionDefinition] = field(default_factory=list)
     path: Path = field(default_factory=Path)
     """Répertoire racine du dépôt (parent du meta.yml)."""
@@ -481,6 +512,15 @@ class RepoMetadata:
             providers=_provider_overrides(infra_data.get("providers"), meta_path),
         )
 
+        # `learning` est lu comme `infra` : un mapping tolérant, jamais exigé.
+        # L'URL n'est PAS validée ici — le parseur du contrat v1 ne refuse pas un
+        # catalogue, il le charge. La politique s'applique au point d'usage, et
+        # `validate-structure` la dit à l'auteur.
+        learning_data = as_mapping(data.get("learning"), "learning", meta_path)
+        learning = LearningDefinition(
+            portal_url=str(learning_data.get("portal_url") or ""),
+        )
+
         sections = [
             SectionDefinition(
                 id=str(s["id"]),
@@ -500,6 +540,7 @@ class RepoMetadata:
             description=str(repo.get("description", "")),
             issues_url=str(repo.get("issues_url") or ""),
             infra=infra,
+            learning=learning,
             sections=sections,
             path=meta_path.parent.resolve(),
         )

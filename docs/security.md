@@ -71,7 +71,15 @@ One parser, two declarative policies — a parameter, not a second validator:
 | Policy | Schemes | Used by |
 | --- | --- | --- |
 | `DOCUMENTATION` | `http`, `https` | `doc_url`, issue URLs. Plain HTTP is still accepted: catalogs and forges publish it, the value is displayed rather than sent with a secret, and refusing it would break existing catalogs without protecting anything |
-| `PORTAIL` | `https` only | Evidence destinations. The link will carry results; in the clear they are exposed on the way |
+| `PORTAIL` | `https` only | Evidence destinations (`learning.portal_url`). The link will carry results; in the clear they are exposed on the way |
+
+The portal has one documented exception, for whoever is writing a portal: with
+`DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
+`[::1]` is accepted. Two guards rather than one — the variable **and** a local
+host — because `http` towards a remote host is a different thing, and a variable
+that meant "trust me on everything" would be no guard at all. It is an
+environment variable, never a contract field: the machine playing the lab decides,
+not the catalogue.
 
 Common to both: the URL is really parsed, a hostname is required, `user:password@`
 is refused, control characters are refused, and the value is normalised before

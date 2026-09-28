@@ -995,12 +995,16 @@ hors ligne, elle se tait.
         "la target « {target} » vise l'hôte « {host} », absent de infra.hosts "
         "du meta.yml",
     # ── sécurité : ce qu'un catalogue ne peut pas faire faire au moteur ─────
+    "portail_refuse":
+        "learning.portal_url est inutilisable : {reason}. Un portail de remise "
+        "se déclare en https, parce que le lien porte les résultats d'un "
+        "apprenant",
     "securite_url_vide": "une URL vide",
     "securite_url_caractere":
         "un caractère de contrôle ({code}), qui n'a rien à faire dans une URL",
     "securite_url_illisible": "une URL que cet outil ne sait pas analyser",
     "securite_url_schema":
-        "le schéma « {scheme} », alors que seuls {allowed} sont acceptés",
+        "le schéma « {scheme} », hors des schémas acceptés ({allowed})",
     "securite_url_sans_hote": "aucun hôte",
     "securite_url_identifiants":
         "des identifiants avant l'hôte : l'œil lit le premier nom, le "
@@ -1072,6 +1076,7 @@ hors ligne, elle se tait.
 
     # ── version du contrat (schema_version) ───────────────────────────────────
     "contract_issues_header": "\n[bold red]Version du contrat :[/bold red]",
+    "repo_fields_header": "\n[bold red]Le meta.yml de ce dépôt :[/bold red]",
     "schema_version_invalid":
         "'schema_version' doit être un entier YAML supérieur ou égal à 1, et au "
         "plus {supported}, la dernière version du contrat que ce dsoxlab lit "

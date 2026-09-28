@@ -38,6 +38,7 @@ contrôle réseau **volontaire et explicite**, qui est autre chose.
 
 from __future__ import annotations
 
+import os
 from enum import Enum
 from urllib.parse import urlparse, urlunparse
 
@@ -54,6 +55,19 @@ class PolitiqueURL(Enum):
     PORTAIL = ("https",)
     """Destination d'une preuve d'apprentissage. ``https`` seul : le lien
     portera des résultats, et une URL en clair les exposerait en chemin."""
+
+
+#: Ce qui active l'exception locale de :func:`url_de_portail`. Une variable
+#: d'environnement plutôt qu'un champ du contrat : c'est une décision de la
+#: machine qui joue le lab, jamais du catalogue — sans quoi un catalogue
+#: pourrait s'autoriser lui-même le transport en clair.
+VARIABLE_PORTAIL_LOCAL = "DSOXLAB_PORTAIL_LOCAL"
+
+#: Les hôtes qui ne quittent pas la machine, donc les seuls où ``http`` n'expose
+#: rien à un tiers. ``localhost`` compris, qu'un résolveur peut pointer ailleurs
+#: — mais c'est alors le fichier hosts de l'utilisateur qui le dit, pas le
+#: catalogue.
+HOTES_LOCAUX = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 class URLRefusee(ValueError):
@@ -133,3 +147,34 @@ def url_sure(
 
     # Normalisée : c'est cette valeur qui sera affichée, pas la chaîne d'entrée.
     return urlunparse(parties)
+
+
+def url_de_portail(valeur: str, *, champ: str = "learning.portal_url") -> str:
+    """L'URL d'un portail de remise, en ``https`` — sauf dérogation locale.
+
+    Le lien porte les résultats d'un apprenant dans son fragment : en clair, ils
+    s'exposent à tout ce qui voit passer la requête. D'où ``https`` seul par
+    défaut, sans exception que le catalogue puisse s'accorder.
+
+    **La dérogation locale**, pour qui écrit un portail. Poser
+    ``DSOXLAB_PORTAIL_LOCAL=1`` autorise ``http`` vers ``localhost``,
+    ``127.0.0.1`` ou ``[::1]``, et rien d'autre : c'est le seul cas où le clair
+    n'expose rien, puisque rien ne sort de la machine. Deux gardes plutôt qu'un :
+    l'utilisateur doit poser la variable **et** l'hôte doit être local. Un
+    catalogue qui déclarerait ``http://formation.example.org`` reste refusé même
+    la variable posée, parce que ce n'est pas la même chose et que la variable
+    dirait autrement « fais-moi confiance pour tout ».
+    """
+    if not valeur:
+        raise URLRefusee(champ, valeur, "securite_url_vide")
+
+    if os.environ.get(VARIABLE_PORTAIL_LOCAL):
+        sure = url_sure(valeur, champ=champ, politique=PolitiqueURL.DOCUMENTATION)
+        hote = (urlparse(sure).hostname or "").lower()
+        if hote in HOTES_LOCAUX:
+            return sure
+        # Hôte distant : on retombe sur la règle générale, qui refusera le
+        # clair et laissera passer le `https`. Le message parle donc de
+        # schéma, ce qui est la vraie raison.
+
+    return url_sure(valeur, champ=champ, politique=PolitiqueURL.PORTAIL)
