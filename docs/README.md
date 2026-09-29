@@ -35,6 +35,7 @@ macOS.
 | [The machine output](./machine-output.md) | What `--json` prints, field by field, and what may be built on it |
 | [Exit codes](./exit-codes.md) | Every code the CLI returns, what it means, and the gesture it calls for |
 | [The security model](./security.md) | Where the trust boundary runs, what the engine refuses to do, and what it does not protect you from |
+| [Design principles](./design-principles.md) | The invariants, each with the incident that revealed it and the test that holds it — and what the project promises to whoever integrates it |
 | [The mark](./brand.md) | Name, logo and their usage terms |
 
 Contributors have [CONTRIBUTING.md](../CONTRIBUTING.md): setup, quality gates,

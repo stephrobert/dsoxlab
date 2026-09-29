@@ -13,6 +13,11 @@
 
 ## Checklist
 
+Beyond the boxes below, a change is held to [the design
+principles](../docs/design-principles.md) — what a check may conclude, what a
+failure owes its reader, what the contract promises. They are referenced rather
+than copied here: a duplicated list drifts.
+
 Only the **Always** block applies to every PR. The other blocks are conditional:
 if a block does not apply, say so (`N/A`) rather than leaving it blank — a blank
 box reads as "forgotten", an explicit `N/A` reads as "considered".

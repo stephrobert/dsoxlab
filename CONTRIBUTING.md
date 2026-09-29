@@ -60,6 +60,13 @@ These are non-negotiable. A change that breaks one of them will not be merged.
    `support` report, both written in English because they are compared between
    machines and published.
 
+These five are about the shape of the code. There is a second set, about what a
+check may conclude and what a failure owes its reader: **[the design
+principles](./docs/design-principles.md)**. Each one comes with the incident that
+revealed it and the test that holds it, and each is a complete reason to refuse a
+change — "this check returns `ok` when its probe fails" needs no further
+argument.
+
 ## Development setup
 
 Requirements: **Python 3.11+** and [uv](https://docs.astral.sh/uv/).

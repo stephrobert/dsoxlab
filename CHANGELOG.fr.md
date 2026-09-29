@@ -48,6 +48,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
   Un portail qui ne passe pas la politique n'affiche **aucun lien**, seulement la
   raison, et renvoie vers `export --out`.
+- **Les invariants du projet sont écrits, avec le bug qui a révélé chacun**
+  (issue #200). Quinze règles étaient appliquées sans avoir jamais été énoncées :
+  une sonde qui n'a pas pu regarder ne conclut pas au vert, zéro test n'est pas
+  une note de zéro, une adresse n'est pas une machine, un marqueur de travail
+  accompli ne s'écrit qu'après le succès, la sortie humaine n'est pas l'interface
+  machine. Elles vivaient dans des commentaires, des docstrings de tests et des
+  entrées de CHANGELOG — chacune découverte le jour où elle était violée, et
+  chacune ayant coûté un bug pour être apprise.
+
+  `docs/design-principles.fr.md` (FR + EN) les énonce en trois familles —
+  mesurer, le dire, le contrat — et donne à chacune deux choses : **l'incident**
+  qui l'a révélée, parce qu'un principe sans son bug se discute, et **le test qui
+  le tient**, parce qu'une règle sans test est une règle qui attend sa régression.
+  Là où rien ne garde encore une règle, la page le dit au lieu de le laisser
+  croire ; deux entrées le disent aujourd'hui.
+
+  Elle écrit aussi ce que le projet **promet** à qui l'intègre — l'héritage de
+  #204, fermée : quelles évolutions du contrat sont permises sans casser la v1,
+  que le `SCHEMA = 1` de la sortie JSON évolue indépendamment de la version du
+  paquet, que les codes de sortie listés ne changent plus de sens, et que les
+  alias `kvm`/`incus` de `runtime.type` sont maintenus sans retrait prévu.
+
+  `CONTRIBUTING.fr.md` et le gabarit de PR renvoient à la page plutôt que d'en
+  recopier la liste, qui dériverait. Et un test garde la page honnête : chaque
+  test qu'elle nomme doit exister, les deux langues doivent nommer les mêmes, et
+  aucun invariant ne peut figurer sans son incident.
 - **Une preuve pour un seul lab, en fichier ou en copier-coller** (issue #271).
   Le lien vers un portail est la façon la plus directe de remettre un résultat,
   et elle ne suffit pas : un terminal qui ne rend pas les URL cliquables, un
