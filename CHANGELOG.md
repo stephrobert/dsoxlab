@@ -49,6 +49,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing here knows Kubernetes. A catalogue whose labs share a populated
   database, a directory or an artifact registry hits the same wall, and declares
   the same field.
+- **A job provisions a real VM with the `kvm` template, then destroys it**
+  (issue #243). `templates/terraform/kvm/` decides whether a VM boots, and no job
+  ran it: "Terraform templates" stops at `validate`, and the five "Parcours on …"
+  jobs never provision. The project has a rule for exactly this — **checking is
+  not parsing** — and the cost was paid in #234, where a defect in the `os` block
+  was found by a user, in production.
+
+  The job exists because GitHub-hosted Linux runners carry `/dev/kvm` since April
+  2024. It is careful because that is **not documented as supported**: the
+  runners page mentions neither KVM nor nested virtualization, the documentation
+  request (actions/runner-images#12933) is still unanswered, and reports say it
+  is sometimes there and sometimes not.
+
+  So the job cannot lie in either direction. `/dev/kvm` absent → it **says so**
+  in the run summary and concludes nothing, without turning the build red for an
+  infrastructure gap that is not ours. `/dev/kvm` present → it provisions for
+  real, and any failure is a failure of the product. It is deliberately **not a
+  required status check**, and it only runs on the paths that can break it —
+  pulling a cloud image on a pull request that touches a translation would cost
+  without teaching anything.
+
+  What it exercises that nothing did: the template under `apply` rather than
+  `validate`, a domain that must actually run, a host that must actually answer,
+  and a `destroy` that must leave **nothing** behind — exit code 6, which no test
+  covered either.
 - **After `submit`, a link that carries the result to the catalogue's portal**
   (issue #270). A learner should not have to export then import by hand. The
   mechanism has to keep working in WSL, in VirtualBox, on a remote VM over SSH
