@@ -141,6 +141,17 @@ STRINGS: dict[str, str] = {
         "Écrire le document dans ce fichier au lieu de la sortie standard",
     "opt_export_force":
         "Écraser le fichier de sortie s'il existe déjà",
+    "remise_portail_declare":
+        "Portail déclaré par ce catalogue :",
+    "remise_rien_envoye":
+        "Rien n'a été envoyé par dsoxlab. Ouvrez ou copiez ce lien pour ajouter "
+        "le résultat :",
+    "remise_portail_refuse":
+        "Ce catalogue déclare un portail inutilisable : {reason}. Aucun lien "
+        "n'est affiché ; dsoxlab export écrit la même preuve dans un fichier.",
+    "remise_charge_trop_grande":
+        "La preuve ne tient pas dans un fragment d'URL ({size} caractères, "
+        "{max} au plus). Employez dsoxlab export --lab <id> --out preuve.json.",
     "preuve_sans_tentative":
         "Aucun résultat enregistré pour {lab_id} : il n'y a pas encore de "
         "preuve à remettre. Jouez d'abord dsoxlab submit {lab_id}.",

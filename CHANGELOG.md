@@ -11,6 +11,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **After `submit`, a link that carries the result to the catalogue's portal**
+  (issue #270). A learner should not have to export then import by hand. The
+  mechanism has to keep working in WSL, in VirtualBox, on a remote VM over SSH
+  and on a cloud instance — where the browser is usually not on the same machine
+  and the portal is usually not reachable from where the tool runs. A `localhost`
+  bridge works in none of those cases; a link works in all of them.
+
+  ```text
+  Portal declared by this catalog:
+    formation.example.org
+
+  Nothing has been sent by dsoxlab. Open or copy this link to add the result:
+  https://formation.example.org/my-learning/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+  ```
+
+  **dsoxlab sends nothing, and tests assert it**: no `webbrowser.open`, no
+  `xdg-open`, no request, no name resolved. The proof travels in a **fragment**,
+  never a query string, so it appears in no server log, no reverse proxy and no
+  CDN — and the host is printed on its own line, because what the eye reads of a
+  600-character URL is its beginning.
+
+  base64url without padding, **no compression**: the proof is under a kilobyte
+  (measured: 434 characters of JSON, 579 encoded, against a 32 KB ceiling), and a
+  decompressor at the far end would be an attack surface for nothing. It is the
+  **same** Evidence v1 document as `export --lab`, with `count: 1` — one format,
+  so a consumer that reads the file reads the link.
+
+  Two decisions the issue asked to settle and document. The link is shown **after
+  a failed attempt too**: a proof states what happened, a portal can turn
+  failures into a revision queue, and showing only successes would manufacture a
+  flattering history. And **no portal means no output at all** — no warning, no
+  default address, because a catalogue without a portal is a normal case.
+
+  A portal that does not pass the policy shows **no link**, only the reason, and
+  points at `export --out`.
 - **A proof for one lab, as a file or a copy-paste** (issue #271). The link to a
   portal is the most direct way to hand a result over, and it is not enough: a
   terminal that does not make URLs clickable, a browser on another machine, an

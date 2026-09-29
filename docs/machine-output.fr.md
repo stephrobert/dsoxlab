@@ -355,6 +355,66 @@ Donc, de votre côté :
   Affichez-les comme du texte ;
 - **demandez confirmation** plutôt que d'importer en silence.
 
+### Remettre un résultat — le lien après `submit`
+
+Quand un catalogue déclare [un portail](./contract-v1.fr.md#learning-optionnel),
+un `submit` réellement enregistré se termine par un lien :
+
+```text
+✔ Soumission enregistrée : 100/100 pts. Tous les tests sont passés.
+
+Portail déclaré par ce catalogue :
+  formation.example.org
+
+Rien n'a été envoyé par dsoxlab. Ouvrez ou copiez ce lien pour ajouter le résultat :
+https://formation.example.org/mon-apprentissage/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+```
+
+**Rien n'est envoyé par dsoxlab.** Aucun navigateur n'est ouvert, aucune requête n'est
+faite, aucun nom n'est résolu — un test le vérifie pour chacun. Ce n'est pas une
+question de principe : dsoxlab tourne dans WSL, dans VirtualBox, sur une VM
+distante en SSH, sur une instance cloud. Le navigateur n'est souvent pas sur la
+même machine, et le portail souvent pas joignable depuis là où l'outil tourne. Un
+lien que l'apprenant emporte marche dans tous ces cas ; un pont `localhost` dans
+aucun.
+
+| Choix | Pourquoi |
+| --- | --- |
+| un **fragment**, `#dsoxlab=…`, jamais `?dsoxlab=…` | le fragment reste dans le navigateur : il ne part pas dans la requête HTTP, donc il n'apparaît dans aucun journal de serveur, de reverse proxy ni de CDN |
+| **base64url sans remplissage** | `+`, `/` et `=` ne traversent pas un fragment d'URL indemnes |
+| **aucune compression** | la preuve pèse moins d'un kilo-octet (mesuré : 434 caractères de JSON, 579 encodés). Un décompresseur à l'arrivée serait une surface d'attaque — une charge pathologique se décompresse en gigaoctets — pour rien |
+| le **même** document Evidence v1, `count: 1` | un seul format ; qui sait lire le fichier sait lire le lien |
+| l'**hôte affiché à part** | ce qu'on lit d'une URL de 600 caractères, c'est son début. Nommer l'hôte en clair est ce qui permet à l'apprenant de voir **où** sa preuve irait |
+
+**Après une tentative ratée aussi.** Le lien s'affiche que le lab soit validé ou
+non : une preuve atteste ce qui s'est passé, et un portail sait en faire une file
+de révision. Ne montrer que les réussites fabriquerait un historique flatteur, et
+l'export complet porte déjà les échecs.
+
+Si le portail déclaré ne passe pas [la politique du portail](./security.fr.md),
+**aucun lien n'est affiché** — la raison l'est, sans recopier la chaîne fautive —
+et `dsoxlab export --lab <id> --out preuve.json` reste le chemin universel. De
+même si la charge dépassait un jour 32 Ko.
+
+### Si vous recevez ce lien
+
+Le fragment est à vous de lire, et ce choix ne vous rend pas digne de confiance :
+votre propre JavaScript le lit. La charge ne porte donc que des données
+pédagogiques, et de votre côté :
+
+1. lisez le fragment **avant** tout ce qui déclare une page vue, et nettoyez
+   l'URL par `history.replaceState` — sinon l'URL entière, preuve comprise, part
+   avec votre mesure d'audience ;
+2. contrôlez la longueur encodée **avant tout décodage** (32 Ko est un plafond
+   raisonnable) ;
+3. validez le schéma, puis demandez confirmation à l'utilisateur. Rien ne doit
+   être importé en silence ;
+4. affichez chaque valeur par `textContent`, jamais comme du HTML : `catalog.id`,
+   `lab_id` et `section` viennent d'un catalogue que vous ne contrôlez pas ;
+5. traitez-la comme un **résultat local**, pas un certificat : elle ne dit rien
+   de qui était au clavier, ni du fait que la charge n'a pas été modifiée en
+   chemin.
+
 ### Ce que ce document ne doit jamais porter
 
 Un catalogue est une **entrée non fiable** : `dsoxlab catalog add <url>` clone

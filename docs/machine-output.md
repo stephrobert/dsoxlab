@@ -345,6 +345,63 @@ So, on your side:
   and `section` come from an untrusted catalog. Render them as text;
 - **confirm with the user** rather than importing silently.
 
+### Handing a result over — the link after `submit`
+
+When a catalogue declares [a portal](./contract-v1.md#learning-optional), a
+`submit` that was actually recorded ends with a link:
+
+```text
+✔ Submission recorded: 100/100 pts. All tests passed.
+
+Portal declared by this catalog:
+  formation.example.org
+
+Nothing has been sent by dsoxlab. Open or copy this link to add the result:
+https://formation.example.org/my-learning/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+```
+
+**Nothing is sent by dsoxlab.** No browser is opened, no request is made, no name is
+resolved — a test asserts each of those. That matters beyond principle: dsoxlab
+runs in WSL, in VirtualBox, on a remote VM over SSH, on a cloud instance. The
+browser is often not on the same machine, and the portal is often not reachable
+from where the tool runs. A link that the learner carries works in every one of
+those cases; a `localhost` bridge works in none of them.
+
+| Choice | Why |
+| --- | --- |
+| a **fragment**, `#dsoxlab=…`, never `?dsoxlab=…` | a fragment stays in the browser: it is not sent in the HTTP request, so it appears in no server log, no reverse proxy, no CDN |
+| **base64url without padding** | `+`, `/` and `=` do not survive a URL fragment unscathed |
+| **no compression** | the proof is under a kilobyte (measured: 434 characters of JSON, 579 encoded). A decompressor at the far end would be an attack surface — a pathological payload expands to gigabytes — for nothing |
+| the **same** Evidence v1 document, `count: 1` | one format; a consumer that reads the file reads the link |
+| the **host printed separately** | what the eye reads of a 600-character URL is its beginning. Naming the host in the clear is what lets a learner see *where* the proof would go |
+
+**After a failed attempt too.** The link is shown whether the lab passed or not:
+a proof states what happened, and a portal can turn failures into a revision
+queue. Showing only successes would manufacture a flattering history, and the
+full export already carries failures.
+
+If the declared portal does not pass [the portal policy](./security.md), **no
+link is shown** — the reason is, without echoing the offending string — and
+`dsoxlab export --lab <id> --out proof.json` remains the universal path. Same if
+the payload ever exceeded 32 KB.
+
+### If you receive that link
+
+The fragment is yours to read, and the choice does not make you trusted: your
+own JavaScript reads it. So the payload carries teaching data only, and on your
+side:
+
+1. read the fragment **before** anything that reports a page view, and clean the
+   URL with `history.replaceState` — otherwise the full URL, proof included,
+   leaves with your analytics;
+2. check the encoded length **before decoding** (32 KB is a sane ceiling);
+3. validate the schema, then ask the user to confirm. Nothing should be imported
+   in silence;
+4. render every value with `textContent`, never as HTML: `catalog.id`, `lab_id`
+   and `section` come from a catalogue you do not control;
+5. treat it as a **local result**, not a certificate: it says nothing about who
+   was at the keyboard, nor that the payload was not edited on the way.
+
 ### What this document must never carry
 
 A catalog is **untrusted input**: `dsoxlab catalog add <url>` clones an
