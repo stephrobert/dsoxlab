@@ -225,6 +225,16 @@ VM.*
 | `dsoxlab doctor` reports missing nested virtualization | it is enabled on **your** computer, not inside the VM | [step 4](#step-4--for-vm-labs-enable-nested-virtualization), appliance powered off |
 | `doctor` says "RAM: … available for … declared" | the VM is too small for this catalog | give it more memory, or play `shell` labs |
 | The import fails on an OVF error | incomplete download | check the SHA256 digest again |
+| VMware refuses the import: "SHA256 digest of file does not match manifest" | a defect in images **up to 0.2.5** — see below | use 0.3.0 or later, or import with `ovftool --skipManifestCheck` |
+| VMware says the OS identifier is not supported and maps it to "Other (32-bit)" | same versions | same fix; the guest is 64-bit either way, so the appliance still runs |
+
+**On the manifest digest, for images up to 0.2.5.** A stream-optimized VMDK ends
+at a marker its reader stops on; `qemu-img` left a zero-filled alignment tail
+after that marker, and `ovftool` therefore hashed 64 512 fewer bytes than our
+manifest declared. The disk was intact — only the two readings disagreed.
+Measured on the published file, fixed in 0.3.0, and now checked at build time:
+the build refuses to ship an image whose file digest is not also its stream
+digest.
 
 A report beats a workaround: `dsoxlab support --issue` fills in the diagnosis
 and opens the issue in the right place.

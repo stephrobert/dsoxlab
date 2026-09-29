@@ -43,6 +43,12 @@ qemu-img convert -p -f qcow2 -O vmdk \
   -o subformat=streamOptimized,adapter_type=lsilogic \
   "$QCOW" "${OUT}/${NOM}-disk1.vmdk"
 
+# `qemu-img` laisse en queue une zone de zéros qu'un lecteur de flux prend pour
+# la fin du fichier : il ignore le reste, et son empreinte ne correspond plus au
+# manifeste. C'est le défaut que VMware a refusé chez un utilisateur. Tout le
+# raisonnement et les mesures sont dans `vmdk_flux.py`.
+python3 "$(dirname "$0")/vmdk_flux.py" couper "${OUT}/${NOM}-disk1.vmdk"
+
 OCTETS=$(stat -c%s "${OUT}/${NOM}-disk1.vmdk")
 CAPACITE=$(qemu-img info --output=json "$QCOW" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["virtual-size"])')
@@ -55,7 +61,8 @@ cat > "${OUT}/${NOM}.ovf" <<OVF
   xmlns="http://schemas.dmtf.org/ovf/envelope/1"
   xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
   xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData"
-  xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData">
+  xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData"
+  xmlns:vmw="http://www.vmware.com/schema/ovf">
   <References>
     <File ovf:href="${NOM}-disk1.vmdk" ovf:id="file1" ovf:size="${OCTETS}"/>
   </References>
@@ -71,8 +78,9 @@ cat > "${OUT}/${NOM}.ovf" <<OVF
   <VirtualSystem ovf:id="${NOM}">
     <Info>dsoxlab appliance ${VERSION}</Info>
     <Name>${NOM}</Name>
-    <OperatingSystemSection ovf:id="96" ovf:version="13">
-      <Info>Debian GNU/Linux (64-bit)</Info>
+    <OperatingSystemSection ovf:id="96" vmw:osType="otherLinux64Guest">
+      <Info>The kind of installed guest operating system</Info>
+      <Description>Debian GNU/Linux 13 (64-bit)</Description>
     </OperatingSystemSection>
     <VirtualHardwareSection>
       <Info>Virtual hardware requirements</Info>
@@ -127,6 +135,10 @@ OVF
 # dimensionnement MESURÉ pour jouer les labs `vm` d'un catalogue complet (les
 # trois hôtes du catalogue Linux se partagent 5120 Mo, et le processeur décide du
 # respect de la fenêtre de 180 s). L'utilisateur peut réduire, il saura pourquoi.
+
+# Le contrôle qui manquait : l'empreinte du FICHIER doit être celle du FLUX. On
+# le vérifie sur le résultat, plutôt que de faire confiance à la coupe.
+python3 "$(dirname "$0")/vmdk_flux.py" controler "${OUT}/${NOM}-disk1.vmdk"
 
 cd "$OUT"
 {

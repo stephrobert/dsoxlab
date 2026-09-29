@@ -237,6 +237,45 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **VMware refusait l'appliance : l'empreinte du manifeste n'était pas celle que
+  son lecteur calcule** (issue #279). Remonté par un utilisateur, et confirmé à
+  l'octet près sur l'image 0.2.5 publiée.
+
+  Un VMDK `streamOptimized` est un **flux** : son lecteur suit une chaîne de
+  marqueurs de 512 octets et s'arrête au marqueur de fin — `val=0, size=0,
+  type=0`, un secteur entièrement nul. `qemu-img` n'écrit pas un flux conforme :
+  il laisse `gdOffset` à un offset réel au lieu de `0xFFFFFFFFFFFFFFFF`, n'écrit
+  ni footer ni marqueur de fin, et termine le fichier par une zone de zéros. Le
+  lecteur prend le premier secteur de cette zone pour la fin du flux.
+
+  ```text
+  taille du disque             : 436 160 000 octets
+  dernier octet utile          : 436 094 621
+  secteur nul suivant          : 436 094 976
+  octets après ce secteur      : 64 512   ← jamais lus par ovftool, comptés par nous
+  ```
+
+  Le disque était intact : seules les deux lectures divergeaient. La fabrique
+  **coupe désormais le fichier juste après ce marqueur** — vérifié sur l'image
+  publiée : `qemu-img check` reste propre et les 20 Gio relus sont identiques
+  octet pour octet — et surtout elle **refuse de livrer une image** dont
+  l'empreinte du fichier n'est pas aussi celle de son flux. C'est ce contrôle qui
+  empêche le défaut de repartir, parce qu'il mesure le résultat et non
+  l'intention.
+
+  Pourquoi aucun contrôle local ne l'avait vu : l'OVA était vérifiée par `tar`,
+  `xmllint` et `sha256sum`, trois outils qui lisent un *fichier*, et importée
+  sous VirtualBox, qui ne vérifie pas le manifeste. Le destinataire, lui, lit un
+  *flux*.
+
+  Pour les images déjà publiées (≤ 0.2.5) : `ovftool --skipManifestCheck`, ou le
+  `.qcow2` sous KVM, ou VirtualBox.
+- **VMware ramenait l'appliance à « Other (32-bit) »** (issue #279).
+  `ovf:id="96"` est la bonne valeur CIM (« Debian 64-Bit »), mais l'OVF ne
+  déclarait ni `vmw:osType` ni `<Description>` : VMware ne trouve alors aucun nom
+  d'OS — d'où l'identifiant vide dans son message — et retombe sur un profil
+  **32 bits** pour un invité qui n'existe qu'en 64 bits. Les deux sont désormais
+  déclarés, et l'OVF valide toujours le schéma DMTF.
 - **Un caractère dans un catalogue rendait tout le catalogue inaffichable**
   (issue #273). Mesuré avant le correctif, sur un lab déclarant
   `title: "Titre [red]hostile[/red] et [/] non apparié"` :
