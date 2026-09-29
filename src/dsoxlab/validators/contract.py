@@ -296,6 +296,7 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
     "repo.id", "repo.category", "repo.title", "repo.blog_url", "repo.description",
     "repo.issues_url",
     "infra.provider", "infra.network", "infra.cidr", "infra.hosts", "infra.providers",
+    "infra.bootstrap",
     "infra.hosts[].name", "infra.hosts[].distro", "infra.hosts[].role",
     "infra.hosts[].ram_mb", "infra.hosts[].vcpu", "infra.hosts[].disk_gb",
     "infra.hosts[].extra_disk_gb", "infra.hosts[].ip",
@@ -437,6 +438,7 @@ def validate_repo_fields(root: Path) -> ContractReport:
         return report
 
     report.issues += _anomalies_du_portail(data, meta)
+    report.issues += _anomalies_du_socle(root, data, meta)
 
     repo = data.get("repo")
     if not isinstance(repo, dict) or str(repo.get("category") or "").strip():
@@ -448,6 +450,36 @@ def validate_repo_fields(root: Path) -> ContractReport:
             path=meta, key="category_absente_avec_labs", params={"labs": labs},
         ))
     return report
+
+
+def _anomalies_du_socle(
+    root: Path, data: dict[str, Any], meta: Path
+) -> list[ContractIssue]:
+    """``infra.bootstrap`` désigne-t-il un fichier de ce catalogue ?
+
+    Même règle que pour une fixture déclarée (issue #177), et pour la même
+    raison : un socle déclaré et absent ne se voit qu'au premier `provision`, et
+    le lab qui suit échoue alors sur une machine nue sans que rien nomme la
+    cause. `provision` le refuse aussi (code 11), mais l'auteur du catalogue a
+    droit de l'apprendre avant, en CI.
+    """
+    infra = data.get("infra")
+    if not isinstance(infra, dict):
+        return []
+    declare = str(infra.get("bootstrap") or "").strip()
+    if not declare:
+        return []
+
+    candidat = Path(declare)
+    if candidat.is_absolute() or ".." in candidat.parts:
+        return [ContractIssue(
+            path=meta, key="bootstrap_hors_depot", params={"path": declare},
+        )]
+    if not (root / candidat).is_file():
+        return [ContractIssue(
+            path=meta, key="bootstrap_absent", params={"path": declare},
+        )]
+    return []
 
 
 def _anomalies_du_portail(data: dict[str, Any], meta: Path) -> list[ContractIssue]:

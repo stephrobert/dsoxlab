@@ -40,6 +40,7 @@ from ..interrupt import (
     Stage,
     interruptible,
 )
+from ..models import RepoMetadata
 from ..reporting import (
     console,
     error,
@@ -73,6 +74,10 @@ def provision(
         "--host",
         help=_("opt_provision_host"),
     )] = None,
+    rejouer_le_socle: Annotated[bool, typer.Option(
+        "--bootstrap",
+        help=_("opt_provision_bootstrap"),
+    )] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     """Lance terraform apply sur le provider courant avec progress bar."""
@@ -82,10 +87,16 @@ def provision(
     # autre terminal pendant le scan des machines orphelines rendrait ce scan
     # faux au moment où on s'en sert.
     ctx.call_on_close(_verrou(root, "provision").release)
-    provisionner(root, host=list(host) if host else None)
+    provisionner(
+        root,
+        host=list(host) if host else None,
+        rejouer_le_socle=rejouer_le_socle,
+    )
 
 
-def provisionner(root: Path, *, host: list[str] | None = None) -> None:
+def provisionner(
+    root: Path, *, host: list[str] | None = None, rejouer_le_socle: bool = False
+) -> None:
     """Le corps de ``provision``, **sans verrou** : l'appelant choisit sa portée.
 
     Extrait pour que ``start`` puisse rejouer cette étape (issue #79). La
@@ -353,6 +364,12 @@ def provisionner(root: Path, *, host: list[str] | None = None) -> None:
         info(_("provision_incomplet_suite"))
         raise typer.Exit(EXIT_HOTES_INJOIGNABLES)
 
+    # Le socle du catalogue, s'il en déclare un. Ici et pas ailleurs : les hôtes
+    # répondent (on vient de l'établir), l'inventaire existe, et le point de
+    # reprise que `run` prendra ensuite inclura donc cette base — un `reset` de
+    # lab ramènera à un cluster sain plutôt qu'à une machine nue.
+    _poser_le_socle(repo_meta, ready_hosts, force=rejouer_le_socle)
+
     # Avec un ciblage, on annonce ce qui a été VÉRIFIÉ et sur quel total : dire
     # « 1 hôte prêt » sur un dépôt qui en déclare trois laisse croire que les
     # deux autres ont été jugés, alors qu'ils n'ont même pas été montés.
@@ -365,6 +382,69 @@ def provisionner(root: Path, *, host: list[str] | None = None) -> None:
         success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
         info(f"  {fqdn} → {ip}")
+
+
+def _poser_le_socle(
+    repo_meta: RepoMetadata, hosts: list[str], *, force: bool
+) -> None:
+    """Joue ``infra.bootstrap`` une fois, et le dit quand il n'y a rien à faire.
+
+    Trois issues possibles, trois messages : le catalogue n'en déclare pas (rien,
+    pas même une ligne — c'est le cas courant), le socle est déjà posé et à jour,
+    ou il se joue maintenant.
+
+    **Un échec fait échouer `provision`** (code 11). L'infrastructure est debout et
+    elle n'est pas utilisable : les labs supposent cette base. Conclure au succès
+    ici reviendrait à laisser le premier lab échouer sur une machine nue, sans que
+    rien relie l'échec au provisionnement — exactement le défaut que le socle
+    devait supprimer.
+    """
+    from ..infra.ansible import AnsibleNotInstalled, run_playbook
+    from ..infra.inventory import build_inventory, read_terraform_outputs
+    from ..services.bootstrap import BootstrapAbsent, a_jouer, enregistrer
+
+    try:
+        travail = a_jouer(repo_meta, force=force)
+    except BootstrapAbsent as absent:
+        # Même règle que pour une fixture déclarée et absente : le dire avec le
+        # chemin attendu, plutôt que de laisser le premier lab buter dessus.
+        error(_(absent.cle, path=absent.chemin))
+        raise typer.Exit(ExitCode.BOOTSTRAP_ECHOUE) from None
+
+    if travail is None:
+        if repo_meta.infra.bootstrap.strip():
+            info(_("bootstrap_a_jour"))
+        return
+
+    playbook, empreinte = travail
+    info(_("bootstrap_starting", playbook=playbook.name, count=len(hosts)))
+
+    try:
+        inventaire = build_inventory(
+            repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
+        )
+        with interruptible(Stage.BOOTSTRAP):
+            resultat = run_playbook(playbook, inventaire, quiet=False)
+    except Interrupted as exc:
+        # Le socle est idempotent par contrat : rejouer `provision` reprend ici,
+        # et rien n'est enregistré — donc rien ne fera croire qu'il est posé.
+        _interrompu(exc, "dsoxlab provision")
+    except AnsibleNotInstalled as exc:
+        error(str(exc))
+        raise typer.Exit(ExitCode.BOOTSTRAP_ECHOUE) from None
+    except Exception as exc:  # noqa: BLE001 — message utilisateur direct
+        error(_("bootstrap_echoue", error=str(exc)))
+        raise typer.Exit(ExitCode.BOOTSTRAP_ECHOUE) from None
+
+    if resultat.rc != 0:
+        error(_("bootstrap_echoue", error=f"rc={resultat.rc} ({resultat.status})"))
+        info(_("bootstrap_echoue_suite"))
+        raise typer.Exit(ExitCode.BOOTSTRAP_ECHOUE)
+
+    # APRÈS le succès, jamais avant : un marqueur posé sur un échec condamne la
+    # machine en silence, et il faudrait deviner qu'il faut l'effacer.
+    enregistrer(repo_meta, empreinte, hosts)
+    success(_("bootstrap_done", playbook=playbook.name))
 
 
 @app.command("ssh", help=_("cmd_ssh_help"))

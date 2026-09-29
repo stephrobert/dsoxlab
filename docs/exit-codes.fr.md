@@ -31,6 +31,7 @@ version anglaise. Un code non documenté est un contrat que personne ne peut lir
 | `8` | `HOTES_INJOIGNABLES` | un `provision` a rendu la main sans que tous les hôtes ciblés répondent | `dsoxlab status` dit lequel et pourquoi ; souvent plus de temps ou plus de vCPU |
 | `9` | `DOCTOR_REQUIS_KO` | `doctor --strict` : un contrôle **requis** a échoué, c'est établi | **réparer** ce que le tableau nomme |
 | `10` | `DOCTOR_INDETERMINE` | `doctor --strict` : un contrôle requis n'a pas pu être mesuré | **remesurer** — rien n'est conclu, donc rien n'est validé |
+| `11` | `BOOTSTRAP_ECHOUE` | le socle du catalogue (`infra.bootstrap`) a échoué, ou son playbook est déclaré et introuvable | lisez le déroulé, puis rejouez-le avec `dsoxlab provision --bootstrap`. Les machines sont debout ; ce qui manque est au-dessus d'elles |
 | `127` | `EXECUTABLE_INTROUVABLE` | un exécutable attendu n'est pas dans le `PATH` | l'installer. 127 est le code que le shell rend lui-même ici, donc un script sait déjà le lire |
 | `130` | `INTERROMPU` | `128 + SIGINT`, un Ctrl-C | le message donne le geste de reprise |
 

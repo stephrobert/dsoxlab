@@ -288,6 +288,17 @@ class InfraDefinition:
 
     network: str = ""
     cidr: str = ""
+    bootstrap: str = ""
+    """Playbook du **socle du catalogue**, joué une fois après ``provision``.
+
+    Chemin relatif à la racine du dépôt. Optionnel : la plupart des catalogues
+    n'ont pas de base commune à poser, et ceux qui en ont une la payaient jusqu'ici
+    dans chaque ``setup.yaml`` (issue #213).
+
+    Le parseur ne vérifie pas que le fichier existe — ce n'est pas son rôle, et un
+    catalogue doit continuer de charger. ``validate-structure`` le réclame, et
+    ``provision`` refuse de conclure sans lui."""
+
     hosts: list[HostDefinition] = field(default_factory=list)
     providers: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Overrides spécifiques par provider — lus par le module Terraform
@@ -491,6 +502,7 @@ class RepoMetadata:
             providers_available=providers_available,
             network=infra_data.get("network", ""),
             cidr=infra_data.get("cidr", ""),
+            bootstrap=str(infra_data.get("bootstrap") or ""),
             hosts=[
                 HostDefinition(
                     name=str(h["name"]),

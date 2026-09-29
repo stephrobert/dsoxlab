@@ -113,6 +113,7 @@ pas d'ordres au moteur.
 | Champ | Obligatoire | Type | Défaut | Remarques |
 | --- | --- | --- | --- | --- |
 | `provider` | non | chaîne **ou** liste de chaînes | `kvm` | Providers empaquetés dans l'outil : `kvm`, `incus`, `outscale`. Une liste signifie que l'apprenant choisit. |
+| `bootstrap` | non | chaîne | | Playbook du **socle du catalogue**, joué une fois à la fin de `provision`, avant tout lab. Voir plus bas. |
 | `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. **Sa longueur est bornée**, voir plus bas. |
 | `cidr` | non | chaîne | | Sous-réseau de ce réseau. |
 | `hosts` | non | liste de mappings | `[]` | Les VM. Voir ci-dessous. |
@@ -145,6 +146,44 @@ range` qui ne nomme ni le pont, ni la limite, ni le champ qui l'a produit. Depui
 la 0.1.100, `dsoxlab provision` refuse avant de travailler et `dsoxlab doctor` le
 signale, tous deux en nommant le pont calculé et la longueur que votre nom de
 réseau doit respecter.
+
+### `infra.bootstrap` — le socle du catalogue
+
+Certains catalogues ont besoin d'une base coûteuse avant que le moindre lab ait un
+sens : un cluster kubeadm, une base de données peuplée, un annuaire, un registre
+d'artefacts. Cette base appartient au **catalogue**, à aucun lab en particulier.
+
+```yaml
+infra:
+  provider: [kvm]
+  network: lab-kubernetes
+  cidr: 10.10.50.0/24
+  bootstrap: bootstrap.yaml     # joué une fois, à la fin de provision
+  hosts:
+    - name: k8s-cp.lab
+      distro: ubuntu24
+```
+
+Le playbook est joué **à la fin de `provision`**, une fois les hôtes joignables,
+sur l'inventaire que dsoxlab génère — il cible donc `all` ou `labenv`, jamais
+`lab_target`, qui appartient à un lab.
+
+| Propriété | Ce que cela veut dire pour vous |
+| --- | --- |
+| **joué une fois** | son contenu est empreint ; tant que cette empreinte ne change pas, `provision` ne le rejoue pas |
+| **rejoué quand il change** | la seule chose utile à faire d'un socle qui a changé |
+| **`provision --bootstrap`** | le rejoue sur demande, après un `destroy` partiel par exemple |
+| **doit être idempotent** | il est rejoué, donc il doit constater plutôt que réinstaller |
+| **un échec fait échouer `provision`** | code de sortie `11`. Les machines sont debout et ne sont pas utilisables : les labs supposent cette base |
+
+**Le point de reprise devient le bon, gratuitement.** `run` le prend juste avant
+`setup.yaml`, donc après le socle. Un `reset` de lab ramène désormais à un cluster
+sain plutôt qu'à une machine nue.
+
+Déclaré et absent du disque ? `validate-structure` le dit, et `provision` refuse
+de conclure. Le chemin est relatif à la racine du dépôt ; un chemin absolu ou
+contenant `..` est refusé — le contrat décrit un catalogue, il ne désigne pas des
+fichiers de la machine.
 
 ### `infra.providers.<provider>`
 

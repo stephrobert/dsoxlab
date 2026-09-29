@@ -21,6 +21,25 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Provider d'infra à activer (ex. kvm, outscale, incus). "
         "Surchargé par DSOXLAB_PROVIDER. Persisté entre commandes.",
+    "opt_provision_bootstrap":
+        "Rejouer le socle du catalogue (infra.bootstrap) même s'il est déjà en "
+        "place",
+    "bootstrap_starting":
+        "Pose du socle du catalogue ({playbook}) sur {count} hôte(s)…",
+    "bootstrap_done":
+        "Socle en place ({playbook}). Les labs peuvent désormais le supposer.",
+    "bootstrap_a_jour":
+        "Socle déjà en place et inchangé : rien à rejouer.",
+    "bootstrap_absent":
+        "le meta.yml déclare infra.bootstrap et le fichier n'est pas là : {path}",
+    "bootstrap_hors_depot":
+        "infra.bootstrap doit rester dans le catalogue : {path} en sort",
+    "bootstrap_echoue":
+        "Le socle du catalogue a échoué : {error}",
+    "bootstrap_echoue_suite":
+        "Les machines sont debout, et elles ne sont pas utilisables en l'état : "
+        "les labs supposent ce socle. Lisez le déroulé ci-dessus, puis rejouez-le "
+        "avec dsoxlab provision --bootstrap.",
     "opt_provision_host":
         "Cible une seule VM (fqdn du meta.yml). Répétable. Si absent, applique "
         "tout le plan. Les ressources partagées (réseau, images de base) sont "
@@ -739,6 +758,8 @@ Chaque lab déclare :
                        provisionnement échoué sont encore définies côté
                        hyperviseur, et nomme la commande qui les retire.
     [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
+    [dim]--bootstrap[/dim]           Rejoue le socle du catalogue ([dim]infra.bootstrap[/dim])
+                       même s'il est déjà en place.
 
   [cyan]status [lab][/cyan]         Où en est le lab actif, ou celui qu'on nomme :
                        [bold]non commencé[/bold], [bold]prêt[/bold], [bold]en cours[/bold], [bold]validé[/bold], ou [bold]dégradé[/bold]
@@ -1651,6 +1672,10 @@ hors ligne, elle se tait.
     "interrupted_hosts_wait":
         "Interrompu pendant l'attente des machines en SSH. L'infrastructure, "
         "elle, est en place.",
+    "interrupted_bootstrap":
+        "Interrompu pendant la pose du socle du catalogue. Les machines sont "
+        "debout, et le socle n'est pas enregistré : dsoxlab provision reprend "
+        "ici.",
     "interrupted_tests":
         "Interrompu : les tests ont été arrêtés. Rien n'a été enregistré, "
         "cette tentative ne te coûte aucun point.",
