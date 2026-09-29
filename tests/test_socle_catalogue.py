@@ -281,8 +281,13 @@ def test_un_catalogue_sans_socle_ne_voit_rien(catalogue: Path) -> None:
 # ── l'option, et le code de sortie ───────────────────────────────────────────
 
 def test_l_option_de_rejeu_existe() -> None:
-    """`--bootstrap` doit être documentée là où on la cherche."""
-    resultat = runner.invoke(app, ["provision", "--help"])
+    """`--bootstrap` doit être documentée là où on la cherche.
+
+    `COLUMNS` fixé : sans lui, Rich coupe le nom de l'option au milieu selon la
+    largeur disponible, et le test mesure la largeur du terminal au lieu de
+    l'aide. Vert en local, rouge en CI — la CI avait raison.
+    """
+    resultat = runner.invoke(app, ["provision", "--help"], env={"COLUMNS": "200"})
 
     assert "--bootstrap" in resultat.output
 
