@@ -50,6 +50,32 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   Rien ici ne connaît Kubernetes. Un catalogue dont les labs partagent une base de
   données peuplée, un annuaire ou un registre d'artefacts rencontre le même mur, et
   déclare le même champ.
+- **Un job provisionne une vraie VM avec le template `kvm`, puis la détruit**
+  (issue #243). `templates/terraform/kvm/` décide si une VM démarre, et aucun job
+  ne l'exécutait : « Terraform templates » s'arrête à `validate`, et les cinq
+  « Parcours on … » ne provisionnent jamais. Le projet a pourtant une règle pour
+  exactement ce cas — **vérifier, ce n'est pas parser** — et la facture a été
+  payée avec #234, où un défaut du bloc `os` a été trouvé par un utilisateur, en
+  production.
+
+  Le job existe parce que les runners Linux hébergés portent `/dev/kvm` depuis
+  avril 2024. Il est prudent parce que ce n'est **pas documenté comme supporté** :
+  la page des runners ne mentionne ni KVM ni la virtualisation imbriquée, la
+  demande de documentation (actions/runner-images#12933) reste sans réponse, et
+  les retours signalent un `/dev/kvm` parfois présent, parfois non.
+
+  Le job ne peut donc mentir dans aucun des deux sens. `/dev/kvm` absent → il le
+  **dit** dans le résumé d'exécution et ne conclut rien, sans faire rougir la
+  construction pour une indisponibilité qui ne nous appartient pas. `/dev/kvm`
+  présent → il provisionne pour de vrai, et tout échec est un échec du produit.
+  Il n'est délibérément **pas un contrôle requis**, et il ne se déclenche que sur
+  les chemins qui peuvent le casser — tirer une image cloud sur une PR qui touche
+  une traduction coûterait sans rien apprendre.
+
+  Ce qu'il éprouve et que rien n'éprouvait : le template sous `apply` et non sous
+  `validate`, un domaine qui doit réellement tourner, un hôte qui doit réellement
+  répondre, et un `destroy` qui ne doit **rien** laisser derrière lui — le code de
+  sortie 6, qu'aucun test ne couvrait non plus.
 - **Après `submit`, un lien qui porte le résultat au portail du catalogue**
   (issue #270). Un apprenant ne devrait pas avoir à exporter puis importer à la
   main. Le mécanisme doit rester valable dans WSL, dans VirtualBox, sur une VM
