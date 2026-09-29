@@ -46,6 +46,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   A portal that does not pass the policy shows **no link**, only the reason, and
   points at `export --out`.
+- **The project's invariants are written down, with the bug that revealed each
+  one** (issue #200). Fifteen rules were being applied without ever having been
+  stated: a probe that could not look does not conclude green, zero tests is not
+  a score of zero, an address is not a machine, a marker of work done is only
+  written when the work succeeded, human output is not the machine interface. They
+  lived in code comments, test docstrings and CHANGELOG entries — each one
+  discovered the day it was violated, and each one costing a bug to learn.
+
+  `docs/design-principles.md` (EN + FR) states them in three families — measuring,
+  saying it, the contract — and gives each one two things: **the incident** that
+  revealed it, because a principle without its bug gets argued about, and **the
+  test that holds it**, because a rule with no test is a rule waiting for its
+  regression. Where nothing guards a rule yet, the page says so rather than
+  implying otherwise; two entries say it today.
+
+  It also writes what the project **promises** to whoever integrates it — the
+  legacy of the closed #204: which contract changes are allowed without breaking
+  v1, that `SCHEMA = 1` of the JSON output evolves independently of the package
+  version, that the listed exit codes do not change meaning, and that the
+  `kvm`/`incus` aliases of `runtime.type` are kept with no removal planned.
+
+  `CONTRIBUTING.md` and the PR template point at the page rather than copying the
+  list, which would drift. And a test keeps the page honest: every test it names
+  must exist, both languages must name the same ones, and no invariant may appear
+  without its incident.
 - **A proof for one lab, as a file or a copy-paste** (issue #271). The link to a
   portal is the most direct way to hand a result over, and it is not enough: a
   terminal that does not make URLs clickable, a browser on another machine, an

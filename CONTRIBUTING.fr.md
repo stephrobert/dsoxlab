@@ -60,6 +60,13 @@ Non négociables. Une modification qui enfreint l'une d'elles ne sera pas mergé
    rapport de `support`, tous deux en anglais parce qu'ils se comparent entre
    machines et se publient.
 
+Ces cinq règles portent sur la forme du code. Il en existe un second jeu, sur ce
+qu'un contrôle peut conclure et sur ce qu'un échec doit à son lecteur : **[les
+invariants du projet](./docs/design-principles.fr.md)**. Chacun porte l'incident
+qui l'a révélé et le test qui le tient, et chacun suffit à refuser une
+modification — « ce contrôle rend `ok` quand sa sonde échoue » n'appelle aucun
+autre argument.
+
 ## Mise en place
 
 Prérequis : **Python 3.11+** et [uv](https://docs.astral.sh/uv/).
