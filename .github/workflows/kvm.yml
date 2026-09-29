@@ -152,8 +152,14 @@ jobs:
           for socket in /var/run/libvirt/libvirt-sock /var/run/libvirt/libvirt-sock-ro; do
             [ -S "$socket" ] && sudo chmod 0666 "$socket"
           done
-          # Le pool `default` est défini par le paquet et pas démarré : sans lui,
-          # l'apply meurt sur un pool introuvable, très loin de la cause.
+          # Le pool `default` n'est pas seulement arrêté sur un runner : il n'est
+          # pas DÉFINI. Troisième défaut trouvé par ce job en tournant, et
+          # troisième fois que le message de dsoxlab donne la ligne exacte —
+          # c'est celle-ci, recopiée de sa sortie.
+          if ! sudo virsh pool-info default >/dev/null 2>&1; then
+            sudo virsh pool-define-as default dir --target /var/lib/libvirt/images
+            sudo virsh pool-build default
+          fi
           sudo virsh pool-start default || true
           sudo virsh pool-autostart default || true
           virsh --connect qemu:///system version
