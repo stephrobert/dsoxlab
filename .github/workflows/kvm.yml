@@ -119,8 +119,13 @@ jobs:
           # en 4 avec « libvirt exposes no usable EFI firmware on this machine ».
           # C'est le deuxième défaut que ce job a trouvé en tournant, et la
           # deuxième fois que le message du produit a donné le correctif exact.
+          # `qemu-utils` porte `qemu-img`, sans lequel libvirt ne crée que des
+          # volumes bruts et tout volume qcow2 du plan échoue. Il n'est qu'une
+          # *recommandation* de `qemu-kvm`, donc `--no-install-recommends` le
+          # laisse dehors — c'est le quatrième défaut trouvé par ce job, et son
+          # message a diagnostiqué la faute en nommant ce drapeau-là.
           sudo apt-get install -y -qq --no-install-recommends \
-            qemu-kvm libvirt-daemon-system libvirt-clients virtinst \
+            qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients virtinst \
             ovmf dnsmasq-base openssh-client
 
           # Même voie que le job « Terraform templates » : l'archive du
