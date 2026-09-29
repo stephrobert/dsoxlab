@@ -28,7 +28,7 @@ version anglaise. Un code non documenté est un contrat que personne ne peut lir
 | `5` | `ORPHELINS` | un `provision` a laissé des domaines orphelins — définis sur l'hyperviseur, absents du state — ou en a trouvé avant de commencer | jouer la ligne `virsh undefine` que le message affiche |
 | `6` | `ORPHELINS_NON_RETIRES` | un `destroy` n'a pas pu retirer ces orphelins | les retirer à la main, puis rejouer `destroy` |
 | `7` | `VERROU` | une autre commande dsoxlab tient déjà le verrou de ce dépôt | **réessayer** — c'est le seul code où réessayer est juste. Le message nomme le processus qui le détient |
-| `8` | `HOTES_INJOIGNABLES` | un `provision` a rendu la main sans que tous les hôtes ciblés répondent | `dsoxlab status` dit lequel et pourquoi ; souvent plus de temps ou plus de vCPU |
+| `8` | `HOTES_INJOIGNABLES` | un `provision` a rendu la main sans que tous les hôtes ciblés répondent | `dsoxlab infra status` dit lequel et pourquoi ; souvent plus de temps ou plus de vCPU |
 | `9` | `DOCTOR_REQUIS_KO` | `doctor --strict` : un contrôle **requis** a échoué, c'est établi | **réparer** ce que le tableau nomme |
 | `10` | `DOCTOR_INDETERMINE` | `doctor --strict` : un contrôle requis n'a pas pu être mesuré | **remesurer** — rien n'est conclu, donc rien n'est validé |
 | `11` | `BOOTSTRAP_ECHOUE` | le socle du catalogue (`infra.bootstrap`) a échoué, ou son playbook est déclaré et introuvable | lisez le déroulé, puis rejouez-le avec `dsoxlab provision --bootstrap`. Les machines sont debout ; ce qui manque est au-dessus d'elles |

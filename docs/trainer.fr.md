@@ -152,6 +152,29 @@ catalogue n'utilise pas n'apparaît jamais en rouge.
 
 ---
 
+---
+
+## Le socle du catalogue
+
+Un catalogue dont tous les labs reposent sur une base coûteuse — un cluster
+kubeadm, une base de données peuplée, un registre — la déclare une fois dans son
+`meta.yml` :
+
+```yaml
+infra:
+  bootstrap: bootstrap.yaml     # relatif à la racine du catalogue
+```
+
+`provision` le joue en dernier, une fois chaque hôte joignable, sur l'inventaire
+que dsoxlab génère (`all` ou `labenv`, jamais `lab_target`, qui appartient à un
+lab). Il est joué **une fois** : le contenu du playbook est empreint, et
+`provision` ne le rejoue que si ce contenu change, ou sur `dsoxlab provision
+--bootstrap`. Il doit donc être idempotent. Un échec sort en **11** — les machines
+sont debout et inutilisables — et le message dit de le rejouer. `destroy` oublie
+le socle, si bien que le `provision` suivant le repose.
+
+Champ par champ : [le contrat v1](./contract-v1.fr.md#infrabootstrap--le-socle-du-catalogue).
+
 ## Choisir un provider
 
 Première règle qui s'applique : `DSOXLAB_PROVIDER` dans l'environnement, puis

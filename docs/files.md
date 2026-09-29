@@ -38,6 +38,7 @@ must never be, and the public one is useless without it.
 | `~/.local/state/dsoxlab/<catalog-id>/terraform/<provider>/` | Terraform working directory and state | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/cloud-init/` | cloud-init templates copied out of the tool for provisioning | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/dsoxlab.lock` | the per-catalog write lock (`flock`) | `XDG_STATE_HOME` |
+| `~/.local/state/dsoxlab/<catalog-id>/bootstrap.json` | fingerprint of the catalog's foundation (`infra.bootstrap`) after it was played successfully. `provision` replays the playbook when its content no longer matches, or on `--bootstrap`; `destroy` removes this file | `XDG_STATE_HOME` |
 | `~/.cache/dsoxlab/<catalog-id>/inventory.json` | generated Ansible inventory | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/<catalog-id>/ssh_config` | generated OpenSSH config for the lab hosts | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/version-check.json` | last version seen on PyPI, and when | `XDG_CACHE_HOME` |

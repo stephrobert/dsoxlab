@@ -138,9 +138,11 @@ and `dsoxlab check` works from inside that session as well as from outside.
 Two commands, two different things:
 
 - **`dsoxlab course`** shows the lesson shipped with the lab, in the terminal.
-- **`dsoxlab guide`** opens the lab's online guide in a browser tab, so it
-  renders exactly as published, with its images and navigation. `--print`
-  prints the URL instead, which is what you want over SSH.
+- **`dsoxlab guide`** prints the address of the lab's online guide, which
+  renders exactly as published once you open it, with its images and
+  navigation. `--open` opens it in your browser: dsoxlab never navigates on its
+  own, since the address comes from the catalog. `--print` is kept for scripts
+  and means the same as the default.
 
 Both `course` and `challenge` go through a pager as soon as their output is
 taller than the terminal, so a long course stays readable without depending on
@@ -170,6 +172,37 @@ credit for having run the right command, and no penalty for reaching the same
 state another way.
 
 ---
+
+---
+
+## Handing your result over
+
+A catalog may declare a **learning portal**. When it does, `submit` ends with a
+link that carries your result:
+
+```text
+Portal declared by this catalog:
+  formation.example.org
+
+Nothing has been sent by dsoxlab. Open or copy this link to add the result:
+https://formation.example.org/my-learning/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+```
+
+Nothing is sent and nothing is opened: you open the link where your browser is,
+which need not be the machine running the lab. The link is shown after a failed
+attempt too, because a proof states what happened.
+
+Without a portal, or when a link is not practical, the same proof exists as a
+file. It carries your scores and nothing about your machine — no path, no
+hostname, no name:
+
+```bash
+dsoxlab export --lab <id> -o proof.json   # the last attempt of one lab
+dsoxlab export -o history.json            # everything recorded in this catalog
+```
+
+What the document contains, field by field, is on [the machine
+output](./machine-output.md#export).
 
 ## Language
 

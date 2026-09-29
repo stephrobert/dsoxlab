@@ -121,6 +121,7 @@ Every page names its audience in its first lines, and
 | I want to… | Read |
 | --- | --- |
 | Install dsoxlab, play labs, understand my score | **[For the learner](docs/learner.md)** |
+| Hand a result to a training portal, or keep it as a file | [For the learner](docs/learner.md#handing-your-result-over) |
 | Play labs on Windows or macOS, without installing anything | **[The appliance](docs/appliance.md)**, a ready-to-play VM |
 | Write my own catalog of labs | **[For the catalog author](docs/catalog-author.md)**, then [the v1 contract](docs/contract-v1.md) field by field |
 | Run the machines the labs need | **[For the trainer](docs/trainer.md)** |

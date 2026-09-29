@@ -19,24 +19,24 @@ oversight to hide.
 
 ## Measuring
 
-**Un contrôle qui n'a pas pu regarder ne conclut jamais au vert.**
+**A check that could not look never concludes green.**
 
 | Invariant | What revealed it | Held by |
 | --- | --- | --- |
 | A probe that could not look does not conclude green. A check has **three** outcomes — `ok`, `failed`, `unknown` — and `unknown` gets its own exit code (`10`) because a script can conclude nothing from a measurement that never happened | issue #172: an unreadable libvirt pool was reported as fine. The whole #172→#179 batch had this single shape | `tests/test_doctor_strict.py`, `tests/test_note_sans_mesure.py` |
 | Zero tests executed is not a score of zero. A `conftest.py` that raises on import, an unreachable machine, a missing dependency — all yield `total == 0`, which is an absence of measurement, not a failure | issue #168: the 0 was being written to the database as a grade | `tests/test_note_sans_mesure.py` |
 | **An address is not a machine.** A host present in the Terraform state is not a host that answers | `dsoxlab start` announced "already provisioned, nothing to rebuild" right after a `provision` that had exited 8 on "the infrastructure exists but is not usable as it stands". It decided on the state alone. Fixed in 0.2.2: it probes port 22 | `tests/test_start_sequence.py` |
-| **Provisioned is not usable.** Terraform returning 0 says the resources exist, not that the lab can run | issues #170, #178 — hence exit code `8`, and `dsoxlab status` naming which host stays silent | `tests/test_host_ready_timeout.py`, `tests/test_codes_de_sortie.py` |
+| **Provisioned is not usable.** Terraform returning 0 says the resources exist, not that the lab can run | issues #170, #178 — hence exit code `8`, and `dsoxlab infra status` naming which host stays silent | `tests/test_host_ready_timeout.py`, `tests/test_codes_de_sortie.py` |
 | **A command executed is not a state reached.** We never check that a command was typed; we check the state of the system | the labs' state machine, and `pytest-testinfra` as the validation tool | the catalogues' own test suites |
 | **Checking is not parsing.** `ast.parse` accepts a Python module whose variable a bad substitution deleted: the file is valid and raises `NameError` on first call. Same gap between `terraform validate` and `terraform apply` | written in the project's working rules before it had a name | `tests/test_contrat_honore.py` (behaviour, not shape) |
-| **A workflow that has never run is a workflow that does not work**, whatever static analysis approves of it | `actionlint`, `zizmor` and `poutine` all passed on the appliance workflow. It took three releases to make it succeed: `/mnt` is owned by root, Packer refuses a pre-existing output directory, `/dev/kvm` is not openable by the `runner` account | *not guarded yet* — only a real run guards this one, which is what issue #243 is about |
+| **A workflow that has never run is a workflow that does not work**, whatever static analysis approves of it | `actionlint`, `zizmor` and `poutine` all passed on the appliance workflow. It took three releases to make it succeed: `/mnt` is owned by root, Packer refuses a pre-existing output directory, `/dev/kvm` is not openable by the `runner` account. The KVM job then made the same point in five runs and four defects — a bridge name one character too long, `ovmf` missing, a storage pool never defined, `qemu-utils` dropped by `--no-install-recommends` — each named by dsoxlab's own message | `.github/workflows/kvm.yml` (issue #243): when the runner exposes `/dev/kvm`, the `kvm` template is applied for real, a host must answer, and `destroy` must leave nothing behind. Without `/dev/kvm` the job says so and concludes nothing |
 | **A check that does not use the recipient's reader checks nothing** | issue #279: the appliance's OVA was verified with `tar`, `xmllint` and `sha256sum` — three tools that read a *file* — and imported under VirtualBox, which does not verify the manifest. VMware reads a *stream*, stops at its end marker, and hashed 64 512 fewer bytes than our manifest declared. The disk was intact; only the two readings disagreed | `tests/test_ova_flux_vmdk.py`, and the build now refuses to ship an image whose file digest is not also its stream digest |
 
 ---
 
 ## Saying it
 
-**Un échec qui ne se dit pas est pire qu'un échec.**
+**A failure that does not say so is worse than a failure.**
 
 | Invariant | What revealed it | Held by |
 | --- | --- | --- |

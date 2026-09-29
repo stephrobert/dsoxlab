@@ -156,7 +156,7 @@ d'artefacts. Cette base appartient au **catalogue**, à aucun lab en particulier
 ```yaml
 infra:
   provider: [kvm]
-  network: lab-kubernetes
+  network: lab-k8s
   cidr: 10.10.50.0/24
   bootstrap: bootstrap.yaml     # joué une fois, à la fin de provision
   hosts:

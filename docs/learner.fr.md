@@ -143,9 +143,11 @@ l'extérieur.
 Deux commandes, deux choses différentes :
 
 - **`dsoxlab course`** affiche la leçon livrée avec le lab, dans le terminal.
-- **`dsoxlab guide`** ouvre le guide en ligne du lab dans un onglet du
-  navigateur : il s'affiche exactement comme publié, avec ses images et sa
-  navigation. `--print` imprime l'URL à la place, ce qu'il faut en SSH.
+- **`dsoxlab guide`** affiche l'adresse du guide en ligne du lab, qui
+  s'affiche exactement comme publié une fois ouvert, avec ses images et sa
+  navigation. `--open` l'ouvre dans votre navigateur : dsoxlab ne navigue jamais
+  de lui-même, l'adresse venant du catalogue. `--print` reste pour les scripts et
+  vaut le défaut.
 
 `course` et `challenge` passent par un pagineur dès que leur sortie dépasse la
 hauteur du terminal : un cours de plusieurs centaines de lignes reste lisible
@@ -175,6 +177,38 @@ Aucun crédit pour avoir tapé la bonne commande, aucune pénalité pour être a
 au même état autrement.
 
 ---
+
+---
+
+## Remettre votre résultat
+
+Un catalogue peut déclarer un **portail de formation**. Quand c'est le cas,
+`submit` se termine par un lien qui porte votre résultat :
+
+```text
+Portail déclaré par ce catalogue :
+  formation.example.org
+
+Rien n'a été envoyé par dsoxlab. Ouvrez ou copiez ce lien pour ajouter le résultat :
+https://formation.example.org/mon-apprentissage/#dsoxlab=eyJzY2hlbWEiOiJkc294…
+```
+
+Rien n'est envoyé et rien n'est ouvert : vous ouvrez le lien là où se trouve
+votre navigateur, qui n'est pas forcément la machine qui joue le lab. Le lien
+s'affiche aussi après une tentative ratée, parce qu'une preuve atteste ce qui
+s'est passé.
+
+Sans portail, ou quand un lien n'est pas pratique, la même preuve existe en
+fichier. Elle porte vos notes et rien de votre machine — ni chemin, ni nom
+d'hôte, ni nom :
+
+```bash
+dsoxlab export --lab <id> -o preuve.json     # la dernière tentative d'un lab
+dsoxlab export -o historique.json            # tout ce que ce catalogue a enregistré
+```
+
+Ce que contient le document, champ par champ, est sur [la sortie
+machine](./machine-output.fr.md#export).
 
 ## Langue
 

@@ -27,7 +27,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
   ```yaml
   infra:
-    network: lab-kubernetes
+    network: lab-k8s
     bootstrap: bootstrap.yaml     # joué une fois, à la fin de provision
   ```
 
@@ -114,7 +114,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   Un portail qui ne passe pas la politique n'affiche **aucun lien**, seulement la
   raison, et renvoie vers `export --out`.
 - **Les invariants du projet sont écrits, avec le bug qui a révélé chacun**
-  (issue #200). Quinze règles étaient appliquées sans avoir jamais été énoncées :
+  (issue #200). Dix-sept règles étaient appliquées sans avoir jamais été énoncées :
   une sonde qui n'a pas pu regarder ne conclut pas au vert, zéro test n'est pas
   une note de zéro, une adresse n'est pas une machine, un marqueur de travail
   accompli ne s'écrit qu'après le succès, la sortie humaine n'est pas l'interface
@@ -127,7 +127,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   qui l'a révélée, parce qu'un principe sans son bug se discute, et **le test qui
   le tient**, parce qu'une règle sans test est une règle qui attend sa régression.
   Là où rien ne garde encore une règle, la page le dit au lieu de le laisser
-  croire ; deux entrées le disent aujourd'hui.
+  croire ; une entrée le dit aujourd'hui.
 
   Elle écrit aussi ce que le projet **promet** à qui l'intègre — l'héritage de
   #204, fermée : quelles évolutions du contrat sont permises sans casser la v1,

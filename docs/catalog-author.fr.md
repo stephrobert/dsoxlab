@@ -165,7 +165,11 @@ document traduit d'un seul côté est signalé ; `runtime.targets[].host` et les
 `solution/` n'est lisible en clair (un catalogue sans `solution/` n'est pas en
 faute, il a fait un autre choix).
 
-`--check-urls` ajoute le seul contrôle réseau : chaque `doc_url` doit répondre.
+`--check-urls` ajoute le seul contrôle réseau. Chaque `doc_url` distincte est
+demandée une fois : un `404` est un défaut du lab et fait échouer la commande ;
+une URL à laquelle le réseau n'a pas répondu, après trois essais, est rapportée à
+part (`doc_urls_unreachable` en `--json`) et ne la fait **pas** échouer, puisqu'un
+contrôle qui n'a pas pu regarder ne conclut rien.
 
 ### Chaque clé, et ce qu'elle veut dire
 

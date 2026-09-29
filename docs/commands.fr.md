@@ -76,6 +76,7 @@ extrait.
 | `7` | Une autre commande dsoxlab tient déjà le verrou d'écriture de ce catalogue. Le message la nomme — le seul code qui vaille une nouvelle tentative |
 | `8` | `provision` a renoncé à attendre des hôtes qui ne répondaient pas : l'infrastructure existe, mais elle n'est pas utilisable en l'état |
 | `9` / `10` | `doctor --strict` : un contrôle requis a échoué, ou n'a pas pu être mesuré. Le premier se répare, le second se remesure |
+| `11` | `provision` a joué le socle du catalogue (`infra.bootstrap`) et il a échoué, ou il est déclaré et introuvable ; `provision --bootstrap` le rejoue |
 | `130` | La commande a été interrompue (Ctrl-C), et dit comment reprendre |
 
 Chacun existe pour la même raison : un échec qui ne se dit pas est pire qu'un

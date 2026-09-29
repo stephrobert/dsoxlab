@@ -147,7 +147,7 @@ from pathlib import Path
 from dsoxlab import config, locking, logging_setup
 from dsoxlab.discovery.repo import read_repo_metadata
 from dsoxlab.infra import inventory, terraform
-from dsoxlab.services import catalog, demo, lab_state, update_check
+from dsoxlab.services import bootstrap, catalog, demo, lab_state, update_check
 from dsoxlab.sessions import store
 from dsoxlab.templates import template_root
 
@@ -204,6 +204,9 @@ with tempfile.TemporaryDirectory() as tmp:
         catalog.racine_catalogues(),
         catalog._fichier_actif(),
         lab_state._empreintes_dir(racine),
+        # Le marqueur du socle : dérivé du code comme les autres, jamais
+        # recopié. `meta` porte le `repo.id`, qui namespace ce fichier.
+        bootstrap._fichier_etat(meta),
     ))
 
 rendus.update(str(p) for p in maison.rglob("*"))

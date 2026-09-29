@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```yaml
   infra:
-    network: lab-kubernetes
+    network: lab-k8s
     bootstrap: bootstrap.yaml     # played once, at the end of provision
   ```
 
@@ -110,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A portal that does not pass the policy shows **no link**, only the reason, and
   points at `export --out`.
 - **The project's invariants are written down, with the bug that revealed each
-  one** (issue #200). Fifteen rules were being applied without ever having been
+  one** (issue #200). Seventeen rules were being applied without ever having been
   stated: a probe that could not look does not conclude green, zero tests is not
   a score of zero, an address is not a machine, a marker of work done is only
   written when the work succeeded, human output is not the machine interface. They
@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   revealed it, because a principle without its bug gets argued about, and **the
   test that holds it**, because a rule with no test is a rule waiting for its
   regression. Where nothing guards a rule yet, the page says so rather than
-  implying otherwise; two entries say it today.
+  implying otherwise; one entry says it today.
 
   It also writes what the project **promises** to whoever integrates it — the
   legacy of the closed #204: which contract changes are allowed without breaking

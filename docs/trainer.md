@@ -148,6 +148,28 @@ use never shows up in red.
 
 ---
 
+---
+
+## The catalog's foundation
+
+A catalog whose labs all rest on an expensive base — a kubeadm cluster, a
+populated database, a registry — declares it once in `meta.yml`:
+
+```yaml
+infra:
+  bootstrap: bootstrap.yaml     # relative to the catalog root
+```
+
+`provision` plays it last, once every host answers, on the inventory dsoxlab
+generates (`all` or `labenv`, never `lab_target`, which belongs to a lab). It is
+played **once**: the playbook's content is fingerprinted, and `provision` replays
+it only when that content changes, or on `dsoxlab provision --bootstrap`. It must
+therefore be idempotent. A failure exits **11** — the machines are up and not
+usable — and the message says to replay it. `destroy` forgets the foundation, so
+the next `provision` lays it down again.
+
+Field by field: [the v1 contract](./contract-v1.md#infrabootstrap--the-catalogues-foundation).
+
 ## Choosing a provider
 
 First rule that matches wins: `DSOXLAB_PROVIDER` in the environment, then
