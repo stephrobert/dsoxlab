@@ -153,6 +153,32 @@ def enregistrer(repo_meta: RepoMetadata, empreinte: str, hosts: list[str]) -> No
     )
 
 
+def oublier(repo_meta: RepoMetadata) -> bool:
+    """Efface le marqueur : les machines qui portaient ce socle n'existent plus.
+
+    Appelé par ``destroy``, et ce n'est pas un détail de ménage. Sans lui, le
+    marqueur survit à la destruction : un ``provision`` qui reconstruit des
+    machines neuves avec un playbook inchangé **saute le socle**, et les labs
+    tournent alors sur une machine nue — exactement la panne que ce champ
+    devait supprimer.
+
+    Rend ``True`` si un marqueur a été retiré, pour que l'appelant puisse le
+    dire. Un marqueur absent n'est pas une anomalie : le catalogue n'en déclare
+    peut-être aucun.
+    """
+    chemin = _fichier_etat(repo_meta)
+    try:
+        chemin.unlink()
+    except FileNotFoundError:
+        return False
+    except OSError as souci:
+        # Ne jamais faire échouer un `destroy` réussi pour un fichier d'état :
+        # le pire qui puisse arriver est un socle rejoué, qui est idempotent.
+        logger.warning("could not remove the bootstrap marker: %s", souci)
+        return False
+    return True
+
+
 def a_jouer(repo_meta: RepoMetadata, *, force: bool = False) -> tuple[Path, str] | None:
     """Le playbook à jouer et son empreinte, ou ``None`` s'il n'y a rien à faire.
 

@@ -61,7 +61,13 @@ class PolitiqueURL(Enum):
 #: d'environnement plutôt qu'un champ du contrat : c'est une décision de la
 #: machine qui joue le lab, jamais du catalogue — sans quoi un catalogue
 #: pourrait s'autoriser lui-même le transport en clair.
-VARIABLE_PORTAIL_LOCAL = "DSOXLAB_PORTAIL_LOCAL"
+VARIABLE_PORTAIL_LOCAL = "DSOXLAB_PORTAL_LOCAL"
+
+#: Les valeurs qui activent la dérogation, et elles seules. « Non vide » aurait
+#: suffi ailleurs ; pas ici : `DSOXLAB_PORTAL_LOCAL=0` aurait **activé** une
+#: exception de sécurité, ce qui est la dernière chose qu'on veut d'une
+#: variable dont le nom promet le contraire.
+VALEURS_AFFIRMATIVES = frozenset({"1", "true", "yes", "on"})
 
 #: Les hôtes qui ne quittent pas la machine, donc les seuls où ``http`` n'expose
 #: rien à un tiers. ``localhost`` compris, qu'un résolveur peut pointer ailleurs
@@ -157,7 +163,7 @@ def url_de_portail(valeur: str, *, champ: str = "learning.portal_url") -> str:
     défaut, sans exception que le catalogue puisse s'accorder.
 
     **La dérogation locale**, pour qui écrit un portail. Poser
-    ``DSOXLAB_PORTAIL_LOCAL=1`` autorise ``http`` vers ``localhost``,
+    ``DSOXLAB_PORTAL_LOCAL=1`` autorise ``http`` vers ``localhost``,
     ``127.0.0.1`` ou ``[::1]``, et rien d'autre : c'est le seul cas où le clair
     n'expose rien, puisque rien ne sort de la machine. Deux gardes plutôt qu'un :
     l'utilisateur doit poser la variable **et** l'hôte doit être local. Un
@@ -168,7 +174,7 @@ def url_de_portail(valeur: str, *, champ: str = "learning.portal_url") -> str:
     if not valeur:
         raise URLRefusee(champ, valeur, "securite_url_vide")
 
-    if os.environ.get(VARIABLE_PORTAIL_LOCAL):
+    if os.environ.get(VARIABLE_PORTAIL_LOCAL, "").strip().lower() in VALEURS_AFFIRMATIVES:
         sure = url_sure(valeur, champ=champ, politique=PolitiqueURL.DOCUMENTATION)
         hote = (urlparse(sure).hostname or "").lower()
         if hote in HOTES_LOCAUX:

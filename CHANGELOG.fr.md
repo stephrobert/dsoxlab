@@ -172,7 +172,7 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
   `https` seulement, par la politique unique de #273 — pas de second parseur, pas
   de seconde liste de schémas. Une exception documentée, pour qui écrit un
-  portail : avec `DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` **vers localhost**
+  portail : avec `DSOXLAB_PORTAL_LOCAL=1`, une URL en `http` **vers localhost**
   est acceptée, et rien d'autre même la variable posée. Deux gardes plutôt qu'un,
   et une variable d'environnement plutôt qu'un champ du contrat : la machine qui
   joue le lab décide, jamais le catalogue.

@@ -45,7 +45,7 @@
       "properties": {
         "portal_url": {
           "type": "string",
-          "description": "Hand-in URL, in https. It does NOT mean dsoxlab sends anything (it never does), nor that the portal is reachable from the machine running dsoxlab, nor that it is approved by anyone: it is declared by this catalogue, and the CLI says so. http is refused, except towards localhost with DSOXLAB_PORTAIL_LOCAL set \u2014 a decision of the machine playing the lab, never of the catalogue."
+          "description": "Hand-in URL, in https. It does NOT mean dsoxlab sends anything (it never does), nor that the portal is reachable from the machine running dsoxlab, nor that it is approved by anyone: it is declared by this catalogue, and the CLI says so. http is refused, except towards localhost with DSOXLAB_PORTAL_LOCAL set \u2014 a decision of the machine playing the lab, never of the catalogue."
         }
       }
     },

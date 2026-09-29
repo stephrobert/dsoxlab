@@ -99,7 +99,7 @@ catalogues peuvent déclarer deux portails différents ; le moteur ne porte aucu
 adresse par défaut et aucun domaine qui lui soit propre.
 
 `https` seulement. L'exception, pour qui écrit un portail : avec
-`DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
+`DSOXLAB_PORTAL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
 `[::1]` est acceptée — et rien d'autre, même la variable posée. Cette décision
 appartient à la machine qui joue le lab, jamais au catalogue.
 

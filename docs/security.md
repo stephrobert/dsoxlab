@@ -74,7 +74,7 @@ One parser, two declarative policies — a parameter, not a second validator:
 | `PORTAIL` | `https` only | Evidence destinations (`learning.portal_url`). The link will carry results; in the clear they are exposed on the way |
 
 The portal has one documented exception, for whoever is writing a portal: with
-`DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
+`DSOXLAB_PORTAL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
 `[::1]` is accepted. Two guards rather than one — the variable **and** a local
 host — because `http` towards a remote host is a different thing, and a variable
 that meant "trust me on everything" would be no guard at all. It is an

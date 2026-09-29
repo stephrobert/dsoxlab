@@ -32,6 +32,8 @@ STRINGS: dict[str, str] = {
         "Socle déjà en place et inchangé : rien à rejouer.",
     "bootstrap_absent":
         "le meta.yml déclare infra.bootstrap et le fichier n'est pas là : {path}",
+    "bootstrap_oublie":
+        "Le socle du catalogue est oublié : le prochain provision le reposera.",
     "bootstrap_hors_depot":
         "infra.bootstrap doit rester dans le catalogue : {path} en sort",
     "bootstrap_echoue":

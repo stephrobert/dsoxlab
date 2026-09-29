@@ -445,6 +445,11 @@ def progress(
     effective_level = level or ctx.level
 
     labs = _catalogue(root, lang, quiet=as_json)
+    # Un lab `validation` défend un guide publié et ne note personne : le
+    # compter dans une progression fabrique un dénominateur que rien ne peut
+    # atteindre. `next` l'écartait déjà ; le contrat l'annonçait pour toute la
+    # progression, et c'est ici que la promesse manquait.
+    labs = [lab for lab in labs if lab.is_exercise]
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -508,7 +513,13 @@ def next_lab(
             "next": None if upcoming is None
             else machine.lab_dict(upcoming, scores_data.get(upcoming.id)),
             "all_done": upcoming is None and bool(labs),
-            "remaining": sum(1 for lab in labs if lab.id not in scores_data),
+            # `is_exercise` : un lab `validation` ne recevra jamais de
+            # résultat, donc le compter comme « restant » annonce un travail
+            # qui ne s'achèvera pas. `next` ne le propose déjà pas.
+            "remaining": sum(
+                1 for lab in labs
+                if lab.is_exercise and lab.id not in scores_data
+            ),
         })
         return
     if upcoming is None:
