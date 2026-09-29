@@ -105,10 +105,11 @@ looks for them again:
 | `DSOXLAB_PORTAL_LOCAL` | Set to `1` to accept an `http` `learning.portal_url` **towards localhost only**, for whoever is writing a portal. Off by default, and never a catalogue's decision |
 | `DSOXLAB_OUTSCALE_PROFILE`, `DSOXLAB_AWS_PROFILE` | Credentials profile for those providers |
 
-Two more are **exported by dsoxlab** for the tests of a lab to read, and are not
-meant to be set by hand: `DSOXLAB_TARGET_HOST` (the host the tests must inspect,
-which is how a multi-distro lab tests the target you chose) and
-`DSOXLAB_LAB_SESSION` (the lab id, inside the session `run` opens).
+Three more are **set by dsoxlab** and are not meant to be set by hand:
+`DSOXLAB_TARGET_HOST` (the host the tests must inspect, which is how a
+multi-distro lab tests the target you chose) and `LAB_NO_REPLAY=1`, both exported
+to the pytest run; and `DSOXLAB_LAB_SESSION` (the lab id) inside the session `run`
+opens, which is how `submit` knows it runs inside one.
 
 ---
 

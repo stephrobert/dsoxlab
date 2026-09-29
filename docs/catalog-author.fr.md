@@ -58,7 +58,8 @@ Trois fichiers Markdown, et le moteur lit chacun à un moment différent :
 Seuls les deux premiers sont exigés par le validator de structure. Sans
 `challenge/README.md`, `dsoxlab challenge` affiche *Aucun fichier
 challenge/README.md pour ce lab*. `dsoxlab new lab` ne le crée pas — il écrit
-`README.md`, `scenario.md` et `test_functional.py`, rien d'autre — ce fichier
+`lab.yaml`, `README.md`, `scenario.md`, `test_functional.py` et, pour un lab `vm`,
+`setup.yaml` et `cleanup.yaml` — ce fichier
 est donc à vous.
 
 **Le barème.** dsoxlab note **par test** : cinq `def test_` dans
@@ -243,7 +244,7 @@ répertoire de lab. La préparation est déclarative (`lab.yaml`) ou Ansible
 **5. `fixtures/` et `runtime.fixtures` doivent dire la même chose.** Le runtime
 shell itère sur `runtime.fixtures`, **pas** sur le répertoire `fixtures/` — les
 deux peuvent donc diverger, et les deux sens échouaient en silence. Depuis la
-0.1.84, plus aucun :
+0.1.76 pour `run` et la 0.1.84 pour le validator, plus aucun :
 
 | Situation | Ce qui se passe |
 | --- | --- |

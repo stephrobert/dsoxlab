@@ -141,9 +141,10 @@ it, the whole plan is applied. Shared resources (the network, the base images)
 are handled by Terraform's dependency graph either way.
 
 `dsoxlab doctor` sorts its findings into **two tables**: what is *required for
-this catalog*, and what is merely *informational*. The sort depends on three
-facts only — does the catalog have `vm` labs, which provider is active, which
-providers it declares — never on the domain. A hypervisor this catalog does not
+this catalog*, and what is merely *informational*. The sort depends on four
+facts only — does the catalog have `vm` labs or declare `infra.hosts`, does a lab
+declare `runtime.services` (which makes `docker` required), which provider is
+active, which providers it declares — never on the domain. A hypervisor this catalog does not
 use never shows up in red.
 
 ---

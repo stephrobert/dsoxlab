@@ -108,11 +108,11 @@ ne les cherche à nouveau :
 | `DSOXLAB_PORTAL_LOCAL` | À `1`, accepte une `learning.portal_url` en `http` **vers localhost seulement**, pour qui écrit un portail. Désactivé par défaut, et jamais une décision du catalogue |
 | `DSOXLAB_OUTSCALE_PROFILE`, `DSOXLAB_AWS_PROFILE` | Profil d'identifiants de ces providers |
 
-Deux autres sont **posées par dsoxlab** pour que les tests d'un lab les lisent,
-et ne se règlent pas à la main : `DSOXLAB_TARGET_HOST` (l'hôte que les tests
-doivent inspecter, ce qui permet à un lab multi-distributions de valider la
-cible choisie) et `DSOXLAB_LAB_SESSION` (l'identifiant du lab, dans la session
-ouverte par `run`).
+Trois autres sont **posées par dsoxlab** et ne se règlent pas à la main :
+`DSOXLAB_TARGET_HOST` (l'hôte que les tests doivent inspecter, ce qui permet à un
+lab multi-distributions de valider la cible choisie) et `LAB_NO_REPLAY=1`, toutes
+deux exportées vers pytest ; et `DSOXLAB_LAB_SESSION` (l'identifiant du lab) dans
+la session ouverte par `run`, ce qui permet à `submit` de savoir qu'il y tourne.
 
 ---
 

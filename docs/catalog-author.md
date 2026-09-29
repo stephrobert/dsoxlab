@@ -58,7 +58,8 @@ Three Markdown files, and the engine reads each at a different moment:
 Only the first two are required by the structure validator. Without
 `challenge/README.md`, `dsoxlab challenge` prints *No challenge/README.md file
 found for this lab*. `dsoxlab new lab` does not create it — it writes
-`README.md`, `scenario.md` and `test_functional.py`, and nothing else — so that
+`lab.yaml`, `README.md`, `scenario.md`, `test_functional.py` and, for a `vm` lab,
+`setup.yaml` and `cleanup.yaml` — so that
 file is yours to add.
 
 **The scale.** dsoxlab grades **per test**: five `def test_` in
@@ -236,7 +237,7 @@ lab directory. Preparation is declarative (`lab.yaml`) or Ansible
 **5. `fixtures/` and `runtime.fixtures` must say the same thing.** The shell
 runtime iterates over `runtime.fixtures`, **not** over the `fixtures/`
 directory — so the two can disagree, and both directions used to fail silently.
-Since 0.1.84 neither does:
+Since 0.1.76 for `run` and 0.1.84 for the validator, neither does:
 
 | Situation | What happens |
 | --- | --- |

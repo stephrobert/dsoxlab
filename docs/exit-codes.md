@@ -25,7 +25,7 @@ documented is a contract nobody can read.
 | `2` | `IMPOSSIBLE` | the command could not run: infrastructure not provisioned, provider not packaged, declared fixture missing from disk, required restore point unobtainable, expected file not found | **prepare** something — this is not a mistake in your work |
 | `3` | `TERRAFORM_ABSENT` | Terraform is not installed, so `provision` and `destroy` have no way to act | install it; a pipeline can automate this |
 | `4` | `TERRAFORM_ECHOUE` | Terraform answered, and it failed | read its output; dsoxlab names the causes it recognises, such as a full or missing storage pool |
-| `5` | `ORPHELINS` | a `provision` left orphan domains — defined on the hypervisor, absent from the state — or found some before starting | run the `virsh undefine` line the message prints |
+| `5` | `ORPHELINS` | a `provision` left orphan domains — defined on the hypervisor, absent from the state — found some before starting, or found that another provider still holds machines for this catalog | run the `virsh undefine` line the message prints |
 | `6` | `ORPHELINS_NON_RETIRES` | a `destroy` could not remove those orphans | remove them by hand, then re-run `destroy` |
 | `7` | `VERROU` | another dsoxlab command already holds this repository's lock | **retry** — this is the only code where retrying is right. The message names the process holding it |
 | `8` | `HOTES_INJOIGNABLES` | a `provision` returned without every targeted host answering | `dsoxlab infra status` says which one and why; often more time or more vCPU |

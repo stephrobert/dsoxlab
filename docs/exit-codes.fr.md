@@ -25,7 +25,7 @@ version anglaise. Un code non documenté est un contrat que personne ne peut lir
 | `2` | `IMPOSSIBLE` | la commande n'a pas pu s'exécuter : infrastructure non provisionnée, provider non packagé, fixture déclarée absente du disque, point de reprise exigé impossible, fichier attendu introuvable | **préparer** quelque chose — ce n'est pas une faute dans ton travail |
 | `3` | `TERRAFORM_ABSENT` | Terraform n'est pas installé, donc `provision` et `destroy` n'ont aucun moyen d'agir | l'installer ; un pipeline peut l'automatiser |
 | `4` | `TERRAFORM_ECHOUE` | Terraform a répondu, et il a échoué | lire sa sortie ; dsoxlab nomme les causes qu'il reconnaît, comme un pool de stockage plein ou absent |
-| `5` | `ORPHELINS` | un `provision` a laissé des domaines orphelins — définis sur l'hyperviseur, absents du state — ou en a trouvé avant de commencer | jouer la ligne `virsh undefine` que le message affiche |
+| `5` | `ORPHELINS` | un `provision` a laissé des domaines orphelins — définis sur l'hyperviseur, absents du state —, en a trouvé avant de commencer, ou a constaté qu'un autre provider tient encore des machines de ce catalogue | jouer la ligne `virsh undefine` que le message affiche |
 | `6` | `ORPHELINS_NON_RETIRES` | un `destroy` n'a pas pu retirer ces orphelins | les retirer à la main, puis rejouer `destroy` |
 | `7` | `VERROU` | une autre commande dsoxlab tient déjà le verrou de ce dépôt | **réessayer** — c'est le seul code où réessayer est juste. Le message nomme le processus qui le détient |
 | `8` | `HOTES_INJOIGNABLES` | un `provision` a rendu la main sans que tous les hôtes ciblés répondent | `dsoxlab infra status` dit lequel et pourquoi ; souvent plus de temps ou plus de vCPU |

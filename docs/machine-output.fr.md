@@ -82,7 +82,7 @@ le même objet lab. Il est décrit une fois, ici.
 | `bloc` | entier ou null | le bloc pédagogique, dérivé de la position dans le `meta.yml` |
 | `bloc_order` | entier ou null | le rang dans ce bloc : c'est l'ordre que suit `next` |
 | `level` | chaîne | niveau libre (`l1`, `rhcsa`…) |
-| `type` | chaîne | `lab`, `challenge` ou `capstone` |
+| `type` | chaîne | `lab`, `challenge`, `capstone` ou `validation` |
 | `exam_passing_score` | entier ou null | seuil de réussite, en pourcentage du barème. `null` sur un lab ordinaire |
 | `difficulty` | chaîne ou null | libre, jamais validé |
 | `estimated_time` | chaîne ou null | libre, par exemple `"30m"` |
@@ -255,7 +255,7 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
 | `catalog.id` | chaîne | le `repo.id` du catalogue, ou le nom du répertoire si le `meta.yml` est illisible |
 | `catalog.version` | chaîne ou null | la révision du catalogue — son commit git aujourd'hui, `null` hors d'un dépôt git. Avec elle, un score obtenu sur une version antérieure d'un lab se reconnaît |
 | `results[].catalog` | chaîne | répété sur chaque ligne, pour que des lignes de plusieurs catalogues puissent se fondre |
-| `results[].lab_type` | chaîne ou null | `lab`, `challenge` ou `capstone` ; `null` quand le lab n'existe plus dans le catalogue |
+| `results[].lab_type` | chaîne ou null | `lab`, `challenge` ou `capstone` — jamais `validation`, que l'export écarte ; `null` quand le lab n'existe plus dans le catalogue |
 | `results[].validated` | booléen | **le verdict, énoncé** — voir plus bas |
 | `results[].attempted_at` | chaîne | quand l'apprenant a tenté le lab, ISO 8601, UTC |
 | `results[].exam` | objet ou null | comme dans `scores` |
@@ -472,6 +472,7 @@ les afficher, comme toute entrée externe.
 | `check.ok` | booléen | tous les tests passent |
 | `check.passed` / `total` | entier | tests réussis, tests joués |
 | `check.score` / `max_score` | entier | la note enregistrée dans la base du catalogue |
+| `check.recorded` | booléen | si une note a réellement été mesurée et inscrite : `false` quand aucun test n'a pu tourner (`total` vaut 0), ce qui est une absence de mesure et non un zéro |
 | `check.output` | chaîne | la sortie brute de pytest, où vit le détail d'un échec |
 
 La commande sort en 1 quand `ok` vaut faux, et rend le document quand même.
@@ -605,7 +606,7 @@ Chaque contrôle :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name`, `labs`, `lab_home` |
+| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, et, sur un catalogue à labs `vm`, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `libvirt_pool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
 | `state` | chaîne | `ok`, `failed`, `choice_required` ou `unknown` |
 | `ok` | booléen | la même chose que `state == "ok"`, gardé pour une lecture vert/rouge immédiate |
 | `label` | chaîne | le nom du composant, traduit : pour l'affichage seulement |
