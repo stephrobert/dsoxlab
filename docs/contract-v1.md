@@ -99,7 +99,7 @@ catalogues may declare two different portals; the engine carries no default
 address and no domain of its own.
 
 `https` only. The exception, for whoever is writing a portal: with
-`DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
+`DSOXLAB_PORTAL_LOCAL=1`, an `http` URL towards `localhost`, `127.0.0.1` or
 `[::1]` is accepted — and nothing else, even with the variable set. That
 decision belongs to the machine playing the lab, never to the catalogue.
 

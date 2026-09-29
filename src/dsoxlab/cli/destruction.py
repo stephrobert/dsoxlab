@@ -158,6 +158,15 @@ def destroy(
     if remove_user_ssh_config(repo_meta):
         info(_("ssh_fragment_removed", repo=repo_meta.id))
 
+    # Le socle du catalogue vivait sur ces machines : le marqueur qui dit
+    # « déjà posé » n'a plus de sujet. Le laisser ferait sauter le socle au
+    # prochain `provision`, et les labs tourneraient sur une machine nue —
+    # la panne même que `infra.bootstrap` supprime.
+    from ..services.bootstrap import oublier
+
+    if oublier(repo_meta):
+        info(_("bootstrap_oublie"))
+
     success(_("destroy_done"))
 
 

@@ -101,7 +101,7 @@ looks for them again:
 | `DSOXLAB_LOG` | `DSOXLAB_LOG=debug` is the same as `-vv` |
 | `DSOXLAB_HOST_READY_TIMEOUT` | Seconds to wait for a provisioned host to answer (default 180) |
 | `DSOXLAB_NO_UPDATE_CHECK` | Set to `1` to silence the daily PyPI version check |
-| `DSOXLAB_PORTAIL_LOCAL` | Set to `1` to accept an `http` `learning.portal_url` **towards localhost only**, for whoever is writing a portal. Off by default, and never a catalogue's decision |
+| `DSOXLAB_PORTAL_LOCAL` | Set to `1` to accept an `http` `learning.portal_url` **towards localhost only**, for whoever is writing a portal. Off by default, and never a catalogue's decision |
 | `DSOXLAB_OUTSCALE_PROFILE`, `DSOXLAB_AWS_PROFILE` | Credentials profile for those providers |
 
 Two more are **exported by dsoxlab** for the tests of a lab to read, and are not

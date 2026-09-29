@@ -31,6 +31,9 @@ STRINGS: dict[str, str] = {
         "Foundation already in place and unchanged: nothing to replay.",
     "bootstrap_absent":
         "meta.yml declares infra.bootstrap and the file is not there: {path}",
+    "bootstrap_oublie":
+        "The catalog's foundation is forgotten: the next provision will lay it "
+        "down again.",
     "bootstrap_hors_depot":
         "infra.bootstrap must stay inside the catalog: {path} does not",
     "bootstrap_echoue":

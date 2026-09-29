@@ -77,7 +77,7 @@ validateur :
 | `PORTAIL` | `https` seul | Destination d'une preuve (`learning.portal_url`). Le lien portera des résultats ; en clair, ils s'exposent en chemin |
 
 Le portail porte une exception documentée, pour qui écrit un portail : avec
-`DSOXLAB_PORTAIL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
+`DSOXLAB_PORTAL_LOCAL=1`, une URL en `http` vers `localhost`, `127.0.0.1` ou
 `[::1]` est acceptée. Deux gardes plutôt qu'un — la variable **et** un hôte local
 — parce que `http` vers un hôte distant est autre chose, et parce qu'une variable
 qui voudrait dire « fais-moi confiance pour tout » ne garderait rien. C'est une

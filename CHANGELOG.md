@@ -164,7 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `https` only, through the single policy of #273 — no second parser, no second
   list of schemes. One documented exception, for whoever is writing a portal:
-  with `DSOXLAB_PORTAIL_LOCAL=1`, an `http` URL **towards localhost** is
+  with `DSOXLAB_PORTAL_LOCAL=1`, an `http` URL **towards localhost** is
   accepted, and nothing else even with the variable set. Two guards rather than
   one, and an environment variable rather than a contract field: the machine
   playing the lab decides, never the catalogue.

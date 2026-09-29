@@ -15,9 +15,42 @@ pare-feu — c'est-à-dire qu'ils ne mesuraient plus ce qu'ils prétendaient.
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _journal_sans_survivant() -> Iterator[None]:
+    """Aucun handler de journal ne survit au test qui l'a posé.
+
+    `configurer()` attache un `RotatingFileHandler` sur
+    `XDG_STATE_HOME/dsoxlab/dsoxlab.log`, donc, en test, sur un `tmp_path`.
+    Rien ne le retirait à la fin : pytest supprimait le répertoire, le handler
+    restait accroché à un fichier disparu, et la première écriture suivante
+    faite **hors** d'une invocation CLI — la complétion, par exemple, que Click
+    traite avant le callback racine — sortait en « --- Logging error --- » au
+    milieu de la sortie d'un autre test.
+
+    Et il y a pire que le fichier : le handler de console pointe sur le `stderr`
+    que `CliRunner` remplace pendant l'invocation, puis **referme**. Toute
+    journalisation ultérieure sort alors en « ValueError: I/O operation on
+    closed file », par-dessus la sortie d'un autre test.
+
+    Le symptôme était donc à la fois lointain et dépendant de l'ordre
+    alphabétique des fichiers : le premier test qui invoque la CLI lègue ses
+    handlers aux suivants. Vécu en ajoutant `test_audit_030.py`, qui a pris
+    cette place et fait échouer `test_completion.py`.
+
+    On retire donc les deux, sur le logger que `configurer()` équipe vraiment —
+    `dsoxlab`, et non la racine du logging.
+    """
+    from dsoxlab import logging_setup
+
+    yield
+    logging_setup._retirer_les_notres(logging.getLogger("dsoxlab"))
 
 
 @pytest.fixture(autouse=True)
