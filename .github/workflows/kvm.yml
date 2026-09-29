@@ -114,9 +114,14 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
+          # `ovmf` n'est pas décoratif : le template demande un démarrage EFI, et
+          # sans ce paquet libvirt n'expose aucun loader — `provision` sort alors
+          # en 4 avec « libvirt exposes no usable EFI firmware on this machine ».
+          # C'est le deuxième défaut que ce job a trouvé en tournant, et la
+          # deuxième fois que le message du produit a donné le correctif exact.
           sudo apt-get install -y -qq --no-install-recommends \
             qemu-kvm libvirt-daemon-system libvirt-clients virtinst \
-            dnsmasq-base openssh-client
+            ovmf dnsmasq-base openssh-client
 
           # Même voie que le job « Terraform templates » : l'archive du
           # fournisseur et la somme qu'il publie à côté, plutôt qu'une action
@@ -153,6 +158,9 @@ jobs:
           sudo virsh pool-autostart default || true
           virsh --connect qemu:///system version
           virsh --connect qemu:///system pool-list --all
+          # Les loaders EFI, imprimés : quand l'apply échouera dessus un jour,
+          # c'est la première chose qu'on voudra lire, et elle n'existe plus après.
+          virsh --connect qemu:///system domcapabilities | grep -A2 '<loader' | head -20 || true
 
       - name: Install dsoxlab from this checkout
         if: steps.kvm.outputs.present == 'true'
