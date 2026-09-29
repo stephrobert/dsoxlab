@@ -107,12 +107,6 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Set up Python
-        if: steps.kvm.outputs.present == 'true'
-        uses: actions/setup-python@e9d6f990972a57673cdb72ec29e19d42ba28880f # v6.0.0
-        with:
-          python-version: "3.12"
-
       - name: Install libvirt, QEMU and Terraform
         if: steps.kvm.outputs.present == 'true'
         env:
@@ -162,11 +156,17 @@ jobs:
 
       - name: Install dsoxlab from this checkout
         if: steps.kvm.outputs.present == 'true'
+        # Un venv, et pas `pip install --user` : Ubuntu 24.04 marque son Python
+        # « externally managed » (PEP 668) et refuse toute installation hors
+        # environnement. Le runner porte déjà Python : une action de moins dans
+        # la chaîne d'approvisionnement.
         run: |
           set -euo pipefail
-          python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet .
-          dsoxlab --version
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet --upgrade pip
+          /tmp/venv/bin/pip install --quiet .
+          echo "/tmp/venv/bin" >> "$GITHUB_PATH"
+          /tmp/venv/bin/dsoxlab --version
 
       - name: Write the smallest stack that exercises the template
         if: steps.kvm.outputs.present == 'true'
@@ -180,7 +180,7 @@ jobs:
 
           infra:
             provider: kvm
-            network: ci-kvm-net
+            network: ci-kvm
             cidr: 10.199.42.0/24
             hosts:
               - name: n1.lab
@@ -228,7 +228,7 @@ jobs:
 
           restant="$(virsh --connect qemu:///system list --all --name | grep -c . || true)"
           reseaux="$(virsh --connect qemu:///system net-list --all --name \
-            | grep -c '^ci-kvm-net$' || true)"
+            | grep -c '^ci-kvm$' || true)"
           virsh --connect qemu:///system list --all
           virsh --connect qemu:///system net-list --all
           if [ "${restant}" != "0" ] || [ "${reseaux}" != "0" ]; then
