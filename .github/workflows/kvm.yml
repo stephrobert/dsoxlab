@@ -1,0 +1,293 @@
+# Provisionne une VRAIE machine avec le template `kvm`, puis la détruit.
+#
+# `templates/terraform/kvm/` est le fichier le plus risqué du dépôt : il décide
+# si une VM démarre, et jusqu'ici aucun job ne l'exécutait. Le job « Terraform
+# templates » s'arrête à `validate`, et les cinq « Parcours on … » jouent le
+# parcours sans jamais provisionner. Or le projet a une règle sur ce point :
+# **vérifier, ce n'est pas parser** — `terraform validate` passe sur une
+# configuration que `terraform apply` refuse. C'est ainsi que le défaut du bloc
+# `os` de l'issue #234 a été découvert par un utilisateur, en production.
+#
+# Pourquoi c'est possible, alors qu'on avait affirmé le contraire : les runners
+# Linux hébergés portent `/dev/kvm` depuis avril 2024, annoncé dans le changelog
+# GitHub sur l'accélération matérielle Android.
+#
+# Pourquoi ce job ne peut pas être exigeant : ce n'est **pas documenté comme
+# supporté**. La page des runners ne mentionne ni KVM ni la virtualisation
+# imbriquée, la demande de documentation (actions/runner-images#12933) reste sans
+# réponse, et les retours signalent un `/dev/kvm` parfois absent. D'où la règle
+# qui façonne tout ce fichier :
+#
+#   - `/dev/kvm` absent  → le job le DIT et ne conclut pas au vert. Il ne rend pas
+#     la CI rouge pour une indisponibilité d'infrastructure qui ne nous appartient
+#     pas. C'est exactement l'invariant du lot #172 → #179 : un contrôle qui n'a
+#     pas pu regarder ne conclut jamais au succès ;
+#   - `/dev/kvm` présent → il provisionne pour de vrai, et tout échec est un
+#     échec du produit.
+#
+# Ce job n'est donc PAS un « required status check » tant que GitHub ne garantit
+# pas cette présence.
+#
+# Le filtre de chemins est délibéré : un provisionnement tire une image cloud de
+# plusieurs centaines de mégaoctets, et le faire sur une PR qui touche une
+# traduction coûterait sans rien apprendre. `workflow_dispatch` reste là pour le
+# jouer à la demande.
+
+name: KVM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/dsoxlab/templates/terraform/kvm/**"
+      - "src/dsoxlab/templates/cloud-init/**"
+      - "src/dsoxlab/infra/**"
+      - "src/dsoxlab/cli/infrastructure.py"
+      - ".github/workflows/kvm.yml"
+  pull_request:
+    paths:
+      - "src/dsoxlab/templates/terraform/kvm/**"
+      - "src/dsoxlab/templates/cloud-init/**"
+      - "src/dsoxlab/infra/**"
+      - "src/dsoxlab/cli/infrastructure.py"
+      - ".github/workflows/kvm.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: kvm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provision-reel:
+    name: Provision a real VM (kvm)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Une pile d'infrastructure SANS labs : le contrat le permet depuis 0.1.88,
+      # et c'est le plus petit sujet qui exerce vraiment le template.
+      STACK: /tmp/pile-kvm
+      # Debian 13 generic est la plus légère des images packagées. Le
+      # téléchargement domine la durée du job, donc le choix compte.
+      DISTRO: debian13
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ── La mesure qui décide de tout le reste ────────────────────────────────
+      - name: Is /dev/kvm here?
+        id: kvm
+        run: |
+          set -uo pipefail
+          if [ -e /dev/kvm ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            ls -l /dev/kvm
+            echo "KVM is available on this runner."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::/dev/kvm is absent on this runner: nothing was measured."
+            {
+              echo "### KVM: not measured"
+              echo
+              echo "\`/dev/kvm\` was absent on this runner, so the \`kvm\` template"
+              echo "was **not** exercised. This is not a success and not a failure:"
+              echo "GitHub does not document nested virtualization as supported on"
+              echo "Linux runners, and it is sometimes there, sometimes not."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install libvirt, QEMU and Terraform
+        if: steps.kvm.outputs.present == 'true'
+        env:
+          TERRAFORM_VERSION: "1.15.4"
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # `ovmf` n'est pas décoratif : le template demande un démarrage EFI, et
+          # sans ce paquet libvirt n'expose aucun loader — `provision` sort alors
+          # en 4 avec « libvirt exposes no usable EFI firmware on this machine ».
+          # C'est le deuxième défaut que ce job a trouvé en tournant, et la
+          # deuxième fois que le message du produit a donné le correctif exact.
+          # `qemu-utils` porte `qemu-img`, sans lequel libvirt ne crée que des
+          # volumes bruts et tout volume qcow2 du plan échoue. Il n'est qu'une
+          # *recommandation* de `qemu-kvm`, donc `--no-install-recommends` le
+          # laisse dehors — c'est le quatrième défaut trouvé par ce job, et son
+          # message a diagnostiqué la faute en nommant ce drapeau-là.
+          sudo apt-get install -y -qq --no-install-recommends \
+            qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients virtinst \
+            ovmf dnsmasq-base openssh-client
+
+          # Même voie que le job « Terraform templates » : l'archive du
+          # fournisseur et la somme qu'il publie à côté, plutôt qu'une action
+          # tierce de plus dans la chaîne d'approvisionnement.
+          workdir="$(mktemp -d)"
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          asset="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/checksums.txt" \
+            "${base}/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          (cd "${workdir}" && grep " ${asset}$" checksums.txt | sha256sum -c -)
+          unzip -q "${workdir}/${asset}" -d "${workdir}"
+          sudo install -m 0755 "${workdir}/terraform" /usr/local/bin/terraform
+          terraform version
+
+      - name: Open libvirt to the runner account
+        if: steps.kvm.outputs.present == 'true'
+        # Le compte `runner` est ajouté aux groupes, mais l'appartenance n'est
+        # rechargée qu'à l'ouverture d'une session : les steps suivants ne la
+        # verraient pas. On ouvre donc le socket et le device directement.
+        # Un runner est éphémère et n'héberge que ce job : ce qui serait une
+        # faute sur un poste partagé est ici la voie la plus simple qui marche.
+        run: |
+          set -euo pipefail
+          sudo usermod -aG libvirt,kvm "$USER" || true
+          sudo systemctl enable --now libvirtd
+          sudo chmod 0666 /dev/kvm
+          for socket in /var/run/libvirt/libvirt-sock /var/run/libvirt/libvirt-sock-ro; do
+            [ -S "$socket" ] && sudo chmod 0666 "$socket"
+          done
+          # Le pool `default` n'est pas seulement arrêté sur un runner : il n'est
+          # pas DÉFINI. Troisième défaut trouvé par ce job en tournant, et
+          # troisième fois que le message de dsoxlab donne la ligne exacte —
+          # c'est celle-ci, recopiée de sa sortie.
+          if ! sudo virsh pool-info default >/dev/null 2>&1; then
+            sudo virsh pool-define-as default dir --target /var/lib/libvirt/images
+            sudo virsh pool-build default
+          fi
+          sudo virsh pool-start default || true
+          sudo virsh pool-autostart default || true
+          virsh --connect qemu:///system version
+          virsh --connect qemu:///system pool-list --all
+          # Les loaders EFI, imprimés : quand l'apply échouera dessus un jour,
+          # c'est la première chose qu'on voudra lire, et elle n'existe plus après.
+          virsh --connect qemu:///system domcapabilities | grep -A2 '<loader' | head -20 || true
+
+      - name: Install dsoxlab from this checkout
+        if: steps.kvm.outputs.present == 'true'
+        # Un venv, et pas `pip install --user` : Ubuntu 24.04 marque son Python
+        # « externally managed » (PEP 668) et refuse toute installation hors
+        # environnement. Le runner porte déjà Python : une action de moins dans
+        # la chaîne d'approvisionnement.
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet --upgrade pip
+          /tmp/venv/bin/pip install --quiet .
+          echo "/tmp/venv/bin" >> "$GITHUB_PATH"
+          /tmp/venv/bin/dsoxlab --version
+
+      - name: Write the smallest stack that exercises the template
+        if: steps.kvm.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${STACK}"
+          cat > "${STACK}/meta.yml" <<YAML
+          repo:
+            id: ci-kvm
+            title: "CI smoke stack"
+
+          infra:
+            provider: kvm
+            network: ci-kvm
+            cidr: 10.199.42.0/24
+            hosts:
+              - name: n1.lab
+                distro: ${DISTRO}
+                ram_mb: 1024
+                vcpu: 2
+                disk_gb: 6
+          YAML
+          cat "${STACK}/meta.yml"
+          dsoxlab instructor bootstrap --lab-home "${STACK}"
+
+      - name: Diagnose before provisioning
+        if: steps.kvm.outputs.present == 'true'
+        # `doctor` avant l'apply : quand le provisionnement échoue, c'est la
+        # première chose qu'on voudra lire, et elle n'existe plus après.
+        run: dsoxlab doctor --lab-home "${STACK}" || true
+
+      - name: Provision, for real
+        id: provision
+        if: steps.kvm.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          debut="$(date +%s)"
+          dsoxlab provision --lab-home "${STACK}"
+          echo "seconds=$(( $(date +%s) - debut ))" >> "$GITHUB_OUTPUT"
+
+      - name: The domain must run, and the host must answer
+        if: steps.kvm.outputs.present == 'true'
+        # Deux contrôles, parce qu'ils disent deux choses : une adresse n'est pas
+        # une machine, et un domaine défini n'est pas un système qui répond.
+        run: |
+          set -euo pipefail
+          virsh --connect qemu:///system list --all
+          virsh --connect qemu:///system list --name --state-running | grep -q . \
+            || { echo "::error::No running domain after provision."; exit 1; }
+          dsoxlab infra status --lab-home "${STACK}"
+
+      - name: Destroy, and let nothing survive
+        if: steps.kvm.outputs.present == 'true'
+        # Le code 6 existe parce qu'un `destroy` sortait en succès en laissant des
+        # machines debout. Rien ne le couvrait : ce step est ce contrôle.
+        run: |
+          set -euo pipefail
+          dsoxlab destroy --yes --lab-home "${STACK}"
+
+          restant="$(virsh --connect qemu:///system list --all --name | grep -c . || true)"
+          reseaux="$(virsh --connect qemu:///system net-list --all --name \
+            | grep -c '^ci-kvm$' || true)"
+          virsh --connect qemu:///system list --all
+          virsh --connect qemu:///system net-list --all
+          if [ "${restant}" != "0" ] || [ "${reseaux}" != "0" ]; then
+            echo "::error::destroy left ${restant} domain(s) and ${reseaux} network(s) behind."
+            exit 1
+          fi
+          echo "Nothing survived the destroy."
+
+      - name: Report what this cost
+        if: always() && steps.kvm.outputs.present == 'true'
+        # La durée est demandée par l'issue #243, et pour une bonne raison : un
+        # provisionnement tire une image cloud, et ce poids se paie à chaque
+        # exécution. La mesurer est la seule façon de décider, plus tard, si le
+        # job reste à sa place.
+        #
+        # La valeur passe par `env:` et non par une interpolation dans le `run` :
+        # c'est la règle du dépôt, et zizmor la fait respecter même quand la
+        # valeur vient d'un step à nous.
+        env:
+          SECONDES: ${{ steps.provision.outputs.seconds }}
+        run: |
+          {
+            echo "### KVM: measured"
+            echo
+            echo "| What | Value |"
+            echo "| --- | --- |"
+            echo "| Distribution | \`${DISTRO}\` |"
+            echo "| provision | ${SECONDES:-n/a} s |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up whatever is left, even on failure
+        if: always() && steps.kvm.outputs.present == 'true'
+        # Le runner est jeté juste après, donc ceci ne protège rien de durable :
+        # c'est le journal qui compte. Ce qui subsiste ici est ce qu'un
+        # utilisateur aurait trouvé sur sa machine.
+        run: |
+          set -uo pipefail
+          virsh --connect qemu:///system list --all --name | while read -r dom; do
+            [ -n "$dom" ] || continue
+            echo "::warning::Leftover domain: ${dom}"
+            virsh --connect qemu:///system destroy "$dom" || true
+            virsh --connect qemu:///system undefine "$dom" --nvram || true
+          done
