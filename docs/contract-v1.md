@@ -112,6 +112,7 @@ for a secret, and a catalogue gives the engine no orders.
 | Field | Required | Type | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `provider` | no | string **or** list of strings | `kvm` | Providers packaged with the tool: `kvm`, `incus`, `outscale`. A list means the learner chooses. |
+| `bootstrap` | no | string | | Playbook of the **catalogue's foundation**, played once at the end of `provision`, before any lab. See below. |
 | `network` | no | string | — | Network the VMs join, dedicated to this repository. **Its length is bounded**, see below. |
 | `cidr` | no | string | — | Subnet of that network. |
 | `hosts` | no | list of mappings | `[]` | The VMs. See below. |
@@ -142,6 +143,44 @@ base image had been downloaded — on `Numerical result out of range`, which nam
 neither the bridge, nor the limit, nor the field that produced it. Since 0.1.100,
 `dsoxlab provision` refuses before doing any work and `dsoxlab doctor` reports it,
 both naming the computed bridge and the length your network name must fit in.
+
+### `infra.bootstrap` — the catalogue's foundation
+
+Some catalogues need an expensive base before any lab means anything: a kubeadm
+cluster, a populated database, a directory, an artifact registry. That base
+belongs to the **catalogue**, not to any one lab.
+
+```yaml
+infra:
+  provider: [kvm]
+  network: lab-kubernetes
+  cidr: 10.10.50.0/24
+  bootstrap: bootstrap.yaml     # played once, at the end of provision
+  hosts:
+    - name: k8s-cp.lab
+      distro: ubuntu24
+```
+
+The playbook is played **at the end of `provision`**, once the hosts answer, on
+the inventory dsoxlab generates — so it targets `all` or `labenv`, never
+`lab_target`, which belongs to a lab.
+
+| Property | What it means for you |
+| --- | --- |
+| **played once** | its content is fingerprinted; while that fingerprint does not change, `provision` does not replay it |
+| **replayed when it changes** | the only useful thing to do with a foundation that changed |
+| **`provision --bootstrap`** | replays it on demand, for after a partial `destroy` |
+| **must be idempotent** | it is replayed, so it must constate rather than reinstall |
+| **a failure fails `provision`** | exit code `11`. The machines are up and are not usable: the labs assume this base |
+
+**The restore point becomes the right one, for free.** `run` takes it just before
+`setup.yaml`, therefore after the foundation. A lab `reset` now returns to a
+healthy cluster rather than to a bare machine.
+
+Declared and missing on disk? `validate-structure` says so, and `provision`
+refuses to conclude. The path is relative to the repository root; an absolute path
+or one containing `..` is refused — the contract describes a catalogue, it does
+not name files on the machine.
 
 ### `infra.providers.<provider>`
 

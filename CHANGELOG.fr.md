@@ -11,6 +11,45 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **`infra.bootstrap` : le socle d'un catalogue, joué une fois après le
+  provisionnement** (issue #213). Un catalogue Kubernetes doit poser un cluster
+  kubeadm avant que le moindre lab ait un sens — containerd, le dépôt
+  `pkgs.k8s.io`, `kubeadm init`, un CNI, l'attente du nœud `Ready`. Plusieurs
+  minutes, et cette base appartient au **catalogue**, à aucun lab en particulier.
+
+  Il n'existait aucun point d'accroche après le provisionnement, donc chaque
+  `setup.yaml` devait inclure `../../shared/kubeadm-cluster.yml`. Ça marchait, et
+  ça coûtait trois choses : un auteur peut l'oublier, et son lab échoue alors sur
+  une machine nue sans que le message dise pourquoi ; le chemin relatif couple le
+  lab à sa profondeur dans `labs/`, donc réorganiser les sections casse tous les
+  `setup.yaml` ; et `reset` rejoue le socle, puisque le point de reprise est pris
+  avant `setup.yaml`.
+
+  ```yaml
+  infra:
+    network: lab-kubernetes
+    bootstrap: bootstrap.yaml     # joué une fois, à la fin de provision
+  ```
+
+  | Propriété | Comment |
+  | --- | --- |
+  | joué **une fois** | son contenu est empreint ; tant que l'empreinte tient, `provision` ne le rejoue pas |
+  | rejoué quand il **change** | la seule chose utile à faire d'un socle qui a changé. C'est le contenu qui décide, pas la date — un `git clone` réécrit toutes les dates |
+  | `provision --bootstrap` | le rejoue sur demande, après un `destroy` partiel |
+  | un échec **fait échouer** `provision` | code de sortie **11** : les machines sont debout et ne sont pas utilisables, puisque les labs supposent cette base |
+  | déclaré et absent | `validate-structure` le dit, et `provision` refuse de conclure — la même règle qu'une fixture déclarée |
+
+  **Le point de reprise devient le bon, et aucune ligne n'a été écrite pour ça.**
+  `run` le prend juste avant `setup.yaml`, donc après le socle : un `reset` de lab
+  ramène désormais à un cluster sain plutôt qu'à une machine nue.
+
+  Le marqueur s'écrit **après** le succès, jamais avant — l'invariant que
+  l'appliance nous a appris à ses frais. Vérifié avec un vrai Ansible : un socle en
+  échec ne laisse rien derrière lui, donc il est rejoué.
+
+  Rien ici ne connaît Kubernetes. Un catalogue dont les labs partagent une base de
+  données peuplée, un annuaire ou un registre d'artefacts rencontre le même mur, et
+  déclare le même champ.
 - **Après `submit`, un lien qui porte le résultat au portail du catalogue**
   (issue #270). Un apprenant ne devrait pas avoir à exporter puis importer à la
   main. Le mécanisme doit rester valable dans WSL, dans VirtualBox, sur une VM

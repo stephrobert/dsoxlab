@@ -63,6 +63,11 @@
             { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
           ]
         },
+        "bootstrap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Playbook of the CATALOGUE's foundation, played once at the end of `provision`, before any lab. Path relative to the repository root. Optional: for a catalogue whose labs share an expensive base (a kubeadm cluster, a populated database, a directory), it replaces the include that every setup.yaml had to carry. It is played on the hosts of the generated inventory, so it targets `all` or `labenv`; it must be replayable without harm, and it is replayed when its content changes."
+        },
         "network": {
           "type": "string",
           "description": "Name of the network the VMs join, dedicated to this repository so several catalogs can coexist."

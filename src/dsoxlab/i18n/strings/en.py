@@ -20,6 +20,25 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Infra provider to activate (e.g. kvm, outscale, incus). "
         "Overridden by DSOXLAB_PROVIDER. Persisted across commands.",
+    "opt_provision_bootstrap":
+        "Replay the catalog's foundation (infra.bootstrap) even if it is already "
+        "in place",
+    "bootstrap_starting":
+        "Setting up the catalog's foundation ({playbook}) on {count} host(s)…",
+    "bootstrap_done":
+        "Foundation in place ({playbook}). The labs can now assume it.",
+    "bootstrap_a_jour":
+        "Foundation already in place and unchanged: nothing to replay.",
+    "bootstrap_absent":
+        "meta.yml declares infra.bootstrap and the file is not there: {path}",
+    "bootstrap_hors_depot":
+        "infra.bootstrap must stay inside the catalog: {path} does not",
+    "bootstrap_echoue":
+        "The catalog's foundation failed: {error}",
+    "bootstrap_echoue_suite":
+        "The machines are up, and they are not usable as they stand: the labs "
+        "assume this foundation. Read the play above, then replay it with "
+        "dsoxlab provision --bootstrap.",
     "opt_provision_host":
         "Target a single VM (fqdn from meta.yml). Repeatable. When omitted, "
         "applies the whole plan. Shared resources (network, base images) are "
@@ -727,6 +746,8 @@ Each lab declares:
                        provisioning are still defined on the hypervisor, and
                        names the command that removes them.
     [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
+    [dim]--bootstrap[/dim]           Replay the catalog's foundation ([dim]infra.bootstrap[/dim])
+                       even if it is already in place.
 
   [cyan]status [lab][/cyan]         Where the active lab stands, or the one you name:
                        [bold]not started[/bold], [bold]ready[/bold], [bold]in progress[/bold], [bold]validated[/bold], or
@@ -1611,6 +1632,10 @@ silent.
     "interrupted_hosts_wait":
         "Interrupted while waiting for the machines to answer over SSH. "
         "The infrastructure itself is up.",
+    "interrupted_bootstrap":
+        "Interrupted while setting up the catalog's foundation. The machines are "
+        "up, and the foundation is not recorded: dsoxlab provision picks it up "
+        "here.",
     "interrupted_tests":
         "Interrupted: the tests were stopped. Nothing was recorded, so this "
         "run costs you no score.",

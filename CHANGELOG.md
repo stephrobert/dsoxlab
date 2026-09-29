@@ -11,6 +11,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`infra.bootstrap`: a catalogue's foundation, played once after provisioning**
+  (issue #213). A Kubernetes catalogue must lay down a kubeadm cluster before any
+  lab means anything — containerd, the `pkgs.k8s.io` repository, `kubeadm init`,
+  a CNI, waiting for the node to be `Ready`. Several minutes, and that base
+  belongs to the **catalogue**, not to any one lab.
+
+  There was no hook after provisioning, so every `setup.yaml` had to include
+  `../../shared/kubeadm-cluster.yml`. It worked, and it cost three things: an
+  author can forget it, and their lab then fails on a bare machine without the
+  message saying why; the relative path couples the lab to its depth under
+  `labs/`, so reorganising sections breaks every `setup.yaml`; and `reset`
+  replays the foundation, since the restore point is taken before `setup.yaml`.
+
+  ```yaml
+  infra:
+    network: lab-kubernetes
+    bootstrap: bootstrap.yaml     # played once, at the end of provision
+  ```
+
+  | Property | How |
+  | --- | --- |
+  | played **once** | its content is fingerprinted; while the fingerprint holds, `provision` does not replay it |
+  | replayed when it **changes** | the only useful thing to do with a foundation that changed. The content decides, not the date — a `git clone` rewrites every date |
+  | `provision --bootstrap` | replays it on demand, after a partial `destroy` |
+  | a failure **fails** `provision` | exit code **11**: the machines are up and are not usable, because the labs assume this base |
+  | declared and missing | `validate-structure` says so, and `provision` refuses to conclude — the same rule as a declared fixture |
+
+  **The restore point becomes the right one, and no line was written for it.**
+  `run` takes it just before `setup.yaml`, therefore after the foundation: a lab
+  `reset` now returns to a healthy cluster rather than to a bare machine.
+
+  The marker is written **after** a success, never before — the invariant the
+  appliance taught us the hard way. Verified with a real Ansible run: a failing
+  foundation leaves nothing behind, so it is replayed.
+
+  Nothing here knows Kubernetes. A catalogue whose labs share a populated
+  database, a directory or an artifact registry hits the same wall, and declares
+  the same field.
 - **After `submit`, a link that carries the result to the catalogue's portal**
   (issue #270). A learner should not have to export then import by hand. The
   mechanism has to keep working in WSL, in VirtualBox, on a remote VM over SSH

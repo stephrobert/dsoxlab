@@ -91,6 +91,14 @@ class ExitCode(IntEnum):
     #: certitude est plus forte qu'une ignorance.
     DOCTOR_INDETERMINE = 10
 
+    #: Le socle du catalogue (``infra.bootstrap``) a échoué, ou son playbook est
+    #: déclaré et introuvable. L'infrastructure est debout, et elle n'est pas
+    #: utilisable : les labs supposent cette base. Distinct de
+    #: ``HOTES_INJOIGNABLES`` parce que les machines répondent — ce qui manque
+    #: est au-dessus d'elles — et distinct de ``IMPOSSIBLE`` parce qu'un
+    #: `provision` a bel et bien créé quelque chose qu'il faudra retirer.
+    BOOTSTRAP_ECHOUE = 11
+
     #: Un exécutable attendu est introuvable dans le ``PATH``. 127 est le code
     #: que le shell rend lui-même dans ce cas : l'outil dit donc la même chose
     #: que son environnement, ce qu'un script sait déjà interpréter.

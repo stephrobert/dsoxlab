@@ -86,6 +86,7 @@ class Stage(StrEnum):
     ANSIBLE = "ansible"
     SERVICES = "services"
     HOSTS_WAIT = "hosts_wait"
+    BOOTSTRAP = "bootstrap"
     TESTS = "tests"
     SESSION = "session"
     UNKNOWN = "unknown"
