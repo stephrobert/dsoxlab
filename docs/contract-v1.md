@@ -153,7 +153,7 @@ belongs to the **catalogue**, not to any one lab.
 ```yaml
 infra:
   provider: [kvm]
-  network: lab-kubernetes
+  network: lab-k8s
   cidr: 10.10.50.0/24
   bootstrap: bootstrap.yaml     # played once, at the end of provision
   hosts:

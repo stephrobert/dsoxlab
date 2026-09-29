@@ -74,6 +74,7 @@ script should branch on the page rather than on this excerpt.
 | `7` | Another dsoxlab command already holds this catalog's write lock. The message names it — the only code worth retrying |
 | `8` | `provision` gave up waiting for hosts that never answered: the infrastructure exists, but it is not usable as it stands |
 | `9` / `10` | `doctor --strict`: a required check failed, or could not be measured. The first is repaired, the second is measured again |
+| `11` | `provision` played the catalog's foundation (`infra.bootstrap`) and it failed, or it is declared and missing; `provision --bootstrap` replays it |
 | `130` | The command was interrupted (Ctrl-C), and says how to resume |
 
 Every one of them exists because a failure that does not announce itself is

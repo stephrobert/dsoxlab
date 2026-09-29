@@ -40,6 +40,7 @@ elle.
 | `~/.local/state/dsoxlab/<catalog-id>/terraform/<provider>/` | Répertoire de travail et state Terraform | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/cloud-init/` | Templates cloud-init recopiés depuis l'outil pour le provisioning | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/dsoxlab.lock` | Verrou d'écriture de ce catalogue (`flock`) | `XDG_STATE_HOME` |
+| `~/.local/state/dsoxlab/<catalog-id>/bootstrap.json` | Empreinte du socle du catalogue (`infra.bootstrap`) après un passage réussi. `provision` rejoue le playbook quand son contenu ne correspond plus, ou sur `--bootstrap` ; `destroy` retire ce fichier | `XDG_STATE_HOME` |
 | `~/.cache/dsoxlab/<catalog-id>/inventory.json` | Inventaire Ansible généré | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/<catalog-id>/ssh_config` | Configuration OpenSSH générée pour les hôtes du lab | `XDG_CACHE_HOME` |
 | `~/.cache/dsoxlab/version-check.json` | Dernière version vue sur PyPI, et sa date | `XDG_CACHE_HOME` |

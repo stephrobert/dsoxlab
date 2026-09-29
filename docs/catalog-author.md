@@ -160,7 +160,11 @@ translated on one side only is reported; `runtime.targets[].host` and the
 directory is readable in clear text (a catalog without `solution/` is not at
 fault, it made another choice).
 
-`--check-urls` adds the only network control: each `doc_url` must answer.
+`--check-urls` adds the only network control. Each distinct `doc_url` is
+requested once: a `404` is a defect of the lab and fails the command; a URL the
+network never answered for, after three tries, is reported apart
+(`doc_urls_unreachable` in `--json`) and does **not** fail it, since a check that
+could not look concludes nothing.
 
 ### Every key, and what it means
 

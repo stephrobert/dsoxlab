@@ -28,7 +28,7 @@ documented is a contract nobody can read.
 | `5` | `ORPHELINS` | a `provision` left orphan domains — defined on the hypervisor, absent from the state — or found some before starting | run the `virsh undefine` line the message prints |
 | `6` | `ORPHELINS_NON_RETIRES` | a `destroy` could not remove those orphans | remove them by hand, then re-run `destroy` |
 | `7` | `VERROU` | another dsoxlab command already holds this repository's lock | **retry** — this is the only code where retrying is right. The message names the process holding it |
-| `8` | `HOTES_INJOIGNABLES` | a `provision` returned without every targeted host answering | `dsoxlab status` says which one and why; often more time or more vCPU |
+| `8` | `HOTES_INJOIGNABLES` | a `provision` returned without every targeted host answering | `dsoxlab infra status` says which one and why; often more time or more vCPU |
 | `9` | `DOCTOR_REQUIS_KO` | `doctor --strict`: a **required** check failed, and that is established | **repair** what the table names |
 | `10` | `DOCTOR_INDETERMINE` | `doctor --strict`: a required check could not be measured | **measure again** — nothing is concluded, so nothing is validated |
 | `11` | `BOOTSTRAP_ECHOUE` | the catalogue's foundation (`infra.bootstrap`) failed, or its playbook is declared and missing | read the play above, then replay it with `dsoxlab provision --bootstrap`. The machines are up; what is missing sits above them |

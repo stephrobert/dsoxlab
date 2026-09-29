@@ -121,6 +121,7 @@ Chaque page nomme son public dès ses premières lignes, et
 | Je veux… | Lire |
 | --- | --- |
 | Installer dsoxlab, jouer des labs, comprendre ma note | **[Pour l'apprenant](docs/learner.fr.md)** |
+| Remettre un résultat à un portail, ou le garder en fichier | [Pour l'apprenant](docs/learner.fr.md#remettre-votre-résultat) |
 | Jouer des labs sous Windows ou macOS, sans rien installer | **[L'appliance](docs/appliance.fr.md)**, une VM prête à jouer |
 | Écrire mon propre catalogue de labs | **[Pour l'auteur de catalogue](docs/catalog-author.fr.md)**, puis [le contrat v1](docs/contract-v1.fr.md) champ par champ |
 | Monter les machines dont les labs ont besoin | **[Pour le formateur](docs/trainer.fr.md)** |
