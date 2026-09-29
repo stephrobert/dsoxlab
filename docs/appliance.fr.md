@@ -231,6 +231,17 @@ VM.*
 | `dsoxlab doctor` dit qu'il manque la virtualisation imbriquée | elle s'active sur **votre** ordinateur, pas dans la VM | [étape 4](#étape-4--pour-les-labs-vm--activer-la-virtualisation-imbriquée), appliance éteinte |
 | `doctor` dit « RAM : … disponibles pour … déclarés » | la VM est trop petite pour ce catalogue | augmentez sa mémoire, ou jouez les labs `shell` |
 | L'import échoue sur une erreur d'OVF | téléchargement incomplet | revérifiez l'empreinte SHA256 |
+| VMware refuse l'import : « SHA256 digest of file does not match manifest » | un défaut des images **jusqu'à la 0.2.5** — voir plus bas | prenez la 0.3.0 ou une version ultérieure, ou importez avec `ovftool --skipManifestCheck` |
+| VMware dit que l'identifiant d'OS n'est pas supporté et le ramène à « Other (32-bit) » | les mêmes versions | le même correctif ; l'invité reste 64 bits, donc l'appliance fonctionne quand même |
+
+**Sur l'empreinte du manifeste, pour les images jusqu'à la 0.2.5.** Un VMDK
+`streamOptimized` se termine à un marqueur sur lequel son lecteur s'arrête ;
+`qemu-img` laissait après ce marqueur une zone de zéros d'alignement, et
+`ovftool` empreignait donc 64 512 octets de moins que ce que notre manifeste
+déclarait. Le disque était intact : seules les deux lectures divergeaient.
+Mesuré sur le fichier publié, corrigé en 0.3.0, et désormais contrôlé à la
+construction — la fabrique refuse de livrer une image dont l'empreinte du fichier
+n'est pas aussi celle de son flux.
 
 Un rapport vaut mieux qu'un contournement : `dsoxlab support --issue` remplit
 le diagnostic et ouvre l'issue au bon endroit.

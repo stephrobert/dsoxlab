@@ -156,6 +156,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **VMware refused the appliance: the manifest digest was not the one its reader
+  computes** (issue #279). Reported by a user, and confirmed to the byte on the
+  published 0.2.5 image.
+
+  A `streamOptimized` VMDK is a **stream**: its reader follows a chain of
+  512-byte markers and stops at the end marker — `val=0, size=0, type=0`, a
+  zero-filled sector. `qemu-img` does not write a conforming stream: it leaves
+  `gdOffset` at a real offset instead of `0xFFFFFFFFFFFFFFFF`, writes neither
+  footer nor end marker, and pads the file with zeros. The reader takes the first
+  sector of that padding for the end of the stream.
+
+  ```text
+  disk size                    : 436 160 000 bytes
+  last useful byte             : 436 094 621
+  zero sector after it         : 436 094 976
+  bytes after that sector      : 64 512   ← never read by ovftool, counted by us
+  ```
+
+  The disk was intact; only the two readings disagreed. The build now **cuts the
+  file right after that marker** — verified on the published image: `qemu-img
+  check` stays clean and the 20 GiB read back are identical byte for byte — and,
+  more importantly, **refuses to ship an image** whose file digest is not also
+  its stream digest. That check is what stops the defect from leaving again,
+  because it measures the result rather than the intention.
+
+  Why no local check had caught it: the OVA was verified with `tar`, `xmllint`
+  and `sha256sum`, three tools that read a *file*, and imported under VirtualBox,
+  which does not verify the manifest. The recipient reads a *stream*.
+
+  For images already published (≤ 0.2.5): `ovftool --skipManifestCheck`, or the
+  `.qcow2` under KVM, or VirtualBox.
+- **VMware mapped the appliance to "Other (32-bit)"** (issue #279). `ovf:id="96"`
+  is the right CIM value ("Debian 64-Bit"), but the OVF declared neither
+  `vmw:osType` nor a `<Description>`: VMware then finds no OS name — hence the
+  empty identifier in its message — and falls back to a **32-bit** profile for a
+  guest that only exists in 64-bit. Both are now declared, and the OVF still
+  validates against the DMTF schema.
 - **One character in a catalog made the whole catalog unviewable** (issue #273).
   Measured before the fix, on a lab declaring
   `title: "Titre [red]hostile[/red] et [/] non apparié"`:
