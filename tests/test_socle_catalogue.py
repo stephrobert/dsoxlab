@@ -281,15 +281,23 @@ def test_un_catalogue_sans_socle_ne_voit_rien(catalogue: Path) -> None:
 # ── l'option, et le code de sortie ───────────────────────────────────────────
 
 def test_l_option_de_rejeu_existe() -> None:
-    """`--bootstrap` doit être documentée là où on la cherche.
+    """`provision` porte bien `--bootstrap`, et on le demande à la commande.
 
-    `COLUMNS` fixé : sans lui, Rich coupe le nom de l'option au milieu selon la
-    largeur disponible, et le test mesure la largeur du terminal au lieu de
-    l'aide. Vert en local, rouge en CI — la CI avait raison.
+    Deux versions de ce test ont échoué en CI en passant en local, toutes deux
+    parce qu'elles lisaient le **rendu** de `--help` : Rich coupe, aligne et
+    tronque selon une largeur qui ne se reproduit pas d'une machine à l'autre.
+    Un test qui lit un rendu mesure le moteur de rendu autant que son sujet.
+
+    Ce qu'on veut savoir est ailleurs et ne dépend de rien : l'option existe-t-elle
+    sur la commande ?
     """
-    resultat = runner.invoke(app, ["provision", "--help"], env={"COLUMNS": "200"})
+    import typer.main
 
-    assert "--bootstrap" in resultat.output
+    commande = typer.main.get_command(app)
+    provision = commande.commands["provision"]  # type: ignore[attr-defined]
+    noms = {nom for param in provision.params for nom in param.opts}
+
+    assert "--bootstrap" in noms, sorted(noms)
 
 
 def test_le_code_de_sortie_du_socle_est_stable() -> None:
