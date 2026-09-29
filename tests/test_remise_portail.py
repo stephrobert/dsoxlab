@@ -247,11 +247,14 @@ def test_l_hote_est_nomme_a_part_du_lien(
     _proposer_la_remise(catalogue, _lab(catalogue))
     sortie = capsys.readouterr().out
 
-    # Sur sa propre ligne, et par égalité : chercher l'hôte comme sous-chaîne
-    # du lien serait la forme même de la validation d'URL que ce projet refuse.
+    # Par ÉGALITÉ, sur une ligne entière : un `in` laisserait passer
+    # `formation.example.org.attaquant.test`, et c'est la forme même de la
+    # validation d'URL par sous-chaîne que ce projet refuse — CodeQL la signale,
+    # à juste titre, jusque dans un test.
+    hote = urlparse(PORTAIL).hostname
     lignes = [ligne.strip() for ligne in sortie.splitlines()]
-    assert "formation.example.org" in lignes, sortie
-    assert urlparse(_lien_dans(sortie)).hostname == "formation.example.org"
+    assert any(ligne == hote for ligne in lignes), sortie
+    assert urlparse(_lien_dans(sortie)).hostname == hote
 
 
 def test_le_texte_dit_que_rien_n_est_envoye(
