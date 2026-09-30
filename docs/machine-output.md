@@ -79,7 +79,7 @@ same lab object. It is described once here.
 | `bloc` | int or null | the teaching block, derived from the position in `meta.yml` |
 | `bloc_order` | int or null | the rank inside that block — `next` follows this order |
 | `level` | string | free-form level (`l1`, `rhcsa`, …) |
-| `type` | string | `lab`, `challenge` or `capstone` |
+| `type` | string | `lab`, `challenge`, `capstone` or `validation` |
 | `exam_passing_score` | int or null | pass mark, as a percentage of the scale. `null` on an ordinary lab |
 | `difficulty` | string or null | free-form, never validated |
 | `estimated_time` | string or null | free-form, e.g. `"30m"` |
@@ -252,7 +252,7 @@ chronological order, with nothing left for the reader to work out.
 | `catalog.id` | string | the catalog's `repo.id`, or the directory name if `meta.yml` cannot be read |
 | `catalog.version` | string or null | the catalog's revision — its git commit today, `null` outside a git repository. With it, a score earned on an earlier version of a lab can be told apart |
 | `results[].catalog` | string | repeated on every line, so lines from several catalogs can be merged |
-| `results[].lab_type` | string or null | `lab`, `challenge` or `capstone`; `null` when the lab no longer exists in the catalog |
+| `results[].lab_type` | string or null | `lab`, `challenge` or `capstone` — never `validation`, which the export excludes; `null` when the lab no longer exists in the catalog |
 | `results[].validated` | bool | **the verdict, stated** — see below |
 | `results[].attempted_at` | string | when the learner attempted the lab, ISO 8601, UTC |
 | `results[].exam` | object or null | as in `scores` |
@@ -458,6 +458,7 @@ external input.
 | `check.ok` | bool | every test passed |
 | `check.passed` / `total` | int | tests passed, tests run |
 | `check.score` / `max_score` | int | the mark recorded in the catalog database |
+| `check.recorded` | bool | whether a mark was actually measured and written: `false` when no test could run (`total` is 0), which is an absence of measurement and not a zero |
 | `check.output` | string | pytest's raw output, where the detail of a failure lives |
 
 The command exits 1 when `ok` is false, and still prints the document.
@@ -591,7 +592,7 @@ Each check:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `provider`, `kvm`, `incus`, `terraform`, `ansible`, `libvirt_pool`, `iso_tool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name`, `labs`, `lab_home` |
+| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, and, on a catalog with `vm` labs, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `libvirt_pool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
 | `state` | string | `ok`, `failed`, `choice_required`, or `unknown` |
 | `ok` | bool | the same thing as `state == "ok"`, kept for a plain green/red reading |
 | `label` | string | the component's name, translated — for display only |

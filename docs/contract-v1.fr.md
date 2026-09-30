@@ -170,7 +170,7 @@ sur l'inventaire que dsoxlab génère — il cible donc `all` ou `labenv`, jamai
 
 | Propriété | Ce que cela veut dire pour vous |
 | --- | --- |
-| **joué une fois** | son contenu est empreint ; tant que cette empreinte ne change pas, `provision` ne le rejoue pas |
+| **joué une fois** | le contenu du **fichier** playbook est empreint ; tant que cette empreinte tient, `provision` ne le rejoue pas. Un rôle ou un `import_playbook` qu'il tire ne change rien à l'empreinte : `provision --bootstrap` est alors la voie pour le rejouer |
 | **rejoué quand il change** | la seule chose utile à faire d'un socle qui a changé |
 | **`provision --bootstrap`** | le rejoue sur demande, après un `destroy` partiel par exemple |
 | **doit être idempotent** | il est rejoué, donc il doit constater plutôt que réinstaller |

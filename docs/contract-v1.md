@@ -167,7 +167,7 @@ the inventory dsoxlab generates — so it targets `all` or `labenv`, never
 
 | Property | What it means for you |
 | --- | --- |
-| **played once** | its content is fingerprinted; while that fingerprint does not change, `provision` does not replay it |
+| **played once** | the playbook **file**'s content is fingerprinted; while that fingerprint holds, `provision` does not replay it. A role or an `import_playbook` it pulls in changes nothing in the fingerprint, so `provision --bootstrap` is the way to replay after such a change |
 | **replayed when it changes** | the only useful thing to do with a foundation that changed |
 | **`provision --bootstrap`** | replays it on demand, for after a partial `destroy` |
 | **must be idempotent** | it is replayed, so it must constate rather than reinstall |

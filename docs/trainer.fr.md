@@ -146,8 +146,9 @@ Terraform.
 
 `dsoxlab doctor` range ses constats en **deux tableaux** : ce qui est *requis
 pour ce catalogue*, et ce qui n'est qu'*informatif*. Le classement ne dépend que
-de trois faits, jamais du domaine : le catalogue a-t-il des labs `vm`, quel
-provider est actif, quels providers déclare-t-il. Un hyperviseur que ce
+de quatre faits, jamais du domaine : le catalogue a-t-il des labs `vm` ou
+déclare-t-il `infra.hosts`, un lab déclare-t-il `runtime.services` (ce qui rend
+`docker` requis), quel provider est actif, quels providers déclare-t-il. Un hyperviseur que ce
 catalogue n'utilise pas n'apparaît jamais en rouge.
 
 ---
