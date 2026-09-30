@@ -49,10 +49,36 @@ chown -R student:student /home/student
 rm -rf /var/log/installer /var/cache/debconf/*-old
 find /var/log -type f -exec truncate -s 0 {} +
 
-# Garde-fou : un seul noyau doit rester. Deux noyaux pèsent 170 Mio bruts, et le
-# cas arrive dès qu'un `full-upgrade` en installe un plus récent.
+# Les anciens noyaux. Le cas arrive dès que Debian publie un noyau entre la
+# gravure de l'ISO et le build : l'installateur pose le sien, le `full-upgrade`
+# en ajoute un plus récent, et les deux restent. `apt-get autoremove` ci-dessus
+# n'y change rien — il ne retire que les paquets marqués « automatiques », et
+# l'installateur installe le noyau EXPLICITEMENT.
+#
+# Le build de la 0.3.0 est mort là-dessus, sur le garde-fou qui suit : il
+# refusait au lieu de corriger, alors que le geste est mécanique. On garde le
+# noyau le plus récent — celui qui bootera — et on purge les autres, y compris
+# celui en cours d'exécution le cas échéant : il est en mémoire, et cette
+# machine va s'éteindre.
+garder="$(ls -1 /boot/vmlinuz-* | sed 's#.*/vmlinuz-##' | sort -V | tail -1)"
+a_purger=()
+while read -r paquet; do
+  [ -n "$paquet" ] || continue
+  [ "$paquet" = "linux-image-${garder}" ] && continue
+  a_purger+=("$paquet")
+done < <(dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 2>/dev/null || true)
+
+if [ "${#a_purger[@]}" -gt 0 ]; then
+  echo "noyau gardé : ${garder} — retirés : ${a_purger[*]}"
+  apt-get -y purge "${a_purger[@]}"
+  apt-get -y autoremove --purge
+fi
+
+# Le garde-fou, maintenant qu'il porte sur le RÉSULTAT et non sur l'intention :
+# deux noyaux pèsent 170 Mio bruts, et une image lourde est ce que
+# l'utilisateur télécharge.
 test "$(ls /boot/vmlinuz-* | wc -l)" -eq 1 \
-  || { echo "plus d'un noyau installé : l'image serait inutilement lourde" >&2; exit 1; }
+  || { echo "plus d'un noyau après nettoyage : $(ls /boot/vmlinuz-*)" >&2; exit 1; }
 
 # La swap n'est ni un système de fichiers ni de l'espace libre : ni `fstrim` ni un
 # remplissage par zéros ne la touchent, et elle peut contenir jusqu'à 100 Mio de
