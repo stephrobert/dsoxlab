@@ -9,6 +9,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.3.0] - 2026-09-30
 
+### Corrigé
+
+- **La fabrique de l'appliance refusait au lieu de nettoyer** (build de cette
+  release même). Debian a publié un noyau entre l'ISO et le build : l'installateur
+  pose le sien **explicitement**, donc `apt-get autoremove` n'y touche jamais, et
+  le `full-upgrade` en ajoute un plus récent à côté. Le script de nettoyage
+  sortait alors en 1 sur son propre garde-fou — « plus d'un noyau installé » — qui
+  avait raison sur le poids (170 Mio) et tort sur le geste. Il garde désormais le
+  noyau qui bootera, purge les autres, et le garde-fou porte sur le **résultat**.
+
 ### Ajouté
 
 - **`infra.bootstrap` : le socle d'un catalogue, joué une fois après le

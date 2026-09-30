@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-09-30
 
+### Fixed
+
+- **The appliance build refused instead of cleaning up** (build of this very
+  release). Debian published a kernel between the ISO and the build: the
+  installer lays down its own **explicitly**, so `apt-get autoremove` never
+  touches it, and `full-upgrade` adds a newer one beside it. The cleanup script
+  then exited 1 on its own guard — « more than one kernel installed » — which was
+  right about the weight (170 MiB) and wrong about what to do. It now keeps the
+  kernel that will boot, purges the others, and the guard checks the **result**.
+
 ### Added
 
 - **`infra.bootstrap`: a catalogue's foundation, played once after provisioning**
