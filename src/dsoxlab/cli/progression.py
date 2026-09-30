@@ -148,7 +148,16 @@ def submit(
     except Interrupted as exc:
         _interrompu(exc, f"dsoxlab submit {lab.id}")
 
-    if result.ok:
+    # « Submission recorded » n'est vrai que si quelque chose a été enregistré.
+    # Deux cas où rien ne l'est, et où l'annoncer trompait : un lab `validation`,
+    # qui défend un guide et ne note personne, et une exécution qui n'a mesuré
+    # aucun test — un `conftest.py` qui lève, une machine injoignable. `check`
+    # disait déjà le premier ; `submit` l'affirmait au contraire.
+    if not lab.is_exercise:
+        info(_("check_validation_sans_note"))
+    elif not a_mesure(result):
+        warn(_("submit_sans_mesure", total=result.total))
+    elif result.ok:
         success(_("submit_success", score=score, max_score=max_score))
     else:
         info(_("submit_partial", passed=result.passed, total=result.total, score=score, max_score=max_score))
@@ -357,7 +366,10 @@ def export(
     except IdentifiantRefuse as refus:
         error(_("export_identifiant_refuse", field=refus.champ,
                 reason=_(refus.cle, **refus.params)))
-        info(_("export_identifiant_refuse_suite"))
+        # `note` et non `info` : `export` rend un document, et une erreur dure
+        # doit laisser la sortie standard VIDE. Un conseil sur stdout suffit à
+        # casser le `json.loads` de l'appelant.
+        note(_("export_identifiant_refuse_suite"))
         raise typer.Exit(1) from None
     except PreuveIntrouvable as absence:
         error(_(absence.cle, lab_id=texte_affichable(absence.lab_id)))
