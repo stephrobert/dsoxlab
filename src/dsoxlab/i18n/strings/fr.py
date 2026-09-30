@@ -966,6 +966,10 @@ hors ligne, elle se tait.
     "check_tip_submit":   "Score sauvegardé. Lancez [bold]dsoxlab submit[/bold] pour valider définitivement et terminer la session.",
     "submit_success":     "Soumission enregistrée : [green]{score}/{max_score} pts[/green]. Tous les tests sont passés.",
     "submit_partial":     "Soumission enregistrée : [yellow]{score}/{max_score} pts[/yellow] ({passed}/{total} tests réussis). Corrigez et soumettez à nouveau si besoin.",
+    "submit_sans_mesure":
+        "Aucun test n'a pu tourner, donc rien n'a été enregistré : une absence "
+        "de mesure n'est pas une note de zéro. Lisez la sortie ci-dessus, puis "
+        "soumettez à nouveau.",
     "submit_exit_cta":    "[bold green]\u2714 Tentative sauvegardée.[/bold green] Tapez [bold]exit[/bold] pour revenir à votre répertoire d'origine.",
     "submit_done":        "[bold green]\u2714 Tentative sauvegardée.[/bold green] Vous pouvez enchaîner avec [bold]dsoxlab run <lab>[/bold] ou libérer l'infra avec [bold]dsoxlab destroy[/bold].",
 

@@ -168,7 +168,11 @@ def infra_status(
     hotes: list[dict[str, Any]] = []
     if not as_json:
         info(_("status_checking", count=len(hosts_dict)))
-    if bastion:
+    # `not as_json` comme la ligne au-dessus : la première règle de la sortie
+    # machine est que rien d'autre que le document n'atteigne la sortie standard.
+    # Ce message y échappait, et un « ℹ » en tête de flux rend un document
+    # illisible pour l'appelant — le défaut même que cette règle prévient.
+    if bastion and not as_json:
         info(_("status_via_bastion",
                bastion=bastion["fqdn"] or bastion["public_ip"]))
 

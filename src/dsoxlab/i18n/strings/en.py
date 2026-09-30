@@ -954,6 +954,9 @@ silent.
     "check_tip_submit":    "Score saved. Run [bold]dsoxlab submit[/bold] to record your final attempt and end the session.",
     "submit_success":      "Submission recorded: [green]{score}/{max_score} pts[/green]. All tests passed.",
     "submit_partial":      "Submission recorded: [yellow]{score}/{max_score} pts[/yellow] ({passed}/{total} tests passed). Fix and re-submit if needed.",
+    "submit_sans_mesure":
+        "No test could run, so nothing was recorded: an absence of measurement "
+        "is not a score of zero. Read the output above, then submit again.",
     "submit_exit_cta":     "[bold green]\u2714 Attempt saved.[/bold green] Type [bold]exit[/bold] to return to your original directory.",
     "submit_done":         "[bold green]\u2714 Attempt saved.[/bold green] Continue with [bold]dsoxlab run <lab>[/bold] or release the infra with [bold]dsoxlab destroy[/bold].",
 

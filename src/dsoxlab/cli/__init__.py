@@ -91,7 +91,7 @@ _ORDRE_COMMANDES = (
 )
 
 #: Même chose pour les sous-applications.
-_ORDRE_GROUPES = ("instructor", "completion", "catalog", "infra")
+_ORDRE_GROUPES = ("new", "instructor", "completion", "catalog", "infra")
 
 
 def _rang(nom: str | None, ordre: tuple[str, ...]) -> int:
