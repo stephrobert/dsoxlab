@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The appliance images were named after the branch, not the version** (build of
+  this release). A `workflow_dispatch` — the way a missed build is caught up —
+  runs on `main`, and the images were therefore called
+  `dsoxlab-appliance-main.ova`. They attached to the right Release all the same,
+  so the documentation announced a file nobody could find. The name now comes
+  from the **tag being targeted**, which is also what the attach step already
+  used.
 - **The appliance build refused instead of cleaning up** (build of this very
   release). Debian published a kernel between the ISO and the build: the
   installer lays down its own **explicitly**, so `apt-get autoremove` never
