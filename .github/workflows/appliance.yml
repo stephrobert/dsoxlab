@@ -55,6 +55,13 @@ jobs:
       # `/` has ~14 GB free on a runner, `/mnt` has ~70. Building anywhere else
       # dies on disk space, twenty minutes in.
       BUILD_DIR: /mnt/appliance
+      # Le nom des images vient du TAG VISÉ, et non de la ref qui porte le build.
+      # Sur un `push` de tag les deux coïncident ; sur un `workflow_dispatch` —
+      # celui qui sert à rattraper un build manqué — le job tourne sur `main`, et
+      # les images s'appelaient alors `dsoxlab-appliance-main.ova`. Elles
+      # s'attachaient pourtant à la bonne Release, si bien que la documentation
+      # annonçait un fichier que personne ne pouvait trouver. Vécu sur la 0.3.0.
+      IMAGE_REF: ${{ inputs.tag || github.ref_name }}
 
     steps:
       - name: Harden the runner
@@ -152,7 +159,7 @@ jobs:
           set -euo pipefail
           packer init .
           packer validate \
-            -var "image_version=${GITHUB_REF_NAME#v}" \
+            -var "image_version=${IMAGE_REF#v}" \
             -var "iso_url=${ISO_URL}" \
             -var "iso_checksum=sha256:${ISO_SUM}" \
             -var "output_directory=${BUILD_DIR}/out" .
@@ -172,7 +179,7 @@ jobs:
           export PACKER_LOG=1
           export PACKER_LOG_PATH="${BUILD_DIR}/packer.log"
           if ! packer build \
-            -var "image_version=${GITHUB_REF_NAME#v}" \
+            -var "image_version=${IMAGE_REF#v}" \
             -var "iso_url=${ISO_URL}" \
             -var "iso_checksum=sha256:${ISO_SUM}" \
             -var "output_directory=${BUILD_DIR}/out" . ; then
@@ -191,7 +198,7 @@ jobs:
         # Verified locally before this workflow existed: the resulting OVA imports
         # into VirtualBox 7.0 ("Successfully imported the appliance"), and the disk
         # comes back byte-identical after the conversion.
-        run: bash packer/faire-ova.sh "${GITHUB_REF_NAME#v}" "${BUILD_DIR}/out"
+        run: bash packer/faire-ova.sh "${IMAGE_REF#v}" "${BUILD_DIR}/out"
 
       - name: The OVF must validate against the DMTF schema
         # VirtualBox imports almost anything; VMware checks. Since the same OVA

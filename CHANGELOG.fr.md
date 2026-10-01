@@ -11,6 +11,12 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Les images de l'appliance étaient nommées d'après la branche et non la
+  version** (build de cette release). Un `workflow_dispatch` — la façon de
+  rattraper un build manqué — tourne sur `main`, et les images s'appelaient donc
+  `dsoxlab-appliance-main.ova`. Elles s'attachaient pourtant à la bonne Release,
+  si bien que la documentation annonçait un fichier introuvable. Le nom vient
+  désormais du **tag visé**, ce que l'étape d'attachement employait déjà.
 - **La fabrique de l'appliance refusait au lieu de nettoyer** (build de cette
   release même). Debian a publié un noyau entre l'ISO et le build : l'installateur
   pose le sien **explicitement**, donc `apt-get autoremove` n'y touche jamais, et
