@@ -53,10 +53,21 @@ systemctl enable qemu-guest-agent
 # pouvait voir le premier démarrage — donc ni savoir si dsoxlab s'installait, ni
 # pourquoi lorsqu'il échouait.
 #
-# `console=tty0` d'abord, `console=ttyS0` ensuite : le noyau écrit sur les deux et
-# la DERNIÈRE reçoit /dev/console, donc l'ordre donne la série à ce qui lit un
-# fichier, sans priver d'affichage celui qui ouvre la fenêtre de sa VM.
-sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"/' \
+# L'ORDRE COMPTE, ET IL ÉTAIT À L'ENVERS. Le noyau écrit ses messages sur TOUTES
+# les consoles déclarées, mais `/dev/console` — celle où écrit l'espace
+# utilisateur — est la DERNIÈRE de la liste. Avec `console=tty0` puis
+# `console=ttyS0`, la première configuration envoyait donc tout son journal sur
+# le port série, et la fenêtre de la VM n'affichait qu'une invite de connexion.
+#
+# Mesuré sur l'appliance 0.3.1, par un utilisateur : « je ne vois pas que la
+# phase d'installation tourne, on voit un login ». Elle tournait, et son service
+# porte bien `StandardOutput=journal+console` : c'est `/dev/console` qui n'était
+# pas là où il regardait.
+#
+# La série vient donc en premier, `tty0` en dernier : la fenêtre reçoit
+# `/dev/console`, et la série garde les messages du noyau pour la CI, pour un
+# formateur à distance et pour qui diagnostique sans écran.
+sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 console=tty0"/' \
   /etc/default/grub
 grep -q '^GRUB_TERMINAL' /etc/default/grub \
   || echo 'GRUB_TERMINAL="console serial"' >> /etc/default/grub

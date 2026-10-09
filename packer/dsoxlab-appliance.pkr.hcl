@@ -87,7 +87,9 @@ source "qemu" "appliance" {
     "preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg ",
     # Locale et clavier sont des variables, non des valeurs figées : cette image
     # sert aussi les catalogues Terraform et Ansible, dont les apprenants ne sont
-    # pas tous francophones.
+    # pas tous francophones. Le clavier vaut `fr` par défaut depuis la 0.3.2 :
+    # l'appliance 0.3.1 arrivait en QWERTY, et `loadkeys fr` n'y trouvait même
+    # pas de disposition française à charger.
     "debian-installer=${var.locale} locale=${var.locale} ",
     "keyboard-configuration/xkb-keymap=${var.keymap} ",
     "hostname=dsoxlab domain=lab ",
@@ -183,6 +185,9 @@ variable "locale" {
 }
 
 variable "keymap" {
-  type    = string
-  default = "us"
+  type = string
+  # AZERTY par défaut : la formation est francophone. Reste une variable,
+  # parce que les catalogues Terraform et Ansible servent aussi des
+  # apprenants qui ne le sont pas — `-var keymap=us` suffit.
+  default = "fr"
 }

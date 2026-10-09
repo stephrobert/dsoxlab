@@ -221,6 +221,8 @@ VM.*
 | Symptom | Most likely cause | What to do |
 | --- | --- | --- |
 | The machine stays on a console, no desktop | the first boot did not complete | it starts over at the next boot: check the VM's network, then restart it |
+| The login prompt appears and nothing seems to happen | the first configuration runs in the background | press **Enter**: the prompt shows the current step. Since 0.3.2 it says so by itself |
+| The keyboard is QWERTY | images **up to 0.3.1** | since 0.3.2 the image ships **AZERTY**. On an earlier image: `sudo apt install console-setup keyboard-configuration && sudo dpkg-reconfigure keyboard-configuration` |
 | "Temporary failure in name resolution" | the VM has no network | **Settings → Network**, adapter 1 enabled, attached to **NAT** |
 | `dsoxlab doctor` reports missing nested virtualization | it is enabled on **your** computer, not inside the VM | [step 4](#step-4--for-vm-labs-enable-nested-virtualization), appliance powered off |
 | `doctor` says "RAM: … available for … declared" | the VM is too small for this catalog | give it more memory, or play `shell` labs |
@@ -285,3 +287,53 @@ runner. It is reproducible: nothing is hand-made in the image.
 - **No automatic update.** `uv tool upgrade dsoxlab` updates the tool inside an
   appliance you already run. Importing a newer image only brings you an updated
   system: dsoxlab itself is installed fresh at every machine's first boot.
+
+---
+
+## Keyboard and language
+
+The image ships a **French AZERTY** keyboard, because the training is French.
+The layout data is in the image: nothing to download, and it works from the
+console before any network.
+
+For another layout, one command:
+
+```bash
+sudo dpkg-reconfigure keyboard-configuration   # then: sudo setupcon
+```
+
+**The system locale stays English**, deliberately: an error message gets
+searched word for word in a search engine. It is the same reason dsoxlab's own
+log is written in English. `fr_FR.UTF-8` is generated in the image all the same,
+so switching does not mean reinstalling:
+
+```bash
+sudo localectl set-locale LANG=fr_FR.UTF-8
+```
+
+And for dsoxlab's own interface, independently of the system:
+
+```bash
+export DSOXLAB_LANG=fr        # or en
+```
+
+---
+
+## Following the first boot
+
+It downloads about 1.5 GB and takes several minutes. It does not block login:
+the prompt appears while it works.
+
+Three ways to know where it stands, from simplest to most precise:
+
+1. **Press Enter at the login prompt.** It shows the current step — `getty`
+   re-reads `/etc/issue` at every prompt.
+2. `journalctl -u dsoxlab-premier-demarrage -f` to follow it live.
+3. `ls -l /var/lib/dsoxlab-premier-demarrage.fait`: that marker exists **only
+   after a complete success**.
+
+**Three signs that it is done**: the machine **reboots by itself**, it comes back
+to a **desktop** rather than a console, and `dsoxlab --version` answers.
+
+On failure, the login prompt names the steps that failed, and nothing is lost:
+everything starts again at the next boot.
