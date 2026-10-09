@@ -125,6 +125,21 @@ def enregistrer_depart(root: Path, lab: LabDefinition) -> None:
     fichier.write_text(contenu + "\n", encoding="utf-8")
 
 
+def repertoire_etat(root: Path, lab_id: str) -> Path:
+    """Le répertoire d'état propre à un lab, hors de son répertoire de travail.
+
+    La préparation d'un lab ``shell`` (``setup.yaml``) y range ce que le
+    harnais doit connaître sans le mettre sous les yeux de l'apprenant :
+    l'incident tiré, les identifiants de référence. ``check`` l'exporte aux
+    tests sous ``LAB_STATE_DIR``. Ce n'est pas un secret, la machine est celle
+    de l'apprenant : c'est une séparation, comme les tests eux-mêmes.
+
+    Il voisine les empreintes ``<lab>.sha256`` sans les heurter : un
+    répertoire au nom du lab, pas un fichier.
+    """
+    return _empreintes_dir(root) / lab_id
+
+
 def _depart_connu(root: Path, lab_id: str) -> str | None:
     fichier = _empreintes_dir(root) / f"{lab_id}.sha256"
     try:
