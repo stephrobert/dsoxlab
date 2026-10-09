@@ -1577,6 +1577,7 @@ silent.
     "err_vm_cleanup_missing":
         "Lab {lab_id} must ship cleanup.yaml at its root (dsoxlab contract "
         "for runtime: vm). Expected file: {path}",
+    "shell_playbook_task": "failed task",
     "err_shell_playbook_failed":
         "{playbook} failed for {lab_id} on localhost (rc={rc}, status={status}). "
         "The lab is not ready: fix the playbook, then run the command again.",

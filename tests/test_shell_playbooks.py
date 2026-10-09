@@ -58,6 +58,7 @@ class _Result:
         self.ok = ok
         self.rc = 0 if ok else 2
         self.status = "successful" if ok else "failed"
+        self.stdout = ""
 
 
 def _espion(monkeypatch: pytest.MonkeyPatch, ok: bool = True) -> list[dict]:
@@ -162,6 +163,38 @@ def test_a_real_setup_writes_into_the_workdir_and_the_state_dir(tmp_path) -> Non
     ShellRuntime().start(lab)
     assert (lab_dir / "challenge" / "work" / "main.tf").read_text() == "# prepared for exam-lab\n"
     assert (repertoire_etat(tmp_path, "exam-lab") / "incident").read_text() == "drift\n"
+
+
+def test_the_failure_names_the_failing_task_and_its_message() -> None:
+    sortie = (
+        "TASK [Prepare the store] ****\n"
+        "ok: [localhost]\n"
+        "TASK [Wait for its address] ****\n"
+        'fatal: [localhost]: FAILED! => {"changed": false, "msg": "Conditionals must have a boolean result."}\n'
+        "PLAY RECAP ****\n"
+    )
+    cause = shell_module.cause_d_echec(sortie)
+    assert "Wait for its address" in cause
+    assert "Conditionals must have a boolean result." in cause
+    assert shell_module.cause_d_echec("PLAY RECAP\nok=3") == ""
+
+
+@pytest.mark.skipif(not ansible_infra.is_available(), reason="ansible-runner or ansible-playbook absent")
+def test_a_real_failing_setup_reports_its_task(tmp_path) -> None:
+    lab_dir = _catalogue(tmp_path)
+    (lab_dir / "setup.yaml").write_text(
+        "- hosts: all\n"
+        "  gather_facts: false\n"
+        "  tasks:\n"
+        "    - name: Refuse on purpose\n"
+        "      ansible.builtin.fail:\n"
+        "        msg: the store is unreachable\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError) as exc:
+        ShellRuntime().start(_lab(lab_dir))
+    assert "Refuse on purpose" in str(exc.value)
+    assert "the store is unreachable" in str(exc.value)
 
 
 def test_check_exports_the_state_dir_to_the_tests(tmp_path) -> None:

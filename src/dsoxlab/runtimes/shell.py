@@ -38,8 +38,10 @@ lab shell qui n'en porte pas se comporte exactement comme avant.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -51,6 +53,30 @@ from ..models.lab import LabDefinition
 from .base import BaseRuntime, EventCallback, SessionSpec
 
 logger = logging.getLogger(__name__)
+
+
+def cause_d_echec(sortie: str) -> str:
+    """La tâche qui a échoué et son message, extraits de la sortie d'Ansible.
+
+    Sans eux, « setup.yaml a échoué (rc=2) » laisse l'auteur comme l'apprenant
+    rejouer le playbook à la main pour savoir ce qui s'est passé : c'est ce
+    qu'a coûté la première préparation d'épreuve (issue #298). Rend une chaîne
+    vide si la sortie ne nomme aucun échec, jamais une supposition.
+    """
+    fatal = None
+    for m in re.finditer(r"^fatal: \[[^\]]+\]: [A-Z]+! => (.*)$", sortie, re.MULTILINE):
+        fatal = m
+    if fatal is None:
+        return ""
+    taches = re.findall(r"^TASK \[(.+?)\]", sortie[: fatal.start()], re.MULTILINE)
+    message = fatal.group(1).strip()
+    try:
+        donnees = json.loads(message)
+        message = str(donnees.get("msg") or donnees.get("stderr") or message)
+    except ValueError:
+        pass
+    tache = taches[-1] if taches else "?"
+    return f"\n  {_('shell_playbook_task')} : {tache}\n  {message[:600]}"
 
 
 class FixtureError(RuntimeError):
@@ -215,7 +241,7 @@ class ShellRuntime(BaseRuntime):
             raise RuntimeError(_(
                 "err_shell_playbook_failed",
                 lab_id=lab.id, playbook=nom, rc=resultat.rc, status=resultat.status,
-            ))
+            ) + cause_d_echec(resultat.stdout))
 
     def _workdir_path(self, lab: LabDefinition) -> Path:
         """Résout ``<lab>/<runtime.workdir>``."""
