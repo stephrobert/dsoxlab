@@ -122,15 +122,55 @@ jobs:
         id: iso
         # The checksum is read from Debian's signed SHA256SUMS rather than pinned
         # here: a hash copied by hand is a hash that rots.
+        #
+        # THREE DEFECTS FIXED HERE, AND THE THIRD IS THE ONE THAT HURT.
+        #
+        # 1. The file was fetched TWICE — once for the name, once for the sum —
+        #    which doubled the exposure to a network that can always fail.
+        #    Fetched once, parsed twice.
+        # 2. No retry, and no connect timeout: a single refused connection
+        #    killed the job.
+        # 3. A single mirror. On 2026-10-09 the v0.3.1 build died right here:
+        #    `curl: (28) Failed to connect to cdimage.debian.org port 443 after
+        #    135168 ms`. Nothing in this repository had changed; the release
+        #    itself was fine, published on PyPI, and the appliance images were
+        #    simply never built. An external dependency with no fallback is a
+        #    single point of failure, however well the rest is pinned.
+        #
+        # The fallbacks are the official Debian primary mirrors, in the order
+        # Debian itself lists them. A mirror that answers with a SHA256SUMS that
+        # does not match its own ISO is impossible: the file is the mirror's.
         run: |
           set -euo pipefail
-          base="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd"
-          name="$(curl -fsSL "$base/SHA256SUMS" | grep -oE 'debian-[0-9.]+-amd64-netinst\.iso' | head -1)"
-          sum="$(curl -fsSL "$base/SHA256SUMS" | grep " $name\$" | cut -d' ' -f1)"
-          test -n "$name" && test -n "$sum"
-          echo "url=$base/$name" >> "$GITHUB_OUTPUT"
-          echo "sum=$sum" >> "$GITHUB_OUTPUT"
-          echo "ISO : $name"
+          miroirs=(
+            "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd"
+            "https://saimei.ftp.acc.umu.se/debian-cd/current/amd64/iso-cd"
+            "https://gemmei.ftp.acc.umu.se/debian-cd/current/amd64/iso-cd"
+          )
+          sommes=""
+          for base in "${miroirs[@]}"; do
+            echo "miroir : ${base}"
+            if sommes="$(curl -fsSL --connect-timeout 20 --max-time 120 \
+                              --retry 4 --retry-delay 5 --retry-all-errors \
+                              "${base}/SHA256SUMS")"; then
+              retenu="${base}"
+              break
+            fi
+            echo "::warning::${base} ne répond pas, miroir suivant"
+            sommes=""
+          done
+          test -n "${sommes}" || {
+            echo "::error::aucun miroir Debian n'a répondu : ${miroirs[*]}"
+            exit 1
+          }
+
+          name="$(printf '%s\n' "${sommes}" | grep -oE 'debian-[0-9.]+-amd64-netinst\.iso' | head -1)"
+          sum="$(printf '%s\n' "${sommes}" | grep " ${name}\$" | cut -d' ' -f1)"
+          test -n "${name}" || { echo "::error::aucune ISO netinst dans SHA256SUMS"; exit 1; }
+          test -n "${sum}" || { echo "::error::aucune empreinte pour ${name}"; exit 1; }
+          echo "url=${retenu}/${name}" >> "$GITHUB_OUTPUT"
+          echo "sum=${sum}" >> "$GITHUB_OUTPUT"
+          echo "ISO : ${name} (depuis ${retenu})"
 
       - name: Prepare the build directory on /mnt
         # `/mnt` has the space (~70 GB against ~14 on `/`), but it belongs to

@@ -7,6 +7,21 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Corrigé
+
+- **Le build de l'appliance mourait sur un seul miroir injoignable** (build de
+  la v0.3.1). Sa première requête réseau résout l'ISO netinst Debian et son
+  empreinte depuis `cdimage.debian.org` ; cet hôte n'a rien répondu pendant
+  135 secondes, et le job s'est arrêté là — avant Packer, avant tout ce que ce
+  dépôt maîtrise. La release, elle, était bonne et publiée sur PyPI : seules les
+  images n'ont jamais été construites. L'étape récupère maintenant `SHA256SUMS`
+  **une fois** au lieu de deux, réessaie avec un délai de connexion, et bascule
+  sur les autres miroirs primaires de Debian. Une dépendance externe sans
+  solution de repli est un point de défaillance unique, quelle que soit la
+  rigueur du reste.
+
 ## [0.3.1] - 2026-10-09
 
 ### Ajouté
