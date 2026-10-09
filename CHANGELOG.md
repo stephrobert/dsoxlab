@@ -7,6 +7,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The appliance build died on a single unreachable mirror** (build of v0.3.1).
+  Its first network call resolves the Debian netinst ISO and its checksum from
+  `cdimage.debian.org`; that host answered nothing for 135 seconds, and the job
+  ended there — before Packer, before anything this repository controls. The
+  release itself was fine and published on PyPI; the images were simply never
+  built. The step now fetches `SHA256SUMS` **once** instead of twice, retries
+  with a connect timeout, and falls back to Debian's other primary mirrors. An
+  external dependency without a fallback is a single point of failure, however
+  well the rest is pinned.
+
 ## [0.3.1] - 2026-10-09
 
 ### Added
