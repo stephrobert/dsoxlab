@@ -29,7 +29,7 @@ option.
 | | Minimum | Confortable |
 | --- | --- | --- |
 | Mémoire vive | 4 Go **libres** pour la VM | 8 Go, obligatoire pour les labs `vm` |
-| Disque | 25 Go libres | 40 Go |
+| Disque | 25 Go libres | 70 Go, si vous enchaînez plusieurs catalogues |
 | Processeur | 2 cœurs | 4 cœurs |
 | Logiciel | VirtualBox (gratuit) | — |
 | Réseau | une connexion, le temps du premier démarrage | — |
@@ -292,9 +292,12 @@ l'image.
 - **Un utilisateur, une machine.** L'appliance n'est pas un serveur de classe
   partagé ; un formateur qui sert plusieurs apprenants veut plutôt
   [la page du formateur](./trainer.fr.md).
-- **Le disque fait 20 Go.** De quoi loger un catalogue et quelques VM de lab,
-  pas un cluster Kubernetes à trois nœuds. À agrandir dans votre hyperviseur au
-  besoin.
+- **Le disque déclare 64 Go, et il grossit chez vous.** Il est *fin* : le
+  fichier téléchargé reste sous 500 Mo, et la place n'est prise sur votre hôte
+  qu'au fur et à mesure. Vous n'avez donc rien à agrandir — le cluster Kubernetes
+  à trois nœuds que 20 Go ne tenaient pas y entre —, mais prévoyez la place
+  **libre** : un catalogue avec ses images de base et ses VM approche la
+  trentaine de gigaoctets, deux la dépassent.
 - **Aucune mise à jour automatique.** `uv tool upgrade dsoxlab` met l'outil à
   jour dans une appliance déjà installée. Réimporter une image plus récente
   n'apporte que le système mis à jour : dsoxlab, lui, s'installe à neuf au

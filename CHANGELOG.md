@@ -42,6 +42,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   artifact, checksum verified against the published file — and the KVM job
   installs exactly what `uv.lock` describes.
 
+- **`doctor --fix` proposed `apt install` on Fedora** (issue #296), where that
+  command does not exist. The remediations now pick the package manager of the
+  machine they run on, and with it the right package names: `virsh` comes from
+  `libvirt-client` — pulled in by `libvirt` — `qemu-utils` is called `qemu-img`,
+  and `genisoimage` no longer exists on Fedora 43, where `xorriso` provides the
+  `xorrisofs` that the check accepts. Names read from `dnf repoquery` on
+  Fedora 43 and AlmaLinux 10, not from memory. apt stays the default when
+  neither is found.
+
+### Changed
+
+- **The appliance declares a 64 GiB disk** instead of 20. A qcow2 holds what it
+  contains and not what it declares, so the download does not grow — but 20 GiB
+  did not hold a kubeadm cluster from the Kubernetes catalog, the base images of
+  two other catalogs and the learner's own work at the same time. Growing the
+  disk afterwards means resizing the partition *and* the filesystem inside the
+  VM: a thing nobody should have to know in order to follow a course.
+- **The KVM job no longer depends on a Debian mirror being up.** It fetches the
+  base image itself, with retries and two fallback mirrors, serves it over the
+  loopback interface and hands the address to the test stack through
+  `providers.kvm.image_url_<distro>` — the override the contract documents. The
+  job measured mirror availability as often as it measured the template; it now
+  measures only the template.
+
 ## [0.3.2] - 2026-10-09
 
 ### Fixed

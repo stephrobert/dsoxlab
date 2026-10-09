@@ -28,7 +28,7 @@ the systems where that command is not an option.
 | | Minimum | Comfortable |
 | --- | --- | --- |
 | Memory | 4 GB **free** for the VM | 8 GB, required for `vm` labs |
-| Disk | 25 GB free | 40 GB |
+| Disk | 25 GB free | 70 GB, if you work through several catalogs |
 | CPU | 2 cores | 4 cores |
 | Software | VirtualBox (free) | — |
 | Network | a connection, for the first boot | — |
@@ -282,8 +282,12 @@ runner. It is reproducible: nothing is hand-made in the image.
 
 - **One user, one machine.** The appliance is not a shared classroom server; a
   trainer serving several learners wants [the trainer's page](./trainer.md).
-- **The disk is 20 GB.** Enough for a catalog and a few lab VMs, not for a
-  Kubernetes cluster of three nodes. Enlarge it in your hypervisor if needed.
+- **The disk declares 64 GB, and it grows on your side.** It is *thin*: the
+  file you download stays under 500 MB, and space is taken from your host only
+  as you go. So there is nothing to enlarge — the three-node Kubernetes cluster
+  that 20 GB could not hold now fits — but plan for the **free** space: one
+  catalog with its base images and its VMs approaches thirty gigabytes, two go
+  past it.
 - **No automatic update.** `uv tool upgrade dsoxlab` updates the tool inside an
   appliance you already run. Importing a newer image only brings you an updated
   system: dsoxlab itself is installed fresh at every machine's first boot.

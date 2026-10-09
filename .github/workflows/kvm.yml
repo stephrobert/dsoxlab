@@ -235,6 +235,74 @@ jobs:
         # première chose qu'on voudra lire, et elle n'existe plus après.
         run: dsoxlab doctor --lab-home "${STACK}" || true
 
+      - name: Serve the base image locally, with a fallback mirror
+        # `dsoxlab provision` laisse Terraform télécharger l'image de base, et
+        # le provider libvirt n'a ni reprise ni miroir de repli. Le 2026-10-09,
+        # `cloud.debian.org` (194.71.11.173) a refusé les connexions depuis les
+        # runners pendant des heures — la même adresse qui a fait tomber le
+        # build de l'appliance le même jour — et ce job échouait sur
+        # « Failed to Open URL », sans aucun rapport avec ce qu'il mesure.
+        #
+        # L'image est donc récupérée ICI, avec reprises et miroirs de repli,
+        # puis SERVIE EN HTTP sur la boucle locale. En HTTP et non en `file://` :
+        # le provider va chercher l'URL avec un client HTTP — son erreur dit
+        # « failed to fetch URL: Get … » — et rien ne garantit qu'il sache lire
+        # le schéma `file`. Le catalogue reçoit l'adresse locale par l'override
+        # que le contrat documente, `providers.kvm.image_url_<distro>`.
+        #
+        # Ce que le job mesure reste donc le template et le provisionnement,
+        # pas la disponibilité d'un miroir Debian.
+        env:
+          STACK: /tmp/pile-kvm
+        run: |
+          set -euo pipefail
+          miroirs=(
+            "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2"
+            "https://gemmei.ftp.acc.umu.se/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2"
+            "https://laotzu.ftp.acc.umu.se/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2"
+          )
+          servi=/tmp/images-base
+          nom_image=debian-13-generic-amd64.qcow2
+          mkdir -p "${servi}"
+          image="${servi}/${nom_image}"
+          for url in "${miroirs[@]}"; do
+            echo "miroir : ${url}"
+            if curl -fsSL --connect-timeout 20 --max-time 900 \
+                    --retry 3 --retry-delay 5 --retry-all-errors \
+                    -o "${image}" "${url}"; then
+              break
+            fi
+            echo "::warning::${url} ne répond pas, miroir suivant"
+            rm -f "${image}"
+          done
+          test -s "${image}" || {
+            echo "::error::aucun miroir n'a fourni l'image de base Debian"
+            exit 1
+          }
+          qemu-img info "${image}" | head -3
+
+          # Un serveur HTTP sur la boucle locale, qui survit à cette étape :
+          # les étapes suivantes tournent dans le même runner.
+          nohup python3 -m http.server 8099 --bind 127.0.0.1 --directory "${servi}" \
+            > /tmp/http-images.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -fsS -o /dev/null "http://127.0.0.1:8099/" && break
+            sleep 1
+          done
+          curl -fsSI "http://127.0.0.1:8099/${nom_image}" | head -3
+
+          # L'override vit dans `providers.kvm`, sous `infra:` — qui est le
+          # dernier bloc du meta.yml écrit à l'étape précédente.
+          # La clé porte la distro du job : écrire `debian13` en dur ici les
+          # ferait dériver en silence le jour où la pile de test change d'image.
+          cat >> "${STACK}/meta.yml" <<YAML
+
+            providers:
+              kvm:
+                image_url_${DISTRO}: http://127.0.0.1:8099/${nom_image}
+          YAML
+          cat "${STACK}/meta.yml"
+
       - name: Provision, for real
         id: provision
         if: steps.kvm.outputs.present == 'true'
