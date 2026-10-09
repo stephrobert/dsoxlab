@@ -557,7 +557,52 @@ def test_sans_hote_declare_les_ressources_se_taisent(
     assert _cles(report.required) >= {"hw_virt", "cpu_arch"}
 
 
-def test_un_qemu_img_absent_est_nomme(tmp_path: Path) -> None:
+def _poste(monkeypatch: pytest.MonkeyPatch, *presents: str) -> None:
+    """Simule un poste où seuls ``presents`` sont dans le PATH."""
+    monkeypatch.setattr(
+        doctor.shutil, "which",
+        lambda nom: f"/usr/bin/{nom}" if nom in presents else None,
+    )
+
+
+def test_fedora_recoit_dnf_et_ses_noms_de_paquets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue blog-roadmap #41 : sur Fedora, `--fix` proposait `apt install`.
+
+    Les noms viennent de `dnf repoquery` sur Fedora 43 et AlmaLinux 10 :
+    `libvirt-clients` et `libvirt-daemon-system` n'y existent pas.
+    """
+    _poste(monkeypatch, "dnf")
+
+    kvm = doctor._check_kvm()
+    assert kvm.fix is not None
+    assert kvm.fix.commands == (("sudo", "dnf", "install", "libvirt", "qemu-kvm"),)
+
+    iso = doctor._check_iso_tool()
+    assert iso.fix is not None
+    assert iso.fix.commands == (("sudo", "dnf", "install", "xorriso"),)
+
+    connu = doctor.explique_echec_provision(
+        "creation of non-raw file images is not supported without qemu-img."
+    )
+    assert connu is not None
+    assert connu[1] == "sudo dnf install qemu-img"
+
+
+def test_debian_garde_apt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """apt gagne dès qu'il est là, et reste le défaut quand rien n'est trouvé."""
+    for presents in (("apt-get", "dnf"), ("apt-get",), ()):
+        _poste(monkeypatch, *presents)
+        kvm = doctor._check_kvm()
+        assert kvm.fix is not None
+        assert kvm.fix.commands[0][:3] == ("sudo", "apt", "install")
+        assert "libvirt-daemon-system" in kvm.fix.commands[0]
+
+
+def test_un_qemu_img_absent_est_nomme(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Rencontré en provisionnant depuis l'appliance, pas en relisant du code.
 
     libvirt dit « creation of non-raw file images is not supported without
@@ -565,6 +610,7 @@ def test_un_qemu_img_absent_est_nomme(tmp_path: Path) -> None:
     manque — `qemu-utils` sur Debian, simple *recommandation* de qemu-kvm — n'est
     nommé nulle part dans ce message.
     """
+    _poste(monkeypatch, "apt-get")
     connu = doctor.explique_echec_provision(
         "Error: Volume Creation Failed\nFailed to create storage volume: internal "
         "error: creation of non-raw file images is not supported without qemu-img."
