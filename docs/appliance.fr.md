@@ -349,3 +349,33 @@ elle revient sur un **bureau** et non une console, et `dsoxlab --version` répon
 
 En cas d'échec, l'invite de connexion nomme les étapes manquées et rien n'est
 perdu : tout recommence au démarrage suivant.
+
+---
+
+## L'assistant du premier démarrage
+
+Au tout premier démarrage, **avant l'invite de connexion**, la machine pose
+trois questions sur sa propre console :
+
+```text
+  Disposition du clavier
+
+    * 1) Français (AZERTY)        2) Belge        3) Suisse romand
+      4) Canadien français        5) US (QWERTY)  6) Allemand (QWERTZ)
+
+  Votre choix [1] (30 s) :
+```
+
+Puis le **fuseau horaire** et la **langue de l'interface dsoxlab**.
+
+Les menus sont numérotés à dessein : les chiffres sont au même endroit sur
+toutes les dispositions, donc répondre « 2 » fonctionne quel que soit le clavier
+que la machine croit avoir — ce qui est précisément le problème qu'on résout.
+
+**Vous pouvez ne rien répondre.** Au bout de 30 secondes, la valeur marquée
+d'une étoile est retenue : AZERTY, Europe/Paris, français. Un démarrage sans
+personne devant l'écran n'est donc jamais bloqué, et `dsoxlab.oobe=0` ajouté à
+la ligne de commande du noyau saute l'assistant entièrement.
+
+Il ne se rejoue pas : son marqueur est `/var/lib/dsoxlab-assistant.fait`. Pour
+le rejouer volontairement, retirez ce fichier et redémarrez.

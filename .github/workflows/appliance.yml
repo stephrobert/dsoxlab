@@ -107,15 +107,24 @@ jobs:
           }
           df -h / /mnt | tail -2
 
-      - name: Install Packer
+      - name: Install Packer (verified release binary)
+        # `apt-get install packer` depuis le dépôt HashiCorp installait une
+        # version non déclarée, que Scorecard signale en « Pinned-Dependencies »
+        # — et à juste titre : deux builds du même commit pouvaient employer
+        # deux Packer différents. L'archive officielle, épinglée et vérifiée,
+        # supprime en outre un dépôt apt tiers de la chaîne.
+        env:
+          PACKER_VERSION: "1.15.0"
         run: |
           set -euo pipefail
-          wget -qO- https://apt.releases.hashicorp.com/gpg \
-            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-            https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
-            | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
-          sudo apt-get update -qq && sudo apt-get install -y -qq packer
+          workdir="$(mktemp -d)"
+          base="https://releases.hashicorp.com/packer/${PACKER_VERSION}"
+          asset="packer_${PACKER_VERSION}_linux_amd64.zip"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/SHA256SUMS" "${base}/packer_${PACKER_VERSION}_SHA256SUMS"
+          (cd "${workdir}" && grep " ${asset}$" SHA256SUMS | sha256sum -c -)
+          unzip -q -o "${workdir}/${asset}" -d "${workdir}"
+          sudo install -m 0755 "${workdir}/packer" /usr/local/bin/packer
           packer version
 
       - name: Resolve the Debian netinst ISO and its checksum

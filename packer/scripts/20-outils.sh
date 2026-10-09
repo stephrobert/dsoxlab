@@ -7,9 +7,32 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-# uv, par son installateur officiel, en tant que `student` : l'outil vit dans son
-# répertoire personnel, comme sur le poste d'un apprenant.
-sudo -u student -H bash -lc 'curl -fsSL https://astral.sh/uv/install.sh | sh'
+# uv, par un BINAIRE DE RELEASE VÉRIFIÉ, et non par `curl | sh`.
+#
+# L'installateur officiel exécute un script téléchargé sans en contrôler
+# l'empreinte : OpenSSF Scorecard le signale en « Pinned-Dependencies », et il a
+# raison. Un dépôt qui épingle toutes ses actions par SHA de 40 caractères et
+# qui tube un script dans un shell se contredit.
+#
+# C'est le même patron que `actionlint` et `trufflehog` en CI : version
+# déclarée, artefact téléchargé, empreinte vérifiée depuis le fichier que le
+# projet publie à côté. L'outil vit toujours dans le répertoire personnel de
+# `student`, comme sur le poste d'un apprenant.
+UV_VERSION=0.12.24
+uv_tmp="$(mktemp -d)"
+uv_base="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}"
+uv_asset="uv-x86_64-unknown-linux-gnu.tar.gz"
+curl -fsSL -o "${uv_tmp}/${uv_asset}" "${uv_base}/${uv_asset}"
+curl -fsSL -o "${uv_tmp}/${uv_asset}.sha256" "${uv_base}/${uv_asset}.sha256"
+( cd "${uv_tmp}" && sha256sum -c "${uv_asset}.sha256" )
+tar -xzf "${uv_tmp}/${uv_asset}" -C "${uv_tmp}"
+install -d -m 0755 -o student -g student /home/student/.local/bin
+for outil in uv uvx; do
+  install -m 0755 -o student -g student \
+    "${uv_tmp}/uv-x86_64-unknown-linux-gnu/${outil}" "/home/student/.local/bin/${outil}"
+done
+rm -rf "${uv_tmp}"
+sudo -u student -H bash -lc 'uv --version'
 
 # Terraform, depuis le dépôt HashiCorp, avec la clé vérifiée. Requis par
 # `provision` dès qu'un catalogue déclare des hôtes.

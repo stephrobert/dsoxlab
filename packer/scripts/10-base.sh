@@ -47,27 +47,68 @@ apt-get install -y --no-install-recommends \
 # chercher son IP dans la console.
 systemctl enable qemu-guest-agent
 
+# ── Le clavier, écrit ici et non espéré du preseed ───────────────────────────
+#
+# La 0.3.2 confiait la disposition au preseed seul. Mesuré dans l'image publiée :
+# `XKBLAYOUT="us"`. Le preseed garde sa ligne — c'est la bonne façon de le
+# demander à l'installateur — mais ce qui FAIT la disposition est ici, après
+# l'installation, où le résultat se lit dans l'image à froid.
+#
+# Les trois endroits doivent dire la même chose, sinon la première
+# reconfiguration contredit les deux autres :
+#   - /etc/default/keyboard, lu par console-setup ET par X11 (donc XFCE) ;
+#   - debconf, pour qu'un `dpkg-reconfigure` ne revienne pas en arrière ;
+#   - la console courante, par setupcon.
+cat > /etc/default/keyboard <<'CLAVIER'
+# AZERTY français : la formation est francophone. Changer de disposition :
+#   sudo dpkg-reconfigure keyboard-configuration && sudo setupcon
+XKBMODEL="pc105"
+XKBLAYOUT="fr"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+CLAVIER
+
+debconf-set-selections <<'DEBCONF'
+keyboard-configuration keyboard-configuration/xkb-keymap select fr
+keyboard-configuration keyboard-configuration/layoutcode string fr
+keyboard-configuration keyboard-configuration/modelcode string pc105
+DEBCONF
+
+# `--save` écrit la configuration de la console sans exiger un terminal, ce qui
+# est le cas ici : ce script tourne par SSH, sans console attachée.
+setupcon --save-only 2>/dev/null || setupcon --save 2>/dev/null || true
+
+# On ne suppose pas que ça a marché : on relit ce qu'on vient d'écrire. Un build
+# qui livrerait un clavier anglais doit échouer ICI, pas chez l'utilisateur.
+grep -q '^XKBLAYOUT="fr"' /etc/default/keyboard || {
+  echo "ÉCHEC : /etc/default/keyboard ne porte pas XKBLAYOUT=fr" >&2
+  exit 1
+}
+echo "clavier : $(grep '^XKBLAYOUT' /etc/default/keyboard)"
+
 # Une console série, sans quoi l'appliance n'est diagnosticable qu'avec un écran.
 # Mesuré en la démarrant : la console était vide, 0 octet, alors que la VM
 # tournait. Ni la CI, ni un formateur à distance, ni l'utilisateur au téléphone ne
 # pouvait voir le premier démarrage — donc ni savoir si dsoxlab s'installait, ni
 # pourquoi lorsqu'il échouait.
 #
-# L'ORDRE COMPTE, ET IL ÉTAIT À L'ENVERS. Le noyau écrit ses messages sur TOUTES
-# les consoles déclarées, mais `/dev/console` — celle où écrit l'espace
-# utilisateur — est la DERNIÈRE de la liste. Avec `console=tty0` puis
-# `console=ttyS0`, la première configuration envoyait donc tout son journal sur
-# le port série, et la fenêtre de la VM n'affichait qu'une invite de connexion.
+# L'ORDRE COMPTE, ET LES DEUX ORDRES ONT UN DÉFAUT. Le noyau écrit ses messages
+# sur TOUTES les consoles déclarées, mais `/dev/console` — celle où écrit
+# l'espace utilisateur — est la DERNIÈRE de la liste.
 #
-# Mesuré sur l'appliance 0.3.1, par un utilisateur : « je ne vois pas que la
-# phase d'installation tourne, on voit un login ». Elle tournait, et son service
-# porte bien `StandardOutput=journal+console` : c'est `/dev/console` qui n'était
-# pas là où il regardait.
+# La série reste donc en dernier, et garde `/dev/console` : c'est elle qui porte
+# TOUT le journal de la première configuration, pour la CI, pour un formateur à
+# distance et pour qui diagnostique sans écran. La 0.3.2 avait inversé l'ordre
+# pour rendre ce journal visible dans la fenêtre, et l'a rendu invisible sur la
+# série — mesuré en démarrant l'image sous QEMU : la série ne portait plus que
+# GRUB et l'invite de connexion. Un aveuglement échangé contre un autre.
 #
-# La série vient donc en premier, `tty0` en dernier : la fenêtre reçoit
-# `/dev/console`, et la série garde les messages du noyau pour la CI, pour un
-# formateur à distance et pour qui diagnostique sans écran.
-sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 console=tty0"/' \
+# Ce que la fenêtre reçoit ne dépend donc plus de `/dev/console` : la première
+# configuration écrit ses annonces d'étape directement sur `/dev/tty1`, et son
+# étape courante dans `/etc/issue`. Les deux publics sont servis, chacun par un
+# chemin qui lui est propre.
+sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"/' \
   /etc/default/grub
 grep -q '^GRUB_TERMINAL' /etc/default/grub \
   || echo 'GRUB_TERMINAL="console serial"' >> /etc/default/grub

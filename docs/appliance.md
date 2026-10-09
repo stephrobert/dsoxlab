@@ -337,3 +337,32 @@ to a **desktop** rather than a console, and `dsoxlab --version` answers.
 
 On failure, the login prompt names the steps that failed, and nothing is lost:
 everything starts again at the next boot.
+
+---
+
+## The first-boot wizard
+
+At the very first boot, **before the login prompt**, the machine asks three
+questions on its own console:
+
+```text
+  Keyboard layout
+
+    * 1) French (AZERTY)          2) Belgian      3) Swiss French
+      4) Canadian French          5) US (QWERTY)  6) German (QWERTZ)
+
+  Your choice [1] (30 s):
+```
+
+Then the **timezone** and dsoxlab's **interface language**.
+
+The menus are numbered on purpose: digits sit in the same place on every
+layout, so answering "2" works whatever keyboard the machine believes it has —
+which is exactly the problem being solved.
+
+**You may answer nothing.** After 30 seconds the starred value is kept: AZERTY,
+Europe/Paris, French. A boot with nobody watching is therefore never blocked,
+and `dsoxlab.oobe=0` on the kernel command line skips the wizard entirely.
+
+It does not run twice: its marker is `/var/lib/dsoxlab-assistant.fait`. To run
+it again deliberately, remove that file and reboot.

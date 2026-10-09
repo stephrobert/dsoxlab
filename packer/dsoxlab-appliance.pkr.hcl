@@ -122,6 +122,9 @@ build {
     scripts = [
       "scripts/10-base.sh",
       "scripts/20-outils.sh",
+      # L'assistant avant la première configuration : il doit poser ses
+      # questions avant que le téléchargement de 1,5 Go commence.
+      "scripts/25-assistant.sh",
       "scripts/30-premier-demarrage.sh",
       # Avant-dernier à dessein : il bascule le résolveur, et 20-outils.sh
       # télécharge encore. Après lui, plus rien n'a besoin du réseau.
