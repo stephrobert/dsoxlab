@@ -23,6 +23,17 @@ le poste de l'apprenant), la préparation se déclare directement dans
 
 `dsoxlab clean` supprime ``<workdir>/``. Aucun script bash n'est invoqué
 (décision 11.3 du REFACTORING-PLAN — zéro exception au déclaratif).
+
+PRÉPARER UN TERRAIN (issue #298). Un lab shell **peut** porter ``setup.yaml``
+et ``cleanup.yaml`` à sa racine : les mêmes playbooks Ansible qu'un lab
+``vm``, joués sur ``localhost`` en connexion locale par le même
+ansible-runner. C'est ce qui permet à une épreuve de monter des machines, un
+stockage partagé ou une panne tirée au hasard avant que l'apprenant commence,
+sans renoncer au déclaratif : un playbook, pas un script. ``run`` le joue après
+les fixtures, ``clean`` joue ``cleanup.yaml`` avant d'effacer le workdir, et
+``reset`` enchaîne les deux. Les playbooks reçoivent ``lab_id``,
+``lab_workdir`` et ``lab_state_dir`` (voir ``lab_state.repertoire_etat``). Un
+lab shell qui n'en porte pas se comporte exactement comme avant.
 """
 
 from __future__ import annotations
@@ -30,9 +41,12 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 
+from ..discovery.repo import find_meta_yml
 from ..i18n import _
+from ..infra import ansible as ansible_infra
 from ..models.lab import LabDefinition
 from .base import BaseRuntime, EventCallback, SessionSpec
 
@@ -64,15 +78,14 @@ class ShellRuntime(BaseRuntime):
         *,
         on_event: EventCallback | None = None,
     ) -> None:
-        """Crée le ``workdir`` et copie les fixtures déclarées.
+        """Crée le ``workdir``, copie les fixtures déclarées, joue ``setup.yaml``.
 
-        ``target_name`` et ``on_event`` sont ignorés pour ce runtime
-        (atelier shell-local, déclaratif pur : aucun event ansible-runner
-        à remonter). Ils font partie du contrat ``BaseRuntime`` et doivent
-        être acceptés, sinon tout appel de la CLI passant ``on_event``
-        échoue en ``TypeError``.
+        ``target_name`` est ignoré pour ce runtime (atelier shell-local). Il
+        fait partie du contrat ``BaseRuntime`` et doit être accepté, sinon tout
+        appel de la CLI le passant échoue en ``TypeError``. ``on_event`` ne
+        sert que si le lab porte un ``setup.yaml`` (#298).
         """
-        del target_name, on_event
+        del target_name
         workdir = self._workdir_path(lab)
         workdir.mkdir(parents=True, exist_ok=True)
 
@@ -111,6 +124,9 @@ class ShellRuntime(BaseRuntime):
             shutil.copy2(src, dst)
             logger.info("fixture %s -> %s", src.name, dst)
 
+        # Après les fixtures : le playbook peut s'appuyer sur ce qu'elles posent.
+        self._jouer(lab, "setup.yaml", on_event)
+
     def session_spec(self, lab: LabDefinition) -> SessionSpec:
         """Un sous-shell dans ``<workdir>/``.
 
@@ -137,9 +153,8 @@ class ShellRuntime(BaseRuntime):
         *,
         on_event: EventCallback | None = None,
     ) -> None:
-        del on_event
-        self.clean(lab, target_name)
-        self.start(lab, target_name)
+        self.clean(lab, target_name, on_event=on_event)
+        self.start(lab, target_name, on_event=on_event)
 
     def clean(
         self,
@@ -148,7 +163,10 @@ class ShellRuntime(BaseRuntime):
         *,
         on_event: EventCallback | None = None,
     ) -> None:
-        del target_name, on_event
+        del target_name
+        # Avant d'effacer le workdir : le nettoyage peut avoir besoin de ce qui
+        # s'y trouve (un state Terraform, par exemple) pour défaire le terrain.
+        self._jouer(lab, "cleanup.yaml", on_event)
         workdir = self._workdir_path(lab)
         if workdir.exists():
             shutil.rmtree(workdir)
@@ -159,6 +177,45 @@ class ShellRuntime(BaseRuntime):
         return "ready" if self._workdir_path(lab).is_dir() else "stopped"
 
     # ─── helpers ──────────────────────────────────────────────────────
+
+    def _jouer(self, lab: LabDefinition, nom: str, on_event: EventCallback | None) -> None:
+        """Joue ``<lab>/<nom>`` sur localhost s'il existe, sinon ne fait rien.
+
+        Un échec lève ``RuntimeError`` : la CLI l'attrape déjà autour de
+        ``run``, affiche le message et sort en 2, sans ouvrir de session sur un
+        terrain à moitié préparé.
+        """
+        playbook = lab.path / nom
+        if not playbook.is_file():
+            return
+        # Import au moment de l'appel : `services` importe déjà les runtimes,
+        # un import de module ferait un cycle à la première importation.
+        from ..services.lab_state import repertoire_etat
+
+        meta = find_meta_yml(lab.path)
+        racine = meta.parent if meta else lab.path.parent
+        etat = repertoire_etat(racine, lab.id)
+        etat.mkdir(parents=True, exist_ok=True)
+        resultat = ansible_infra.run_playbook(
+            playbook_path=playbook,
+            inventory={"all": {"hosts": {"localhost": {
+                "ansible_connection": "local",
+                # L'interpréteur de dsoxlab lui-même : il existe toujours, là
+                # où une découverte automatique pourrait en choisir un autre.
+                "ansible_python_interpreter": sys.executable,
+            }}}},
+            extra_vars={
+                "lab_id": lab.id,
+                "lab_workdir": str(self._workdir_path(lab)),
+                "lab_state_dir": str(etat),
+            },
+            on_event=on_event,
+        )
+        if not resultat.ok:
+            raise RuntimeError(_(
+                "err_shell_playbook_failed",
+                lab_id=lab.id, playbook=nom, rc=resultat.rc, status=resultat.status,
+            ))
 
     def _workdir_path(self, lab: LabDefinition) -> Path:
         """Résout ``<lab>/<runtime.workdir>``."""

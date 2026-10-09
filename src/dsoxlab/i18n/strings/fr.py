@@ -1615,6 +1615,9 @@ hors ligne, elle se tait.
     "err_vm_cleanup_missing":
         "Le lab {lab_id} doit fournir cleanup.yaml à la racine (contrat "
         "dsoxlab pour runtime: vm). Fichier attendu : {path}",
+    "err_shell_playbook_failed":
+        "{playbook} a échoué pour {lab_id} sur localhost (rc={rc}, status={status}). "
+        "Le lab n'est pas prêt : corrigez le playbook, puis relancez la commande.",
     "err_vm_cleanup_failed":
         "cleanup.yaml a échoué pour {lab_id} sur la target « {target} » "
         "(rc={rc}, status={status}).",

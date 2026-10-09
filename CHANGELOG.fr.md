@@ -7,6 +7,20 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+
+- **Un lab `shell` peut préparer son terrain** (issue #298). Il porte, s'il le
+  veut, `setup.yaml` et `cleanup.yaml`, les mêmes playbooks qu'un lab `vm`,
+  joués sur `localhost` en connexion locale : `run` après les fixtures, `clean`
+  avant d'effacer le répertoire de travail, `reset` les deux. Les playbooks
+  reçoivent `lab_id`, `lab_workdir` et `lab_state_dir`, un répertoire d'état
+  hors du répertoire de travail, que `check` exporte aux tests sous
+  `LAB_STATE_DIR`. Les épreuves de niveau Terraform en ont besoin pour monter
+  des machines, un stockage partagé et une panne tirée au hasard sans la
+  livrer à l'apprenant. Un lab `shell` sans ces fichiers ne change pas.
+
 ## [0.3.0] - 2026-09-30
 
 ### Corrigé

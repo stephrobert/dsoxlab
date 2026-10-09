@@ -29,8 +29,8 @@ ma-formation/
         ├── lab.yaml            ← obligatoire
         ├── README.md           ← obligatoire
         ├── scenario.md         ← obligatoire
-        ├── setup.yaml          ← obligatoire pour runtime vm (Ansible)
-        ├── cleanup.yaml        ← obligatoire pour runtime vm (Ansible)
+        ├── setup.yaml          ← obligatoire pour runtime vm, optionnel pour shell (Ansible)
+        ├── cleanup.yaml        ← obligatoire pour runtime vm, optionnel pour shell (Ansible)
         ├── fixtures/           ← optionnel, pour runtime shell
         └── challenge/
             ├── README.md       ← la mission affichée par `dsoxlab challenge`
@@ -133,6 +133,36 @@ Le message complet du parseur va toujours dans
 `~/.local/state/dsoxlab/dsoxlab.log`, que `dsoxlab support` collecte : le rapport,
 lui, garde la première ligne et la position, parce que six lignes de prose PyYAML
 dans un rapport cachent toutes les autres anomalies.
+
+---
+
+## Préparer le terrain d'un lab shell
+
+Un lab `shell` est déclaratif : un répertoire de travail et des fixtures. Une
+épreuve a parfois besoin de plus avant que l'apprenant commence, des machines
+déjà en service, un stockage partagé, une **panne tirée au hasard** qu'il ne
+doit pas lire dans ses fichiers. Elle peut alors porter, à la racine du lab, les
+mêmes playbooks qu'un lab `vm` (issue #298) :
+
+| Fichier | Joué par | Sur |
+| --- | --- | --- |
+| `setup.yaml` | `run`, après la copie des fixtures ; `reset`, en second | `localhost`, connexion locale |
+| `cleanup.yaml` | `clean`, **avant** d'effacer le répertoire de travail ; `reset`, en premier | `localhost`, connexion locale |
+
+Les deux sont **optionnels** : un lab `shell` qui n'en porte pas se comporte
+exactement comme avant. Un playbook en échec fait sortir `run` en **2**, sans
+ouvrir de session sur un terrain à moitié préparé.
+
+Les playbooks reçoivent trois variables : `lab_id`, `lab_workdir` (le
+répertoire de travail de l'apprenant) et `lab_state_dir`, le répertoire d'état
+du lab, **hors** du répertoire de travail. La préparation y range ce que les
+tests doivent connaître sans le mettre sous les yeux de l'apprenant : l'incident
+tiré, les identifiants de référence. `check` l'exporte aux tests sous
+`LAB_STATE_DIR`. Ce n'est pas un secret, la machine est celle de l'apprenant :
+c'est une séparation, comme les tests eux-mêmes.
+
+On reste dans le déclaratif : un playbook, jamais un script. Le refus de
+`runtime/kvm.sh` et `runtime/incus.sh` tient toujours.
 
 ---
 

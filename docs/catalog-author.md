@@ -29,8 +29,8 @@ my-training/
         ├── lab.yaml            ← required
         ├── README.md           ← required
         ├── scenario.md         ← required
-        ├── setup.yaml          ← required for runtime vm (Ansible)
-        ├── cleanup.yaml        ← required for runtime vm (Ansible)
+        ├── setup.yaml          ← required for runtime vm (Ansible), optional for shell
+        ├── cleanup.yaml        ← required for runtime vm (Ansible), optional for shell
         ├── fixtures/           ← optional, for runtime shell
         └── challenge/
             ├── README.md       ← the mission shown by `dsoxlab challenge`
@@ -130,6 +130,36 @@ fix is a newer dsoxlab rather than an edit to your file.
 The full parser message still goes to `~/.local/state/dsoxlab/dsoxlab.log`, which
 `dsoxlab support` collects: the report keeps the first line and the position,
 because six lines of PyYAML prose in a report hide every other finding.
+
+---
+
+## Preparing the terrain of a shell lab
+
+A `shell` lab is declarative: a working directory and fixtures. An exam
+sometimes needs more before the learner starts, machines already running, a
+shared store, a **randomly drawn failure** the learner must not read in their
+files. It may then carry, at the lab root, the same playbooks a `vm` lab ships
+(issue #298):
+
+| File | Played by | On |
+| --- | --- | --- |
+| `setup.yaml` | `run`, after copying the fixtures; `reset`, second | `localhost`, local connection |
+| `cleanup.yaml` | `clean`, **before** removing the working directory; `reset`, first | `localhost`, local connection |
+
+Both are **optional**: a `shell` lab without them behaves exactly as before. A
+failing playbook makes `run` exit with **2**, without opening a session on a
+half-prepared terrain.
+
+The playbooks receive three variables: `lab_id`, `lab_workdir` (the learner's
+working directory) and `lab_state_dir`, the lab's state directory, **outside**
+the working directory. The preparation stores there what the tests need to know
+without putting it under the learner's eyes: the drawn incident, reference
+identifiers. `check` exports it to the tests as `LAB_STATE_DIR`. It is not a
+secret, the machine is the learner's: it is a separation, like the tests
+themselves.
+
+This stays declarative: a playbook, never a script. The refusal of
+`runtime/kvm.sh` and `runtime/incus.sh` still holds.
 
 ---
 

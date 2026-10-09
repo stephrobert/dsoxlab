@@ -422,6 +422,11 @@ def check_lab(
     # côté formateur, écrasant le travail manuel de l'apprenant).
     env = os.environ.copy()
     env.setdefault("LAB_NO_REPLAY", "1")
+    # Le répertoire d'état du lab (#298) : la préparation y range ce que les
+    # tests doivent connaître sans l'exposer dans le workdir.
+    from .lab_state import repertoire_etat
+
+    env["LAB_STATE_DIR"] = str(repertoire_etat(repo_root, lab.id))
 
     # Expose aux tests le FQDN de la target choisie. Sans ça, un lab
     # multi-distrib ne peut que coder son hôte en dur : la target Ubuntu
