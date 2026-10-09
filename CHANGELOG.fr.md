@@ -7,9 +7,30 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.3.2] - 2026-10-09
 
 ### Corrigé
+
+- **L'appliance arrivait en QWERTY, sans moyen d'en changer** (images jusqu'à la
+  0.3.1). L'image est désormais construite en **AZERTY français** et embarque
+  `console-setup` et `keyboard-configuration` — sans eux, `loadkeys fr`
+  répondait `unable to open file fr`, faute de toute disposition française sur
+  le disque. La disposition reste une variable de build (`-var keymap=us`), et
+  la locale du système reste l'anglais à dessein : un message d'erreur se
+  cherche mot pour mot dans un moteur de recherche, ce qui est la raison même
+  pour laquelle le journal de dsoxlab s'écrit en anglais. `fr_FR.UTF-8` est tout
+  de même générée : basculer est une commande, pas une réinstallation.
+- **Le premier démarrage écrivait son journal là où personne ne regardait.** Son
+  service porte bien `StandardOutput=journal+console`, mais la ligne de commande
+  du noyau disait `console=tty0 console=ttyS0`, et `/dev/console` est la
+  **dernière** console déclarée : tout partait sur le port série, pendant que la
+  fenêtre de la VM n'affichait qu'une invite de connexion. Remonté en ces
+  termes : « je ne vois pas que la phase d'installation tourne, on voit un
+  login ». L'ordre est inversé, la fenêtre reçoit donc `/dev/console` et la
+  série garde les messages du noyau pour la CI et le diagnostic à distance. Le
+  premier démarrage écrit en outre son étape courante dans `/etc/issue`, que
+  `getty` relit à chaque invite : une touche Entrée dit maintenant où il en est,
+  et un échec nomme les étapes manquées au lieu de laisser une invite ordinaire.
 
 - **Le build de l'appliance mourait sur un seul miroir injoignable** (build de
   la v0.3.1). Sa première requête réseau résout l'ISO netinst Debian et son
@@ -4412,7 +4433,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/stephrobert/dsoxlab/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stephrobert/dsoxlab/compare/v0.2.5...v0.3.0
 [0.1.20]: https://github.com/stephrobert/dsoxlab/compare/v0.1.19...v0.1.20

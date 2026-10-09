@@ -7,9 +7,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.2] - 2026-10-09
 
 ### Fixed
+
+- **The appliance arrived with a QWERTY keyboard, and could not be switched**
+  (images up to 0.3.1). The image is now built with a **French AZERTY** layout,
+  and ships `console-setup` and `keyboard-configuration` — without them,
+  `loadkeys fr` answered `unable to open file fr`, there being no French layout
+  on the disk at all. The layout stays a build variable (`-var keymap=us`), and
+  the system locale stays English on purpose: an error message gets searched
+  word for word in a search engine, which is the same reason dsoxlab's log is
+  written in English. `fr_FR.UTF-8` is generated all the same, so switching is a
+  command rather than a reinstall.
+- **The first boot wrote its progress where nobody was looking.** Its service
+  carries `StandardOutput=journal+console`, but the kernel command line read
+  `console=tty0 console=ttyS0`, and `/dev/console` is the **last** console
+  declared: everything went to the serial port, while the VM window showed only
+  a login prompt. Reported as « I can't see the installation phase running, we
+  see a login ». The order is reversed, so the window gets `/dev/console` and
+  the serial keeps the kernel messages for CI and remote diagnosis. The first
+  boot also writes its current step into `/etc/issue`, which `getty` re-reads at
+  every prompt: pressing Enter now says where it stands, and a failure names the
+  steps that failed instead of leaving an ordinary prompt.
 
 - **The appliance build died on a single unreachable mirror** (build of v0.3.1).
   Its first network call resolves the Debian netinst ISO and its checksum from
@@ -4174,7 +4194,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/stephrobert/dsoxlab/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stephrobert/dsoxlab/compare/v0.2.5...v0.3.0
 [0.1.20]: https://github.com/stephrobert/dsoxlab/compare/v0.1.19...v0.1.20

@@ -227,6 +227,8 @@ VM.*
 | Symptôme | Cause la plus fréquente | Geste |
 | --- | --- | --- |
 | La machine reste sur une console, pas de bureau | le premier démarrage n'a pas abouti | il recommence au démarrage suivant : redémarrez la VM après avoir vérifié son réseau |
+| L'invite de connexion s'affiche et rien ne semble se passer | la première configuration tourne en arrière-plan | tapez **Entrée** : l'invite affiche l'étape en cours. Depuis la 0.3.2, elle le dit d'elle-même |
+| Le clavier est en QWERTY | images **jusqu'à la 0.3.1** | depuis la 0.3.2 l'image est en **AZERTY**. Sur une image antérieure : `sudo apt install console-setup keyboard-configuration && sudo dpkg-reconfigure keyboard-configuration` |
 | « Temporary failure in name resolution » | la VM n'a pas de réseau | **Configuration → Réseau**, carte 1 activée en **NAT** |
 | `dsoxlab doctor` dit qu'il manque la virtualisation imbriquée | elle s'active sur **votre** ordinateur, pas dans la VM | [étape 4](#étape-4--pour-les-labs-vm--activer-la-virtualisation-imbriquée), appliance éteinte |
 | `doctor` dit « RAM : … disponibles pour … déclarés » | la VM est trop petite pour ce catalogue | augmentez sa mémoire, ou jouez les labs `shell` |
@@ -297,3 +299,53 @@ l'image.
   jour dans une appliance déjà installée. Réimporter une image plus récente
   n'apporte que le système mis à jour : dsoxlab, lui, s'installe à neuf au
   premier démarrage de chaque machine.
+
+---
+
+## Le clavier, et la langue
+
+L'image arrive en **AZERTY français**, parce que la formation l'est. Les données
+de disposition sont dans l'image : il n'y a rien à télécharger, et cela marche
+dès la console, avant tout réseau.
+
+Pour un autre clavier, une commande suffit :
+
+```bash
+sudo dpkg-reconfigure keyboard-configuration   # puis : sudo setupcon
+```
+
+**La locale du système reste l'anglais**, et c'est un choix : un message d'erreur
+se cherche mot pour mot dans un moteur de recherche. C'est la même raison qui
+fait écrire le journal de dsoxlab en anglais. `fr_FR.UTF-8` est tout de même
+générée dans l'image, donc basculer ne demande pas de réinstaller :
+
+```bash
+sudo localectl set-locale LANG=fr_FR.UTF-8
+```
+
+Et pour l'interface de dsoxlab, indépendamment du système :
+
+```bash
+export DSOXLAB_LANG=fr        # ou en
+```
+
+---
+
+## Suivre le premier démarrage
+
+Il télécharge environ 1,5 Go et prend plusieurs minutes. Il ne bloque pas la
+connexion : l'invite s'affiche pendant qu'il travaille.
+
+Trois façons de savoir où il en est, de la plus simple à la plus précise :
+
+1. **Tapez Entrée sur l'invite de connexion.** Elle affiche l'étape en cours —
+   `getty` relit `/etc/issue` à chaque invite.
+2. `journalctl -u dsoxlab-premier-demarrage -f` pour le suivre en direct.
+3. `ls -l /var/lib/dsoxlab-premier-demarrage.fait` : ce marqueur n'existe
+   **qu'après un succès complet**.
+
+**Les trois signes qui disent que c'est fini** : la machine **redémarre d'elle-même**,
+elle revient sur un **bureau** et non une console, et `dsoxlab --version` répond.
+
+En cas d'échec, l'invite de connexion nomme les étapes manquées et rien n'est
+perdu : tout recommence au démarrage suivant.

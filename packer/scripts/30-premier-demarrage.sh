@@ -35,6 +35,27 @@ marque=/var/lib/dsoxlab-premier-demarrage.fait
 
 export DEBIAN_FRONTEND=noninteractive
 echec=""
+
+# ── Dire où l'on en est, sur l'invite de connexion elle-même ─────────────────
+#
+# Le journal part sur /dev/console, désormais la fenêtre de la VM. Cela ne suffit
+# pas : `getty` affiche son invite par-dessus, et un utilisateur qui se connecte
+# ne voit plus rien défiler. Il croit alors que rien ne tourne — mesuré, remonté
+# en ces termes : « je ne vois pas que la phase d'installation tourne, on voit un
+# login ».
+#
+# `/etc/issue` est relu par getty à CHAQUE invite : une touche Entrée suffit donc
+# à voir l'étape en cours, sans rien savoir de systemd ni de journalctl.
+annoncer() {
+  echo "$1"
+  {
+    printf '\n  dsoxlab : première configuration EN COURS\n'
+    printf '  %s\n\n' "$1"
+    printf '  La suivre en direct :  journalctl -u dsoxlab-premier-demarrage -f\n'
+    printf "  La machine redémarrera d'elle-même quand ce sera terminé.\n\n"
+  } > /etc/issue
+}
+
 echo "=== Première configuration de l'appliance dsoxlab ==="
 
 # ── 0. Attendre que le réseau réponde VRAIMENT ───────────────────────────────
@@ -58,7 +79,7 @@ attendre_la_resolution() {
   return 1
 }
 
-echo "Attente du réseau…"
+annoncer "Étape 1 sur 4 : attente du réseau…"
 if ! attendre_la_resolution; then
   echo "ÉCHEC : aucun nom ne se résout après deux minutes d'attente." >&2
   echo "Rien n'a été installé, et RIEN N'EST PERDU : cette configuration" >&2
@@ -68,11 +89,13 @@ if ! attendre_la_resolution; then
 fi
 
 # ── 1. dsoxlab, dans sa dernière version publiée ─────────────────────────────
-echo "Installation de dsoxlab (dernière version publiée)…"
+annoncer "Étape 2 sur 4 : installation de dsoxlab…"
 if ! sudo -u student -H bash -lc 'uv tool install --force dsoxlab'; then
   echo "ÉCHEC : « uv tool install dsoxlab » n'a pas abouti." >&2
   echec="$echec dsoxlab"
 fi
+
+annoncer "Étape 3 sur 4 : installation des hyperviseurs…"
 
 # ── 2. Les hyperviseurs, seulement s'ils peuvent servir ──────────────────────
 #
@@ -167,7 +190,7 @@ if [ "${DSOXLAB_APPLIANCE_DESKTOP:-1}" = "1" ]; then
   # Les pilotes vidéo se nomment aussi : `vmware` sert le contrôleur VMSVGA que
   # VirtualBox et VMware présentent par défaut, `vesa` et `fbdev` rattrapent
   # tout le reste. Une appliance ne sait pas sur quel hyperviseur elle tombera.
-  echo "Installation du bureau XFCE et de Firefox…"
+  annoncer "Étape 4 sur 4 : installation du bureau XFCE et de Firefox…"
   if apt-get install -y --no-install-recommends \
       xserver-xorg-core xserver-xorg-input-libinput \
       xserver-xorg-video-vmware xserver-xorg-video-vesa \
@@ -217,8 +240,19 @@ if [ -n "$echec" ]; then
   echo "=== Configuration INCOMPLÈTE :$echec ===" >&2
   echo "Ces étapes recommenceront au prochain démarrage. Vérifiez l'accès" >&2
   echo "réseau de la machine virtuelle, puis redémarrez-la." >&2
+  # L'invite de connexion doit porter l'échec, et pas seulement le journal : sans
+  # cela, l'utilisateur voit une invite ordinaire et croit la machine prête.
+  {
+    printf '\n  dsoxlab : configuration INCOMPLÈTE —%s\n\n' "$echec"
+    printf '  Rien n\x27est perdu : ces étapes recommenceront au prochain démarrage.\n'
+    printf '  Vérifiez le réseau de la VM, puis redémarrez-la.\n\n'
+    printf '  Le détail :  journalctl -u dsoxlab-premier-demarrage --no-pager\n\n'
+  } > /etc/issue
   exit 1
 fi
+
+# Réussi : l'invite redevient celle de Debian, sans trace de chantier.
+printf 'Debian GNU/Linux 13 \\n \\l\n\n' > /etc/issue
 
 touch "$marque"
 
