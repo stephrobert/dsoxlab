@@ -157,11 +157,30 @@ variable "build_memory_mb" {
   default = 2048
 }
 
-#: Le disque est fin : un qcow2 n'occupe que ce qu'il contient, et l'OVA dérivée
-#: est compressée. 20 Gio laissent la place aux images de base des labs.
+#: Le disque est FIN : un qcow2 n'occupe que ce qu'il contient, et l'OVA dérivée
+#: est compressée. Déclarer 64 Gio plutôt que 20 coûte donc **20 Mio** de
+#: téléchargement, et pas 44 Gio : mesuré sur deux images construites ici, le
+#: même jour, 467 Mio pour 20 Gio déclarés contre 487 Mio pour 64. Les 20 Mio
+#: sont les métadonnées ext4 d'un système de fichiers plus large — 4 063 232
+#: inodes au lieu de 1,3 million — écrites en zéros, que le `detect-zeroes=unmap`
+#: du disque de build n'alloue pas. Le partitionnement `atomic` du preseed prend
+#: tout le disque, quel qu'il soit, donc il n'y a rien d'autre à régler.
+#:
+#: Pourquoi 20 Gio ne suffisaient pas, une fois l'appliance vraiment employée :
+#:
+#:   système et bureau après le premier démarrage      environ 6 Gio
+#:   images de base des labs (debian, alma, ubuntu)    2 à 3 Gio chacune
+#:   un cluster kubeadm du catalogue Kubernetes        3 machines, 10 Gio
+#:   les images Docker des labs Terraform              jusqu'à 5 Gio
+#:   le travail de l'apprenant, et ses instantanés     le reste
+#:
+#: Soit une trentaine de gigaoctets dès qu'on enchaîne deux catalogues, sur un
+#: disque qui en déclarait vingt. Agrandir après coup suppose de redimensionner
+#: la partition ET le système de fichiers dans la VM : un geste que personne
+#: n'a à connaître pour suivre une formation.
 variable "disk_size_mb" {
   type    = number
-  default = 20480
+  default = 65536
 }
 
 variable "ssh_username" {

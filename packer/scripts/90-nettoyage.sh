@@ -96,9 +96,10 @@ done
 #
 # Il n'y a plus de repli par remplissage de zéros, et c'est délibéré : sous
 # `ignore` il était le seul à fonctionner, mais il écrivait toute la place libre
-# (environ 17 Gio sur ce disque) avant que le convert final ne la reprenne. Un
-# repli qui ne se déclenche jamais n'est pas un repli ; celui-là coûtait des
-# minutes quand il se déclenchait.
+# avant que le convert final ne la reprenne — environ 17 Gio quand le disque en
+# déclarait 20, et donc une soixantaine depuis qu'il en déclare 64. Un repli qui
+# ne se déclenche jamais n'est pas un repli ; celui-là coûtait des minutes quand
+# il se déclenchait, et en coûterait trois fois plus aujourd'hui.
 fstrim -av
 
 # La mesure, affichée : elle se compare au « disk size » que `qemu-img info`

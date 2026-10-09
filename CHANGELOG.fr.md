@@ -45,6 +45,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   téléchargé, empreinte confrontée au fichier publié — et le job KVM installe
   exactement ce que décrit `uv.lock`.
 
+- **`doctor --fix` proposait `apt install` sur Fedora** (issue #296), où cette
+  commande n'existe pas. Les remédiations choisissent désormais le gestionnaire
+  de paquets de la machine où elles s'exécutent, et avec lui les bons noms de
+  paquets : `virsh` vient de `libvirt-client` — tiré par `libvirt` —,
+  `qemu-utils` s'appelle `qemu-img`, et `genisoimage` n'existe plus sur
+  Fedora 43, où `xorriso` fournit le `xorrisofs` que le contrôle accepte. Noms
+  relevés par `dnf repoquery` sur Fedora 43 et AlmaLinux 10, pas de mémoire.
+  apt reste le défaut quand aucun des deux n'est trouvé.
+
+### Modifié
+
+- **L'appliance déclare un disque de 64 Gio** au lieu de 20. Un qcow2 occupe ce
+  qu'il contient et non ce qu'il déclare, donc le téléchargement ne grossit
+  pas — mais 20 Gio ne tenaient pas en même temps un cluster kubeadm du
+  catalogue Kubernetes, les images de base de deux autres catalogues et le
+  travail de l'apprenant. Agrandir le disque après coup suppose de
+  redimensionner la partition *et* le système de fichiers dans la VM : un geste
+  que personne n'a à connaître pour suivre une formation.
+- **Le job KVM ne dépend plus de la disponibilité d'un miroir Debian.** Il
+  récupère lui-même l'image de base, avec reprises et deux miroirs de repli, la
+  sert sur la boucle locale et donne l'adresse à la pile de test par
+  `providers.kvm.image_url_<distro>`, l'override que le contrat documente. Le
+  job mesurait la disponibilité d'un miroir aussi souvent que le template ; il
+  ne mesure plus que le template.
+
 ## [0.3.2] - 2026-10-09
 
 ### Corrigé

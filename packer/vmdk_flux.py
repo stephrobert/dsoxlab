@@ -21,9 +21,11 @@ et ignore tout ce qui suit. Sur le disque de la 0.2.5 : dernier octet utile à
 lectures, deux empreintes, et c'est l'utilisateur qui l'apprend.
 
 Ce module coupe le fichier juste après ce secteur nul, puis **vérifie** que les
-deux lectures s'accordent. Éprouvé sur le disque publié : ``qemu-img check``
-reste propre et les 20 GiB relus sont identiques, empreinte du brut comparée
-avant et après. Le secteur nul est conservé : il tient le rôle du marqueur de
+deux lectures s'accordent. Éprouvé sur le disque publié de la 0.2.5, qui
+déclarait alors 20 GiB : ``qemu-img check`` reste propre et le disque relu est
+identique, empreinte du brut comparée avant et après. Le raisonnement ne dépend
+pas de cette taille — il porte sur la queue du fichier, dont la zone
+d'alignement ne peut pas dépasser un grain. Le secteur nul est conservé : il tient le rôle du marqueur de
 fin, et il évite qu'un lecteur aligné lise au-delà du fichier.
 """
 
