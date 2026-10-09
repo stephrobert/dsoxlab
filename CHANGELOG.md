@@ -7,6 +7,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The appliance asked nobody, and arrived in QWERTY** (images up to 0.3.2).
+  A **first-boot wizard** now asks for the keyboard layout, the timezone and
+  dsoxlab's interface language, on the machine's own console, **before** the
+  login prompt — the pattern of an operating system's initial setup. The menus
+  are numbered because digits sit in the same place on every layout: answering
+  « 2 » works whatever keyboard the machine believes it has, which is precisely
+  the problem being solved. Without an answer it falls back after 30 seconds, so
+  a boot with nobody watching — this image's own CI, a remote server — is never
+  blocked, and `dsoxlab.oobe=0` on the kernel command line skips it entirely.
+  The image still ships **French AZERTY** as its default.
+- **The 0.3.2 keyboard fix did not work**, and the fix is now verifiable. That
+  release declared three debconf keys where Debian documents one; a value a
+  `select` refuses makes the default win silently under `priority=critical`, and
+  the published image carried `XKBLAYOUT="us"`. The layout is now written
+  **after** the installation, in `10-base.sh`, where the build checks what it
+  wrote and **fails** if it is not `fr` — measured in a locally built image
+  before publishing anything.
+- **The first boot spoke where nobody was looking**, and both orders of
+  `console=` had that defect. The serial port keeps `/dev/console`, so the full
+  journal stays available to CI and to remote diagnosis; the VM window gets what
+  the script writes to `/dev/tty1` explicitly; the login prompt carries the
+  current step through `/etc/issue`. Three audiences, three paths, none of them
+  depending on which console came last on the kernel command line.
+- **Three unpinned installations** that OpenSSF Scorecard reported, and it was
+  right: `uv` arrived by `curl | sh` in the image, Packer by an unpinned
+  third-party apt repository in CI, and the KVM job resolved its dependencies
+  freely with `pip install .`. All three now use the pattern this repository
+  already applies to actionlint and trufflehog — declared version, downloaded
+  artifact, checksum verified against the published file — and the KVM job
+  installs exactly what `uv.lock` describes.
+
 ## [0.3.2] - 2026-10-09
 
 ### Fixed

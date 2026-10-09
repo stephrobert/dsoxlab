@@ -7,6 +7,44 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Corrigé
+
+- **L'appliance ne demandait rien, et arrivait en QWERTY** (images jusqu'à la
+  0.3.2). Un **assistant de premier démarrage** demande désormais la disposition
+  du clavier, le fuseau horaire et la langue de l'interface dsoxlab, sur la
+  console de la machine, **avant** l'invite de connexion — le patron d'une
+  installation de système. Les menus sont numérotés parce que les chiffres sont
+  au même endroit sur toutes les dispositions : répondre « 2 » fonctionne quel
+  que soit le clavier que la machine croit avoir, ce qui est précisément le
+  problème qu'on résout. Sans réponse il retombe sur le défaut au bout de 30
+  secondes, donc un démarrage sans personne devant l'écran — la CI de cette
+  image, un serveur distant — n'est jamais bloqué, et `dsoxlab.oobe=0` sur la
+  ligne de commande du noyau le saute entièrement. L'image reste livrée en
+  **AZERTY français** par défaut.
+- **Le correctif de clavier de la 0.3.2 ne fonctionnait pas**, et le nouveau se
+  vérifie. Cette version déclarait trois clés debconf là où Debian en documente
+  une ; une valeur qu'un `select` refuse fait silencieusement gagner le défaut
+  sous `priority=critical`, et l'image publiée portait `XKBLAYOUT="us"`. La
+  disposition est maintenant écrite **après** l'installation, dans
+  `10-base.sh`, où le build relit ce qu'il a écrit et **échoue** si ce n'est pas
+  `fr` — mesuré dans une image construite en local avant de rien publier.
+- **Le premier démarrage parlait là où personne ne regardait**, et les deux
+  ordres de `console=` avaient ce défaut. Le port série garde `/dev/console`,
+  donc le journal complet reste disponible pour la CI et le diagnostic à
+  distance ; la fenêtre de la VM reçoit ce que le script écrit explicitement sur
+  `/dev/tty1` ; l'invite de connexion porte l'étape courante par `/etc/issue`.
+  Trois publics, trois chemins, et aucun qui dépende de la console arrivée en
+  dernier sur la ligne de commande du noyau.
+- **Trois installations non épinglées** que signalait OpenSSF Scorecard, à juste
+  titre : `uv` arrivait par `curl | sh` dans l'image, Packer par un dépôt apt
+  tiers non épinglé en CI, et le job KVM résolvait ses dépendances librement
+  avec `pip install .`. Les trois emploient désormais le patron que ce dépôt
+  applique déjà à actionlint et trufflehog — version déclarée, artefact
+  téléchargé, empreinte confrontée au fichier publié — et le job KVM installe
+  exactement ce que décrit `uv.lock`.
+
 ## [0.3.2] - 2026-10-09
 
 ### Corrigé

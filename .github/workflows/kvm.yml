@@ -179,13 +179,31 @@ jobs:
         # « externally managed » (PEP 668) et refuse toute installation hors
         # environnement. Le runner porte déjà Python : une action de moins dans
         # la chaîne d'approvisionnement.
+        env:
+          UV_VERSION: "0.12.24"
         run: |
           set -euo pipefail
-          python3 -m venv /tmp/venv
-          /tmp/venv/bin/pip install --quiet --upgrade pip
-          /tmp/venv/bin/pip install --quiet .
-          echo "/tmp/venv/bin" >> "$GITHUB_PATH"
-          /tmp/venv/bin/dsoxlab --version
+          # `pip install .` résolvait les dépendances LIBREMENT, donc deux
+          # exécutions du même commit pouvaient installer deux arbres
+          # différents — ce que Scorecard signale en « Pinned-Dependencies ».
+          # `uv sync --frozen` installe exactement ce que `uv.lock` décrit, et
+          # refuse de le modifier.
+          #
+          # uv arrive par un binaire de release vérifié, pas par une action :
+          # une dépendance de moins dans la chaîne, et l'empreinte contrôlée.
+          workdir="$(mktemp -d)"
+          base="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}"
+          asset="uv-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o "${workdir}/${asset}" "${base}/${asset}"
+          curl -fsSL -o "${workdir}/${asset}.sha256" "${base}/${asset}.sha256"
+          (cd "${workdir}" && sha256sum -c "${asset}.sha256")
+          tar -xzf "${workdir}/${asset}" -C "${workdir}"
+          sudo install -m 0755 "${workdir}/uv-x86_64-unknown-linux-gnu/uv" /usr/local/bin/uv
+          uv --version
+
+          uv sync --frozen --no-dev
+          echo "${PWD}/.venv/bin" >> "$GITHUB_PATH"
+          ./.venv/bin/dsoxlab --version
 
       - name: Write the smallest stack that exercises the template
         if: steps.kvm.outputs.present == 'true'

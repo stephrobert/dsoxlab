@@ -47,13 +47,23 @@ echec=""
 # `/etc/issue` est relu par getty à CHAQUE invite : une touche Entrée suffit donc
 # à voir l'étape en cours, sans rien savoir de systemd ni de journalctl.
 annoncer() {
+  # 1. Le journal et la console série, par la sortie standard du service.
   echo "$1"
+
+  # 2. L'invite de connexion, relue par getty à CHAQUE invite.
   {
     printf '\n  dsoxlab : première configuration EN COURS\n'
     printf '  %s\n\n' "$1"
     printf '  La suivre en direct :  journalctl -u dsoxlab-premier-demarrage -f\n'
     printf "  La machine redémarrera d'elle-même quand ce sera terminé.\n\n"
   } > /etc/issue
+
+  # 3. La FENÊTRE de la machine virtuelle, explicitement. Elle ne reçoit plus
+  #    /dev/console, rendu à la série pour que la CI et le diagnostic à distance
+  #    gardent tout le journal. Écrire ici est donc le seul moyen de parler à qui
+  #    regarde l'écran — et `|| true`, parce qu'un tty1 absent (machine sans
+  #    console graphique) ne doit pas faire échouer la configuration.
+  printf '  dsoxlab : %s\n' "$1" > /dev/tty1 2>/dev/null || true
 }
 
 echo "=== Première configuration de l'appliance dsoxlab ==="
@@ -248,6 +258,8 @@ if [ -n "$echec" ]; then
     printf '  Vérifiez le réseau de la VM, puis redémarrez-la.\n\n'
     printf '  Le détail :  journalctl -u dsoxlab-premier-demarrage --no-pager\n\n'
   } > /etc/issue
+  printf '\n  dsoxlab : configuration INCOMPLÈTE —%s — elle recommencera au prochain démarrage.\n' \
+    "$echec" > /dev/tty1 2>/dev/null || true
   exit 1
 fi
 
