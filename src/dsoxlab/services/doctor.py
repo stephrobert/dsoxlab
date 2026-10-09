@@ -151,6 +151,25 @@ def _fix(*commands: Sequence[str], kind: FixKind = FixKind.AUTOMATIC) -> Fix:
     return Fix(commands=tuple(tuple(cmd) for cmd in commands), kind=kind)
 
 
+def _installer(apt: Sequence[str], dnf: Sequence[str]) -> list[str]:
+    """La commande d'installation de paquets **du poste**, apt ou dnf.
+
+    Toutes les remédiations proposaient ``sudo apt install``, y compris sur
+    Fedora, où ``--fix`` lançait donc une commande introuvable (issue
+    blog-roadmap #41). Les noms diffèrent aussi d'une famille à l'autre, d'où
+    deux listes. Relevé le 2026-10-01 par ``dnf repoquery`` sur Fedora 43 et
+    AlmaLinux 10 : ``virsh`` vient de ``libvirt-client``, tiré par ``libvirt`` ;
+    ``qemu-utils`` s'appelle ``qemu-img`` ; ``genisoimage`` n'existe plus sur
+    Fedora 43, ``xorriso`` fournit ``xorrisofs``, que le contrôle accepte.
+
+    apt reste le choix par défaut quand aucun des deux n'est trouvé : c'est le
+    comportement d'avant, et la famille Debian celle que dsoxlab éprouve.
+    """
+    if shutil.which("apt-get") is None and shutil.which("dnf") is not None:
+        return ["sudo", "dnf", "install", *dnf]
+    return ["sudo", "apt", "install", *apt]
+
+
 @dataclass(frozen=True)
 class Check:
     """Un composant diagnostiqué.
@@ -343,7 +362,7 @@ def _check_incus() -> Check:
     if not shutil.which("incus"):
         return _check(
             "incus", False, _("detail_incus_missing"),
-            fix=_fix(["sudo", "apt", "install", "incus"]),
+            fix=_fix(_installer(["incus"], ["incus"])),
         )
 
     # Le numéro de version n'est qu'un ornement du diagnostic. Le verdict vient
@@ -441,10 +460,10 @@ def _check_kvm() -> Check:
     if not shutil.which("virsh"):
         return _check(
             "kvm", False, _("detail_kvm_missing"),
-            fix=_fix([
-                "sudo", "apt", "install",
-                "libvirt-clients", "libvirt-daemon-system", "qemu-kvm",
-            ]),
+            fix=_fix(_installer(
+                ["libvirt-clients", "libvirt-daemon-system", "qemu-kvm"],
+                ["libvirt", "qemu-kvm"],
+            )),
         )
     # Un virsh qui sort en erreur est justement ce que ce contrôle cherche à
     # rapporter ; un virsh qui ne répond pas dit la même chose plus fort.
@@ -1091,7 +1110,9 @@ def explique_echec_provision(
     # et les quatre volumes du plan échouent d'un coup sans que rien ne nomme le
     # paquet qui manque.
     if "without qemu-img" in bas or "non-raw file images" in bas:
-        return _("explain_qemu_img_absent"), "sudo apt install qemu-utils"
+        return _("explain_qemu_img_absent"), shlex.join(
+            _installer(["qemu-utils"], ["qemu-img"])
+        )
 
     # « already exists » sur un domaine : un provisionnement précédent a échoué
     # APRÈS avoir défini la machine, qui n'est donc pas dans le state Terraform.
@@ -1154,7 +1175,7 @@ def _check_iso_tool() -> Check:
             return _check("iso_tool", True, outil)
     return _check(
         "iso_tool", False, _("detail_iso_tool_missing"),
-        fix=_fix(["sudo", "apt", "install", "genisoimage"]),
+        fix=_fix(_installer(["genisoimage"], ["xorriso"])),
     )
 
 
