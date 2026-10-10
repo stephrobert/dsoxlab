@@ -60,6 +60,13 @@ LANGUES=(
   "fr|Français"
   "en|English"
 )
+# Le bureau coûte environ 700 Mo de téléchargement, autant sur le disque, et
+# une part de mémoire et de processeur qui manquera aux machines de lab. Le
+# défaut reste « oui » : l'appliance est faite pour quelqu'un qui découvre.
+BUREAUX=(
+  "1|Oui — bureau XFCE et navigateur (environ 700 Mo)"
+  "0|Non — console seule, plus léger et plus rapide"
+)
 
 demander() {
   # $1 = titre, $2... = entrées « valeur|libellé ». Écrit le choix sur stdout.
@@ -106,8 +113,56 @@ printf '  les valeurs marquées d%sune étoile sont retenues.\n' "'"
 clavier=$(demander "Disposition du clavier" "${CLAVIERS[@]}")
 fuseau=$(demander "Fuseau horaire" "${FUSEAUX[@]}")
 langue=$(demander "Langue de l'interface dsoxlab" "${LANGUES[@]}")
+bureau=$(demander "Installer un bureau graphique ?" "${BUREAUX[@]}")
 
-printf '\n  Retenu : clavier %s, fuseau %s, interface %s.\n\n' "$clavier" "$fuseau" "$langue"
+# ── Le mot de passe, et pourquoi il se pose ICI ────────────────────────────
+#
+# Celui du build est PUBLIC : il est écrit dans le preseed, dans ce dépôt. Il
+# ne doit pas survivre. La recette le faisait expirer (`chage -d 0`), ce qui
+# marche en console et CASSE la connexion graphique : le greeter de LightDM
+# annonce « Changing password for student » puis échoue, sans issue visible.
+#
+# Ici, nous sommes en console, avant `getty` et avant que LightDM existe.
+# C'est le seul moment où la question peut être posée sans rien casser.
+demander_mot_de_passe() {
+  local un deux i
+  printf '\n  Mot de passe de « student »\n\n'
+  printf '  Celui de fabrication (« dsoxlab ») est public : il est écrit dans\n'
+  printf '  le dépôt du projet. Choisissez-en un autre.\n\n'
+  for i in 1 2; do
+    printf '  Nouveau mot de passe (vide = garder le défaut) : '
+    un=""; read -r -s -t "$DELAI" un || true; printf '\n'
+    [ -z "$un" ] && return 1
+    printf '  Confirmer                                      : '
+    deux=""; read -r -s -t "$DELAI" deux || true; printf '\n'
+    if [ "$un" = "$deux" ]; then
+      printf '%s:%s' student "$un" | chpasswd && return 0
+      printf '\n  Le changement a échoué ; le mot de passe par défaut est gardé.\n'
+      return 1
+    fi
+    printf '\n  Les deux saisies diffèrent.\n'
+  done
+  return 1
+}
+
+if demander_mot_de_passe; then
+  # L'expiration n'a plus lieu d'être : le mot de passe vient d'être choisi.
+  chage -d -1 student 2>/dev/null || true
+  mot_de_passe="changé"
+else
+  # Personne devant l'écran, ou refus. On lève quand même l'expiration : une
+  # machine dont la session ne peut pas s'ouvrir est pire qu'une machine dont
+  # le mot de passe est connu. Mais on le DIT, ici et dans le mot d'accueil.
+  chage -d -1 student 2>/dev/null || true
+  mot_de_passe="encore « dsoxlab » — changez-le avec : passwd"
+  printf '\n  ⚠ Le mot de passe de « student » est encore celui par défaut.\n'
+  printf '    Une fois connecté :  passwd\n'
+fi
+
+if [ "$bureau" = "1" ]; then bureau_dit="bureau XFCE"; else bureau_dit="console seule"; fi
+printf '\n  Retenu : clavier %s, fuseau %s, interface %s, %s.\n' \
+  "$clavier" "$fuseau" "$langue" "$bureau_dit"
+printf '  Mot de passe : %s\n\n' "$mot_de_passe"
 # Le dialogue va à l'écran ; ce qui en RESTE va au journal, pour qui diagnostique
 # plus tard une machine dont il n'a pas vu le premier démarrage.
 logger -t dsoxlab-assistant "clavier=${clavier} fuseau=${fuseau} langue=${langue}" 2>/dev/null || true
@@ -133,8 +188,30 @@ loadkeys "$clavier" 2>/dev/null || true
 
 timedatectl set-timezone "$fuseau" 2>/dev/null || true
 
-# La langue de l'interface est une variable d'environnement : elle vit dans le
-# profil de l'apprenant, pas dans une configuration système.
+# La première configuration lit ce fichier avant d'installer quoi que ce soit.
+# Un fichier et non une variable d'environnement : les deux scripts tournent
+# dans des unités systemd distinctes, qui ne partagent aucun environnement.
+install -d -m 0755 /etc/dsoxlab
+cat > /etc/dsoxlab/appliance.conf <<CONF
+# Écrit par l'assistant de premier démarrage. Lu par
+# /usr/local/sbin/dsoxlab-premier-demarrage avant l'étape du bureau.
+DSOXLAB_APPLIANCE_DESKTOP=${bureau}
+CONF
+
+# La langue de l'interface est une variable d'environnement. Elle allait dans
+# `~/.profile`, et c'était le même défaut que pour le PATH d'`uv` : `.profile`
+# n'est lu que par un shell de LOGIN. Un terminal ouvert depuis le bureau XFCE
+# n'en est pas un — l'interface restait donc en anglais alors que l'assistant
+# avait retenu « français », ce qui s'est vu sur une capture d'écran réelle.
+#
+# `/etc/environment` est lu par PAM, donc par TOUTES les sessions : console,
+# SSH et graphique. C'est le mécanisme prévu pour cela, et il n'accepte pas
+# `export`, seulement `CLÉ=valeur`.
+sed -i '/^DSOXLAB_LANG=/d' /etc/environment 2>/dev/null || true
+printf 'DSOXLAB_LANG=%s\n' "$langue" >> /etc/environment
+
+# `~/.profile` garde la sienne : une session ouverte avant que PAM relise
+# `/etc/environment` doit tout de même avoir la bonne langue.
 if [ -d /home/student ]; then
   sed -i '/^export DSOXLAB_LANG=/d' /home/student/.profile 2>/dev/null || true
   printf 'export DSOXLAB_LANG=%s\n' "$langue" >> /home/student/.profile
@@ -181,9 +258,22 @@ StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
-# Trois questions à trente secondes : deux minutes couvrent le pire cas, et
-# bornent un démarrage sans personne devant l'écran.
-TimeoutStartSec=3min
+# Le pire cas se CALCULE, il ne s'estime pas — et le calcul a changé le jour où
+# la question du mot de passe est arrivée :
+#
+#   3 questions × 30 s                              90 s
+#   mot de passe : 2 tentatives × 2 saisies × 30 s  120 s
+#                                                   ─────
+#                                                   210 s
+#
+# Les 3 minutes d'origine couvraient trois questions ; elles auraient tué
+# l'assistant en plein dialogue, et c'est le pire moment possible : sans son
+# `chage -d -1`, la machine serait restée inouvrable au greeter — exactement le
+# défaut qu'il est là pour corriger.
+#
+# 8 minutes laissent de la marge pour une question de plus, sans cesser de
+# borner un démarrage où personne ne répond.
+TimeoutStartSec=8min
 
 [Install]
 WantedBy=multi-user.target

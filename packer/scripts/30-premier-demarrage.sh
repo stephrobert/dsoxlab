@@ -63,7 +63,7 @@ annoncer() {
   #    gardent tout le journal. Écrire ici est donc le seul moyen de parler à qui
   #    regarde l'écran — et `|| true`, parce qu'un tty1 absent (machine sans
   #    console graphique) ne doit pas faire échouer la configuration.
-  printf '  dsoxlab : %s\n' "$1" > /dev/tty1 2>/dev/null || true
+  { printf '  dsoxlab : %s\n' "$1" > /dev/tty1; } 2>/dev/null || true
 }
 
 echo "=== Première configuration de l'appliance dsoxlab ==="
@@ -77,21 +77,111 @@ echo "=== Première configuration de l'appliance dsoxlab ==="
 #
 # On ne teste pas l'interface ni la route, qui peuvent être là sans servir : on
 # teste ce dont les étapes suivantes ont besoin, c'est-à-dire résoudre un nom.
+# Les deux destinations dont CETTE configuration dépend, et rien d'autre :
+# Debian pour les paquets, PyPI pour dsoxlab. Les nommer ici évite le piège
+# d'attendre un nom que les étapes n'utilisent pas.
+DESTINATIONS="deb.debian.org pypi.org"
+
+joignable() {
+  # Une RÉSOLUTION, puis une CONNEXION. La première ne prouve pas la seconde :
+  # un résolveur local peut répondre avant que la route par défaut existe, et
+  # c'est exactement ce qui faisait passer l'ancien contrôle pour vert alors
+  # que l'installation suivante échouait.
+  getent hosts "$1" >/dev/null 2>&1 || return 1
+  # `bash` sait ouvrir une socket sans aucun outil réseau installé ; le délai
+  # borne l'attente d'un hôte qui ne répond pas du tout.
+  timeout 5 bash -c "exec 3<>/dev/tcp/$1/443" 2>/dev/null
+}
+
 attendre_la_resolution() {
   local restants=60          # 60 × 2 s = deux minutes, large pour un DHCP
+  local manquantes
   while [ "$restants" -gt 0 ]; do
-    if getent hosts deb.debian.org >/dev/null 2>&1; then
+    manquantes=""
+    for hote in $DESTINATIONS; do
+      joignable "$hote" || manquantes="$manquantes $hote"
+    done
+    if [ -z "$manquantes" ]; then
+      echo "Réseau prêt :$(printf ' %s' $DESTINATIONS) répondent en HTTPS."
       return 0
     fi
     restants=$((restants - 1))
     sleep 2
   done
+  # Nommer CE QUI manque : « PyPI injoignable » et « miroir Debian
+  # injoignable » n'appellent pas le même geste.
+  echo "Injoignable après deux minutes :$manquantes" >&2
   return 1
 }
 
-annoncer "Étape 1 sur 4 : attente du réseau…"
+# ── Dire pourquoi, là où l'utilisateur regarde ───────────────────────────────
+#
+# Chaque étape écrit sa sortie dans un fichier à elle. Le journal la reçoit
+# toujours ; la FENÊTRE ne reçoit que ce qui compte, et seulement en cas
+# d'échec. C'est la différence entre « configuration INCOMPLÈTE — bureau » et
+# « apt n'a pas trouvé xfce4 parce que l'index est vide ».
+TRACES=/var/log/dsoxlab
+install -d -m 0755 "$TRACES"
+
+# Nomme la cause quand le motif est reconnaissable, et se tait sinon. Même
+# principe que `explique_echec_provision` dans `services/doctor.py` : la sortie
+# brute d'un outil n'est pas un diagnostic, et une cause inventée serait pire
+# que pas de cause du tout.
+cause_probable() {
+  local trace=$1
+  if grep -qiE 'unable to locate package|has no installation candidate' "$trace"; then
+    printf "l'index des paquets est vide ou périmé"
+  elif grep -qiE 'temporary failure resolving|could not resolve' "$trace"; then
+    printf "cette machine n'a pas de résolution DNS"
+  elif grep -qiE 'failed to fetch|unable to connect|connection (failed|timed out)' "$trace"; then
+    printf "le miroir Debian est injoignable depuis cette machine"
+  elif grep -qiE 'no space left on device' "$trace"; then
+    printf "le disque est plein"
+  elif grep -qiE 'could not get lock|frontend lock' "$trace"; then
+    printf "une autre installation tient le verrou d'apt"
+  elif grep -qiE 'unmet dependencies|broken packages|dpkg: error' "$trace"; then
+    printf "un conflit entre paquets"
+  fi
+}
+
+# Joue une étape. En cas d'échec, dit CE QUI a échoué et POURQUOI, sur la
+# fenêtre de la machine autant que dans le journal.
+etape() {
+  local cle=$1; shift
+  local trace="$TRACES/${cle}.log"
+  local code=0
+  "$@" > "$trace" 2>&1 || code=$?
+
+  # Le journal reçoit tout, succès ou échec : c'est lui qu'on relit à froid.
+  cat "$trace"
+  [ "$code" = 0 ] && return 0
+
+  local cause lignes rapport
+  cause=$(cause_probable "$trace")
+  # Les trois lignes qui disent quelque chose, pas les quatre cents d'apt.
+  lignes=$(grep -E '^(E:|Err:|W: Failed|dpkg: error)' "$trace" | tail -3)
+  if [ -z "$lignes" ]; then
+    lignes=$(grep -vE '^(Get:|Hit:|Ign:|Reading|Building|Preparing|Unpacking|Setting up|Selecting|\(Reading)' \
+             "$trace" | grep -v '^$' | tail -3)
+  fi
+
+  rapport=$(
+    printf '\n  ╭─ l%sétape « %s » a échoué (code %s)\n' "'" "$cle" "$code"
+    [ -n "$cause" ] && printf '  │\n  │  Cause probable : %s.\n' "$cause"
+    printf '  │\n  │  Ce que dit la commande :\n'
+    printf '%s\n' "$lignes" | sed 's/^/  │      /'
+    printf '  │\n  ╰─ trace complète : %s\n\n' "$trace"
+  )
+  # Le journal et la console série…
+  printf '%s\n' "$rapport"
+  # …et la FENÊTRE, qui ne reçoit rien d'autre. C'est tout l'objet du correctif.
+  { printf '%s\n' "$rapport" > /dev/tty1; } 2>/dev/null || true
+  return "$code"
+}
+
+annoncer "Étape 1 sur 5 : attente du réseau…"
 if ! attendre_la_resolution; then
-  echo "ÉCHEC : aucun nom ne se résout après deux minutes d'attente." >&2
+  echo "ÉCHEC : le réseau n'est pas utilisable après deux minutes." >&2
   echo "Rien n'a été installé, et RIEN N'EST PERDU : cette configuration" >&2
   echo "recommencera au prochain démarrage. Vérifiez la carte réseau de la" >&2
   echo "machine virtuelle, puis redémarrez-la." >&2
@@ -99,13 +189,33 @@ if ! attendre_la_resolution; then
 fi
 
 # ── 1. dsoxlab, dans sa dernière version publiée ─────────────────────────────
-annoncer "Étape 2 sur 4 : installation de dsoxlab…"
-if ! sudo -u student -H bash -lc 'uv tool install --force dsoxlab'; then
-  echo "ÉCHEC : « uv tool install dsoxlab » n'a pas abouti." >&2
+# ── L'index des paquets, AVANT toute installation ────────────────────────────
+#
+# `90-nettoyage.sh` retire `/var/lib/apt/lists/*` de l'image : c'est ce qui la
+# rend légère, et c'est délibéré. Mais une image sans index n'installe plus
+# rien tant qu'il n'est pas reconstruit.
+#
+# Cet `apt-get update` vivait DANS la branche `if [ -e /dev/kvm ]`, ce qui l'a
+# rendu invisible pendant tout le développement : sur une machine qui a la
+# virtualisation imbriquée, il était joué et le bureau s'installait. Sur une
+# machine sans — VirtualBox par défaut, donc le cas le plus courant chez un
+# apprenant — il ne l'était pas, et l'étape du bureau cherchait `xfce4` dans un
+# index vide. Elle échouait à chaque démarrage, en répétant le même message.
+# Remonté depuis une VM VirtualBox réelle, pas trouvé en relisant du code.
+annoncer "Étape 2 sur 5 : mise à jour de l'index des paquets…"
+if etape index-des-paquets apt-get update; then
+  echo "Index des paquets reconstruit."
+else
+  echo "Sans index, ni les hyperviseurs ni le bureau ne peuvent s'installer." >&2
+  echec="$echec index-des-paquets"
+fi
+
+annoncer "Étape 3 sur 5 : installation de dsoxlab…"
+if ! etape dsoxlab sudo -u student -H bash -lc 'uv tool install --force dsoxlab'; then
   echec="$echec dsoxlab"
 fi
 
-annoncer "Étape 3 sur 4 : installation des hyperviseurs…"
+annoncer "Étape 4 sur 5 : installation des hyperviseurs…"
 
 # ── 2. Les hyperviseurs, seulement s'ils peuvent servir ──────────────────────
 #
@@ -115,7 +225,6 @@ annoncer "Étape 3 sur 4 : installation des hyperviseurs…"
 # et le marqueur se pose quand même.
 if [ -e /dev/kvm ]; then
   echo "Virtualisation imbriquée disponible : installation de KVM et d'Incus…"
-  apt-get update -qq || true
   # `ovmf` est nommé explicitement, et ce n'est pas du zèle : sur Debian il n'est
   # qu'une RECOMMANDATION de qemu-kvm, donc `--no-install-recommends` l'écarte.
   # Sans lui, libvirt n'expose aucun firmware EFI et tout `provision` s'arrête net
@@ -127,7 +236,7 @@ if [ -e /dev/kvm ]; then
   # Comme `ovmf`, ce n'est qu'une recommandation sur Debian, donc écartée par
   # `--no-install-recommends`. Les deux ont été trouvés en provisionnant pour de
   # vrai depuis l'appliance, pas en relisant la liste.
-  if apt-get install -y --no-install-recommends \
+  if etape hyperviseurs apt-get install -y --no-install-recommends \
       qemu-kvm qemu-utils ovmf libvirt-daemon-system libvirt-clients virtinst \
       incus; then
 
@@ -171,7 +280,6 @@ if [ -e /dev/kvm ]; then
         && echo "Incus initialisé (profil minimal)." || true
     fi
   else
-    echo "ÉCHEC : les hyperviseurs n'ont pas pu être installés." >&2
     echec="$echec hyperviseurs"
   fi
 else
@@ -188,6 +296,14 @@ fi
 # passer par `--print`.
 #
 # Rien de tout cela ne pèse dans l'image distribuée : c'est téléchargé ici.
+# Le choix de l'assistant, s'il a été fait. `DSOXLAB_APPLIANCE_DESKTOP` dans
+# l'environnement reste prioritaire : c'est ce qui permet de construire une
+# image sans bureau sans toucher à l'assistant.
+if [ -z "${DSOXLAB_APPLIANCE_DESKTOP:-}" ] && [ -r /etc/dsoxlab/appliance.conf ]; then
+  # shellcheck source=/dev/null
+  . /etc/dsoxlab/appliance.conf
+fi
+
 if [ "${DSOXLAB_APPLIANCE_DESKTOP:-1}" = "1" ]; then
   # Le serveur X est nommé explicitement, et c'est la TROISIÈME fois que ce
   # motif mord : comme `ovmf` et `qemu-utils`, `xserver-xorg` n'est qu'une
@@ -200,8 +316,8 @@ if [ "${DSOXLAB_APPLIANCE_DESKTOP:-1}" = "1" ]; then
   # Les pilotes vidéo se nomment aussi : `vmware` sert le contrôleur VMSVGA que
   # VirtualBox et VMware présentent par défaut, `vesa` et `fbdev` rattrapent
   # tout le reste. Une appliance ne sait pas sur quel hyperviseur elle tombera.
-  annoncer "Étape 4 sur 4 : installation du bureau XFCE et de Firefox…"
-  if apt-get install -y --no-install-recommends \
+  annoncer "Étape 5 sur 5 : installation du bureau XFCE et de Firefox…"
+  if etape bureau apt-get install -y --no-install-recommends \
       xserver-xorg-core xserver-xorg-input-libinput \
       xserver-xorg-video-vmware xserver-xorg-video-vesa \
       xserver-xorg-video-fbdev xfonts-base x11-xserver-utils \
@@ -213,9 +329,14 @@ if [ "${DSOXLAB_APPLIANCE_DESKTOP:-1}" = "1" ]; then
     systemctl enable lightdm
     echo "Bureau installé, la machine démarrera dessus."
   else
-    echo "ÉCHEC : le bureau n'a pas pu être installé." >&2
     echec="$echec bureau"
   fi
+else
+  # Le dire, plutôt que de sauter l'étape en silence : sans cette ligne,
+  # quelqu'un qui a répondu « non » sans s'en souvenir chercherait pourquoi sa
+  # machine démarre en console.
+  annoncer "Bureau non installé : vous l'avez refusé au premier démarrage."
+  echo "Pour l'installer plus tard : sudo apt install xfce4 lightdm firefox-esr"
 fi
 
 # ── 4. Le fragment SSH que dsoxlab écrit doit être lu ────────────────────────
@@ -248,18 +369,47 @@ fi
 # dsoxlab, sans rien qui explique pourquoi ni comment rattraper.
 if [ -n "$echec" ]; then
   echo "=== Configuration INCOMPLÈTE :$echec ===" >&2
-  echo "Ces étapes recommenceront au prochain démarrage. Vérifiez l'accès" >&2
-  echo "réseau de la machine virtuelle, puis redémarrez-la." >&2
-  # L'invite de connexion doit porter l'échec, et pas seulement le journal : sans
-  # cela, l'utilisateur voit une invite ordinaire et croit la machine prête.
-  {
-    printf '\n  dsoxlab : configuration INCOMPLÈTE —%s\n\n' "$echec"
-    printf '  Rien n\x27est perdu : ces étapes recommenceront au prochain démarrage.\n'
-    printf '  Vérifiez le réseau de la VM, puis redémarrez-la.\n\n'
-    printf '  Le détail :  journalctl -u dsoxlab-premier-demarrage --no-pager\n\n'
-  } > /etc/issue
-  printf '\n  dsoxlab : configuration INCOMPLÈTE —%s — elle recommencera au prochain démarrage.\n' \
-    "$echec" > /dev/tty1 2>/dev/null || true
+
+  # La cause de CHAQUE étape a déjà été affichée par `etape`, juste au-dessus et
+  # dans la fenêtre. Ce bilan dit donc autre chose : ce qui a échoué, ce que la
+  # machine sait encore faire, et le geste à poser. Trois choses que l'ancien
+  # message ne disait pas — « configuration INCOMPLÈTE — bureau — elle
+  # recommencera » laissait l'utilisateur sans savoir s'il devait agir.
+  bilan=$(
+    printf '\n  ╭─ dsoxlab : la configuration est INCOMPLÈTE\n'
+    printf '  │\n'
+    for quoi in $echec; do
+      case "$quoi" in
+        index-des-paquets) printf '  │  ✘ %-18s rien ne peut s%sinstaller sans lui\n' "$quoi" "'" ;;
+        dsoxlab)           printf '  │  ✘ %-18s la commande « dsoxlab » est absente\n' "$quoi" ;;
+        hyperviseurs)      printf '  │  ✘ %-18s les labs « vm » ne pourront pas tourner\n' "$quoi" ;;
+        bureau)            printf '  │  ✘ %-18s la machine démarre en console, sans XFCE\n' "$quoi" ;;
+        *)                 printf '  │  ✘ %s\n' "$quoi" ;;
+      esac
+    done
+    printf '  │\n'
+    printf '  │  La cause de chacune est affichée au-dessus, et conservée dans\n'
+    printf '  │  /var/log/dsoxlab/<étape>.log\n'
+    printf '  │\n'
+    printf '  │  CE QU%sIL FAUT FAIRE\n' "'"
+    printf '  │    1. régler la cause ci-dessus (le plus souvent : le réseau de la VM)\n'
+    printf '  │    2. sudo reboot\n'
+    printf '  │\n'
+    printf '  │  La configuration RECOMMENCE à chaque démarrage tant qu%selle n%sa\n' "'" "'"
+    printf '  │  pas abouti. Rien n%sest perdu, rien n%sest à réinstaller.\n' "'" "'"
+    printf '  │\n'
+    printf '  ╰─ tout le journal : journalctl -u dsoxlab-premier-demarrage --no-pager\n\n'
+  )
+
+  # Le journal et la console série.
+  printf '%s\n' "$bilan" >&2
+  # La FENÊTRE : c'est là que l'utilisateur regarde, et c'est là qu'il ne voyait
+  # qu'une ligne.
+  { printf '%s\n' "$bilan" > /dev/tty1; } 2>/dev/null || true
+  # L'invite de connexion, relue par getty : sans elle, l'utilisateur qui se
+  # connecte plus tard voit une invite ordinaire et croit la machine prête.
+  printf '%s\n' "$bilan" > /etc/issue
+
   exit 1
 fi
 
@@ -305,7 +455,20 @@ UNIT
 systemctl enable dsoxlab-premier-demarrage.service
 
 # Le mot de passe du build ne doit pas survivre : il est public, il est dans ce
-# dépôt. `chage -d 0` force son changement à la première connexion.
+# dépôt. Son changement est demandé par l'ASSISTANT de premier démarrage
+# (`25-assistant.sh`), en console, avant que LightDM existe.
+#
+# Il était forcé ici par `chage -d 0`, et c'était un défaut : en console PAM
+# mène le dialogue correctement, mais le greeter de LightDM annonce
+# « Changing password for student » puis échoue. L'appliance avec bureau était
+# donc impossible à ouvrir à la première connexion — remonté d'une VirtualBox
+# réelle, après que l'image a été publiée.
+#
+# `chage -d 0` est posé quand même ici, pour la fenêtre entre la fin de la
+# fabrication et le premier démarrage : si quelqu'un démarre l'image avec
+# `dsoxlab.oobe=0`, l'assistant est sauté et le mot de passe public ne doit pas
+# rester silencieusement valable. L'assistant lève cette expiration dès qu'il
+# s'exécute, qu'il ait obtenu une réponse ou non.
 chage -d 0 student
 
 # Un mot d'accueil qui dit quoi taper, plutôt qu'un shell muet.

@@ -120,18 +120,56 @@ decompresses the disk.
 
 Skip this if you only want `shell` labs.
 
+> **Read this before ticking the box.** Running KVM *inside VirtualBox* works
+> poorly, and we are working on it. VirtualBox exposes partial nested
+> virtualisation: enough for `/dev/kvm` to appear and for libvirt to agree to
+> start a machine, not enough for that machine to run correctly.
+>
+> What it looks like, measured on 2026-10-10 with VirtualBox 7: `dsoxlab
+> provision` creates all three machines in two seconds, then one of them burns
+> **a whole core at 100%** without ever allocating its memory — 369 MB touched
+> out of 2048 requested. Adding memory and CPUs changes nothing (tried up to
+> 16 GB and 8 vCPUs), and the appliance eventually **freezes**.
+>
+> If you are after `vm` labs, prefer one of the two paths below. If you stay on
+> VirtualBox, `shell` labs work perfectly, and there are many of them: the
+> whole Terraform catalog, and a good share of the others.
+
+| What you want to play | The solid path |
+| --- | --- |
+| `vm` labs, comfortably | **dsoxlab directly on your Linux machine** — `uv tool install dsoxlab`, native KVM, no nesting at all. This is the tool's primary use case |
+| `vm` labs, from a virtual machine | **the appliance under KVM/QEMU** rather than VirtualBox: the `.qcow2` is made for it, and KVM-inside-KVM behaves far better |
+| `shell` labs | **VirtualBox is fine**, and you can leave the box unticked |
+
+
 A `vm` lab starts real machines *inside* the appliance. Your computer therefore
 has to allow a virtual machine to launch others, which is set **outside** the
 appliance, with it powered off.
 
-In VirtualBox, select the machine, then **Settings → System → Processor**, and
-tick **Enable Nested VT-x/AMD-V**. On the command line:
+In VirtualBox, select the machine, then **Settings → System → Processor**.
+Three settings matter on that tab, and two of them are easy to miss:
+
+![VirtualBox's Processor tab, set correctly: 4 CPUs, Processing Cap at 100%,
+and nested virtualisation
+ticked](./assets/appliance-virtualbox-processeur.png)
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| **Nested VT-x/AMD-V** | ticked | without it, no `vm` lab starts at all |
+| **Number of CPUs** | 4 | the image asks for it, but the import does not always carry it over |
+| **Processing Cap** | 100% | one import left it at **1%**: the machine is then not slow, it is unusable |
+
+On the command line:
 
 ```bash
 VBoxManage modifyvm "dsoxlab-appliance-<version>" --nested-hw-virt on
+VBoxManage modifyvm "dsoxlab-appliance-<version>" --cpus 4 --cpuexecutioncap 100
 ```
 
-If the box is greyed out, your CPU or your BIOS does not expose it: `shell`
+If the box is greyed out, there are two likely causes: on an Intel host, some
+VirtualBox versions only expose the setting from the command line; and on
+Windows, **Hyper-V must be disabled**, otherwise it keeps virtualisation to
+itself. If nothing helps, your CPU or your BIOS does not expose it: `shell`
 labs remain entirely playable.
 
 ---
@@ -166,11 +204,43 @@ Network**, then restart it.
 | user | `student` |
 | password | `dsoxlab` |
 
-**The machine requires you to change that password immediately.** That is
-expected: the build password is public, it is written in this repository. It
-asks for the old one (`dsoxlab`), then the new one twice.
+You only need that password if you skipped the wizard's question: **at the
+very first boot, before the login prompt, the machine asks you to choose
+another one.** The build password is public, it is written in this repository.
+
+If you did not answer, it is still `dsoxlab` and the appliance said so on
+screen. Change it once logged in:
+
+```bash
+passwd
+```
+
+> Up to 0.3.3 this change was **forced** by the system at first login. That was
+> a defect: LightDM's graphical greeter cannot carry that dialogue, and the
+> session could not be opened at all without switching to a text console.
 
 You land on an XFCE desktop. The terminal is in the bottom bar, second icon.
+
+---
+
+### Switching to a text console when the desktop will not cooperate
+
+A full-screen terminal without any desktop stays available: that is how you
+repair a graphical session that refuses to open.
+
+**In VirtualBox, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F3</kbd> does not work**:
+your host system grabs it, and the virtual machine never sees a thing. You need
+the **host key**, shown at the bottom right of the window — <kbd>Right
+Ctrl</kbd> by default:
+
+| | |
+| --- | --- |
+| go to a console | <kbd>Right Ctrl</kbd>+<kbd>F3</kbd> |
+| back to the desktop | <kbd>Right Ctrl</kbd>+<kbd>F1</kbd> (sometimes <kbd>F7</kbd>) |
+
+Many compact keyboards have **no** <kbd>Right Ctrl</kbd> key. The combination
+can be changed: **File → Preferences → Input**, *Virtual Machines* tab, **Host
+Key Combination** — click the field and press the key you want.
 
 ---
 
@@ -280,6 +350,11 @@ runner. It is reproducible: nothing is hand-made in the image.
 
 ## Known limits
 
+- **`vm` labs under VirtualBox: work in progress.** KVM inside VirtualBox
+  behaves badly — a machine burning a core without booting, then a freeze. It
+  is not a matter of memory or CPUs. Until that improves, `vm` labs want
+  dsoxlab on a plain Linux machine, or the appliance under KVM/QEMU; `shell`
+  labs work everywhere. See step 4.
 - **One user, one machine.** The appliance is not a shared classroom server; a
   trainer serving several learners wants [the trainer's page](./trainer.md).
 - **The disk declares 64 GB, and it grows on your side.** It is *thin*: the

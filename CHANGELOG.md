@@ -7,6 +7,114 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-10-10
+
+### Added
+
+- **`dsoxlab` typed on its own now guides you.** It used to print Typer's
+  help — twenty-five commands in a row, with no hint of the first move. For
+  someone opening the appliance's terminal and typing the only word they know,
+  that is a wall. The welcome screen states the machine's state in one line,
+  then offers **the moves that match that state**: install a catalog when
+  there is none, choose an active one when none is, list and play labs when
+  everything is ready. It ends with the whole path, from an empty machine to a
+  graded lab — because dsoxlab's error messages each name the next step, but
+  you have to meet them one at a time to discover them. `dsoxlab --help` still
+  gives the full list, one keystroke away.
+- **The first-boot wizard asks whether you want the desktop.** XFCE costs
+  about 700 MB of download, as much on disk, and a share of the memory and
+  CPU the lab machines will want. `30-premier-demarrage.sh` already tested
+  `DSOXLAB_APPLIANCE_DESKTOP`, but nothing set it. Answering « no » now skips
+  the step — and the appliance says so at the next boot rather than silently
+  landing on a console.
+
+### Fixed
+
+- **The desktop could never install on a machine without nested
+  virtualisation**, which is VirtualBox out of the box — the most common case
+  for a learner. `apt-get update` lived *inside* the `if [ -e /dev/kvm ]`
+  branch, while the build deliberately strips `/var/lib/apt/lists/*` to keep
+  the image light. With no index, step 4 looked for `xfce4` in an empty
+  catalogue and failed **at every boot**, always with the same message. The
+  index is now rebuilt for everyone, as a step of its own, before anything is
+  installed. Reproduced in two QEMU machines built from the published 0.3.3
+  image — one with `/dev/kvm`, one without — which is what separated the cause
+  from the symptom.
+- **Nothing said *why* it had failed.** The output of `apt` goes to the
+  service's standard output, so to the journal and the **serial** console; the
+  VM's own window, `/dev/tty1`, only ever received the step headings. The whole
+  diagnosis existed somewhere nobody looks. Each step now writes its output to
+  `/var/log/dsoxlab/<step>.log`, and on failure the window gets the error
+  lines, the path to the full trace, and **the probable cause named** when the
+  pattern is recognisable: an empty package index, no DNS, an unreachable
+  mirror, a full disk, a held apt lock, a package conflict. An unrecognised
+  message gets no invented cause — only its raw output.
+- **The closing message said nothing actionable.** « configuration INCOMPLÈTE —
+  bureau — elle recommencera au prochain démarrage » read as punctuation, named
+  no subject, and left the reader unsure whether to act. It now lists each
+  failed step with what it costs (« the machine boots to a console, without
+  XFCE »), the two things to do, and the fact that nothing is lost.
+
+- **The graphical login could not be opened at all.** `chage -d 0 student`
+  forces a password change at first login; in a text console PAM carries that
+  dialogue fine, but LightDM's greeter announces « Changing password for
+  student » and then fails, with no visible way out. The appliance shipped
+  with a desktop nobody could log into. The password is now chosen by the
+  **first-boot wizard**, in a console, before `getty` and before LightDM even
+  exists. With no answer — an unattended boot — the expiry is lifted anyway
+  and the default password stays, because a machine whose session cannot be
+  opened is worse than one whose password is known; but the appliance **says
+  so**, on screen and in the message of the day, instead of keeping quiet.
+- **Waiting for the network did not measure what the next step needs.** It
+  waited for `deb.debian.org` to *resolve*, while the step right after it
+  installs dsoxlab from **PyPI** — and a resolution is not a connection: a
+  local resolver can answer before the default route exists. It now waits for
+  both destinations, over HTTPS, and names the one that is missing.
+
+- **`dsoxlab` was not on the PATH of a desktop terminal.** `uv` installs its
+  tools into `~/.local/bin`, and Debian's `.profile` adds that directory to
+  the PATH — but `.profile` is only read by a **login** shell. A terminal
+  opened from the XFCE desktop is an interactive *non-login* shell: it reads
+  `~/.bashrc`, which did not touch the PATH. So `~/.local/bin/dsoxlab` existed
+  and `dsoxlab` answered « command not found », in the one window where a
+  learner is going to type it. The first-boot configuration used `bash -lc`,
+  which is why the recipe never saw it. `~/.bashrc` now extends the PATH, and
+  the build fails if `uv` stays unreachable from a non-login shell.
+
+
+
+- **The catalog registry listed three catalogs out of six**, and pointed
+  `terraform` at a renamed repository. `kubernetes`, `devsecops` and `python`
+  were missing entirely, so `dsoxlab catalog list` showed a learner half of
+  what exists; and `terraform-training` is now only a redirect to
+  `terraform-dsoxlab-training`, which works until the old name disappears.
+  Every entry has been checked against the GitHub API: the repository exists,
+  it is public, and the URL is the canonical name.
+- **The interface stayed in English although the wizard had been told
+  « français ».** `DSOXLAB_LANG` was written to `~/.profile`, which a desktop
+  terminal never reads — the same defect as the PATH, found on the same
+  screenshot. It now goes to `/etc/environment`, which PAM reads for every
+  session: console, SSH and graphical.
+- **A catalog installed by URL was still offered as installable.** The welcome
+  screen compared identifiers, while `catalog add <url>` names a catalog after
+  its URL and `catalog add <name>` after the manifest. The comparison is now
+  made on the repository URL, which does not depend on how it was installed.
+
+### Documentation
+
+- **Running KVM inside VirtualBox behaves badly, and the page now says so
+  before you tick the box.** Measured on 2026-10-10: `provision` creates all
+  three machines in two seconds, then one burns a whole core at 100% without
+  ever allocating its memory, and the appliance eventually freezes — unchanged
+  by 16 GB of RAM and 8 vCPUs. The page gives the two solid paths for `vm`
+  labs and states that `shell` labs are unaffected. The work to improve this
+  is under way.
+- VirtualBox's Processor tab is documented **in full, with a screenshot**: not
+  only nested virtualisation, but the two settings an import can leave
+  anywhere — one left 1 vCPU and a Processing Cap at 1%, at which point the
+  machine is not slow, it is unusable. Plus the host key needed to reach a
+  text console, and how to change it on a keyboard without a right Ctrl.
+
 ## [0.3.3] - 2026-10-09
 
 ### Fixed
@@ -4253,7 +4361,8 @@ Initial public release.
 - Environment diagnostics (`dsoxlab doctor [--fix]`).
 - Bilingual (English/French) user interface driven by `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/stephrobert/dsoxlab/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/stephrobert/dsoxlab/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/stephrobert/dsoxlab/compare/v0.3.0...v0.3.1

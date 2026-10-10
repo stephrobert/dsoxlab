@@ -125,19 +125,62 @@ décompresse le disque pendant ce temps.
 
 À sauter si vous ne visez que les labs `shell`.
 
+> **À lire avant de cocher.** Faire tourner KVM *à l'intérieur de VirtualBox*
+> fonctionne mal, et nous y travaillons. VirtualBox expose une virtualisation
+> imbriquée partielle : assez pour que `/dev/kvm` apparaisse et que libvirt
+> accepte de démarrer une machine, pas assez pour qu'elle s'exécute
+> correctement.
+>
+> Ce que cela donne, mesuré le 2026-10-10 sur VirtualBox 7 : `dsoxlab
+> provision` crée les trois machines en deux secondes, puis l'une d'elles
+> occupe **un cœur à 100 %** sans jamais allouer sa mémoire — 369 Mo touchés
+> sur 2048 demandés. Ajouter de la mémoire et des processeurs n'y change rien
+> (essayé jusqu'à 16 Go et 8 vCPU), et l'appliance finit par **geler**.
+>
+> Si vous visez les labs `vm`, préférez l'un des deux chemins du tableau
+> ci-dessous. Si vous restez sous VirtualBox, les labs `shell` fonctionnent
+> parfaitement, et ils sont nombreux : la totalité du catalogue Terraform, et
+> une bonne part des autres.
+
+| Ce que vous voulez jouer | Le chemin solide |
+| --- | --- |
+| les labs `vm`, confortablement | **dsoxlab directement sur votre machine Linux** — `uv tool install dsoxlab`, KVM natif, aucune imbrication. C'est le cas d'usage principal de l'outil |
+| les labs `vm`, depuis une machine virtuelle | **l'appliance sous KVM/QEMU** plutôt que VirtualBox : le `.qcow2` est fait pour cela, et l'imbrication KVM-dans-KVM se comporte bien mieux |
+| les labs `shell` | **VirtualBox convient**, et vous pouvez laisser la case décochée |
+
+
+
+
 Un lab de type `vm` démarre de vraies machines *dans* l'appliance. Il faut donc
 que votre ordinateur autorise une machine virtuelle à en lancer d'autres, ce
 qui se règle **en dehors** de l'appliance, celle-ci étant éteinte.
 
 Dans VirtualBox, sélectionnez la machine, puis **Configuration → Système →
-Processeur**, et cochez **Activer VT-x/AMD-V imbriqué**. En ligne de commande :
+Processeur**. Trois réglages comptent sur cet onglet, et deux ne sautent pas
+aux yeux :
+
+![L'onglet Processeur de VirtualBox, correctement réglé : 4 processeurs,
+Processing Cap à 100 %, et la virtualisation imbriquée
+cochée](./assets/appliance-virtualbox-processeur.png)
+
+| Réglage | Valeur | Pourquoi |
+| --- | --- | --- |
+| **Nested VT-x/AMD-V** | coché | sans lui, aucun lab `vm` ne démarre |
+| **Number of CPUs** | 4 | l'image le demande, mais l'import ne le reprend pas toujours |
+| **Processing Cap** | 100 % | un import l'a laissé à **1 %** : la machine n'est alors pas lente, elle est inutilisable |
+
+En ligne de commande :
 
 ```bash
 VBoxManage modifyvm "dsoxlab-appliance-<version>" --nested-hw-virt on
+VBoxManage modifyvm "dsoxlab-appliance-<version>" --cpus 4 --cpuexecutioncap 100
 ```
 
-Si la case est grisée, votre processeur ou votre BIOS ne l'expose pas : les
-labs `shell` restent entièrement jouables.
+Si la case est grisée, deux causes : sur un hôte Intel, certaines versions de
+VirtualBox n'exposent le réglage qu'en ligne de commande ; et sous Windows,
+**Hyper-V doit être désactivé**, sans quoi il garde la virtualisation pour lui.
+Si rien n'y fait, votre processeur ou votre BIOS ne l'expose pas : les labs
+`shell` restent entièrement jouables.
 
 ---
 
@@ -177,6 +220,28 @@ demande l'ancien (`dsoxlab`), puis le nouveau deux fois.
 
 Vous arrivez sur un bureau XFCE. Le terminal est dans la barre du bas, deuxième
 icône.
+
+---
+
+### Passer sur une console texte, quand le bureau ne répond pas
+
+Un terminal en plein écran, sans bureau, reste accessible : c'est par là qu'on
+répare une session graphique qui refuse de s'ouvrir.
+
+**Dans VirtualBox, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F3</kbd> ne marche
+pas** : c'est votre système hôte qui l'intercepte, et la machine virtuelle ne
+voit jamais rien. Il faut la **touche hôte**, affichée en bas à droite de la
+fenêtre — <kbd>Ctrl droite</kbd> par défaut :
+
+| | |
+| --- | --- |
+| aller sur une console | <kbd>Ctrl droite</kbd>+<kbd>F3</kbd> |
+| revenir au bureau | <kbd>Ctrl droite</kbd>+<kbd>F1</kbd> (parfois <kbd>F7</kbd>) |
+
+Beaucoup de claviers compacts n'ont **pas** de <kbd>Ctrl droite</kbd>. La
+combinaison se change : **Fichier → Préférences → Entrée**, onglet *Machines
+virtuelles*, ligne **Combinaison touche hôte** — cliquez dans le champ et
+appuyez sur la touche que vous voulez.
 
 ---
 
@@ -289,6 +354,12 @@ l'image.
 
 ## Limites connues
 
+- **Les labs `vm` sous VirtualBox : chantier en cours.** KVM à l'intérieur de
+  VirtualBox se comporte mal — une machine qui brûle un cœur sans démarrer,
+  puis un gel. Ce n'est pas une question de mémoire ni de processeurs. En
+  attendant mieux, les labs `vm` demandent dsoxlab sur une machine Linux
+  directe, ou l'appliance sous KVM/QEMU ; les labs `shell` fonctionnent
+  partout. Voir l'étape 4.
 - **Un utilisateur, une machine.** L'appliance n'est pas un serveur de classe
   partagé ; un formateur qui sert plusieurs apprenants veut plutôt
   [la page du formateur](./trainer.fr.md).

@@ -103,7 +103,12 @@ class _I18nGroup(TyperGroup):
 app = typer.Typer(
     name="dsoxlab",
     help=_("app_help"),
-    no_args_is_help=True,
+    # `dsoxlab` seul n'affiche PAS l'aide : il affiche un accueil qui tient
+    # compte de l'état de la machine (voir `_amorcage.py`). L'aide de Typer
+    # aligne vingt-cinq commandes sans dire par où commencer, ce qui est un mur
+    # pour qui ouvre le terminal de l'appliance et tape le seul mot qu'il
+    # connaît. `dsoxlab --help` la donne toujours, à une frappe.
+    no_args_is_help=False,
     rich_markup_mode="rich",
     add_completion=True,
     cls=_I18nGroup,

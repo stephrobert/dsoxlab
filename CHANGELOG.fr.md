@@ -7,6 +7,123 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.3.4] - 2026-10-10
+
+### Ajouté
+
+- **`dsoxlab` tapé seul guide désormais.** Il affichait l'aide de Typer —
+  vingt-cinq commandes alignées, sans la moindre indication du premier geste.
+  Pour qui ouvre le terminal de l'appliance et tape le seul mot qu'il
+  connaisse, c'est un mur. L'accueil dit l'état de la machine en une ligne,
+  puis propose **les gestes qui correspondent à cet état** : installer un
+  catalogue quand il n'y en a aucun, en choisir un actif quand aucun ne l'est,
+  lister et jouer quand tout est prêt. Il se termine par le parcours entier,
+  d'une machine vide à un lab noté — car les messages d'erreur de dsoxlab
+  nomment chacun le geste suivant, mais il faut les rencontrer un par un pour
+  les découvrir. `dsoxlab --help` donne toujours la liste complète, à une
+  frappe.
+- **L'assistant de premier démarrage demande si l'on veut le bureau.** XFCE
+  coûte environ 700 Mo de téléchargement, autant sur le disque, et une part de
+  la mémoire et du processeur qui manquera aux machines de lab.
+  `30-premier-demarrage.sh` testait déjà `DSOXLAB_APPLIANCE_DESKTOP`, mais
+  rien ne le renseignait. Répondre « non » saute l'étape — et l'appliance le
+  dit au démarrage suivant, au lieu d'arriver en console sans explication.
+
+### Corrigé
+
+- **Le bureau ne pouvait jamais s'installer sur une machine sans virtualisation
+  imbriquée**, c'est-à-dire VirtualBox par défaut — le cas le plus courant chez
+  un apprenant. `apt-get update` vivait *dans* la branche `if [ -e /dev/kvm ]`,
+  alors que la construction retire délibérément `/var/lib/apt/lists/*` pour
+  alléger l'image. Sans index, l'étape 4 cherchait `xfce4` dans un catalogue
+  vide et échouait **à chaque démarrage**, toujours avec le même message.
+  L'index est désormais reconstruit pour tout le monde, comme une étape à part
+  entière, avant toute installation. Reproduit dans deux machines QEMU
+  démarrées sur l'image 0.3.3 publiée — l'une avec `/dev/kvm`, l'autre sans —
+  ce qui est ce qui a séparé la cause du symptôme.
+- **Rien ne disait *pourquoi* ça avait échoué.** La sortie d'`apt` part sur la
+  sortie standard du service, donc au journal et à la console **série** ; la
+  fenêtre de la machine, `/dev/tty1`, ne recevait que les titres d'étapes. Tout
+  le diagnostic existait dans un endroit que personne ne regarde. Chaque étape
+  écrit maintenant sa sortie dans `/var/log/dsoxlab/<étape>.log`, et en cas
+  d'échec la fenêtre reçoit les lignes d'erreur, le chemin de la trace
+  complète, et **la cause probable nommée** quand le motif est reconnaissable :
+  index vide, pas de DNS, miroir injoignable, disque plein, verrou d'apt,
+  conflit de paquets. Un message inconnu ne reçoit aucune cause inventée —
+  seulement sa sortie brute.
+- **Le message de fin ne disait rien d'actionnable.** « configuration
+  INCOMPLÈTE — bureau — elle recommencera au prochain démarrage » se lisait
+  comme une ponctuation, ne désignait aucun sujet, et laissait le lecteur sans
+  savoir s'il devait agir. Il énumère désormais chaque étape en échec avec ce
+  qu'elle coûte (« la machine démarre en console, sans XFCE »), les deux gestes
+  à poser, et le fait que rien n'est perdu.
+
+- **La connexion graphique était tout simplement impossible.**
+  `chage -d 0 student` force le changement de mot de passe à la première
+  connexion ; en console texte, PAM mène ce dialogue sans problème, mais le
+  greeter de LightDM annonce « Changing password for student » puis échoue,
+  sans issue visible. L'appliance était livrée avec un bureau dans lequel
+  personne ne pouvait ouvrir de session. Le mot de passe est désormais choisi
+  par l'**assistant de premier démarrage**, en console, avant `getty` et avant
+  que LightDM existe. Sans réponse — démarrage sans personne devant l'écran —
+  l'expiration est levée quand même et le mot de passe par défaut reste, parce
+  qu'une machine dont la session ne peut pas s'ouvrir est pire qu'une machine
+  dont le mot de passe est connu ; mais l'appliance le **dit**, à l'écran et
+  dans le mot d'accueil, au lieu de le taire.
+- **L'attente du réseau ne mesurait pas ce dont l'étape suivante a besoin.**
+  Elle attendait que `deb.debian.org` se *résolve*, alors que l'étape qui suit
+  installe dsoxlab depuis **PyPI** — et une résolution n'est pas une
+  connexion : un résolveur local peut répondre avant que la route par défaut
+  existe. Elle attend maintenant les deux destinations, en HTTPS, et nomme
+  celle qui manque.
+
+- **`dsoxlab` n'était pas dans le PATH d'un terminal du bureau.** `uv` installe
+  ses outils dans `~/.local/bin`, et le `.profile` de Debian ajoute bien ce
+  répertoire au PATH — mais `.profile` n'est lu que par un shell de **login**.
+  Un terminal ouvert depuis le bureau XFCE est un shell interactif *non-login* :
+  il lit `~/.bashrc`, qui ne touchait pas au PATH. Résultat :
+  `~/.local/bin/dsoxlab` existait et `dsoxlab` répondait « command not found »,
+  dans la seule fenêtre où un apprenant va le taper. La première configuration,
+  elle, utilise `bash -lc` — c'est pourquoi la recette ne l'a jamais vu.
+  `~/.bashrc` étend désormais le PATH, et la construction échoue si `uv` reste
+  introuvable depuis un shell non-login.
+
+
+
+- **Le registre des catalogues en annonçait trois sur six**, et pointait
+  `terraform` vers un dépôt renommé. `kubernetes`, `devsecops` et `python`
+  manquaient entièrement : `dsoxlab catalog list` montrait donc à un apprenant
+  la moitié de ce qui existe. Et `terraform-training` n'est plus qu'une
+  redirection vers `terraform-dsoxlab-training`, ce qui marche jusqu'au jour
+  où l'ancien nom disparaît. Chaque entrée a été confrontée à l'API GitHub :
+  le dépôt existe, il est public, et l'URL est le nom canonique.
+- **L'interface restait en anglais alors que l'assistant avait retenu
+  « français ».** `DSOXLAB_LANG` était écrit dans `~/.profile`, qu'un terminal
+  du bureau ne lit jamais — le même défaut que pour le PATH, trouvé sur la
+  même capture d'écran. Il va désormais dans `/etc/environment`, que PAM lit
+  pour toutes les sessions : console, SSH et graphique.
+- **Un catalogue installé par son URL restait proposé à l'installation.**
+  L'accueil comparait les identifiants, or `catalog add <url>` nomme le
+  catalogue d'après l'URL et `catalog add <nom>` d'après le manifeste. La
+  comparaison porte maintenant sur l'URL du dépôt, qui ne dépend pas de la
+  façon dont il a été posé.
+
+### Documentation
+
+- **Faire tourner KVM dans VirtualBox se comporte mal, et la page le dit
+  maintenant avant qu'on ne coche la case.** Mesuré le 2026-10-10 :
+  `provision` crée les trois machines en deux secondes, puis l'une brûle un
+  cœur entier à 100 % sans jamais allouer sa mémoire, et l'appliance finit par
+  geler — sans que 16 Go de mémoire et 8 vCPU n'y changent rien. La page donne
+  les deux chemins solides pour les labs `vm` et précise que les labs `shell`
+  ne sont pas concernés. Le travail pour améliorer cela est en cours.
+- L'onglet Processeur de VirtualBox est documenté **en entier, avec une
+  capture** : pas seulement la virtualisation imbriquée, mais les deux
+  réglages qu'un import peut laisser n'importe où — l'un a donné 1 vCPU et un
+  Processing Cap à 1 %, auquel cas la machine n'est pas lente, elle est
+  inutilisable. Plus la touche hôte pour atteindre une console texte, et
+  comment la changer sur un clavier sans Ctrl droite.
+
 ## [0.3.3] - 2026-10-09
 
 ### Corrigé
@@ -4496,7 +4613,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/stephrobert/dsoxlab/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/stephrobert/dsoxlab/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/stephrobert/dsoxlab/compare/v0.3.0...v0.3.1
