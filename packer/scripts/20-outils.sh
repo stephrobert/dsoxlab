@@ -34,6 +34,40 @@ done
 rm -rf "${uv_tmp}"
 sudo -u student -H bash -lc 'uv --version'
 
+# ── Le PATH d'un terminal du BUREAU, qui n'est pas celui d'un shell de login ──
+#
+# `uv` installe ses outils dans `~/.local/bin`, et `dsoxlab` en fait partie. Le
+# `.profile` de Debian ajoute bien ce répertoire au PATH — mais `.profile` n'est
+# lu que par un shell de LOGIN. Un terminal ouvert depuis le bureau XFCE est un
+# shell interactif NON-login : il ne lit que `~/.bashrc`, qui ne touche pas au
+# PATH.
+#
+# Conséquence mesurée dans une VirtualBox réelle : `dsoxlab` installé,
+# `~/.local/bin/dsoxlab` bien présent, et « bash: dsoxlab: command not found »
+# dans la seule fenêtre où l'apprenant va le taper. Le `bash -lc` de la
+# première configuration, lui, fonctionnait — ce qui rendait le défaut
+# invisible côté recette.
+#
+# Le test `case` évite d'empiler le chemin à chaque ouverture de terminal.
+cat >> /home/student/.bashrc <<'BASHRC'
+
+# dsoxlab : `uv` installe ses outils dans ~/.local/bin. `.profile` l'ajoute au
+# PATH, mais seulement pour un shell de login ; un terminal du bureau n'en est
+# pas un et ne lit que ce fichier.
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) PATH="$HOME/.local/bin:$PATH" ;;
+esac
+BASHRC
+chown student:student /home/student/.bashrc
+
+# Le contrôle porte sur le COMPORTEMENT, pas sur la présence de la ligne : un
+# shell interactif non-login doit trouver `uv`. `-i` sans `-l`, c'est très
+# exactement ce que fait le terminal du bureau.
+sudo -u student -H bash -ic 'command -v uv' >/dev/null \
+  || { echo "ÉCHEC : uv reste introuvable dans un shell non-login" >&2; exit 1; }
+echo "PATH : ~/.local/bin est atteignable depuis un terminal du bureau."
+
 # Terraform, depuis le dépôt HashiCorp, avec la clé vérifiée. Requis par
 # `provision` dès qu'un catalogue déclare des hôtes.
 install -d -m 0755 /usr/share/keyrings

@@ -19,7 +19,7 @@ import typer
 
 from .. import __version__
 from ..config import get_lab_home
-from ..i18n import _, set_lang
+from ..i18n import _, get_lang, set_lang
 from ..logging_setup import configurer as configurer_journal
 from ..reporting import console, update_console
 from ._commun import _lang
@@ -61,21 +61,72 @@ def _bootstrap(
     configurer_journal(verbose, debug=debug)
 
     if ctx.invoked_subcommand is None:
+        # La langue AVANT l'accueil : il est entièrement traduit, et le choisir
+        # après l'aurait affiché en anglais sur une machine française.
+        _choisir_la_langue()
+        _accueil()
         return
-    try:
-        root = get_lab_home()
-        lang = _lang(root)
-        set_lang(lang)
-    # Aveugle et silencieux, volontairement : choisir la langue est un préalable
-    # à TOUTES les commandes. Sans contexte de lab, on continue en langue par
-    # défaut ; échouer ici empêcherait jusqu'à `dsoxlab --help`.
-    except Exception:  # noqa: S110, BLE001
-        pass  # silencieux si LAB_HOME introuvable
+    _choisir_la_langue()
 
     # L'avis de mise à jour est posé ici, mais affiché à la toute fin par
     # atexit : c'est le seul moyen qu'il soit le dernier message, y compris
     # quand la commande sort en erreur ou lève typer.Exit.
     atexit.register(_notify_update_available)
+
+
+def _choisir_la_langue() -> None:
+    """Aligne la langue d'affichage sur le contexte du dépôt courant.
+
+    Aveugle et silencieux, volontairement : choisir la langue est un préalable
+    à TOUTES les commandes. Sans contexte de lab, on continue en langue par
+    défaut ; échouer ici empêcherait jusqu'à `dsoxlab --help`.
+    """
+    try:
+        root = get_lab_home()
+        set_lang(_lang(root))
+    except Exception:  # noqa: S110, BLE001
+        pass  # silencieux si LAB_HOME introuvable
+
+
+def _accueil() -> None:
+    """Ce que `dsoxlab` seul affiche : l'état, puis le geste suivant.
+
+    Le geste dépend de l'état, et c'est tout l'intérêt : proposer
+    « dsoxlab start » à qui n'a aucun catalogue ne l'avance pas, et proposer
+    « catalog add » à qui en a déjà trois le renvoie en arrière.
+    """
+    from ..reporting.console import afficher_accueil
+    from ..services import catalog
+
+    # Chaque lecture est protégée : un accueil ne doit jamais être ce qui
+    # casse. Un dossier de catalogues illisible rend une liste vide, et
+    # l'accueil guide alors vers l'installation — ce qui reste un bon conseil.
+    try:
+        poses = catalog.installes()
+    except Exception:  # noqa: BLE001
+        poses = []
+    try:
+        actif = catalog.nom_actif()
+    except Exception:  # noqa: BLE001
+        actif = None
+    try:
+        connus = [
+            (c.id, c.description(get_lang()), c.depot) for c in catalog.lire_manifeste()
+        ]
+    except Exception:  # noqa: BLE001
+        connus = []
+
+    afficher_accueil(
+        version=__version__,
+        installes=[c.id for c in poses],
+        # L'URL plutôt que l'identifiant : `catalog add <url>` nomme le
+        # catalogue d'après l'URL, `catalog add <nom>` d'après le manifeste.
+        # Comparer les identifiants faisait donc réapparaître en
+        # « installable » un catalogue déjà posé.
+        depots_installes=[c.depot for c in poses if c.depot],
+        actif=actif,
+        connus=connus,
+    )
 
 
 def _notify_update_available() -> None:

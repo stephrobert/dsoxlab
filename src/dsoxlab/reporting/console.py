@@ -486,6 +486,174 @@ def success(msg: str) -> None:
     console.print(f"[green]✔[/green] {msg}")
 
 
+#: Les commandes que l'accueil propose, appariées à la clé qui les décrit.
+#:
+#: Ce sont des DONNÉES et non des messages : une commande s'écrit pareil dans
+#: toutes les langues, et la traduire la casserait. Les sortir ici plutôt que
+#: de les écrire dans des appels d'affichage dit exactement cela — et c'est ce
+#: que le garde-fou i18n réclamait, à juste titre : une chaîne en dur dans un
+#: `console.print` est suspecte tant qu'on n'a pas dit ce qu'elle est.
+_ACCUEIL_SANS_CATALOGUE = (
+    ("dsoxlab catalog add linux", "accueil_geste_add"),
+    ("dsoxlab demo", "accueil_geste_demo"),
+)
+_ACCUEIL_SANS_ACTIF = (("dsoxlab catalog use", "accueil_geste_use"),)
+_ACCUEIL_PRET = (
+    ("dsoxlab list-labs", "accueil_geste_liste"),
+    ("dsoxlab start <lab>", "accueil_geste_start"),
+)
+_ACCUEIL_TOUJOURS = (("dsoxlab doctor", "accueil_geste_doctor"),)
+
+#: Le parcours entier, dans l'ordre où on le suit. Chaque message d'erreur de
+#: dsoxlab nomme déjà le geste suivant ; il faut les rencontrer un par un pour
+#: les découvrir, et un apprenant qui ouvre un terminal n'a aucune idée du
+#: chemin. Le voici d'un bloc.
+_ACCUEIL_PARCOURS = (
+    ("dsoxlab catalog add linux", "accueil_parcours_1"),
+    ("dsoxlab catalog use linux", "accueil_parcours_2"),
+    ("dsoxlab instructor bootstrap", "accueil_parcours_3"),
+    ("dsoxlab use --provider kvm", "accueil_parcours_4"),
+    ("dsoxlab provision", "accueil_parcours_5"),
+    ("dsoxlab run <lab>", "accueil_parcours_6"),
+    ("dsoxlab check", "accueil_parcours_7"),
+)
+
+#: Celle qui joue tout le parcours à elle seule.
+_ACCUEIL_RACCOURCI = "dsoxlab start <lab>"
+
+#: La boucle qui installe tous les catalogues restants, en deux morceaux
+#: puisque la liste s'insère au milieu.
+_ACCUEIL_BOUCLE_AVANT = "for c in "
+_ACCUEIL_BOUCLE_APRES = "; do dsoxlab catalog add $c; done"
+
+
+def gestes_pour(installes: list[str], actif: str | None) -> tuple[tuple[str, str], ...]:
+    """Les gestes à proposer, pour un état donné de la machine.
+
+    Hors du rendu à dessein : c'est une décision, et une décision se teste.
+    Proposer « start » à qui n'a aucun catalogue ne l'avance pas ; proposer
+    « catalog add » à qui en a trois le renvoie en arrière.
+    """
+    # Annotée : sans cela, mypy infère le type de la PREMIÈRE branche — un
+    # tuple de deux éléments — et refuse la branche à un seul.
+    choix: tuple[tuple[str, str], ...]
+    if not installes:
+        choix = _ACCUEIL_SANS_CATALOGUE
+    elif not actif:
+        commande, cle = _ACCUEIL_SANS_ACTIF[0]
+        choix = ((f"{commande} {installes[0]}", cle),)
+    else:
+        choix = _ACCUEIL_PRET
+    return choix + _ACCUEIL_TOUJOURS
+
+
+def catalogues_restants(
+    connus: list[tuple[str, str, str]],
+    installes: list[str],
+    depots_installes: list[str],
+) -> list[tuple[str, str]]:
+    """Les catalogues du manifeste qui ne sont pas déjà posés.
+
+    La comparaison porte sur l'URL du dépôt AVANT l'identifiant :
+    ``catalog add <url>`` nomme le catalogue d'après l'URL, ``catalog add
+    <nom>`` d'après le manifeste. Comparer les seuls identifiants faisait
+    réapparaître en « installable » un catalogue déjà installé — mesuré sur une
+    machine où `kubernetes` était posé sous le nom de son dépôt.
+    """
+    def _normalise(url: str) -> str:
+        return url.rstrip("/").removesuffix(".git")
+
+    poses = {_normalise(d) for d in depots_installes}
+    return [
+        (cle, description)
+        for cle, description, depot in connus
+        if cle not in installes and _normalise(depot) not in poses
+    ]
+
+
+def _gestes(entrees: tuple[tuple[str, str], ...], *, large: int = 27) -> None:
+    """Affiche des couples (commande, libellé traduit), alignés."""
+    for commande, cle in entrees:
+        console.print(f"    [cyan]{commande:<{large}}[/cyan] {_(cle)}")
+
+
+def afficher_accueil(
+    *,
+    version: str,
+    installes: list[str],
+    depots_installes: list[str],
+    actif: str | None,
+    connus: list[tuple[str, str, str]],
+) -> None:
+    """L'écran que `dsoxlab` seul affiche : l'état, puis le geste suivant.
+
+    Le geste dépend de l'état, et c'est tout l'intérêt. Proposer
+    « dsoxlab start » à qui n'a aucun catalogue ne l'avance pas ; proposer
+    « catalog add » à qui en a déjà trois le renvoie en arrière. L'aide de
+    Typer, elle, alignait vingt-cinq commandes sans distinguer les deux.
+    """
+    console.print()
+    console.print(f"  [bold]dsoxlab[/bold] [dim]{version}[/dim]")
+    console.print(f"  [dim]{_('accueil_baseline')}[/dim]")
+    console.print()
+
+    # ── 1. L'état, en une ligne ──────────────────────────────────────────
+    if not installes:
+        console.print(f"  [yellow]•[/yellow] {_('accueil_etat_aucun')}")
+    elif actif:
+        console.print(
+            f"  [green]•[/green] {_('accueil_etat_actif')} [bold]{actif}[/bold]"
+            f" [dim]({len(installes)})[/dim]"
+        )
+    else:
+        console.print(
+            f"  [yellow]•[/yellow] {_('accueil_etat_sans_actif')}"
+            f" [dim]({', '.join(installes)})[/dim]"
+        )
+    console.print()
+
+    # ── 2. Le geste suivant, et lui seul ─────────────────────────────────
+    console.print(f"  [bold]{_('accueil_titre_suite')}[/bold]")
+    console.print()
+    _gestes(gestes_pour(installes, actif))
+    console.print()
+
+    # ── 3. Les catalogues, quand il en reste à installer ─────────────────
+    #
+    # Les lister TOUS quand tout est déjà posé serait du bruit : on ne montre
+    # que ce qui manque, et rien du tout s'il ne manque rien.
+    restants = catalogues_restants(connus, installes, depots_installes)
+    if restants:
+        console.print(f"  [bold]{_('accueil_titre_catalogues')}[/bold]")
+        console.print()
+        for cle, description in restants:
+            console.print(f"    [cyan]{cle:<12}[/cyan] [dim]{description}[/dim]")
+        console.print()
+        console.print(f"    [dim]{_('accueil_tous_les_catalogues')}[/dim]")
+        ids = " ".join(cle for cle, _d in restants)
+        console.print(f"    [cyan]{_ACCUEIL_BOUCLE_AVANT}{ids}{_ACCUEIL_BOUCLE_APRES}[/cyan]")
+        console.print()
+
+    # ── 4. Le parcours entier, pour qui veut savoir où il va ────────────
+    #
+    # Chaque message d'erreur de dsoxlab nomme déjà le geste suivant. Mais il
+    # faut les rencontrer un par un pour les découvrir, et un apprenant qui
+    # ouvre un terminal n'a aucune idée du chemin. Le voici d'un bloc — avec,
+    # en premier, le fait que `start` le joue à lui seul.
+    console.print(f"  [bold]{_('accueil_titre_parcours')}[/bold]")
+    console.print()
+    console.print(
+        f"    [cyan]{_ACCUEIL_RACCOURCI}[/cyan]  [dim]{_('accueil_parcours_start')}[/dim]"
+    )
+    console.print()
+    for commande, cle in _ACCUEIL_PARCOURS:
+        console.print(f"    [dim]{commande:<30}[/dim] [dim]{_(cle)}[/dim]")
+    console.print()
+
+    console.print(f"  [dim]{_('accueil_pied')}[/dim]")
+    console.print()
+
+
 def info(msg: str) -> None:
     console.print(f"[cyan]ℹ[/cyan] {msg}")
 
