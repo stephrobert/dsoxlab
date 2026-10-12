@@ -1595,8 +1595,12 @@ silent.
         "Lab {lab_id} must ship setup.yaml at its root (dsoxlab contract for "
         "runtime: vm). Expected file: {path}",
     "err_vm_setup_failed":
-        "setup.yaml failed for {lab_id} on target '{target}' "
-        "(rc={rc}, status={status}). Stats: {stats}",
+        "setup.yaml failed for {lab_id} on target '{target}' (rc={rc}, status={status}).{detail}",
+    "ansible_sans_message": "(no message)",
+    "ansible_autres_echecs":
+        "  … and {count} more failed task(s), see the trace",
+    "ansible_trace_conservee":
+        "  Full ansible output: {path}",
     "err_vm_cleanup_missing":
         "Lab {lab_id} must ship cleanup.yaml at its root (dsoxlab contract "
         "for runtime: vm). Expected file: {path}",
