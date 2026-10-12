@@ -7,7 +7,7 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.3.5] - 2026-10-12
 
 ### Corrigé
 
@@ -4632,7 +4632,8 @@ Première version publique.
 - Diagnostics de l'environnement (`dsoxlab doctor [--fix]`).
 - Interface utilisateur bilingue (anglais/français) pilotée par `DSOXLAB_LANG`.
 
-[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/stephrobert/dsoxlab/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/stephrobert/dsoxlab/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/stephrobert/dsoxlab/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/stephrobert/dsoxlab/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/stephrobert/dsoxlab/compare/v0.3.1...v0.3.2
