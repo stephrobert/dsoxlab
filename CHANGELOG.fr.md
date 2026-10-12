@@ -7,6 +7,25 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Corrigé
+
+- **Un lab `vm` en échec ne disait rien de la cause.** `setup.yaml a échoué …
+  (rc=4, status=failed). Stats : {}` : c'est tout ce qu'un apprenant recevait,
+  et tout ce que le mainteneur recevait aussi — ce qui a rendu
+  [kubernetes#94](https://github.com/stephrobert/kubernetes-dsoxlab-training/issues/94)
+  indiagnosticable pendant deux jours. dsoxlab savait pourtant :
+  ansible-runner lui envoie un événement `runner_on_failed` qui porte le nom
+  de la tâche, l'hôte et le message, et `PlaybookResult` capturait déjà la
+  sortie complète. Les deux étaient jetés, et le répertoire d'artefacts
+  supprimé au retour. L'échec rapporte maintenant **la tâche fautive, l'hôte
+  et le message d'ansible** ; quand aucun événement n'a été émis — ce que
+  `Stats : {}` signifie précisément — il retombe sur les dernières lignes
+  parlantes de la sortie ; et la trace complète est conservée sous
+  `~/.local/state/dsoxlab/ansible/`, horodatée pour qu'un second essai
+  n'écrase pas le premier.
+
 ## [0.3.4] - 2026-10-10
 
 ### Ajouté

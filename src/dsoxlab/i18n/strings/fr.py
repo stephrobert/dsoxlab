@@ -1633,8 +1633,12 @@ hors ligne, elle se tait.
         "Le lab {lab_id} doit fournir setup.yaml à la racine (contrat dsoxlab "
         "pour runtime: vm). Fichier attendu : {path}",
     "err_vm_setup_failed":
-        "setup.yaml a échoué pour {lab_id} sur la target « {target} » "
-        "(rc={rc}, status={status}). Stats : {stats}",
+        "setup.yaml a échoué pour {lab_id} sur la target « {target} » (rc={rc}, status={status}).{detail}",
+    "ansible_sans_message": "(aucun message)",
+    "ansible_autres_echecs":
+        "  … et {count} autre(s) tâche(s) en échec, voir la trace",
+    "ansible_trace_conservee":
+        "  Sortie complète d'ansible : {path}",
     "err_vm_cleanup_missing":
         "Le lab {lab_id} doit fournir cleanup.yaml à la racine (contrat "
         "dsoxlab pour runtime: vm). Fichier attendu : {path}",

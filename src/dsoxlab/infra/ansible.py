@@ -23,6 +23,7 @@ import tempfile
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,42 @@ from ..i18n import _
 from ..interrupt import EVENT_INTERRUPT, Interrupted, SignalRelay, Stage
 
 logger = logging.getLogger(__name__)
+
+
+
+@dataclass(frozen=True)
+class TacheEnEchec:
+    """Ce qu'ansible a dit d'une tâche qui n'est pas passée.
+
+    Reconstitué depuis l'événement ``runner_on_failed`` ou
+    ``runner_on_unreachable``, qui porte déjà tout : dsoxlab le recevait et le
+    laissait filer.
+    """
+
+    tache: str
+    """Le nom de la tâche, tel que le playbook l'écrit."""
+
+    hote: str
+    """L'hôte sur lequel elle a échoué."""
+
+    message: str
+    """Le message d'ansible — souvent la seule ligne qui explique."""
+
+    injoignable: bool = False
+    """``True`` pour un ``unreachable`` : la cause est le lien, pas la tâche."""
+
+    def resume(self, largeur: int = 400) -> str:
+        """Une ligne par fait, prête à être affichée.
+
+        Le repli sur « (aucun message) » est ici et pas seulement chez
+        l'appelant : un `TacheEnEchec` construit à la main — par un test, ou
+        par un futur appelant — produisait sinon une ligne qui s'arrête sur
+        deux-points, ce qui se lit comme un bug d'affichage plutôt que comme
+        un module muet.
+        """
+        quoi = "injoignable" if self.injoignable else "échec"
+        message = " ".join(self.message.split())[:largeur] or _("ansible_sans_message")
+        return f"{self.tache} — {self.hote} ({quoi}) : {message}"
 
 
 @dataclass
@@ -53,6 +90,17 @@ class PlaybookResult:
 
     stdout: str = ""
     """Sortie agrégée (utile pour debug)."""
+
+    echecs: list[TacheEnEchec] = field(default_factory=list)
+    """Les tâches qui ont échoué, dans l'ordre où ansible les a signalées.
+
+    Vide ne veut pas dire « tout va bien » : un playbook interrompu avant la
+    première tâche n'en produit aucune, et c'est précisément le cas qui
+    laissait l'utilisateur sans rien (``Stats: {}``). L'appelant doit donc
+    retomber sur ``stdout``, jamais conclure du vide."""
+
+    trace: Path | None = None
+    """Où la sortie complète a été conservée, quand elle l'a été."""
 
     @property
     def ok(self) -> bool:
@@ -182,17 +230,53 @@ def run_playbook(
         if not project_link.exists():
             project_link.symlink_to(project_dir, target_is_directory=True)
 
+        # Les échecs, captés au vol. L'événement porte déjà le nom de la
+        # tâche, l'hôte et le message : il suffisait de les garder.
+        echecs: list[TacheEnEchec] = []
+
+        def _collecter(event: dict[str, Any]) -> None:
+            nom = event.get("event")
+            if nom not in {"runner_on_failed", "runner_on_unreachable"}:
+                return
+            donnees = event.get("event_data") or {}
+            resultat = donnees.get("res") or {}
+            # `msg` est le plus courant ; `stderr` et `reason` couvrent les
+            # modules qui n'en posent pas. `module_stderr` sert aux échecs de
+            # connexion, où `msg` est souvent laconique.
+            message = ""
+            for cle in ("msg", "reason", "stderr", "module_stderr", "stdout"):
+                valeur = resultat.get(cle)
+                if isinstance(valeur, str) and valeur.strip():
+                    message = valeur.strip()
+                    break
+            if not message:
+                message = str(resultat) if resultat else "(aucun message)"
+            echecs.append(TacheEnEchec(
+                tache=str(donnees.get("task") or "(tâche sans nom)"),
+                hote=str(donnees.get("host") or "?"),
+                message=message,
+                injoignable=nom == "runner_on_unreachable",
+            ))
+
         kwargs: dict[str, Any] = {}
-        if on_event is not None:
+        if True:
             def _safe_handler(event: dict[str, Any]) -> bool:
                 """ansible-runner event_handler : doit retourner True
                 pour continuer (False arrête le run). On wrap le
                 callback utilisateur pour ne pas tuer le playbook si
                 la CLI plante."""
+                # La collecte d'abord, et hors du try de l'appelant : perdre
+                # le diagnostic parce que la barre de progression a planté
+                # serait exactement le défaut qu'on corrige.
                 try:
-                    on_event(event)
-                except Exception:  # le callback ne doit pas tuer le playbook
-                    logger.exception("on_event callback failed")
+                    _collecter(event)
+                except Exception:
+                    logger.exception("could not collect the ansible failure event")
+                if on_event is not None:
+                    try:
+                        on_event(event)
+                    except Exception:  # le callback ne doit pas tuer le playbook
+                        logger.exception("on_event callback failed")
                 return True
 
             kwargs["event_handler"] = _safe_handler
@@ -242,15 +326,100 @@ def run_playbook(
         if relais.is_requested() or (runner.status or "") == "canceled":
             raise Interrupted(Stage.ANSIBLE, hard=relais.count >= 2)
 
+        sortie = _read_stdout(runner)
+        statut = runner.status or "unknown"
+        code = runner.rc if runner.rc is not None else -1
+
+        # La trace n'est écrite QUE sur échec, et elle survit au tmpdir : sans
+        # elle, la seule copie de ce qu'ansible a dit disparaît au `cleanup()`
+        # ci-dessous. C'est ce qui a laissé l'issue kubernetes#94 sans
+        # diagnostic pendant deux jours.
+        trace: Path | None = None
+        if (code != 0 or statut != "successful") and sortie:
+            trace = _conserver_la_trace(playbook_path, sortie)
+
         return PlaybookResult(
-            rc=runner.rc if runner.rc is not None else -1,
-            status=runner.status or "unknown",
+            rc=code,
+            status=statut,
             stats=runner.stats or {},
-            stdout=_read_stdout(runner),
+            stdout=sortie,
+            echecs=echecs,
+            trace=trace,
         )
     finally:
         if tmpdir_obj is not None:
             tmpdir_obj.cleanup()
+
+
+def detailler(result: PlaybookResult, *, taches: int = 3) -> str:
+    """Ce qu'il faut lire quand un playbook échoue, en quelques lignes.
+
+    Trois niveaux, du plus utile au plus brut, parce qu'aucun n'est toujours
+    disponible :
+
+    1. les tâches qu'ansible a déclarées en échec — le cas courant ;
+    2. à défaut, les dernières lignes parlantes de sa sortie — c'est ce qui
+       reste quand le playbook meurt avant la première tâche, cas où les
+       stats sont vides et où l'ancien message ne disait **rien** ;
+    3. et toujours, le chemin de la trace complète.
+
+    Le deuxième niveau est celui qui manquait : l'issue kubernetes#94 montre
+    « Stats: {} », donc aucun événement d'échec, donc rien à afficher si l'on
+    se contentait du premier.
+    """
+    lignes: list[str] = []
+
+    for echec in result.echecs[:taches]:
+        lignes.append(f"  ✘ {echec.resume()}")
+    reste = len(result.echecs) - taches
+    if reste > 0:
+        lignes.append(_("ansible_autres_echecs", count=reste))
+
+    if not lignes and result.stdout:
+        # Les lignes qui disent quelque chose : on écarte le décor d'ansible
+        # (titres de PLAY et de TASK, séparateurs) pour garder les messages.
+        bruit = ("PLAY [", "TASK [", "PLAY RECAP", "***", "ok:", "skipping:")
+        utiles = [
+            ligne.rstrip()
+            for ligne in result.stdout.splitlines()
+            if ligne.strip() and not ligne.lstrip().startswith(bruit)
+        ]
+        lignes.extend(f"  {ligne}" for ligne in utiles[-6:])
+
+    if result.trace is not None:
+        lignes.append(_("ansible_trace_conservee", path=str(result.trace)))
+
+    if not lignes:
+        return ""
+    return "\n" + "\n".join(lignes)
+
+
+def _conserver_la_trace(playbook_path: Path, sortie: str) -> Path | None:
+    """Écrit la sortie d'ansible là où on pourra la relire, et rend le chemin.
+
+    Sous ``XDG_STATE_HOME`` plutôt que dans un tmpdir : un diagnostic qui
+    disparaît avec le processus qui l'a produit ne sert à personne. Le nom
+    porte le playbook et l'horodatage, pour qu'un second essai n'écrase pas le
+    premier — c'est souvent la comparaison des deux qui parle.
+
+    Toute erreur est avalée : ne pas pouvoir écrire une trace ne doit jamais
+    remplacer l'échec qu'on cherchait à expliquer.
+    """
+    try:
+        base = Path(
+            os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state"
+        ) / "dsoxlab" / "ansible"
+        base.mkdir(parents=True, exist_ok=True)
+        # UTC et non l'heure locale : une trace se compare entre machines,
+        # et `dsoxlab support` la collecte.
+        horodatage = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
+        chemin = base / f"{playbook_path.parent.name}-{playbook_path.stem}-{horodatage}.log"
+        chemin.write_text(sortie, encoding="utf-8")
+        logger.info("ansible output kept at %s", chemin)
+    except OSError:
+        logger.exception("could not keep the ansible trace")
+        return None
+    return chemin
 
 
 def _env_overrides() -> dict[str, str]:

@@ -116,7 +116,7 @@ class VmRuntime(BaseRuntime):
             raise RuntimeError(_(
                 "err_vm_setup_failed",
                 lab_id=lab.id, target=target.name, rc=result.rc,
-                status=result.status, stats=result.stats,
+                status=result.status, detail=ansible_infra.detailler(result),
             ))
 
     def stop(self, lab: LabDefinition, target_name: str | None = None) -> None:
