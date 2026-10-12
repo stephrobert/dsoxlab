@@ -152,6 +152,14 @@ def test_le_message_est_remis_sur_une_ligne_et_borne() -> None:
 
 @pytest.mark.parametrize("vide", ["", "   ", "\n"])
 def test_un_message_vide_ne_produit_pas_une_ligne_muette(vide: str) -> None:
-    """Mieux vaut « (aucun message) » qu'une ligne qui s'arrête sur deux-points."""
+    """Une ligne qui s'arrête sur deux-points se lit comme un bug d'affichage.
+
+    L'invariant est là, et **pas** dans le texte du repli : la première
+    version de ce test cherchait le mot « aucun », donc la traduction
+    française. Il passait sur une machine en français et tombait en CI, où la
+    langue par défaut est l'anglais — un test qui mesurait la locale de son
+    auteur plutôt que le comportement.
+    """
     resume = _echec(message=vide).resume()
-    assert resume.rstrip().endswith((":", ")")) is False or "aucun" in resume
+    assert not resume.rstrip().endswith(":"), resume
+    assert resume.rstrip() != f"{_echec().tache} — k8s-cp.lab (échec) :"
