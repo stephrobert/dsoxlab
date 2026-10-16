@@ -271,6 +271,19 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 ### Supprimé
 ### Corrigé
 
+- **Un `terraform output` en échec passait pour « rien n'est provisionné ».**
+  Rencontré sur une stack bien debout, dont le cache de plugins avait été vidé :
+  `terraform output` répondait `Required plugins are not installed`, les deux
+  lecteurs d'outputs avalaient cet échec, et `infra status` concluait que
+  l'infrastructure n'était pas provisionnée en proposant `dsoxlab provision`.
+  C'est la seule chose à ne pas faire : elle aurait créé un second exemplaire de
+  ce qui tournait déjà, et la commande de retrait échouait sans dire pourquoi. La
+  règle du dépôt est pourtant écrite : un contrôle qui n'a pas pu REGARDER ne
+  conclut jamais. Celui-ci concluait, et faux. La valeur rendue ne change pas,
+  parce qu'elle irrigue tous les appelants : ce qui change est que la cause est
+  nommée, avec le geste qui la répare (`terraform init` réinstalle les
+  providers).
+
 - **`reset` détruisait le travail de l'apprenant sans demander.** `clean`
   confirme et prend `--yes` ; `reset`, qui fait « clean + redémarrage » et
   emporte donc STRICTEMENT PLUS, ne demandait rien. L'asymétrie allait dans le

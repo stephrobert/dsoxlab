@@ -255,6 +255,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 
+- **A failing `terraform output` passed for "nothing is provisioned".** Met on a
+  stack that was perfectly up, whose plugin cache had been emptied: `terraform
+  output` answered `Required plugins are not installed`, both output readers
+  swallowed it, and `infra status` concluded that the infrastructure was not
+  provisioned, offering `dsoxlab provision`. That is the one thing not to do: it
+  would have created a second copy of what was already running, and the removal
+  command failed without saying why. The repository's own rule says a check that
+  could not LOOK never concludes; this one concluded, and wrongly. The returned
+  value is unchanged, because it feeds every caller: what changes is that the
+  cause is now named, with the gesture that repairs it (`terraform init`
+  reinstalls the providers).
+
 - **`reset` destroyed the learner's work without asking.** `clean` confirms and
   takes `--yes`; `reset`, which does "clean + restart" and therefore takes away
   STRICTLY MORE, asked nothing. The asymmetry went the wrong way: the more

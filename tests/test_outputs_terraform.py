@@ -156,3 +156,52 @@ def test_la_forme_aplatie_reste_lue(repo_meta: RepoMetadata) -> None:
 
     hotes = inventaire["all"]["children"]["labenv"]["hosts"]
     assert hotes["un.lab"]["ansible_host"] == "10.99.0.11"
+
+
+def test_un_output_en_echec_ne_passe_pas_pour_une_absence_d_infra(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le state existe, la lecture échoue : rien ne peut être conclu.
+
+    Rencontré le 2026-10-16 sur une stack bien debout, dont le cache de plugins
+    avait été vidé : `terraform output` répondait « Required plugins are not
+    installed ». Les deux lecteurs d'outputs avalaient cet échec, `infra status`
+    annonçait « l'infrastructure n'est pas provisionnée », et proposait
+    `dsoxlab provision` : la seule chose à ne pas faire, puisqu'elle aurait
+    créé un second exemplaire de ce qui tournait.
+
+    Le contrôle garde sa valeur de retour, qui irrigue tout l'appelant ; ce qui
+    change est qu'il NOMME désormais sa cause, au lieu de conclure à sa place.
+    """
+    from dsoxlab.infra import inventory
+    from dsoxlab.utils.shell import CommandResult
+
+    tf_dir = tmp_path / "terraform" / "kvm"
+    tf_dir.mkdir(parents=True)
+    (tf_dir / "terraform.tfstate").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr("dsoxlab.infra.terraform.workdir", lambda _meta: tf_dir)
+    monkeypatch.setattr(
+        "dsoxlab.utils.shell.run_command",
+        lambda *a, **k: CommandResult(
+            returncode=1,
+            stdout="",
+            stderr="Error: Required plugins are not installed\n"
+            "  - registry.terraform.io/dmacvicar/libvirt: there is no package",
+        ),
+    )
+
+    chemin = tmp_path / "meta.yml"
+    chemin.write_text(META, encoding="utf-8")
+    caplog.set_level(logging.INFO, logger="dsoxlab.infra.inventory")
+
+    assert inventory.read_terraform_outputs(RepoMetadata.from_yaml(chemin)) is None
+
+    avertissements = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any("'terraform output' failed" in m for m in avertissements), (
+        "l'échec de lecture doit être nommé, sinon l'appelant conclut à tort "
+        f"qu'il n'y a pas d'infrastructure ; relevé : {avertissements}"
+    )
+    assert any("terraform" in m and "init" in m for m in avertissements), (
+        "le message doit porter le geste qui répare"
+    )

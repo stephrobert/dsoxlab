@@ -693,7 +693,21 @@ def read_terraform_outputs(repo_meta: RepoMetadata) -> dict[str, Any] | None:
         logger.debug("Cannot read Terraform outputs: %s", exc)
         return None
 
-    if not result.ok or not result.stdout.strip():
+    if not result.ok:
+        # Le state EXISTE et la lecture a échoué : ce n'est pas « rien n'est
+        # provisionné ». Sans ce message, l'appelant annonce une
+        # infrastructure absente et propose de la monter, alors qu'elle tourne.
+        logger.warning(
+            "Terraform state exists in %s but 'terraform output' failed: %s. "
+            "Nothing can be concluded about what is running. A plugin cache "
+            "emptied since the apply is the usual cause: run "
+            "'terraform -chdir=%s init' to reinstall the providers.",
+            tf_dir,
+            (result.stderr or result.stdout).strip()[:300],
+            tf_dir,
+        )
+        return None
+    if not result.stdout.strip():
         return None
 
     try:
