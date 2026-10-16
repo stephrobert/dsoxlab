@@ -7,6 +7,381 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-16
+
+### Added
+
+- **`instructor audit` now measures whether a bilingual message can RUN.**
+  A catalog showed 93 bilingual messages out of 93, and all 93 raised a
+  `NameError`: the `message` name had landed in a `noqa` comment instead of
+  the import, because a corrector split that line on its commas. Three other
+  catalogs carried a local variable of the same name, which hides the helper
+  for the whole function. In both cases the form is right, the file imports,
+  pytest collects it, and the learner is the first to find out, as a Python
+  traceback instead of the message. The count is reported as
+  `assertions.unreachable_helper` in `--json`, and as a warning on the
+  console, never inside the progress line: a bilingual message that raises is
+  not a translated message. `ruff F823` catches only the call placed BEFORE
+  the assignment; four assertions of a kubernetes lab called the helper after
+  it, which ruff accepts and Python rejects.
+- **Three quality gates, as ratchets rather than thresholds.**
+  `scripts/complexite.py` measures what `ruff C901` cannot see: cognitive
+  complexity, nesting depth and length. Measured on `cli/_barres.py`,
+  `_run_ansible_with_progress` scores a cyclomatic complexity of **1** for
+  91 lines and three nested closures, and a cognitive complexity of 54.
+  `scripts/code-mort.py` names symbols with no caller, knowing about Typer
+  decorators and pytest fixtures, which is why it can fail a commit where
+  vulture (108 lines, ~80 of them structural false positives) could not.
+  Both compare against a frozen record under `scripts/*-reference.json` that
+  can only go down, and run as pre-commit hooks.
+- **`scripts/complexite-ecran.py`: the complexity of what the learner sees.**
+  Runs real commands at 80, 100, 120 and 160 columns and measures height,
+  truncations, table columns, suggested commands, jargon, raw tool output,
+  minimum readable width, and dead ends. Runs on push.
+
+### Changed
+
+- **The last two functions brought under the threshold.**
+  `_apply_translation` (28 cognitive complexity, 49 lines) becomes **3** and
+  19 lines: read the translation, override the repo, override the sections.
+  `build_progress` (28, 49 lines) becomes **2** and 13 lines, a block's
+  summary and its average each getting their own function. Apart from
+  `run_playbook`, whose complexity the audit established as necessary, the
+  repository now carries only deliberate complexity: **20 blocks** above a
+  threshold, down from 33 at the start of this batch.
+- **Empty table cells carried an em dash**, which the rendering rules forbid
+  and nobody types. They show a middle dot.
+
+- **The contract parser reads in pieces.** `LabDefinition.from_yaml` ran 156
+  lines with 31 cognitive complexity and five levels of nesting: loading,
+  translation merge, targets, services, runtime and field copying, all in one.
+  Five named functions later, the method drops to **1** and **66 lines**. The
+  six catalogs' 374 `lab.yaml` files were re-read afterwards, in English and
+  French: none disappears, the gap is zero everywhere.
+  The check that confronts the JSON schema with the parser had to be widened
+  to the module's functions: limited to the method, it would have stayed green
+  while measuring nothing, which is worse than deleting it. It now also covers
+  reading `meta.<lang>.yml`.
+
+- **The diagnosis sorts without deciding in bulk.** `collect_checks` chained
+  six families of checks in a single 139-line function with 43 cognitive
+  complexity, recomputing along the way the four facts the whole
+  required/informational split depends on. Those facts are now an object and
+  each family a function: the function drops to **5** and **41 lines**.
+  Rendering was compared character by character on `ansible-training`, and the
+  agnosticism counter-example replayed: `terraform-training`, with no `infra:`
+  block, still sorts hypervisors and outbound access as informational.
+- **A `course.yaml` translation moved out of the loader.**
+  `CourseManifest.load` merged overrides five levels deep, 31 cognitive
+  complexity in 39 lines: **4** and **19 lines** now. Seven tests cover that
+  path, which no catalog exercises today, including the invariant that
+  matters: sections are paired by `id`, never by position, otherwise a partial
+  translation lands its title on the wrong section at the first addition.
+
+- **Two screens reworked for what they actually show.** The `check` verdict
+  put the score third, drew a green bar next to a red score, and spent one line
+  in three on "Hints: none". It now fits in three lines, score first, one colour
+  per state, and the hints line shows only when there are hints. The `run`
+  welcome, a learner's very first screen, listed its commands as sentences:
+  they wrapped mid-item and the remainder restarted at the margin, looking like
+  another entry. It is a two-column grid now, 13 lines instead of 18, and its
+  border goes from yellow to cyan, yellow being the warning colour everywhere
+  else.
+
+- **`use` no longer reads `meta.yml` itself.** The command parsed the file by
+  hand, derived providers and sections, applied three refusal rules then wrote
+  the context: 103 lines and 44 cognitive complexity, none of it reachable
+  without going through the CLI. Reading and refusals now live in
+  `services/contexte_service.py`; the command drops to **14** and **59
+  lines**, and the "nothing to set, so clear" path, written twice identically,
+  is written once. Seventeen tests cover the three traps and, above all, their
+  counter-cases: a section may share a provider's name, `linux/l2` validates
+  the section and not the level, and a repo with no `sections` block filters
+  nothing.
+
+- **`start` announces the steps, it no longer contains them.** The command
+  was a chain of `elif` on the step key, each branch doing real work: 85 lines,
+  54 cognitive complexity, seven levels of nesting. Each step is now a
+  function, the dispatch a table, and the "this step failed, here is how to
+  replay it" message is hoisted to one place instead of being rewritten in
+  three branches out of four, where a new step would have forgotten it. The
+  command drops to **7** cognitive complexity and **45 lines**.
+
+- **`doctor` no longer decides what it repairs.** The command ran 121 lines
+  and 56 cognitive complexity: it split fixes between those it names and those
+  it runs, checked `sudo` preconditions, drove the cascade, classified each
+  outcome, then re-judged everything for `--strict`, which it called from five
+  places. All of that now lives in `services/remediation.py`, where the runner
+  is injectable; the command drops to **10** cognitive complexity and **50
+  lines**, with a single exit. Fifteen new tests describe what none could
+  reach: a missing terminal and a missing `sudo` refuse the cascade **before**
+  the first fix, a failure midway does not stop it, and a failed fix no longer
+  announces "effective after a reboot".
+
+- **`infra status` measures without displaying.** The command ran 205 lines
+  with a cognitive complexity of 61: it built the inventory, probed each host,
+  queried the hypervisor through three `nonlocal` variables, diagnosed, then
+  produced two outputs. Measurement now lives in
+  `services/infra_state_service.py`, where the network probe is injectable, and
+  the diagnosis sentence in `reporting`: the command drops to **16** cognitive
+  complexity and **79 lines**. The hypervisor's lazy query is preserved, and
+  its state (queryable, error) stays readable by callers, so they can tell
+  "no domain" from "nothing answered".
+  Ten new tests characterise the `--json` document, which was only covered on
+  its richest part: `provider`, `summary`, the per-host field list and the exit
+  codes were held by nothing. Terminal rendering was compared stream by stream
+  against 0.3.5 on a simulated infrastructure, two silent hosts of which one
+  stopped domain and one missing domain: identical, exit code included.
+
+- **`validate-structure` is no longer the most complex function here.** It ran
+  280 lines for a cyclomatic complexity of 53 and a cognitive one of 65: eleven
+  families of checks chained together, the machine document built along the
+  way, the verdict decided en route, and the same three-instruction pattern
+  **repeated seven times**. The checks now live in
+  `services/validation_service.py`, behind a table that is iterated over; the
+  command drops to **4** cognitive complexity and **39 lines**, and a catalog
+  CI can call validation from Python instead of parsing a subprocess's output.
+  Both outputs now read the **same** report: nothing can report a finding to
+  the terminal that the document omits.
+  The `--json` document is unchanged, verified byte for byte across the five
+  catalogs and against a catalog built to trigger six families of findings.
+  That comparison still missed two display regressions, caught by eye: the
+  `meta.yml` section repeated the contract findings, and structure findings had
+  vanished from the screen while remaining in the document. A finding therefore
+  carries its display section as well as its family, and 17 tests hold the lot.
+
+- **Progress bars no longer carry event parsing.** For each piloted tool,
+  `cli/_barres.py` held a function that read ansible-runner or `terraform -json`
+  events, kept progress state in a closure-captured `dict`, and called Rich.
+  Measured: cognitive complexity of **54** and **77**, nesting depth 7 and 8,
+  and a cyclomatic complexity of **1** on the worse of the two, which made it
+  invisible to `ruff C901`. Module coverage: **19 %**, the lowest in the
+  repository, because you cannot test a closure without standing up a terminal.
+  Parsing and state now live in `reporting/evenements.py`, where a tracker is an
+  object returning `Avancement` values: both functions drop to **0** cognitive
+  complexity and 13 and 10 lines, `_barres.py` rises to **81 %** coverage and
+  the new module to **95 %**, with 28 tests that had no way of existing before.
+  A tracker no longer decides any colour: it returns a meaning (`ok`, `echec`),
+  and styling lives in one place. Rendering verified unchanged against a real
+  playbook over a local connection.
+
+- **`dsoxlab instructor audit`: what a learner will not work out alone.**
+  `validate-structure` answers "does this catalog follow the contract?"; this
+  one answers "can a learner do the work with what they are given?". The
+  checklist comes from reading labs as a learner would, across six catalogs:
+  `linux` (86), `terraform` (91) and `kubernetes` (64) give everything needed,
+  while `ansible` has **39 labs** where most assertions carry no message, 231
+  silent assertions out of 302. Assertions are read from the syntax tree rather
+  than by regex, which required the message to start on the `assert` line and
+  so counted as silent some that spoke. A test file that does not compile is no
+  longer "zero assertions" but a named gap: `pytest` will trip on it too.
+  The checklist looks for the brief **wherever it is written**. The contract
+  does not require `challenge/README.md`, and `kubernetes` writes its brief in
+  `scenario.md`: a rule reading only the former would have declared "no
+  mission" on all 64 of its labs. There is no "mission missing" finding, since
+  nothing mechanical tells a document that states work from one that explains a
+  notion; complete silence is still reported, as "no course".
+  It also counts assertion messages carrying **both languages**
+  (`assertions.both_languages` in `--json`). Everything else in a catalog is
+  bilingual: duplicated files where that is possible, `text_en` / `text_fr`
+  keys in `hints.yaml` where it is not. The six catalogs' 4,284 assertion
+  messages are the last single-language text an English-speaking learner meets.
+  `--export` writes a dossier gathering each lab's course, mission and tests:
+  teaching relevance cannot be measured, but it can be reviewed, and what
+  needed reading was spread over four files per lab.
+- **`course` splits the course even without a `course.yaml`.** No catalog ships
+  that file (0 of 310 labs), so `course` printed `scenario.md` + `README.md` in
+  one block: a median of 363 lines on `linux`, up to 1,080. The split is now
+  inferred from the headings the documents already carry, and its level is
+  chosen per document, because it cannot be fixed: `ansible` uses fifteen
+  level-2 headings per lab, `linux` uses two and hides its course under seven
+  level-3 ones. Measured result: 4 to 16 sections per lab, and the first
+  section of a `linux` lab drops from 400 lines to 70. `course.yaml` keeps
+  priority, `--all` restores the single block, and an inferred table of
+  contents says so.
+
+- **`list-labs` fits the terminal it has.** Its eight columns needed 160
+  columns to avoid truncating; at 80 (a terminal opened without resizing, a
+  tmux split in two) six of them collapsed to a single letter and the render
+  counted **104 truncations**. Widths are now **measured on the labs being
+  shown**, columns are added by usefulness as long as they fit, and `--long`
+  forces all eight. The identifier is never clipped, the level (`l1`…`l4`) is
+  reserved alongside the title and the score, and a column holding the same
+  value everywhere is dropped: on `python-dsoxlab-training`, showing `type`,
+  which is "lab" for all seven labs, cost the title sixteen wrapped lines.
+  104 truncations become 0.
+- **`check` no longer dumps pytest's raw output.** It lists the failing test
+  names and the assertion message their author wrote, which carries the repair
+  step; the expression reconstruction pytest adds (`assert False`,
+  `+ where …`) stays behind `-v` and in `--json`. 75 lines become 29.
+
+- **A newcomer's journey now holds end to end.** Played for real, typing only
+  what the previous screen offered, it broke at the third command: `dsoxlab
+  demo` printed a ninety-character path and a `cd` on its own line, after which
+  `course`, `check` and `hint` all three failed with "Lab not found", without
+  saying it was a matter of directory. `demo` now marks its demonstration
+  **active**, as `catalog add` has always done, and the active-catalog pointer
+  accepts a path as well as an identifier. In the same pass: `next` no longer
+  refuses when no section is active (it was the very command `catalog add`
+  suggests), the welcome screen no longer claims "no catalog" while holding an
+  active one, and `doctor` no longer paints "0 labs" red right after a
+  successful install.
+- **The welcome screen now only addresses whoever it concerns.** It offered
+  eleven next commands and named seven infrastructure terms (`provider`,
+  `hypervisor`, `provision`, `terraform`, `kvm`…) to someone who has installed
+  nothing yet, plus a 94-character shell loop. The first command offered is now
+  `dsoxlab demo`, which clones nothing; the machines block only appears when the
+  active catalog declares them (`infra.hosts` non-empty, `doctor`'s own
+  criterion); the loop is gone. 42 lines become 23, eleven commands become four,
+  and labels are no longer cut mid-line.
+
+- **An empty catalog finally says why.** "No lab found." with exit code 0 was
+  the answer `list-labs`, `status`, `progress` and `scores` gave on a machine
+  with no catalog: a light screen, and a dead end. Three causes lead there, and
+  each now carries its next step: no active catalog, a catalog declaring none,
+  or `lab.yaml` files that raise while parsing. The last case **names the
+  offending files**, which was the costliest symptom to diagnose in the whole
+  contract. Exit codes are unchanged, and everything goes to stderr: `dsoxlab
+  list-labs | grep` still receives labs and nothing else.
+- **`doctor` no longer leaves a red row without a remedy.** Right after a
+  successful install it painted "Labs detected ✘ KO, 0 labs" with an empty
+  remediation column, which reads as a broken installation. The step now
+  depends on the cause: install a catalog when there is none, fix the files
+  when they raise. And the remediation column disappears when there is nothing
+  to remedy: empty top to bottom, it took its share of the width and truncated
+  the detail, which carries the component's version and path. No truncation
+  left at 80 columns.
+
+### Removed
+### Fixed
+
+- **`reset` destroyed the learner's work without asking.** `clean` confirms and
+  takes `--yes`; `reset`, which does "clean + restart" and therefore takes away
+  STRICTLY MORE, asked nothing. The asymmetry went the wrong way: the more
+  destructive of the two was the silent one. Found with a lab in hand, on a
+  file that had just been filled in. `reset` now confirms, takes `--yes/-y`
+  like `clean`, and takes the repository lock only AFTER the answer, so that a
+  question nobody can see never blocks another terminal.
+- **`infra status` leaked raw logger lines** before saying the same thing
+  properly: one `WARNING … Host x.lab has no IP` per host, then "this lab needs
+  a VM, and none is running". Lowering the level would have lost a real signal,
+  because the two cases do not look alike: with NO Terraform output at all,
+  nothing is provisioned, which is the normal state before `provision` and
+  which the caller already reports; with outputs that do not carry THIS host,
+  the stack is up and a machine is missing. The first case is now an `info`
+  (still in the journal, shown with `-v`), the second stays a warning and names
+  the hosts Terraform does know.
+
+- **`validate-structure` reported pytest's own `.pyc` files as undeclared
+  fixtures.** The exemption covered hidden files only, and `__pycache__` is not
+  hidden: it appears as soon as an author plays the solution of their own lab.
+  Measured on 2026-10-16, that made 24 findings on
+  `devsecops-dsoxlab-training`, all of them `.pyc`, on a catalog that is
+  otherwise spotless. A control that cries false on the most disciplined
+  repository is the surest way to have it unlearned. What a TOOL writes
+  (`__pycache__`, `.pytest_cache`, `.ruff_cache`, `*.pyc`, `*.pyo`) is now
+  exempt, exactly like a hidden file.
+
+- **A relayed failure message counted as untranslated**, forever. Seven
+  kubernetes labs write a helper that receives the message as a parameter
+  (`def _json(host, args, absent): assert res.rc == 0, absent`); the callers
+  pass a `message(en=…, fr=…)`, so the learner does read their own language,
+  but the assertion itself only sees a name. `instructor audit` now has a
+  third category, `indirects`, counted neither as bilingual nor as
+  monolingual, and the "mixed languages" finding ignores them. Counting them
+  as monolingual left seven permanently red lines in a finished catalog, and a
+  check you learn to ignore no longer checks anything; counting them as
+  bilingual would be worse, since assigning a French string to a variable
+  would be enough to turn green. Only a bare name, attribute or subscript is
+  indirect: a string, an f-string or a concatenation still carries a text and
+  is still judged.
+
+- **The pedagogical audit only counted assertions**, and therefore reported
+  three catalogs as entirely bilingual while they still carried twenty-five
+  French messages. `pytest.fail("…")` says exactly the same thing to the
+  learner as `assert condition, "…"`, and it was invisible to the measurement.
+  Measured on 2026-10-16 across the six catalogs: **256 explicit failures**,
+  220 of them in the terraform catalog alone. `instructor audit` now counts
+  both forms, including `fail(reason=…)` and `fail` imported directly, and a
+  failure with no message is still counted as mute rather than dropped. This
+  is the module's own rule applied to itself: a check that does not look never
+  concludes green.
+
+- **`scripts/check-release.py` took a Dependabot run for the CI** and refused a
+  healthy tag. GitHub triggers runs of its own under the `dynamic` event
+  (Dependabot Updates, Dependency Graph): they attempt a dependency update,
+  they do not build the commit. Measured on `2dffd98`, one failing `uv in /.
+  - Update` reported a red CI while all nine `push` workflows were green. They
+  are now out of the verdict but still in the report, because a check that
+  gets its subject wrong costs more than no check: you learn to override it,
+  and the day it is right nobody listens.
+
+- **`doctor` now checks the Ansible collections the catalog needs**, reported by
+  two users on `kubernetes-dsoxlab-training#94`: on a fresh machine, **every**
+  lab of that catalog failed on `run` with `couldn't resolve module/action
+  'community.general.modprobe'`. The cause fits in one sentence: `ansible-core`
+  only ships `ansible.builtin`, a collection is not a Python package, and
+  nothing installed it. The maintainer could not reproduce it, for an
+  instructive reason: his machine carried twelve collections accumulated over
+  years of work. That is the textbook defect you never see at home, and exactly
+  what a diagnostic exists to say in your place.
+
+  The check reads what the catalog itself declares, never a list written in
+  dsoxlab: its root `requirements.yml` first, the Ansible convention, which also
+  carries the version bounds; failing that, the FQCN modules called by the
+  playbooks dsoxlab plays itself (`setup.yaml`, `cleanup.yaml`, `shared/`). Both
+  sources are read, because each catches what the other misses: a lookup
+  declared but never visible as a `module:`, and a module added to a `setup.yaml`
+  without anybody completing the list. What a lab's `solution/` calls does not
+  count: that is the learner's work, and often the very subject of the lab.
+
+  A missing collection is named **with the file that requires it**, and `--fix`
+  plays `ansible-galaxy collection install -r <the catalog's requirements.yml>`
+  when that file exists: it bounds the versions, and installing the bare name
+  would pull the latest published one. The kubernetes catalog writes down why,
+  in that very file: its 37 labs were validated against `community.general`
+  11.4.7, two majors before the latest. A diagnostic must not make anyone
+  install a version nobody has played. When `ansible-galaxy` does not answer,
+  the check reports `unknown`, never green, and `doctor --strict` has its own
+  exit code (`10`) for that.
+
+  Measured on the six catalogs: 8 collections required on `ansible`, 3 on
+  `linux`, 1 on `kubernetes`, none beyond `ansible.builtin` on `devsecops`, and
+  the check does not appear at all on `terraform` and `python`, which have no
+  `vm` labs.
+
+- **The course navigation bar suggested a command that went elsewhere.** It
+  printed "→ dsoxlab course --next"; typing it gave "No active lab in session",
+  or worse, section 1 of a **different** lab, the one the context still held as
+  active. Rendering did pass the lab id to the translated string: neither
+  language placed it, and the parameter was silently dropped. Both gestures now
+  name their lab.
+  Two guards come out of it, because the defect was invisible to review and to
+  tests alike: **every parameter passed to `_()` must be placed by the
+  string**, in both languages, and **every command quoted in a message must
+  exist**, with the options it advertises, checked against the Typer object
+  rather than a hand-kept list. The first one found two more silently ignored
+  parameters.
+
+
+- **The course reading position now follows its lab.** It was global: a learner
+  reading section 8 of one course, then opening another lab's course, landed
+  straight on section 8 of that one, with no table of contents and no
+  introduction; and if the new course had fewer sections, they got the
+  end-of-course panel, "congratulations", without having read a thing. Found by
+  playing two labs in a row.
+- **`check` groups failures that share a cause.** On a lab whose fixture is not
+  in place, all five tests return the same "run dsoxlab run first": it was
+  printed five times, over ten lines.
+
+- **Four symbols no caller had**, and one `if True:` in `infra/ansible.py` that
+  guarded nothing while indenting 20 lines: `inventaire_du_socle` (an identity
+  function), `rapport_sans_journal`, `lab_state.ETATS`, and
+  `config.set_active_target`, which duplicated `write_context`.
+  `terraform.get_outputs` and `provider_dir` are kept on reprieve, with a
+  written reason: `infra/` is the layer lab repositories import, and
+  `containers-dsoxlab-training` could not be cloned to check.
+
 ## [0.3.5] - 2026-10-12
 
 ### Fixed

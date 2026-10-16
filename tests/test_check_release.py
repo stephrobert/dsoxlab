@@ -228,6 +228,49 @@ def test_une_ci_en_echec_reste_un_echec(
         assert r.echecs, f"une CI rouge doit bloquer (ci_verifiee={drapeau})"
 
 
+def test_un_dependabot_rouge_ne_fait_pas_une_ci_rouge(
+    cr: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mesuré sur 2dffd98 : un tag sain était refusé pour la mauvaise raison.
+
+    GitHub déclenche des runs pour son propre compte sous l'événement
+    `dynamic` (« Dependabot Updates », « Dependency Graph »). Ils tentent une
+    mise à jour de dépendance ; ils ne construisent pas le commit. Les compter
+    dans le verdict faisait annoncer une CI rouge alors que les neuf workflows
+    de `push` étaient verts, et c'est ainsi qu'on apprend à passer outre un
+    contrôle, jusqu'au jour où il a raison.
+    """
+    _sans_gh(cr, monkeypatch, code=0, sortie=(
+        '[{"name": "uv in /. - Update", "status": "completed",'
+        '  "conclusion": "failure", "event": "dynamic"},'
+        ' {"name": "CI", "status": "completed",'
+        '  "conclusion": "success", "event": "push"}]'
+    ))
+    r = cr.Rapport()
+    cr._verifier_ci(r)
+
+    assert not r.echecs
+    # Écarté du verdict, pas du rapport : l'échec reste dit, à traiter à part.
+    assert r.notes
+
+
+def test_un_dependabot_rouge_ne_couvre_pas_une_ci_rouge(
+    cr: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """L'exemption ne doit pas devenir une porte : seul `dynamic` en sort."""
+    _sans_gh(cr, monkeypatch, code=0, sortie=(
+        '[{"name": "uv in /. - Update", "status": "completed",'
+        '  "conclusion": "failure", "event": "dynamic"},'
+        ' {"name": "CI", "status": "completed",'
+        '  "conclusion": "failure", "event": "push"}]'
+    ))
+    r = cr.Rapport()
+    cr._verifier_ci(r)
+
+    assert r.echecs
+    assert any("CI" in str(e) for e in r.echecs)
+
+
 # ── Les versions annoncées : celles qu'on a enjambées ───────────────────────
 
 def _index(*versions: str) -> str:

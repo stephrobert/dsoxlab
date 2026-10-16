@@ -24,7 +24,22 @@ class ActiveContext:
     """Provider sélectionné par ``dsoxlab use <name>``. Override par
     ``DSOXLAB_PROVIDER`` env var. Lu par ``read_repo_metadata`` pour
     résoudre ``infra.provider`` quand ``meta.yml`` en déclare plusieurs."""
-    course_pos: int = 0  # 1-based index of last section read (0 = not started)
+    course_pos: int = 0
+    """Position de lecture du cours, **du lab nommé par** ``course_lab``.
+
+    Index 1-based de la dernière section lue, 0 si le cours n'est pas commencé.
+    """
+
+    course_lab: str | None = None
+    """Le lab auquel ``course_pos`` se rapporte.
+
+    Sans ce champ, la position était **globale** : un apprenant qui lisait la
+    section 8 d'un cours, puis ouvrait le cours d'un autre lab, tombait
+    directement sur la section 8 de celui-ci, sans sommaire ni introduction. Et
+    si le nouveau cours comptait moins de sections, il recevait l'écran de fin,
+    « félicitations », sans avoir rien lu. Vérifié en jouant deux labs à la
+    suite.
+    """
 
     def label(self) -> str:
         if self.section and self.level:
@@ -132,6 +147,7 @@ def read_context(root: Path) -> ActiveContext:
         active_target=_texte(data.get("active_target")),
         active_provider=_texte(data.get("active_provider")),
         course_pos=_position(data.get("course_pos")),
+        course_lab=_texte(data.get("course_lab")),
     )
 
 
@@ -174,24 +190,31 @@ def write_context(
     _persist(root, existing)
 
 
-def set_course_pos(root: Path, pos: int) -> None:
-    """Met à jour la position courante dans le cours (1-based)."""
+def set_course_pos(root: Path, lab_id: str, pos: int) -> None:
+    """Met à jour la position de lecture, et le lab auquel elle se rapporte."""
     ctx = read_context(root)
     ctx.course_pos = max(0, pos)
+    ctx.course_lab = lab_id
     _persist(root, ctx)
+
+
+def course_pos_de(root: Path, lab_id: str) -> int:
+    """La position de lecture **de ce lab**, ou 0 si elle est d'un autre.
+
+    Rendre 0 plutôt que la position d'un autre cours est le fond du sujet : une
+    position qui ne se rapporte à rien de ce qu'on affiche est pire qu'une
+    absence de position, parce qu'elle a l'air d'une reprise.
+    """
+    ctx = read_context(root)
+    if ctx.course_lab != lab_id:
+        return 0
+    return ctx.course_pos
 
 
 def set_active_lab(root: Path, lab_id: str | None) -> None:
     """Met à jour le lab actif dans le contexte."""
     ctx = read_context(root)
     ctx.active_lab = lab_id
-    _persist(root, ctx)
-
-
-def set_active_target(root: Path, target: str | None) -> None:
-    """Met à jour la target active dans le contexte (peut être None pour effacer)."""
-    ctx = read_context(root)
-    ctx.active_target = target
     _persist(root, ctx)
 
 

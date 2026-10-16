@@ -74,6 +74,12 @@ NOEUDS_META: dict[str, tuple[str, ...]] = {
     "s": ("properties", "sections", "items"),
 }
 
+#: Variables qui ne portent PAS un nœud du schéma, et qu'on écarte donc du
+#: contrôle bidirectionnel. `meta.<lang>.yml` a la forme de `meta.yml` mais
+#: n'en surcharge qu'une poignée de champs, par conception : exiger qu'il les
+#: lise tous ferait échouer le test sur un fichier parfaitement conforme.
+HORS_SCHEMA = frozenset({"overrides", "section"})
+
 #: `schema_version` n'est pas lu par un littéral de `from_yaml` : il passe par
 #: `read_schema_version()`, que l'analyse syntaxique ne suit pas. On l'ajoute
 #: donc à la main, mais **depuis la constante**, pour qu'un renommage du champ
@@ -96,16 +102,26 @@ def _corps_de_methode(module: ast.Module, classe: str, methode: str) -> ast.AST:
 
 
 def cles_lues(chemin: Path, classe: str, methode: str) -> dict[str, set[str]]:
-    """Les clés littérales que ``classe.methode`` lit, groupées par variable.
+    """Les clés littérales que le parseur lit, groupées par variable.
 
     Trois écritures comptent, et ce sont les trois qu'emploie le contrat :
     ``var["cle"]``, ``var.get("cle")`` et ``"cle" in var``.
+
+    On regarde ``classe.methode`` **et les fonctions du module**, parce que la
+    lecture du contrat ne tient plus dans une seule méthode : `from_yaml`
+    délègue à `_lire_runtime`, `_lire_targets`, `_lire_services`. Se limiter à
+    la méthode laissait ce contrôle vert en ne mesurant plus rien, ce qui est
+    pire que de l'avoir supprimé.
     """
     module = ast.parse(chemin.read_text(encoding="utf-8"), filename=str(chemin))
-    corps = _corps_de_methode(module, classe, methode)
+    portee: list[ast.AST] = [_corps_de_methode(module, classe, methode)]
+    portee += [
+        noeud for noeud in module.body
+        if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
 
     lues: dict[str, set[str]] = defaultdict(set)
-    for noeud in ast.walk(corps):
+    for noeud in (n for racine in portee for n in ast.walk(racine)):
         if isinstance(noeud, ast.Subscript) and isinstance(noeud.value, ast.Name):
             cle = noeud.slice
             if isinstance(cle, ast.Constant) and isinstance(cle.value, str):
@@ -165,6 +181,7 @@ def _confronter(
     lues: dict[str, set[str]],
     origine: str,
 ) -> None:
+    lues = {nom: cles for nom, cles in lues.items() if nom not in HORS_SCHEMA}
     inconnues = sorted(set(lues) - set(noeuds))
     assert not inconnues, (
         f"{origine} ouvre des mappings qu'aucun nœud du schéma ne décrit : "

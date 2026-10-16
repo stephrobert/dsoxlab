@@ -7,6 +7,408 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.4.0] - 2026-10-16
+
+### Ajouté
+
+- **`instructor audit` mesure désormais si un message bilingue peut
+  S'EXÉCUTER.** Un catalogue affichait 93 messages bilingues sur 93, et les 93
+  rendaient un `NameError` : le nom `message` était parti dans un commentaire
+  `noqa` au lieu de l'import, parce qu'un correcteur découpait cette ligne sur
+  ses virgules. Trois autres catalogues portaient une variable locale du même
+  nom, qui masque le helper pour toute la fonction. Dans les deux cas la forme
+  est juste, le fichier s'importe, pytest le collecte, et l'apprenant est le
+  premier à le découvrir, sous la forme d'une trace Python au lieu du message.
+  Le compte sort en `assertions.unreachable_helper` en `--json`, et en
+  avertissement sur la console, jamais dans la ligne de progression : un
+  message bilingue qui lève n'est pas un message traduit. `ruff F823` n'attrape
+  que l'appel placé AVANT l'affectation ; quatre assertions d'un lab kubernetes
+  appelaient le helper après, ce que ruff accepte et que Python refuse.
+- **Trois garde-fous de qualité, en cliquets plutôt qu'en seuils.**
+  `scripts/complexite.py` mesure ce que `ruff C901` ne voit pas : complexité
+  cognitive, profondeur d'imbrication et longueur. Mesuré sur
+  `cli/_barres.py`, `_run_ansible_with_progress` affiche une cyclomatique de
+  **1** pour 91 lignes et trois fermetures emboîtées, et une cognitive de 54.
+  `scripts/code-mort.py` nomme les symboles sans appelant en connaissant les
+  décorateurs Typer et les fixtures pytest, ce qui lui permet de faire échouer
+  un commit là où vulture (108 lignes, dont environ 80 de faux positifs
+  structurels) ne pouvait pas. Les deux comparent à un relevé figé dans
+  `scripts/*-reference.json`, qui ne peut que descendre, et tournent en hook
+  pre-commit.
+- **`scripts/complexite-ecran.py` : la complexité de ce que l'apprenant voit.**
+  Joue de vraies commandes à 80, 100, 120 et 160 colonnes et mesure hauteur,
+  troncatures, colonnes de tableau, gestes proposés, jargon, sortie d'outil
+  brute, largeur minimale lisible et impasses. Tourne au push.
+
+### Modifié
+
+- **Deux dernières fonctions ramenées sous le seuil.** `_apply_translation`
+  (28 de cognitive, 49 lignes) devient **3** et 19 lignes : lire la
+  traduction, surcharger le dépôt, surcharger les sections. `build_progress`
+  (28, 49 lignes) devient **2** et 13 lignes, le résumé d'un bloc et le calcul
+  de sa moyenne ayant chacun leur fonction. Hors `run_playbook`, dont l'audit
+  a établi que la complexité est nécessaire, le dépôt n'a plus que de la
+  complexité assumée : **20 blocs** au-dessus d'un seuil, contre 33 au début
+  de ce lot.
+- **Les cellules vides des tableaux portaient un tiret cadratin**, que la
+  règle de rendu proscrit et que personne ne tape. Elles affichent un point
+  médian.
+
+- **Le parseur du contrat se lit par morceaux.** `LabDefinition.from_yaml`
+  faisait 156 lignes pour 31 de complexité cognitive et cinq niveaux
+  d'imbrication : chargement, fusion de la traduction, cibles, services,
+  runtime et recopie des champs, d'un seul tenant. Cinq fonctions nommées plus
+  tard, la méthode tombe à **1** et **66 lignes**. Les 374 `lab.yaml` des six
+  catalogues ont été relus après coup, en anglais et en français : aucun ne
+  disparaît, l'écart est nul partout.
+  Le contrôle qui confronte le schéma JSON au parseur a dû être élargi aux
+  fonctions du module : limité à la méthode, il serait resté vert en ne
+  mesurant plus rien, ce qui est pire que de l'avoir supprimé. Au passage, il
+  couvre maintenant la lecture de `meta.<lang>.yml`.
+
+- **Le diagnostic range sans décider en vrac.** `collect_checks` enchaînait
+  six familles de contrôles dans une seule fonction de 139 lignes et 43 de
+  complexité cognitive, en recalculant au passage les quatre faits dont dépend
+  tout le classement requis/informatif. Ces faits sont désormais un objet, et
+  chaque famille une fonction : la fonction tombe à **5** et **41 lignes**. Le
+  rendu a été comparé caractère par caractère sur `ansible-training`, et le
+  contre-exemple d'agnosticisme rejoué : `terraform-training`, sans bloc
+  `infra:`, range toujours hyperviseurs et accès sortant en informatifs.
+- **La traduction d'un `course.yaml` est sortie du chargeur.**
+  `CourseManifest.load` fusionnait les surcharges à cinq niveaux
+  d'imbrication, pour 31 de cognitive en 39 lignes : **4** et **19 lignes**
+  maintenant. Sept tests couvrent ce chemin, qu'aucun catalogue n'exerce
+  aujourd'hui, dont l'invariant qui compte : les sections s'apparient par
+  `id`, jamais par position, faute de quoi une traduction partielle pose son
+  titre sur la mauvaise section au premier ajout.
+
+- **Deux écrans repris pour ce qu'ils donnent à voir.** Le verdict de `check`
+  mettait le score en troisième position, affichait une barre verte à côté d'un
+  score rouge, et consacrait une ligne sur trois à « Hints : aucun ». Il tient
+  maintenant en trois lignes, score en tête, une seule couleur par état, et la
+  ligne des indices n'apparaît que s'il y en a. L'accueil de `run`, premier
+  écran d'un apprenant, listait ses commandes en phrases : elles se repliaient
+  au milieu et la suite repartait en marge comme une autre entrée. C'est une
+  grille à deux colonnes, 13 lignes au lieu de 18, et son cadre passe du jaune
+  au cyan, le jaune étant la couleur des avertissements partout ailleurs.
+  Au passage, les parenthèses de pluriel disparaissent (« 1 indice utilisé »,
+  « 2 indices utilisés ») et les tirets cadratins aussi.
+
+- **`use` ne relit plus le `meta.yml` lui-même.** La commande lisait le
+  fichier à la main, en déduisait providers et sections, appliquait trois
+  règles de refus puis écrivait le contexte : 103 lignes et 44 de complexité
+  cognitive, dont aucune ligne n'était joignable sans passer par la CLI. La
+  lecture et les refus vivent dans `services/contexte_service.py` ; la
+  commande tombe à **14** et **59 lignes**, et le chemin « rien à poser, donc
+  on efface », écrit deux fois à l'identique, ne l'est plus qu'une.
+  Dix-sept tests décrivent les trois pièges et surtout leurs contre-cas : une
+  section peut porter le nom d'un provider, `linux/l2` valide la section et
+  non le niveau, et un dépôt sans bloc `sections` ne filtre rien.
+
+- **`start` annonce les étapes, il ne les contient plus.** La commande était
+  une chaîne de `elif` sur l'identifiant d'étape, chacune faisant un vrai
+  travail : 85 lignes, 54 de complexité cognitive, sept niveaux d'imbrication.
+  Chaque étape est désormais une fonction, l'aiguillage une table, et l'annonce
+  de l'étape qui a cassé est hissée en un seul endroit, au lieu d'être réécrite
+  dans trois branches sur quatre : une étape ajoutée l'aurait oubliée. La
+  commande tombe à **7** de cognitive et **45 lignes**.
+
+- **`doctor` ne décide plus de ce qu'il répare.** La commande portait 121
+  lignes et 56 de complexité cognitive : elle partageait les correctifs entre
+  ceux qu'on nomme et ceux qu'on joue, vérifiait les préconditions de `sudo`,
+  menait la cascade, classait chaque sortie, puis rejugeait le tout pour
+  `--strict`, qu'elle appelait depuis cinq endroits. Tout cela vit dans
+  `services/remediation.py`, où l'exécuteur est injectable ; la commande tombe
+  à **10** de cognitive et **50 lignes**, avec une seule sortie. Quinze tests
+  nouveaux décrivent ce qu'aucun n'atteignait : un terminal absent et un `sudo`
+  introuvable refusent la cascade **avant** le premier correctif, un échec au
+  milieu ne l'arrête pas, et un correctif raté n'annonce plus « effectif après
+  redémarrage ».
+
+- **`infra status` mesure sans afficher.** La commande portait 205 lignes et
+  une complexité cognitive de 61 : elle construisait l'inventaire, sondait
+  chaque hôte, interrogeait l'hyperviseur à travers trois variables `nonlocal`,
+  diagnostiquait, puis rendait deux sorties. La mesure vit désormais dans
+  `services/infra_state_service.py`, où la sonde réseau est injectable, et la
+  phrase de diagnostic dans `reporting` : la commande tombe à **16** de
+  cognitive et **79 lignes**. L'interrogation paresseuse de l'hyperviseur est
+  conservée, et son état (interrogeable, erreur) reste lisible par l'appelant,
+  pour qu'il distingue « aucun domaine » de « rien n'a répondu ».
+  Dix tests nouveaux caractérisent le document `--json`, qui n'avait de
+  couverture que sur sa partie la plus riche : `provider`, `summary`, la liste
+  des champs par hôte et les codes de retour n'étaient tenus par rien. Le rendu
+  terminal a été comparé flux par flux à celui de la 0.3.5 sur une
+  infrastructure simulée, deux hôtes muets dont un domaine éteint et un domaine
+  absent : identique, code de retour compris.
+
+- **`validate-structure` n'est plus la fonction la plus complexe du dépôt.**
+  Elle faisait 280 lignes pour une complexité cyclomatique de 53 et une
+  cognitive de 65 : onze familles de contrôles enchaînées, le document machine
+  tenu au fil de l'eau, le verdict décidé en chemin, et le même patron de trois
+  instructions **répété sept fois**. Les contrôles vivent désormais dans
+  `services/validation_service.py`, derrière une table que l'on parcourt ; la
+  commande tombe à **4** de cognitive et **39 lignes**, et une CI de catalogue
+  peut appeler la validation en Python au lieu d'analyser la sortie d'un
+  sous-processus. Les deux sorties lisent maintenant le **même** rapport : rien
+  ne peut plus signaler au terminal une anomalie que le document taise.
+  Le document `--json` est inchangé, vérifié octet pour octet sur les cinq
+  catalogues et sur un catalogue fabriqué pour déclencher six familles
+  d'anomalies. Cette comparaison n'a pourtant pas vu deux régressions
+  d'affichage, trouvées à l'œil : la rubrique du `meta.yml` répétait les
+  anomalies de contrat, et les anomalies de structure avaient disparu de
+  l'écran alors qu'elles restaient dans le document. Une anomalie porte donc sa
+  rubrique en plus de sa famille, et 17 tests tiennent l'ensemble.
+
+- **Les barres de progression ne portent plus la lecture des événements.**
+  `cli/_barres.py` tenait, pour chaque outil piloté, une fonction qui lisait les
+  événements d'ansible-runner ou de `terraform -json`, gardait l'état de la
+  progression dans un `dict` capturé par fermeture, et appelait Rich. Mesuré :
+  complexité cognitive de **54** et **77**, profondeur d'imbrication 7 et 8, et
+  une cyclomatique de **1** sur la pire des deux, qui la rendait invisible à
+  `ruff C901`. Couverture du module : **19 %**, la plus basse du dépôt, parce
+  qu'on ne teste pas une fermeture sans monter un terminal.
+  La lecture et l'état vivent désormais dans `reporting/evenements.py`, où un
+  suivi est un objet qui rend des `Avancement` : les deux fonctions tombent à
+  **0** de cognitive et 13 et 10 lignes, `_barres.py` passe à **81 %** de
+  couverture et le nouveau module à **95 %**, avec 28 tests qui n'avaient aucun
+  moyen d'exister avant. Un suivi ne décide plus d'aucune couleur : il rend un
+  sens (`ok`, `echec`), et le style vit en un seul endroit. Rendu vérifié
+  inchangé sur un vrai playbook en connexion locale.
+
+- **`dsoxlab instructor audit` : ce qu'un apprenant ne trouvera pas tout seul.**
+  `validate-structure` répond à « ce catalogue respecte-t-il le contrat ? » ;
+  celle-ci répond à « un apprenant peut-il faire le travail avec ce qu'on lui
+  donne ? ». La grille vient d'une lecture de labs à la place d'un apprenant,
+  sur six catalogues, et ce qu'elle a trouvé : `linux` (86), `terraform` (91)
+  et `kubernetes` (64) donnent tout ce qu'il faut, tandis qu'`ansible` compte
+  **39 labs** dont la majorité des assertions ne portent aucun message, soit
+  231 assertions muettes sur 302. Les assertions sont lues sur l'arbre
+  syntaxique et non à la regex, qui ne voyait pas un message écrit sur la ligne
+  suivante et en comptait donc de muettes qui parlaient. Un fichier de tests
+  qui ne compile pas n'est plus « zéro assert » mais un manque nommé : `pytest`
+  butera dessus de la même façon.
+  La grille cherche l'énoncé **où qu'il soit écrit**. Le contrat n'exige pas
+  `challenge/README.md`, et `kubernetes` écrit le sien dans `scenario.md` : une
+  règle qui n'aurait regardé que le premier aurait déclaré « aucune mission »
+  sur ses 64 labs. Il n'existe pas de constat « mission absente », faute de
+  pouvoir distinguer mécaniquement un document qui énonce d'un document qui
+  explique ; le silence complet reste dit par « aucun cours ».
+  Elle compte enfin les messages d'assertion qui portent **les deux langues**
+  (`assertions.both_languages` en `--json`). Tout le reste d'un catalogue est
+  bilingue : fichiers dupliqués pour ce qui peut l'être, clés `text_en` /
+  `text_fr` dans `hints.yaml` pour ce qui ne le peut pas. Les 4 284 messages
+  d'assertion des six catalogues sont les derniers textes monolingues que
+  rencontre un apprenant anglophone.
+  `--export` écrit un dossier qui rassemble cours, mission et tests de chaque
+  lab : la pertinence pédagogique ne se mesure pas, mais elle se relit, et ce
+  qu'il faut lire était dispersé dans quatre fichiers par lab.
+- **`course` découpe le cours même sans `course.yaml`.** Ce fichier n'existe
+  dans aucun catalogue (0 sur 310 labs), donc `course` affichait `scenario.md`
+  + `README.md` d'un bloc : une médiane de 363 lignes sur `linux`, un maximum
+  de 1 080. Le découpage est désormais déduit des titres que les documents
+  portent déjà, et son niveau est choisi par document, parce qu'il ne peut pas
+  être fixe : `ansible` met quinze titres de niveau 2 par lab, `linux` en met
+  deux et cache son cours sous sept titres de niveau 3. Résultat mesuré : 4 à
+  16 sections par lab, et la première section d'un lab `linux` passe de 400 à
+  70 lignes. `course.yaml` garde la priorité, `--all` rend l'affichage d'un
+  bloc, et le sommaire déduit s'annonce comme tel.
+
+- **`list-labs` tient dans le terminal qu'on a.** Ses huit colonnes exigeaient
+  160 colonnes pour ne rien tronquer ; à 80 (un terminal ouvert sans
+  redimensionnement, un tmux coupé en deux) six d'entre elles tombaient à une
+  lettre et le rendu comptait **104 troncatures**. Les largeurs sont désormais
+  **mesurées sur les labs affichés**, les colonnes ajoutées par utilité tant
+  qu'elles tiennent, et `--long` force les huit. L'identifiant n'est jamais
+  rogné, le niveau (`l1`…`l4`) est réservé au même titre que le titre et le
+  score, et une colonne qui porte la même valeur partout est écartée : sur
+  `python-dsoxlab-training`, afficher `type`, qui vaut « lab » pour les sept
+  labs, coûtait seize lignes de repli au titre. 104 troncatures passent à 0.
+- **`check` ne déverse plus la sortie brute de pytest.** Il liste les noms des
+  tests en échec et le message d'assertion que leur auteur a écrit, qui porte
+  le geste de réparation ; la reconstruction d'expression que pytest ajoute
+  (`assert False`, `+ where …`) reste sous `-v` et dans `--json`. 75 lignes
+  passent à 29.
+
+- **Le parcours d'un nouvel arrivant tient de bout en bout.** Joué pour de
+  vrai, en ne tapant que ce que l'écran précédent proposait, il cassait à la
+  troisième commande : `dsoxlab demo` affichait un chemin de quatre-vingt-dix
+  caractères et un `cd` sur une ligne séparée, et `course`, `check` et `hint`
+  échouaient ensuite toutes les trois sur « Lab introuvable » sans dire que
+  c'était une question de répertoire. `demo` rend désormais sa démonstration
+  **active**, comme `catalog add` le fait depuis toujours, et le pointeur de
+  catalogue actif accepte un chemin en plus d'un identifiant. Dans la même
+  passe : `next` ne refuse plus quand aucune section n'est active (il proposait
+  pourtant ce geste juste après `catalog add`), l'accueil ne dit plus « aucun
+  catalogue » quand il en a un d'actif, et `doctor` ne peint plus « 0 lab » en
+  rouge juste après une installation réussie.
+- **L'accueil ne s'adresse plus qu'à ceux que ça concerne.** Il proposait onze
+  gestes et nommait sept termes d'infrastructure (`provider`, `hyperviseur`,
+  `provision`, `terraform`, `kvm`…) à quelqu'un qui n'a encore rien installé,
+  plus une boucle shell de 94 caractères. Le premier geste est désormais
+  `dsoxlab demo`, qui ne clone rien ; le bloc des machines n'apparaît que si le
+  catalogue actif en déclare (`infra.hosts` non vide, le critère de `doctor`) ;
+  la boucle est partie. 42 lignes deviennent 23, onze gestes quatre, et les
+  libellés ne sont plus coupés en fin de ligne.
+
+- **Un catalogue vide dit enfin pourquoi.** « Aucun lab trouvé. » en sortant
+  en 0 était la réponse de `list-labs`, `status`, `progress` et `scores` sur un
+  poste sans catalogue : un écran léger, et une impasse. Trois causes mènent là,
+  et chacune a maintenant son geste : aucun catalogue actif, un catalogue qui
+  n'en déclare pas, ou des `lab.yaml` qui lèvent au parsing. Ce dernier cas
+  **nomme les fichiers fautifs**, ce qui était le symptôme le plus coûteux à
+  diagnostiquer de tout le contrat. Le code de retour ne change pas, et tout
+  part sur stderr : `dsoxlab list-labs | grep` reçoit toujours des labs et rien
+  d'autre.
+- **`doctor` ne laisse plus un rouge sans remédiation.** Juste après une
+  installation réussie, il peignait « Labs détectés ✘ KO, 0 lab » avec une
+  colonne de remédiation vide, de quoi faire croire à une installation cassée.
+  Le geste dépend désormais de la cause : poser un catalogue s'il n'y en a pas,
+  corriger les fichiers s'ils lèvent. Et la colonne de remédiation disparaît
+  quand il n'y a rien à remédier : vide de haut en bas, elle prenait sa part de
+  largeur et faisait tronquer le détail, qui porte la version et le chemin du
+  composant. Plus aucune troncature à 80 colonnes.
+
+### Supprimé
+### Corrigé
+
+- **`reset` détruisait le travail de l'apprenant sans demander.** `clean`
+  confirme et prend `--yes` ; `reset`, qui fait « clean + redémarrage » et
+  emporte donc STRICTEMENT PLUS, ne demandait rien. L'asymétrie allait dans le
+  mauvais sens : la plus destructrice des deux était la silencieuse. Trouvé lab
+  en main, sur un fichier qui venait d'être rempli. `reset` confirme désormais,
+  prend `--yes/-y` comme `clean`, et ne prend le verrou du dépôt qu'APRÈS la
+  réponse, pour qu'une question que personne ne voit ne bloque jamais un autre
+  terminal.
+- **`infra status` déversait des lignes de logger brut** avant de dire
+  proprement la même chose : un `WARNING … Host x.lab has no IP` par hôte, puis
+  « ce lab a besoin d'une VM, et aucune ne tourne ». Baisser le niveau aurait
+  perdu un vrai signal, car les deux cas ne se ressemblent pas : sans AUCUN
+  output Terraform, rien n'est provisionné, c'est l'état normal avant
+  `provision` et l'appelant le dit déjà ; avec des outputs qui ne portent pas
+  CET hôte, la stack est debout et il manque une machine. Le premier cas passe
+  en `info` (toujours au journal, visible avec `-v`), le second reste un
+  avertissement et nomme les hôtes que Terraform connaît.
+
+- **`validate-structure` signalait les `.pyc` de pytest comme des fixtures non
+  déclarées.** L'exemption ne couvrait que les fichiers cachés, et
+  `__pycache__` ne l'est pas : il apparaît dès qu'un auteur joue la solution de
+  son propre lab. Mesuré le 2026-10-16, cela faisait 24 écarts sur
+  `devsecops-dsoxlab-training`, tous des `.pyc`, sur un catalogue par ailleurs
+  irréprochable. Un contrôle qui crie faux sur le dépôt le plus discipliné est
+  la façon la plus sûre de le faire désapprendre. Ce qu'un OUTIL dépose
+  (`__pycache__`, `.pytest_cache`, `.ruff_cache`, `*.pyc`, `*.pyo`) est
+  désormais exempté, exactement comme un fichier caché.
+
+- **Un message d'échec relayé comptait comme non traduit**, définitivement.
+  Sept labs kubernetes écrivent un helper qui reçoit le message en paramètre
+  (`def _json(host, args, absent): assert res.rc == 0, absent`) ; les
+  appelants passent un `message(en=…, fr=…)`, donc l'apprenant lit bien sa
+  langue, mais l'assertion elle-même ne voit qu'un nom. `instructor audit`
+  porte désormais une troisième catégorie, `indirects`, comptée ni comme
+  bilingue ni comme monolingue, et le constat « langues mélangées » les
+  ignore. Les compter comme monolingues laissait sept lignes rouges
+  définitives dans un catalogue achevé, et un contrôle qu'on apprend à
+  ignorer ne contrôle plus rien ; les compter comme bilingues serait pire,
+  puisqu'il suffirait d'affecter une chaîne française à une variable pour
+  passer au vert. Seuls un nom nu, un attribut ou un indice sont indirects :
+  une chaîne, une f-string ou une concaténation portent un texte et restent
+  jugées.
+
+- **L'audit pédagogique ne comptait que les assertions**, et déclarait donc
+  trois catalogues entièrement bilingues alors qu'ils portaient encore
+  vingt-cinq messages français. `pytest.fail("…")` dit exactement la même
+  chose à l'apprenant que `assert condition, "…"`, et il était invisible à la
+  mesure. Mesuré le 2026-10-16 sur les six catalogues : **256 échecs
+  explicites**, dont 220 pour le seul catalogue terraform. `instructor audit`
+  compte désormais les deux formes, y compris `fail(reason=…)` et `fail`
+  importé directement, et un échec sans message reste compté comme muet plutôt
+  qu'écarté. C'est la règle du module appliquée à lui-même : un contrôle qui
+  n'a pas regardé ne conclut jamais au vert.
+
+- **`scripts/check-release.py` prenait un run Dependabot pour la CI** et
+  refusait un tag sain. GitHub déclenche des runs pour son propre compte sous
+  l'événement `dynamic` (Dependabot Updates, Dependency Graph) : ils tentent
+  une mise à jour de dépendance, ils ne construisent pas le commit. Mesuré sur
+  `2dffd98`, un « uv in /. - Update » en échec annonçait une CI rouge alors que
+  les neuf workflows de `push` étaient verts. Ils sortent du verdict, mais
+  restent au rapport : un contrôle qui se trompe de sujet coûte plus cher que
+  l'absence de contrôle, parce qu'on apprend à passer outre, et que le jour où
+  il a raison personne ne l'écoute.
+
+- **`doctor` contrôle désormais les collections Ansible que le catalogue
+  exige**, signalé par deux utilisateurs sur `kubernetes-dsoxlab-training#94` :
+  sur une machine fraîche, **tous** les labs de ce catalogue échouaient au `run`
+  sur un `couldn't resolve module/action 'community.general.modprobe'`. La cause
+  tient en une phrase : `ansible-core` ne fournit que `ansible.builtin`, une
+  collection n'est pas un paquet Python, et rien ne l'installait. Le mainteneur
+  ne reproduisait pas, pour une raison instructive : sa machine portait douze
+  collections accumulées au fil des années. C'est le cas d'école du défaut qu'on
+  ne voit jamais chez soi, et exactement ce qu'un diagnostic existe pour dire à
+  sa place.
+
+  Le contrôle lit ce que le catalogue déclare lui-même, jamais une liste écrite
+  dans dsoxlab : d'abord son `requirements.yml` racine, la convention Ansible,
+  qui porte en outre les bornes de version ; à défaut, les modules appelés en
+  FQCN par les playbooks que dsoxlab joue (`setup.yaml`, `cleanup.yaml`,
+  `shared/`). Les deux sources sont lues, parce que chacune attrape ce que
+  l'autre rate : un lookup déclaré mais qu'aucun `module:` ne révèle, et un
+  module ajouté dans un `setup.yaml` sans que personne complète la liste. Ce que
+  la `solution/` d'un lab appelle ne compte pas : c'est le travail de
+  l'apprenant, et souvent le sujet même du lab.
+
+  Une collection manquante est nommée **avec le fichier qui l'exige**, et
+  `--fix` joue `ansible-galaxy collection install -r <le requirements.yml du
+  catalogue>` quand ce fichier existe : il borne les versions, là où installer
+  le nom seul prendrait la dernière publiée. Le catalogue kubernetes écrit
+  pourquoi, dans ce fichier même : ses 37 labs ont été validés en
+  `community.general` 11.4.7, deux majeures avant la dernière. Un diagnostic ne
+  doit pas faire installer une version que personne n'a jouée. Quand
+  `ansible-galaxy` ne répond pas, le contrôle sort en `unknown`, jamais en vert,
+  et `doctor --strict` a son propre code de sortie (`10`) pour ce cas.
+
+  Mesuré sur les six catalogues : 8 collections exigées sur `ansible`, 3 sur
+  `linux`, 1 sur `kubernetes`, aucune hors `ansible.builtin` sur `devsecops`, et
+  le contrôle n'apparaît pas du tout sur `terraform` et `python`, qui n'ont
+  aucun lab `vm`.
+
+- **Une remédiation portant un chemin long était tronquée**, donc incopiable :
+  Rich ne replie pas un mot plus large que sa colonne, il le coupe par un « … ».
+  La colonne replie maintenant à l'intérieur des mots.
+
+- **La barre du cours proposait une commande qui partait ailleurs.** Elle
+  affichait « → dsoxlab course --next » ; l'apprenant la tapait et tombait sur
+  « Aucun lab actif en session », ou pire, sur la section 1 d'un **autre** lab,
+  celui que le contexte gardait pour actif. Le rendu passait pourtant bien
+  l'identifiant du lab à la chaîne traduite : aucune des deux langues ne le
+  plaçait, et le paramètre partait à la poubelle sans un mot. Les deux gestes
+  nomment désormais leur lab.
+  Deux garde-fous en sortent, parce que ce défaut était invisible à la
+  relecture comme aux tests : **tout paramètre passé à `_()` doit être placé
+  par la chaîne**, dans les deux langues, et **toute commande citée dans un
+  message doit exister**, avec les options qu'elle annonce, vérifiée contre
+  l'objet Typer et non contre une liste tenue à la main. Le premier a trouvé
+  deux autres paramètres ignorés en silence.
+
+
+- **La position de lecture du cours suit son lab.** Elle était globale : un
+  apprenant qui lisait la section 8 d'un cours, puis ouvrait le cours d'un
+  autre lab, tombait directement sur la section 8 de celui-ci, sans sommaire ni
+  introduction ; et si le nouveau cours comptait moins de sections, il recevait
+  l'écran de fin, « félicitations », sans avoir rien lu. Vérifié en jouant deux
+  labs à la suite.
+- **`check` groupe les échecs qui partagent une cause.** Sur un lab dont la
+  fixture n'est pas posée, les cinq tests rendent le même « lance d'abord
+  dsoxlab run » : il s'affichait cinq fois, sur dix lignes.
+
+- **Quatre symboles que personne n'appelait**, et un `if True:` dans
+  `infra/ansible.py` qui ne gardait rien tout en indentant 20 lignes :
+  `inventaire_du_socle` (une fonction identité), `rapport_sans_journal`,
+  `lab_state.ETATS`, et `config.set_active_target`, qui doublait
+  `write_context`. `terraform.get_outputs` et `provider_dir` sont gardés en
+  sursis, avec un motif écrit : `infra/` est la couche que les dépôts de labs
+  importent, et `containers-dsoxlab-training` n'était pas clonable pour
+  vérifier.
+
 ## [0.3.5] - 2026-10-12
 
 ### Corrigé

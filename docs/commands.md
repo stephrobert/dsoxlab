@@ -37,6 +37,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
 | `dsoxlab infra status` | Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent. |
 | `dsoxlab install` | Deprecated: use `dsoxlab completion install`. Installs shell completion. |
+| `dsoxlab instructor audit` | What a learner will not work out alone in this catalog. |
 | `dsoxlab instructor bootstrap` | Generate the lab SSH key (if missing) and check that terraform/ansible-runner are installed. |
 | `dsoxlab list-labs` | List all available labs (filtered by active context if set). |
 | `dsoxlab new catalog` | Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/. |

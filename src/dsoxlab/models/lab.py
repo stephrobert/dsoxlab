@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -25,6 +26,129 @@ class ValidationConfig:
     functional: bool = True
     security: bool = False
     persistence_after_reboot: bool = False
+
+
+def _charger_document(lab_yaml: Path) -> dict[str, Any]:
+    """Le `lab.yaml` chargé, et la garantie que c'est bien un mapping.
+
+    Un fichier vide ou réduit à des commentaires donne `None` ; une racine en
+    liste ou en scalaire donne une `list` ou un `int`. Sans ce garde-fou,
+    l'accès suivant lèverait `AttributeError`, hors du contrat que
+    `discovery/scanner.py` rattrape : le lab ferait planter la CLI au lieu
+    d'être écarté avec un avertissement.
+    """
+    with lab_yaml.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    if not isinstance(data, dict):
+        raise LabYamlError(
+            f"{lab_yaml}: le document doit être un mapping YAML "
+            f"(reçu : {type(data).__name__})."
+        )
+    return data
+
+
+def _fusionner_la_traduction(
+    data: dict[str, Any], lab_yaml: Path, lang: str, traduisibles: tuple[str, ...]
+) -> None:
+    """Applique `lab.<lang>.yaml` sur les seuls champs traduisibles.
+
+    Une traduction illisible est **avalée volontairement** : elle ne doit pas
+    faire disparaître un lab du catalogue. L'original reste affiché, dans sa
+    langue, ce qui est très préférable à un lab absent de `list-labs` sans
+    que rien ne le dise.
+    """
+    if not lang or lang == "en":
+        return
+    fichier = lab_yaml.parent / f"lab.{lang[:2].lower()}.yaml"
+    if not fichier.exists():
+        return
+    try:
+        with fichier.open(encoding="utf-8") as fh:
+            traduction = yaml.safe_load(fh)
+    except yaml.YAMLError:
+        return
+    if not isinstance(traduction, dict):
+        return
+    for cle in traduisibles:
+        if cle in traduction:
+            data[cle] = traduction[cle]
+
+
+def _lire_targets(runtime_data: dict[str, Any], lab_yaml: Path) -> list[Target]:
+    """Les cibles déclarées, chacune nommée et rattachée à un hôte."""
+    targets: list[Target] = []
+    for idx, t in enumerate(
+        as_mapping_list(runtime_data.get("targets"), "runtime.targets", lab_yaml)
+    ):
+        if "name" not in t or "host" not in t:
+            raise LabYamlError(
+                f"{lab_yaml}: runtime.targets[{idx}] doit contenir 'name' et 'host'."
+            )
+        roles = as_mapping(t.get("roles"), f"runtime.targets[{idx}].roles", lab_yaml)
+        targets.append(Target(
+            name=str(t["name"]),
+            host=str(t["host"]),
+            label_en=str(t.get("label_en", "")),
+            label_fr=str(t.get("label_fr", "")),
+            roles={str(k): str(v) for k, v in roles.items()},
+        ))
+    return targets
+
+
+def _lire_services(runtime_data: dict[str, Any], lab_yaml: Path) -> list[Service]:
+    """Les conteneurs dont le lab a besoin, image et nom obligatoires.
+
+    dsoxlab lance l'image que le lab déclare : aucun nom de produit n'a sa
+    place ici, c'est l'invariant d'agnosticisme du contrat.
+    """
+    services: list[Service] = []
+    for idx, s in enumerate(
+        as_mapping_list(runtime_data.get("services"), "runtime.services", lab_yaml)
+    ):
+        if "name" not in s or "image" not in s:
+            raise LabYamlError(
+                f"{lab_yaml}: runtime.services[{idx}] doit contenir 'name' et 'image'."
+            )
+        prefixe = f"runtime.services[{idx}]"
+        env = as_mapping(s.get("env"), f"{prefixe}.env", lab_yaml)
+        services.append(Service(
+            name=str(s["name"]),
+            image=str(s["image"]),
+            ports=as_str_list(s.get("ports"), f"{prefixe}.ports", lab_yaml),
+            run_args=as_str_list(s.get("run_args"), f"{prefixe}.run_args", lab_yaml),
+            env={str(k): str(v) for k, v in env.items()},
+            ready_tcp=as_int(s.get("ready_tcp"), 0, f"{prefixe}.ready_tcp", lab_yaml),
+            ready_exec=as_argv(s.get("ready_exec"), f"{prefixe}.ready_exec", lab_yaml),
+            ready_timeout=as_int(
+                s.get("ready_timeout"), 90, f"{prefixe}.ready_timeout", lab_yaml
+            ),
+            post_start=as_argv_list(
+                s.get("post_start"), f"{prefixe}.post_start", lab_yaml
+            ),
+            spawns=as_str_list(s.get("spawns"), f"{prefixe}.spawns", lab_yaml),
+        ))
+    return services
+
+
+def _lire_runtime(data: dict[str, Any], lab_yaml: Path) -> RuntimeConfig:
+    """Le bloc `runtime:`, cibles et services compris.
+
+    `runtime: vm` au lieu du bloc `runtime:\\n  type: vm` est la faute la plus
+    naturelle du contrat : elle donne une chaîne, pas un mapping, et c'est
+    `as_mapping` qui le dit en nommant le champ.
+    """
+    runtime_data = as_mapping(data.get("runtime"), "runtime", lab_yaml)
+    return RuntimeConfig(
+        type=RuntimeType(runtime_data.get("type", "shell")),
+        targets=_lire_targets(runtime_data, lab_yaml),
+        default=str(runtime_data.get("default", "")),
+        snapshot_required=bool(runtime_data.get("snapshot_required", False)),
+        session=str(runtime_data.get("session", "target")),
+        workdir=runtime_data.get("workdir", "challenge/work"),
+        fixtures=as_str_list(runtime_data.get("fixtures"), "runtime.fixtures", lab_yaml),
+        topology=runtime_data.get("topology", "local"),
+        services=_lire_services(runtime_data, lab_yaml),
+    )
 
 
 @dataclass
@@ -143,107 +267,17 @@ class LabDefinition:
                 donc technique et non traduit, à la différence de ce que lève
                 la lecture d'un ``meta.yml``. Voir :class:`._contract.LabYamlError`.
         """
-        with lab_yaml.open(encoding="utf-8") as fh:
-            data = yaml.safe_load(fh)
-
-        # Un fichier vide ou réduit à des commentaires donne None ; une racine
-        # en liste ou en scalaire donne un list/int. Sans ce garde-fou, l'accès
-        # suivant lèverait AttributeError, hors du contrat (KeyError,
-        # ValueError, YAMLError) que discovery/scanner.py rattrape : le lab
-        # ferait planter la CLI au lieu d'être ignoré avec un warning.
-        if not isinstance(data, dict):
-            raise LabYamlError(
-                f"{lab_yaml}: le document doit être un mapping YAML "
-                f"(reçu : {type(data).__name__})."
-            )
+        data = _charger_document(lab_yaml)
 
         # AVANT toute autre lecture : si le fichier annonce une version du
         # contrat que ce dsoxlab ne connaît pas, aucun de ses champs n'a de
         # sens ici. Échouer sur `schema_version` nomme la vraie cause ; échouer
         # trois champs plus loin enverrait l'auteur corriger un champ correct.
         schema_version = read_schema_version(data, lab_yaml)
+        _fusionner_la_traduction(data, lab_yaml, lang, cls._TRANSLATABLE)
+        runtime = _lire_runtime(data, lab_yaml)
 
-        # Fusion des traductions
-        if lang and lang != "en":
-            lang_yaml = lab_yaml.parent / f"lab.{lang[:2].lower()}.yaml"
-            if lang_yaml.exists():
-                try:
-                    with lang_yaml.open(encoding="utf-8") as fh:
-                        overrides = yaml.safe_load(fh)
-                    if not isinstance(overrides, dict):
-                        overrides = {}
-                    for key in cls._TRANSLATABLE:
-                        if key in overrides:
-                            data[key] = overrides[key]
-                except yaml.YAMLError:
-                    pass  # fichier de traduction invalide — on garde les valeurs de base
-
-        # `runtime: vm` au lieu du bloc `runtime:\n  type: vm` est la faute la
-        # plus naturelle du contrat : elle donne une str, pas un mapping.
-        runtime_data = as_mapping(data.get("runtime"), "runtime", lab_yaml)
-
-        targets_raw = as_mapping_list(runtime_data.get("targets"), "runtime.targets", lab_yaml)
-        targets: list[Target] = []
-        for idx, t in enumerate(targets_raw):
-            if "name" not in t or "host" not in t:
-                raise LabYamlError(
-                    f"{lab_yaml}: runtime.targets[{idx}] doit contenir "
-                    f"'name' et 'host'."
-                )
-            roles_raw = as_mapping(
-                t.get("roles"), f"runtime.targets[{idx}].roles", lab_yaml
-            )
-            targets.append(Target(
-                name=str(t["name"]),
-                host=str(t["host"]),
-                label_en=str(t.get("label_en", "")),
-                label_fr=str(t.get("label_fr", "")),
-                roles={str(k): str(v) for k, v in roles_raw.items()},
-            ))
-
-        services_raw = as_mapping_list(runtime_data.get("services"), "runtime.services", lab_yaml)
-        services: list[Service] = []
-        for idx, s in enumerate(services_raw):
-            if "name" not in s or "image" not in s:
-                raise LabYamlError(
-                    f"{lab_yaml}: runtime.services[{idx}] doit contenir "
-                    f"'name' et 'image'."
-                )
-            env_raw = as_mapping(
-                s.get("env"), f"runtime.services[{idx}].env", lab_yaml
-            )
-            services.append(Service(
-                name=str(s["name"]),
-                image=str(s["image"]),
-                ports=as_str_list(s.get("ports"), f"runtime.services[{idx}].ports", lab_yaml),
-                run_args=as_str_list(s.get("run_args"), f"runtime.services[{idx}].run_args", lab_yaml),
-                env={str(k): str(v) for k, v in env_raw.items()},
-                ready_tcp=as_int(s.get("ready_tcp"), 0, f"runtime.services[{idx}].ready_tcp", lab_yaml),
-                ready_exec=as_argv(
-                    s.get("ready_exec"), f"runtime.services[{idx}].ready_exec", lab_yaml
-                ),
-                ready_timeout=as_int(s.get("ready_timeout"), 90, f"runtime.services[{idx}].ready_timeout", lab_yaml),
-                post_start=as_argv_list(
-                    s.get("post_start"), f"runtime.services[{idx}].post_start", lab_yaml
-                ),
-                spawns=as_str_list(
-                    s.get("spawns"), f"runtime.services[{idx}].spawns", lab_yaml
-                ),
-            ))
-
-        runtime = RuntimeConfig(
-            type=RuntimeType(runtime_data.get("type", "shell")),
-            targets=targets,
-            default=str(runtime_data.get("default", "")),
-            snapshot_required=bool(runtime_data.get("snapshot_required", False)),
-            session=str(runtime_data.get("session", "target")),
-            workdir=runtime_data.get("workdir", "challenge/work"),
-            fixtures=as_str_list(runtime_data.get("fixtures"), "runtime.fixtures", lab_yaml),
-            topology=runtime_data.get("topology", "local"),
-            services=services,
-        )
-
-        # `None` — pas une chaîne — quand la clé est absente : c'est ce qui
+        # `None`, pas une chaîne, quand la clé est absente : c'est ce qui
         # distingue « non déclaré » de « déclaré », y compris quand la valeur
         # déclarée est le nom d'un domaine.
         section_raw = data.get("section")

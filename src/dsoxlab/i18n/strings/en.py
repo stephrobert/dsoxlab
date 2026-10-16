@@ -15,8 +15,7 @@ STRINGS: dict[str, str] = {
     "accueil_geste_start": "play one, from end to end",
     "accueil_geste_doctor": "what this machine can do, and what is missing",
     "accueil_titre_catalogues": "Catalogs you can add",
-    "accueil_tous_les_catalogues": "All of them at once:",
-    "accueil_pied": "dsoxlab --help for every command · dsoxlab fullhelp for the detailed guide",
+    "accueil_pied": "dsoxlab --help · dsoxlab fullhelp for the full guide",
     "accueil_titre_parcours": "The whole path, if you would rather drive it yourself",
     "accueil_parcours_start": "plays every step below on its own",
     "accueil_parcours_1": "install a catalog",
@@ -141,11 +140,72 @@ STRINGS: dict[str, str] = {
     "course_toc_col_id": "Section ID",
     "course_toc_col_title": "Title",
     "course_toc_tip":    "Read a section: [bold]dsoxlab course {id} --section <n>[/bold]",
+    "course_toc_deduit":
+        "Table of contents inferred from the course headings. All at once: dsoxlab course {id} --all",
     "cmd_course_opt_next": "Go to the next section (increments saved position).",
+    "audit_mission_sans_validation":
+        "The mission does not say how to validate. Add: dsoxlab check <id>",
+    "audit_aucun_test":
+        "No test: nothing proves the work, and the score will always be zero.",
+    "audit_asserts_sans_message":
+        "{sans} of {total} assertions carry no message: the learner will see "
+        "which tests fail, and nothing about what to fix.",
+    "audit_messages_melanges":
+        "Only {bilingues} of {total} assertion messages carry both languages: "
+        "the other failures speak one language to every learner. The catalog's "
+        "conftest.py provides message(en=..., fr=...).",
+    "audit_tests_illisibles":
+        "The test file is not valid Python, so nothing could be counted and "
+        "pytest will not load it either: {raison}",
+    "audit_cours_absent":
+        "No course (scenario.md or README.md): the mission arrives with nothing to prepare it.",
+    "audit_cours_indivisible":
+        "{lignes} lines of course that even automatic splitting cannot open: "
+        "add headings, or a course.yaml.",
+    "audit_aucun_indice":
+        "No hint (challenge/hints.yaml): a stuck learner has only the solution or giving up.",
+    "audit_titre": "What a learner will not work out alone",
+    "audit_colonne_lab": "Lab",
+    "audit_colonne_constat": "Finding",
+    "audit_rien_a_signaler":
+        "All {count} labs examined give the learner what the work requires.",
+    "audit_resume":
+        "{labs} labs examined: {manques} missing, {attentions} worth attention.",
+    "audit_resume_assertions":
+        "{total} assertions: {sans} without a message, {monolingues} in one "
+        "language, {bilingues} in both.",
+    "audit_helper_injoignable":
+        "{count} bilingual message(s) cannot run: the `message` name is not "
+        "imported in the module, or a local variable of the same name hides it. "
+        "The test file loads and pytest collects it; the learner is the first to "
+        "find out, as a Python traceback instead of the message.",
+    "audit_suite_export":
+        "Teaching relevance cannot be measured: to have it reviewed, "
+        "dsoxlab instructor audit --export dossier.md",
+    "audit_export_ecrit": "Review dossier written to {path} ({lignes} lines)",
+    "audit_dossier_titre": "Review dossier for a dsoxlab catalog",
+    "audit_dossier_intro":
+        "This dossier gathers {count} labs, each with its course, its mission and "
+        "its tests, in the order a learner meets them. It passes no judgement: it "
+        "exists so that a review can.",
+    "audit_dossier_niveau": "Level",
+    "audit_dossier_runtime": "Runtime",
+    "audit_dossier_competences": "Target skills",
+    "audit_dossier_cours": "The course",
+    "audit_dossier_mission": "The mission",
+    "audit_dossier_tests": "What the tests require",
+    "audit_dossier_vide": "(missing)",
+    "cmd_instructor_audit_help":
+        "What a learner will not work out alone in this catalog.",
+    "opt_audit_export":
+        "Write a review dossier (course, mission, tests) to this file.",
+    "course_section_ouverture": "Opening",
+    "cmd_course_opt_all":
+        "Show the whole course at once, without splitting it into sections.",
     "cmd_course_opt_prev": "Go to the previous section (decrements saved position).",
     "course_nav_progress": "Section {pos}/{total}",
-    "course_nav_prev":     "← [bold]dsoxlab course --prev[/bold]",
-    "course_nav_next":     "→ [bold]dsoxlab course --next[/bold]",
+    "course_nav_prev":     "← [bold]dsoxlab course {id} --prev[/bold]",
+    "course_nav_next":     "→ [bold]dsoxlab course {id} --next[/bold]",
     "course_end_title":    "End of course — {id}",
     "course_end_body":     "You have read all [bold]{total}[/bold] sections.\n\nTime to test your skills: run [bold cyan]dsoxlab challenge {id}[/bold cyan] to tackle the challenge.",
     "course_section_not_found": "Section '{name}' not found. Use [bold]dsoxlab course {id}[/bold] to list available sections.",
@@ -238,11 +298,12 @@ STRINGS: dict[str, str] = {
         "To start over: dsoxlab demo --force",
     "demo_echec":      "Cannot install: {error}",
     "demo_suite":
-        "To get started:\n"
-        "  cd {path}\n"
+        "To get started, from any directory:\n"
         "  dsoxlab course {lab}\n"
         "  dsoxlab run {lab}\n"
         "Then, once the mission is done: dsoxlab check {lab}",
+    "demo_repertoire":
+        "The lab files live in {path}",
 
     # ── catalog: discover, install and locate a catalogue ───────────────────
     "cmd_lab_status_help":
@@ -285,6 +346,15 @@ STRINGS: dict[str, str] = {
         "Run dsoxlab provision again: it resumes without recreating anything. "
         "If the delay is too short for this machine, raise it: "
         "DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
+    "labs_table_colonnes_masquees":
+        "{masquees} of {total} columns are hidden, for lack of width: "
+        "dsoxlab list-labs --long shows them all.",
+    "opt_labs_long":
+        "Show every column, even when the terminal is too narrow.",
+    "check_echecs_de_tests":
+        "What is left to do, according to the tests:",
+    "check_sortie_complete":
+        "The full test output: dsoxlab -v check {lab_id}",
     "check_rien_mesure":
         "No test could be collected: nothing was measured, and nothing is "
         "recorded.",
@@ -357,6 +427,10 @@ STRINGS: dict[str, str] = {
     "catalog_installation": "Installing {name} from {url}…",
     "catalog_installe":
         "Catalogue '{name}' installed in {path}, and made active.",
+    "catalog_collections_manquantes":
+        "This catalog needs Ansible collections that are not installed: {names}",
+    "catalog_collections_geste":
+        "Install them before running a lab: {command}",
     "catalog_installe_suite":
         "It is usable from any directory:\n"
         "  dsoxlab list-labs\n"
@@ -722,7 +796,9 @@ Each lab declares:
     [dim]--out <file>[/dim]         Write it to a file; standard output stays empty.
                        Never overwrites without [bold]--force[/bold].
 
-  [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch.
+  [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch
+                       (with confirmation: work in progress is lost).
+    [dim]--yes / -y[/dim]           Skip confirmation.
 
   [cyan]clean <id>[/cyan]           Destroy environment resources (with confirmation).
     [dim]--yes / -y[/dim]           Skip confirmation.
@@ -934,15 +1010,15 @@ silent.
     "lab_ready_target":   "Lab {lab_id} ready. You are connected to [bold]{host}[/bold].",
     "lab_subshell_tip":   "Type [bold]dsoxlab check[/bold] to validate your work, or [bold]exit[/bold] to leave the session.",
     "lab_welcome_title":  "How this lab works",
-    "lab_welcome_course": "[bold cyan]dsoxlab course[/bold cyan] [dim][<id>][/dim]   Read the guided exercises ([dim]scenario.md[/dim]).",
-    "lab_welcome_challenge": "[bold cyan]dsoxlab challenge[/bold cyan] [dim][<id>][/dim]   Display the challenge mission ([dim]challenge/README.md[/dim]).",
-    "lab_welcome_check":  "[bold cyan]dsoxlab check[/bold cyan] [dim][<id>][/dim]   Run tests and show your score — [bold]nothing is saved[/bold].",
-    "lab_welcome_submit": "[bold cyan]dsoxlab submit[/bold cyan] [dim][<id>][/dim]  Final submission: run tests, [bold]save result[/bold] to database, then [bold]exit[/bold] the session.",
-    "lab_welcome_hint":   "[bold cyan]dsoxlab hint[/bold cyan] [dim][<id>][/dim]   Reveal the next hint — [red]deducts points[/red] from your final score.",
+    "lab_welcome_course": "The guided exercises of the course.",
+    "lab_welcome_challenge": "The mission: what you have to produce.",
+    "lab_welcome_check":  "Run the tests. [bold]Nothing is saved.[/bold]",
+    "lab_welcome_submit": "Final submission: [bold]saves[/bold], then leaves.",
+    "lab_welcome_hint":   "Reveal the next hint, [red]at the cost of points[/red].",
     "lab_welcome_session_local": "You are on [bold]your own machine[/bold], at the repository root: this is where you write your code and run your commands against the lab hosts.",
-    "lab_welcome_exit":   "Type [bold]exit[/bold] at any time to leave the session without saving.",
+    "lab_welcome_exit":   "[bold]exit[/bold] leaves the session at any time, saving nothing.",
     "lab_welcome_session_target": "You are about to be connected to [bold]{host}[/bold]: work there as on a real machine.",
-    "lab_welcome_commands_here": "Your mission is printed just above: dsoxlab does not exist on the lab host, so keep it in sight. The commands below run from [bold]your own machine[/bold] — after [bold]exit[/bold], or in a second terminal.",
+    "lab_welcome_commands_here": "dsoxlab does not exist there: the commands below run from [bold]your own machine[/bold], after [bold]exit[/bold] or in a second terminal.",
     "lab_welcome_labdir":  "The lab lives in [bold]{labdir}/[/bold]: the paths in the mission are relative to that directory.",
     "lab_welcome_local_ssh": "The lab machine is [bold]{host}[/bold]: connect with [bold]dsoxlab ssh {host}[/bold] when the brief asks for it (a plain ssh would fail: the name does not resolve and the key belongs to the repository).",
     "lab_welcome_start_here": "Start with [bold]dsoxlab challenge[/bold]: the mission states which files to create and what will be checked.",
@@ -989,6 +1065,7 @@ silent.
 
     # ── clean ─────────────────────────────────────────────────────────────────
     "confirm_clean": "Delete resources for lab {lab_id}?",
+    "confirm_reset": "Reset lab {lab_id}? Your work in progress is lost.",
     "cleaning":      "Cleaning [bold]{lab_id}[/bold]…",
     "clean_done":    "Clean complete.",
 
@@ -997,6 +1074,7 @@ silent.
     "labs_have_issues":       "Some labs have structure or metadata issues.",
     "opt_check_urls":
         "Also check that every doc_url answers (hits the network).",
+    "structure_issues_header": "\n[bold]Lab structure:[/bold]",
     "content_issues_header":
         "\n[bold]Content:[/bold]",
     # Deux titres, parce que ce sont deux verdicts : le site a répondu et sa
@@ -1177,6 +1255,7 @@ silent.
     "check_terraform":    "Terraform",
     "check_tf_providers": "Terraform providers",
     "check_ansible":      "ansible-playbook",
+    "check_collections":  "Ansible collections",
     "check_libvirt_pool": "libvirt pool",
     "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs detected",
@@ -1225,7 +1304,7 @@ silent.
         "no provider pinned yet: provision has not run for this repository.",
     "detail_kvm_missing":    "not found",
     "detail_pytest_missing": "not found",
-    "detail_pytest_bundled": "bundled with dsoxlab (used by 'check')",
+    "detail_pytest_bundled": "bundled with dsoxlab",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
     # ── git and docker: two tools nothing declared ──────────────────────────
@@ -1264,6 +1343,20 @@ silent.
         "not found: `run` cannot play a vm lab's setup.yaml "
         "(ansible-runner does not install it)",
     "detail_ansible_ok":     "present",
+    "detail_collections_aucune":
+        "none beyond ansible.builtin",
+    "detail_collections_ok":
+        "1 collection required, installed",
+    "detail_collections_ok_n":
+        "{count} collections required, all installed",
+    "detail_collections_non_mesure":
+        "ansible-galaxy did not answer: cannot tell what is installed",
+    "detail_collections_manquantes":
+        "{names} is missing. The catalog requires it ({file}); ansible-core "
+        "only ships ansible.builtin, and a collection is not a Python package",
+    "detail_collections_manquantes_n":
+        "{names} are missing. The catalog requires them ({file}); ansible-core "
+        "only ships ansible.builtin, and a collection is not a Python package",
     "detail_hw_virt_missing":
         "{device} is absent: no hardware virtualization, the vm labs cannot "
         "run on this machine. Enable VT-x/AMD-V in the BIOS, or nested "
@@ -1291,7 +1384,7 @@ silent.
     "detail_cpu_arch_unknown":
         "machine architecture could not be determined",
     "detail_resources_ram":
-        "RAM: {avail} MB available for {need} MB declared",
+        "RAM {avail} MB free / {need} MB declared",
     "detail_resources_ram_unknown":
         "RAM: /proc/meminfo unreadable, nothing measured",
     "explain_qemu_img_absent":
@@ -1304,8 +1397,7 @@ silent.
         "so a pool that was enough yesterday can run short today. Check what is "
         "left, then free space or destroy a lab infrastructure you no longer use:",
     "detail_resources_disk":
-        "pool {pool}: {avail} GB available; up to {need} GB declared, "
-        "allocated on demand (qcow2)",
+        "pool {pool} {avail} GB free / {need} GB declared (qcow2)",
     "detail_resources_disk_unknown":
         "pool {pool}: not answering, disk space not measured",
     "detail_resources_disk_unprobed":
@@ -1339,7 +1431,7 @@ silent.
         "not found: incus builds the agent:config CD-ROM on the host, "
         "without it no VM starts",
     "detail_unknown_error":  "unknown error",
-    "detail_labs_count":     "{count} lab(s) in {root}",
+    "detail_labs_count":     "{count} labs",
 
     # ── doctor — why a component is informational here ───────────────────────
     "doctor_note_no_vm":
@@ -1410,6 +1502,24 @@ silent.
     # ── console — next ────────────────────────────────────────────────────────
     "next_suggestion":   "Next recommended: [bold cyan]{lab_id}[/bold cyan] — {title}",
     "next_all_done":     "[green]All labs validated in this context![/green] Run [bold]dsoxlab progress[/bold] for a summary.",
+    "remediation_labs_aucun_catalogue":
+        "dsoxlab demo, or dsoxlab catalog add linux",
+    "remediation_labs_illisibles":
+        "dsoxlab list-labs names the offending files",
+    "labs_illisibles":
+        "{count} of {vus} lab.yaml files could not be read: those labs are "
+        "invisible to every command.",
+    "labs_illisibles_suite":
+        "Fix the contract in those files, then run again. The log keeps the "
+        "detail: dsoxlab support",
+    "catalogue_sans_lab":
+        "This catalog holds no lab ({path}). Check that it declares its labs "
+        "under labs/.",
+    "aucun_catalogue_actif":
+        "No active catalog. Try dsoxlab demo for a first lab, or dsoxlab "
+        "catalog add linux for a full course.",
+    "next_catalogue_vide":
+        "This catalog holds no lab. Check how it was installed: dsoxlab doctor",
     "next_no_context":   "No active context. Run [bold]dsoxlab use <section>[/bold] first.",
 
     # ── console — lab detail ──────────────────────────────────────────────────
@@ -1437,7 +1547,7 @@ silent.
 
     # ── console — doctor ──────────────────────────────────────────────────────
     "doctor_table_title":    "Required for this repo",
-    "doctor_optional_title": "Informational — not required here",
+    "doctor_optional_title": "Informational: not required here",
     "doctor_choose_title": "Hypervisors: one is required, none selected",
     "doctor_choose_hint":
         "This repo has labs that require a VM. Pick a provider with "
@@ -1451,24 +1561,22 @@ silent.
     "col_status":         "Status",
     "col_detail":         "Detail",
     "col_remediation":    "Remediation",
-    "status_ok":          "[green]✔ OK[/green]",
-    "status_ko":          "[red]✘ KO[/red]",
+    "status_ok":          "[green]✔[/green]",
+    "status_ko":          "[red]✘[/red]",
     "status_present":     "[green]installed[/green]",
-    "status_absent":      "[dim]— absent[/dim]",
+    "status_absent":      "[dim]absent[/dim]",
     "status_choose":      "[yellow]to be chosen[/yellow]",
-    "status_unknown":     "[yellow]? not measured[/yellow]",
+    "status_unknown":     "[yellow]?[/yellow]",
     "doctor_fix_hint":    "ℹ Use [bold]dsoxlab doctor --fix[/bold] to attempt automatic remediation.",
     "doctor_manual_hint":
         "ℹ [bold]--fix[/bold] cannot repair what is missing: apply the "
         "remediation shown above by hand.",
 
     # ── console — check result ────────────────────────────────────────────────
-    "check_result_title":       "Result — {lab_id}",
-    "check_result_tests":       "[bold]Tests:[/bold]",
-    "check_result_hints_label": "[bold]Hints:[/bold]",
-    "check_result_no_hints":    "none",
-    "check_result_hints_used":  "{count} used — [yellow]-{cost} pts[/yellow]",
-    "check_result_score_label": "[bold]Score:[/bold]",
+    "check_result_title":       "Result: {lab_id}",
+    "check_result_tests_passes": "{passed}/{total} tests",
+    "check_result_hint_used":   "1 hint used, [yellow]-{cost} pts[/yellow]",
+    "check_result_hints_used":  "{count} hints used, [yellow]-{cost} pts[/yellow]",
 
     # ── console — hint ────────────────────────────────────────────────────────
     "hint_panel_title": "[bold]Hint[/bold]",

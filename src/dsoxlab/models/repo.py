@@ -78,23 +78,46 @@ def _apply_translation(data: dict[str, Any], meta_path: Path, lang: str) -> None
     """
     if not lang or lang == "en":
         return
-    lang_path = meta_path.parent / f"meta.{lang[:2].lower()}.yml"
-    if not lang_path.is_file():
+    overrides = _lire_la_traduction(meta_path.parent / f"meta.{lang[:2].lower()}.yml")
+    if overrides is None:
         return
+    _surcharger_le_depot(data, overrides)
+    _surcharger_les_sections(data, overrides)
+
+
+def _lire_la_traduction(chemin: Path) -> dict[str, Any] | None:
+    """Le document de traduction, ou ``None`` s'il n'y a rien d'exploitable.
+
+    Absent, illisible, ou d'une forme inattendue : les trois donnent la même
+    réponse, parce qu'ils appellent le même geste. Un catalogue ne doit jamais
+    devenir illisible parce que sa traduction l'est.
+    """
+    if not chemin.is_file():
+        return None
     try:
-        overrides = yaml.safe_load(lang_path.read_text(encoding="utf-8"))
+        overrides = yaml.safe_load(chemin.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
-        return
-    if not isinstance(overrides, dict):
-        return
+        return None
+    return overrides if isinstance(overrides, dict) else None
 
-    base_repo = data.get("repo")
-    over_repo = overrides.get("repo")
-    if isinstance(base_repo, dict) and isinstance(over_repo, dict):
-        for champ in _TRANSLATABLE_REPO:
-            if champ in over_repo:
-                base_repo[champ] = over_repo[champ]
 
+def _surcharger_le_depot(data: dict[str, Any], overrides: dict[str, Any]) -> None:
+    base = data.get("repo")
+    traduit = overrides.get("repo")
+    if not isinstance(base, dict) or not isinstance(traduit, dict):
+        return
+    for champ in _TRANSLATABLE_REPO:
+        if champ in traduit:
+            base[champ] = traduit[champ]
+
+
+def _surcharger_les_sections(data: dict[str, Any], overrides: dict[str, Any]) -> None:
+    """Appariement par ``id``, jamais par position.
+
+    Une section insérée dans ``meta.yml`` décalerait sinon toutes les
+    traductions suivantes, en silence : les titres se poseraient sur les
+    mauvaises sections, et aucun contrôle ne pourrait le voir.
+    """
     base_sections = data.get("sections")
     over_sections = overrides.get("sections")
     if not isinstance(base_sections, list) or not isinstance(over_sections, list):

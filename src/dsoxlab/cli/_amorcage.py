@@ -126,7 +126,31 @@ def _accueil() -> None:
         depots_installes=[c.depot for c in poses if c.depot],
         actif=actif,
         connus=connus,
+        machines_a_monter=_machines_a_monter(),
     )
+
+
+def _machines_a_monter() -> bool:
+    """Le catalogue actif demande-t-il de monter des machines ?
+
+    Lit le seul `meta.yml` du catalogue actif, et pas ses labs : un scan
+    complet coûte 95 ms sur un catalogue de 113 labs, pour une question à
+    laquelle un fichier répond. Le critère est celui que `doctor` applique
+    depuis la 0.1.88, `infra.hosts` non vide, et il doit rester le même : deux
+    écrans qui décident différemment de ce qu'est un catalogue « à machines »
+    finiraient par se contredire.
+
+    Rend ``False`` à la moindre difficulté. Un accueil ne doit jamais être ce
+    qui casse, et se taire sur un bloc d'infrastructure est sans conséquence.
+    """
+    try:
+        from ..config import get_lab_home
+        from ..discovery.repo import read_repo_metadata
+
+        meta = read_repo_metadata(get_lab_home())
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(meta is not None and meta.infra.hosts)
 
 
 def _notify_update_available() -> None:

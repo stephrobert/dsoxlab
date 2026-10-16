@@ -29,7 +29,7 @@ from typing import Annotated
 import typer
 
 from ..config import (
-    read_context,
+    course_pos_de,
     set_active_lab,
     set_course_pos,
 )
@@ -179,6 +179,7 @@ def course(
     section: Annotated[str | None, typer.Option("--section", "-s", help=_("cmd_course_opt_section"))] = None,
     next_section: Annotated[bool, typer.Option("--next", "-n", help=_("cmd_course_opt_next"))] = False,
     prev_section: Annotated[bool, typer.Option("--prev", "-p", help=_("cmd_course_opt_prev"))] = False,
+    tout: Annotated[bool, typer.Option("--all", help=_("cmd_course_opt_all"))] = False,
     no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
@@ -187,60 +188,106 @@ def course(
     lab = _resolve_lab(root, lab_id, lang)
 
 
-    manifest = CourseManifest.load(lab.path, lang=lang)
-
+    manifest = _manifeste_du_cours(lab, lang, tout=tout)
     if manifest is None:
-        # Pas de course.yaml : fallback sur scenario.md + README.md, soit
-        # plusieurs centaines de lignes d'un bloc. C'est le cas qui rend le
-        # pager indispensable.
+        # Soit l'apprenant a demandé tout le cours (`--all`), soit les
+        # documents ne portent aucun titre exploitable : 3 labs sur 310.
         with paged(enabled=not no_pager):
             print_lab_course(lab, lang=lang)
         return
 
     total = len(manifest.sections)
-    ctx = read_context(root)
-    current_pos = ctx.course_pos  # 0 = non démarré
+    # La position de CE lab, et non celle d'un autre cours : voir
+    # `course_pos_de`.
+    current_pos = course_pos_de(root, lab.id)
 
-    # ── Résolution de la position cible ──────────────────────────────────────
-    if next_section:
-        target_pos = (current_pos or 0) + 1
-    elif prev_section:
-        target_pos = max(1, (current_pos or 1) - 1)
-    elif section is not None:
-        found = manifest.resolve_section(section)
-        if found is None:
-            error(_("course_section_not_found", name=texte_affichable(section),
-                    id=texte_affichable(lab.id)))
-            raise typer.Exit(1)
-        # Retrouver l'index 1-based de la section
-        target_pos = next(
-            (i + 1 for i, s in enumerate(manifest.sections) if s.id == found.id),
-            1,
-        )
-    else:
-        # Pas d'option : reprendre là où on en était, ou afficher section 1
-        if current_pos and 1 <= current_pos <= total:
-            target_pos = current_pos
-        elif current_pos and current_pos > total:
-            print_course_end(lab, manifest)
-            return
-        else:
-            # Jamais commencé → sommaire + section 1, paginés ensemble : les
-            # séparer ferait défiler le sommaire hors de l'écran.
-            with paged(enabled=not no_pager):
-                print_course_toc(lab, manifest)
-                _show_course_section(root, lab, manifest, 1)
-            return
+    if _sommaire_a_afficher(current_pos, total, section, next_section, prev_section):
+        # Jamais commencé → sommaire + section 1, paginés ensemble : les
+        # séparer ferait défiler le sommaire hors de l'écran.
+        with paged(enabled=not no_pager):
+            print_course_toc(lab, manifest)
+            _show_course_section(root, lab, manifest, 1)
+        return
 
-    # ── Fin de cours ─────────────────────────────────────────────────────────
-    if target_pos > total:
-        set_course_pos(root, total)
+    cible = _position_visee(
+        manifest, current_pos, section, next_section=next_section,
+        prev_section=prev_section,
+    )
+    if cible is None:
+        error(_("course_section_not_found", name=texte_affichable(section or ""),
+                id=texte_affichable(lab.id)))
+        raise typer.Exit(1)
+
+    if cible > total:
+        set_course_pos(root, lab.id, total)
         print_course_end(lab, manifest)
         return
 
-    # ── Affichage de la section ───────────────────────────────────────────────
     with paged(enabled=not no_pager):
-        _show_course_section(root, lab, manifest, target_pos)
+        _show_course_section(root, lab, manifest, cible)
+
+
+def _manifeste_du_cours(
+    lab: LabDefinition, lang: str, *, tout: bool
+) -> CourseManifest | None:
+    """Le découpage du cours : déclaré, déduit, ou aucun.
+
+    ``course.yaml`` garde la priorité partout où il existe. Il n'existe nulle
+    part aujourd'hui (mesuré le 2026-10-16 : 0 sur les 310 labs des cinq
+    catalogues), donc le découpage déduit des titres est le chemin NORMAL, et
+    non un repli.
+    """
+    if tout:
+        return None
+    declare = CourseManifest.load(lab.path, lang=lang)
+    if declare is not None:
+        return declare
+    from ..services.course_service import manifeste_automatique
+
+    return manifeste_automatique(lab.path, lab.title, lang=lang)
+
+
+def _sommaire_a_afficher(
+    position: int, total: int, section: str | None, suivant: bool, precedent: bool
+) -> bool:
+    """Faut-il ouvrir sur le sommaire ?
+
+    Seulement au premier passage, et seulement si l'apprenant n'a rien demandé
+    de précis : une position hors bornes vient d'un cours qui a changé de
+    découpage, et repartir du sommaire est alors le geste utile.
+    """
+    if section is not None or suivant or precedent:
+        return False
+    return not position or not (1 <= position <= total)
+
+
+def _position_visee(
+    manifest: CourseManifest,
+    position: int,
+    section: str | None,
+    *,
+    next_section: bool,
+    prev_section: bool,
+) -> int | None:
+    """La section à afficher, en rang 1-based, ou ``None`` si introuvable.
+
+    Extraite de ``course`` parce qu'elle en portait l'essentiel des branches, et
+    qu'une décision se teste mieux qu'un affichage. Une position **au-delà** du
+    total est rendue telle quelle : c'est l'appelant qui en fait une fin de
+    cours.
+    """
+    if next_section:
+        return (position or 0) + 1
+    if prev_section:
+        return max(1, (position or 1) - 1)
+    if section is not None:
+        trouvee = manifest.resolve_section(section)
+        if trouvee is None:
+            return None
+        return next(
+            (i + 1 for i, s in enumerate(manifest.sections) if s.id == trouvee.id), 1
+        )
+    return position if 1 <= position <= len(manifest.sections) else 1
 
 
 def _show_course_section(
@@ -248,7 +295,7 @@ def _show_course_section(
 ) -> None:
     """Mémorise la position atteinte puis affiche la section correspondante."""
     total = len(manifest.sections)
-    set_course_pos(root, pos)
+    set_course_pos(root, lab.id, pos)
     print_course_section(lab, manifest.sections[pos - 1], pos=pos, total=total)
 
 

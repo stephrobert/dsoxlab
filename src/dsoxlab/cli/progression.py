@@ -156,7 +156,7 @@ def submit(
     if not lab.is_exercise:
         info(_("check_validation_sans_note"))
     elif not a_mesure(result):
-        warn(_("submit_sans_mesure", total=result.total))
+        warn(_("submit_sans_mesure"))
     elif result.ok:
         success(_("submit_success", score=score, max_score=max_score))
     else:
@@ -500,13 +500,15 @@ def next_lab(
     ctx = read_context(root)
     lang = _lang(root)
 
-    # Erreur dure, en `--json` comme ailleurs : sans contexte il n'y a rien à
-    # décrire. La cause part sur stderr, la sortie standard reste vide, et le
-    # code de retour ne change pas.
-    if not ctx.section:
-        error(_("next_no_context"))
-        raise typer.Exit(1)
-
+    # Pas de garde-fou sur l'absence de contexte, et c'est un retrait : il
+    # refusait un cas qui fonctionne. `next_pending_lab` trie par (bloc, type,
+    # ordre déclaré), c'est-à-dire l'ordre pédagogique du `meta.yml`, qui ne
+    # dépend d'aucune section active ; les deux filtres ci-dessous sont déjà
+    # conditionnels. Sans contexte, `next` propose donc le premier lab non fait
+    # du catalogue entier, ce qui est exactement la question posée.
+    #
+    # Le défaut se voyait en jouant le parcours : `catalog add` affiche
+    # « dsoxlab next » parmi les deux gestes suivants, et `next` sortait en 1.
     labs = _catalogue(root, lang, quiet=as_json)
     if ctx.section:
         labs = [lab for lab in labs if lab.section == ctx.section]
@@ -535,6 +537,12 @@ def next_lab(
         })
         return
     if upcoming is None:
+        if not labs:
+            # « Tout est fait » sur un catalogue vide serait une félicitation
+            # mensongère, et c'est le cas qu'on rencontre juste après une
+            # installation qui a échoué.
+            error(_("next_catalogue_vide"))
+            raise typer.Exit(1)
         success(_("next_all_done"))
         return
     success(_("next_suggestion", lab_id=texte_affichable(upcoming.id),
@@ -552,6 +560,7 @@ def reset(
     target: Annotated[str | None, typer.Option("--target", "-t",
         help=_("opt_run_target"))] = None,
     lab_home: LabHomeOption = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help=_("opt_yes"))] = False,
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
@@ -561,6 +570,16 @@ def reset(
         error(str(exc))
         raise typer.Exit(1) from None
 
+    # `reset` fait « clean + redémarrage » : il emporte donc STRICTEMENT PLUS
+    # que `clean`, qui demande confirmation. Ne rien demander ici effaçait le
+    # travail en cours de l'apprenant sans un mot, et l'asymétrie allait dans
+    # le mauvais sens.
+    if not yes:
+        typer.confirm(_("confirm_reset", lab_id=texte_affichable(lab.id)), abort=True)
+
+    # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
+    # attend une réponse au clavier bloquerait l'autre terminal sur une
+    # question que personne ne voit.
     ctx.call_on_close(_verrou(root, "reset").release)
     info(_("resetting", lab_id=texte_affichable(lab.id)))
     try:
@@ -579,8 +598,6 @@ def reset(
         error(str(exc))
         raise typer.Exit(2) from None
 
-
-# ── clean ─────────────────────────────────────────────────────────────────────
 
 # ── clean ─────────────────────────────────────────────────────────────────────
 

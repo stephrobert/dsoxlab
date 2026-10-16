@@ -33,6 +33,34 @@ def _plain(output: str) -> str:
     return _ANSI.sub("", output)
 
 
+#: Les commandes qui emportent le travail de l'apprenant. Toutes doivent
+#: demander confirmation, et toutes doivent offrir de quoi la passer : un
+#: formateur qui scripte sa remise à zéro ne peut pas répondre au clavier.
+_COMMANDES_DESTRUCTRICES = ("clean", "reset")
+
+
+def test_les_commandes_destructrices_offrent_toutes_yes() -> None:
+    """`reset` emporte STRICTEMENT PLUS que `clean`, et ne demandait rien.
+
+    Mesuré le 2026-10-16 en jouant un lab : `clean` confirmait et portait un
+    `--yes`, `reset` effaçait le travail rempli sans un mot. L'asymétrie allait
+    dans le mauvais sens, et elle ne se voyait que lab en main. On interroge
+    l'arbre des commandes plutôt qu'un rendu : c'est la surface publique.
+    """
+    groupe = typer.main.get_command(app)
+    for nom in _COMMANDES_DESTRUCTRICES:
+        commande = groupe.commands[nom]  # type: ignore[attr-defined]
+        options = {
+            drapeau
+            for parametre in commande.params
+            for drapeau in getattr(parametre, "opts", [])
+        }
+        assert "--yes" in options and "-y" in options, (
+            f"`{nom}` ne porte pas --yes/-y : "
+            f"options déclarées {sorted(options)}"
+        )
+
+
 def test_version_flag_prints_version() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0

@@ -76,88 +76,44 @@ def use(
         help=_("opt_use_provider"))] = None,
     reset: Annotated[bool, typer.Option("--reset", "-r", help=_("opt_use_reset"))] = False,
 ) -> None:
+    from ..services.contexte_service import (
+        MetaIllisible,
+        decouper,
+        lire_declarations,
+        refus_eventuel,
+    )
+
     root = _root(lab_home)
     # `.dsoxlab-context.json` est réécrit EN ENTIER à chaque changement : deux
     # `use` concurrents, et le premier est perdu sans laisser de trace.
     ctx.call_on_close(_verrou(root, "use").release)
-    if reset:
+
+    # `--reset`, et `use` tout court : sans rien à poser, la commande efface.
+    # Les deux chemins étaient écrits deux fois, à l'identique.
+    if reset or (context is None and target is None and lang is None and provider is None):
         clear_context(root)
         success(_("context_cleared"))
         return
-    # Si seule l'option --target est donnée (pas de section/level),
-    # on met juste à jour la target sans toucher au contexte.
-    if context is None and target is None and lang is None and provider is None:
-        clear_context(root)
-        success(_("context_cleared"))
-        return
 
-    # Lecture brute du meta.yml (pas _resolve_provider) : on doit pouvoir
-    # valider même quand la résolution standard laisse le provider non
-    # résolu (plusieurs candidats sans choix actif).
-    declared_providers: list[str] = []
-    declared_sections: list[str] = []
-    import yaml as _yaml
+    try:
+        declarations = lire_declarations(root)
+    except MetaIllisible as exc:
+        error(_("meta_read_failed", error=exc.cause))
+        raise typer.Exit(1) from None
 
-    from ..discovery.repo import find_meta_yml
-
-    meta_path = find_meta_yml(root) or (root / "meta.yml")
-    if meta_path.is_file():
-        try:
-            raw = _yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
-        except _yaml.YAMLError as exc:
-            error(_("meta_read_failed", error=exc))
-            raise typer.Exit(1) from None
-        declared = (raw.get("infra") or {}).get("provider")
-        if isinstance(declared, list):
-            declared_providers = [str(p) for p in declared if p]
-        elif isinstance(declared, str) and declared:
-            declared_providers = [declared]
-        declared_sections = [
-            str(s.get("id")) for s in (raw.get("sections") or []) if s.get("id")
-        ]
-
-    # Garde-fou : `dsoxlab use incus` pose une SECTION nommée « incus »,
-    # pas un provider — et filtre alors le catalogue sur une section qui
-    # n'existe pas (« Aucun lab trouvé »). Piège d'autant plus vicieux que
-    # le nom ressemble à un provider. On refuse et on guide.
-    if (
-        context is not None
-        and context in declared_providers
-        and context not in declared_sections
-    ):
-        error(_("provider_not_a_section", name=context))
+    refus = refus_eventuel(declarations, context=context, provider=provider)
+    if refus is not None:
+        error(_(refus.cle, **refus.params))
         raise typer.Exit(1)
 
-    # Même piège, cas général : une section inconnue était acceptée sans un
-    # mot, puis « list-labs » répondait « Aucun lab trouvé ». L'apprenant
-    # croyait le catalogue vide alors qu'il venait de poser un filtre qui ne
-    # correspond à rien. On refuse, et on montre ce qui existe.
-    # Un meta.yml sans bloc « sections » ne déclare rien : on ne filtre pas.
-    if context is not None and declared_sections:
-        demandee = context.strip().split("/", 1)[0]
-        if demandee and demandee not in declared_sections:
-            error(_("section_unknown",
-                    name=demandee,
-                    sections=", ".join(declared_sections)))
-            raise typer.Exit(1)
-
-    # --provider <name> : valider contre les providers candidats du
-    # meta.yml avant de l'enregistrer dans le contexte session.
     if provider is not None:
-        if declared_providers and provider not in declared_providers:
-            error(_("provider_unknown",
-                    name=provider,
-                    candidates=", ".join(declared_providers)))
-            raise typer.Exit(1)
         set_active_provider(root, provider)
         success(_("context_provider_set", provider=provider))
 
     section: str | None = None
     level: str | None = None
     if context:
-        parts = context.strip().split("/", 1)
-        section = parts[0] or None
-        level = parts[1] if len(parts) > 1 else None
+        section, level = decouper(context)
     if context or lang or target:
         write_context(root, section, level, lang=lang, active_target=target)
     if section:
@@ -182,6 +138,7 @@ def list_labs(
     section: Annotated[str | None, typer.Option("--section", "-s", help=_("opt_section"))] = None,
     lab_type: Annotated[str | None, typer.Option("--type", "-t", help=_("opt_type"))] = None,
     bloc: Annotated[int | None, typer.Option("--bloc", "-b", help=_("opt_bloc"))] = None,
+    long: Annotated[bool, typer.Option("--long", help=_("opt_labs_long"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
 ) -> None:
     root = _root(lab_home)
@@ -213,7 +170,7 @@ def list_labs(
             "count": len(labs),
         })
         return
-    print_labs_table(labs, scores)
+    print_labs_table(labs, scores, tout=long)
 
 
 # ── show ──────────────────────────────────────────────────────────────────────

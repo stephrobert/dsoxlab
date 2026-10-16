@@ -45,6 +45,7 @@ but est de retirer des surprises.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -205,10 +206,7 @@ def start(
     lab_home: LabHomeOption = None,
 ) -> None:
     """Enchaîne les étapes d'un lab en les annonçant une par une."""
-    from ..config import read_context, write_context
-    from ..services.doctor import collect_checks
-    from .infrastructure import provisionner
-    from .parcours import run
+    from ..config import read_context
 
     root = _root(lab_home)
     lang = _lang(root)
@@ -219,67 +217,107 @@ def start(
     # change. `start` relancé sur le même lab affiche donc la même séquence, en
     # disant simplement qu'il n'a rien eu à faire.
     section = lab.section
-    a_poser = bool(section) and section != contexte.section
+    situation = _Situation(
+        root=root,
+        lab=lab,
+        section=section,
+        a_poser=bool(section) and section != contexte.section,
+        target=target,
+        lab_home=lab_home,
+    )
 
     etapes = _sequence(lab, section)
     total = len(etapes)
     console.print(_("start_plan", lab_id=texte_affichable(lab.id), total=total))
 
-    numero = 0
-    for etape in etapes:
-        numero += 1
+    for numero, etape in enumerate(etapes, start=1):
         _annonce(numero, total, etape)
-
-        if etape.cle == "start_step_context":
-            assert section is not None
-            if not a_poser:
-                console.print(_("start_context_already", section=texte_affichable(section)))
-                continue
-            # `write_context` préserve les autres champs (niveau, langue, lab
-            # actif) : `start` pose une section, il ne réinitialise rien.
-            write_context(root, section=section, level=None)
-            console.print(_("start_context_set", section=texte_affichable(section)))
-
-        elif etape.cle == "start_step_deps":
-            rapport = collect_checks(root, _read_repo(root))
-            manquants = rapport.failing()
-            if manquants:
-                console.print(_(
-                    "start_deps_failing",
-                    components=", ".join(_(f"check_{c.key}") for c in manquants),
-                ))
+        try:
+            _ETAPES.get(etape.cle, _derouler_le_lab)(situation)
+        except typer.Exit as sortie:
+            # Une étape qui s'arrête nomme l'étape et la commande qui la
+            # rejoue. Le geste est le même pour toutes, et il n'a pas à être
+            # réécrit dans chacune : une étape ajoutée l'aurait oublié.
+            if sortie.exit_code:
                 _echec(numero, total, etape)
-                raise typer.Exit(2)
-            console.print(_("start_deps_ok", count=len(rapport.required)))
+            raise
 
-        elif etape.cle == "start_step_infra":
-            if _infra_prete(root):
-                console.print(_("start_infra_already"))
-                continue
-            # Le verrou couvre la seule étape qui écrit le state, et il est rendu
-            # avant `run`, qui prend le sien (voir l'en-tête du module).
-            verrou = _verrou(root, "start")
-            try:
-                provisionner(root)
-            except typer.Exit as sortie:
-                if sortie.exit_code:
-                    _echec(numero, total, etape)
-                raise
-            finally:
-                verrou.release()
 
-        else:
-            # Dernière étape : `run` prépare, montre la mission et ouvre la
-            # session. On le laisse faire son travail entier plutôt que d'en
-            # réimplémenter des morceaux : il tient son verrou, ses barres de
-            # progression et ses messages, et il reste la commande que
-            # l'apprenant rejouera seul.
-            try:
-                run(lab_id=lab.id, target=target, lab_home=lab_home)
-            except typer.Exit as sortie:
-                if sortie.exit_code:
-                    _echec(numero, total, etape)
-                raise
+@dataclass(frozen=True)
+class _Situation:
+    """Ce que les étapes de `start` ont besoin de savoir, et rien de plus."""
+
+    root: Path
+    lab: LabDefinition
+    section: str | None
+    a_poser: bool
+    target: str | None
+    lab_home: Path | None
+
+
+def _poser_le_contexte(situation: _Situation) -> None:
+    section = situation.section
+    assert section is not None
+    if not situation.a_poser:
+        console.print(_("start_context_already", section=texte_affichable(section)))
+        return
+    # `write_context` préserve les autres champs (niveau, langue, lab actif) :
+    # `start` pose une section, il ne réinitialise rien.
+    from ..config import write_context
+
+    write_context(situation.root, section=section, level=None)
+    console.print(_("start_context_set", section=texte_affichable(section)))
+
+
+def _verifier_les_dependances(situation: _Situation) -> None:
+    from ..services.doctor import collect_checks
+
+    rapport = collect_checks(situation.root, _read_repo(situation.root))
+    manquants = rapport.failing()
+    if manquants:
+        console.print(_(
+            "start_deps_failing",
+            components=", ".join(_(f"check_{c.key}") for c in manquants),
+        ))
+        raise typer.Exit(2)
+    console.print(_("start_deps_ok", count=len(rapport.required)))
+
+
+def _monter_l_infra(situation: _Situation) -> None:
+    from .infrastructure import provisionner
+
+    if _infra_prete(situation.root):
+        console.print(_("start_infra_already"))
+        return
+    # Le verrou couvre la seule étape qui écrit le state, et il est rendu avant
+    # `run`, qui prend le sien (voir l'en-tête du module).
+    verrou = _verrou(situation.root, "start")
+    try:
+        provisionner(situation.root)
+    finally:
+        verrou.release()
+
+
+def _derouler_le_lab(situation: _Situation) -> None:
+    """Dernière étape : `run` prépare, montre la mission et ouvre la session.
+
+    On le laisse faire son travail entier plutôt que d'en réimplémenter des
+    morceaux : il tient son verrou, ses barres de progression et ses messages,
+    et il reste la commande que l'apprenant rejouera seul.
+    """
+    from .parcours import run
+
+    run(lab_id=situation.lab.id, target=situation.target, lab_home=situation.lab_home)
+
+
+#: L'aiguillage par clé d'étape. Une étape absente de la table est la dernière,
+#: celle qui déroule le lab : c'est `_sequence` qui décide de la liste, et elle
+#: la termine toujours par là.
+_ETAPES: dict[str, Callable[[_Situation], None]] = {
+    "start_step_context": _poser_le_contexte,
+    "start_step_deps": _verifier_les_dependances,
+    "start_step_infra": _monter_l_infra,
+}
 
 
 def _resoudre_lab(root: Path, lab_id: str | None, lang: str) -> LabDefinition:
@@ -301,16 +339,13 @@ def _resoudre_lab(root: Path, lab_id: str | None, lang: str) -> LabDefinition:
     from ..services.progress_service import next_pending_lab
     from ..sessions.store import get_best_scores
 
+    # Comme `next`, et pour la même raison : l'ordre pédagogique vient du
+    # `meta.yml`, pas d'une section active. Sans contexte, on suggère donc dans
+    # le catalogue entier plutôt que de refuser.
     contexte = read_context(root)
-    if not contexte.section:
-        # Même exigence que `next`, et pour la même raison : sans contexte il n'y
-        # a pas d'ordre pédagogique, donc rien à suggérer. On ne devine pas.
-        error(_("next_no_context"))
-        raise typer.Exit(1)
-
     labs = [
         lab for lab in discover_labs(root, lang=lang)
-        if lab.section == contexte.section
+        if (not contexte.section or lab.section == contexte.section)
         and (not contexte.level or lab.level == contexte.level)
     ]
     scores = get_best_scores(root, [lab.id for lab in labs])

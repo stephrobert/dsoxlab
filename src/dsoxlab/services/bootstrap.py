@@ -43,7 +43,6 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from ..config import xdg_state_home
 from ..models import RepoMetadata
@@ -198,13 +197,3 @@ def a_jouer(repo_meta: RepoMetadata, *, force: bool = False) -> tuple[Path, str]
     if not force and empreinte == empreinte_enregistree(repo_meta):
         return None
     return chemin, empreinte
-
-
-def inventaire_du_socle(inventaire: dict[str, Any]) -> dict[str, Any]:
-    """L'inventaire tel que le socle le reçoit : tous les hôtes du dépôt.
-
-    Un socle vise le **catalogue**, pas un lab : il n'y a donc pas de groupe
-    ``lab_target`` à respecter ici. Les playbooks de socle ciblent ``all`` ou
-    ``labenv``, les deux groupes que l'inventaire porte déjà.
-    """
-    return inventaire

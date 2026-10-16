@@ -1,0 +1,9 @@
+{
+  "_lire": "Scores de complexité d'écran, produits par « python3 scripts/complexite-ecran.py --figer ». Ils ne peuvent que descendre : toute hausse fait échouer le hook. Les poids et la méthode sont dans le script, et une hausse peut être légitime (un écran qui explique davantage) : elle s'entérine alors sciemment, en disant pourquoi dans le message de commit.",
+  "largeur": 80,
+  "scores": {
+    "accueil": 43.5,
+    "catalogue": 34.5,
+    "demo": 57.0
+  }
+}
