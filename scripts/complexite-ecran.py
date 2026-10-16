@@ -360,14 +360,27 @@ def _binaire() -> str:
 
 
 def parcours_accueil(base: Path, largeur: int) -> Parcours:
-    """Le premier contact : un poste sans aucun catalogue."""
+    """Le premier contact : un poste sans aucun catalogue.
+
+    **`doctor` n'en fait pas partie, et c'est délibéré.** Son écran dépend des
+    LOGICIELS INSTALLÉS : mesuré le 2026-10-16, il pesait 22 des 43,5 points du
+    parcours sur une machine où libvirt, terraform, docker et incus répondent,
+    et davantage sur un runner nu, où les mêmes contrôles manquent et où chacun
+    apporte son geste de réparation. Les deux mesures sont justes, et c'est
+    bien le problème : le cliquet a passé en local et échoué en CI, donc il
+    mesurait le poste et non le sujet.
+
+    Ne restent ici que les écrans qui ne dépendent que du code. Celui de
+    `doctor` garde ses propres contrôles : le pliage de sa colonne de
+    remédiation, les gestes qu'il propose et son document d'état sont testés
+    ailleurs.
+    """
     dsox = _binaire()
     vide = base / "vide"
     vide.mkdir(parents=True, exist_ok=True)
     env = _env_isole(base)
     ecrans = [
         mesurer_ecran([dsox], cwd=vide, env_sup=env, largeur=largeur),
-        mesurer_ecran([dsox, "doctor"], cwd=vide, env_sup=env, largeur=largeur),
         mesurer_ecran(
             [dsox, "list-labs"], cwd=vide, env_sup=env, largeur=largeur
         ),
