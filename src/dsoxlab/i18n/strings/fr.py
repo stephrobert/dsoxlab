@@ -1738,7 +1738,8 @@ hors ligne, elle se tait.
     "err_service_start_failed":
         "Le démarrage du service « {name} » a échoué :\n{detail}",
     "err_service_post_start_failed":
-        "L'initialisation du service « {name} » a échoué sur « {command} » :\n{detail}",
+        "L'initialisation du service « {name} » a échoué sur « {command} » :\n{detail}\n"
+        "Conteneur {container} : docker logs {container}",
     "err_service_container_stopped":
         "Le service « {name} » ne tourne plus, son initialisation ne peut pas "
         "être jouée.\nConteneur {container}, sorti avec le code {code}.\n"
