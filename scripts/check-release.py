@@ -56,6 +56,10 @@ class Rapport:
     def __init__(self) -> None:
         self.echecs: list[str] = []
         self.attentes: list[str] = []
+        # Accumulée comme les deux autres : une note n'empêche pas de taguer,
+        # mais un test doit pouvoir vérifier qu'elle a bien été posée, sans
+        # lire la sortie affichée.
+        self.notes: list[str] = []
 
     def ok(self, titre: str, detail: str = "") -> None:
         suffixe = f" {detail}" if detail else ""
@@ -68,6 +72,7 @@ class Rapport:
 
     def note(self, titre: str, detail: str) -> None:
         """Information : n'empêche pas de taguer."""
+        self.notes.append(titre)
         print(f"  {JAUNE}!{RAZ} {titre}")
         print(f"      {detail}")
 
@@ -269,6 +274,11 @@ def _verifier_pypi(r: Rapport, version: str) -> None:
 #: alors que la CI de la 0.1.67 tournait encore, faute d'avoir pu joindre `gh`.
 #: Un garde-fou qui, ne pouvant mesurer, conclut au vert est exactement l'échec
 #: muet que ce dépôt combat partout ailleurs.
+#: L'événement des runs que GitHub déclenche pour son propre compte
+#: (« Dependabot Updates », « Dependency Graph »). Ils ne construisent pas le
+#: commit, donc leur résultat n'entre pas dans le verdict de la CI.
+_EVENEMENT_INFRA = "dynamic"
+
 _SANS_GH = (
     "Vérifie l'état de la CI à la main, puis relance. Si `gh` n'est pas "
     "disponible ici, relance avec --ci-verifiee une fois que tu l'as vue verte : "
@@ -366,7 +376,8 @@ def _verifier_ci(r: Rapport, *, ci_verifiee: bool = False) -> None:
     # était prévu — il ne l'était que pour un gh présent mais non authentifié.
     try:
         sortie = subprocess.run(
-            ["gh", "run", "list", "--commit", sha, "--json", "conclusion,name,status"],
+            ["gh", "run", "list", "--commit", sha,
+             "--json", "conclusion,name,status,event"],
             cwd=RACINE, capture_output=True, text=True, check=False,
         )
     except OSError:
@@ -390,12 +401,34 @@ def _verifier_ci(r: Rapport, *, ci_verifiee: bool = False) -> None:
         else:
             r.attendre("État de la CI illisible", _SANS_GH)
         return
-    en_cours = [x["name"] for x in runs if x.get("status") != "completed"]
-    echoues = [
+    # Tous les runs d'un commit ne l'éprouvent pas. GitHub en déclenche pour
+    # son propre compte sous l'événement `dynamic` : « Dependabot Updates »,
+    # « Dependency Graph ». Ils tentent une mise à jour de dépendance, ils ne
+    # construisent ni ne testent ce commit, et leur échec ne dit rien de lui.
+    # Mesuré sur 2dffd98 : « uv in /. - Update » en échec faisait annoncer une
+    # CI rouge alors que les neuf workflows de `push` étaient verts, et ce
+    # script refusait donc un tag sain. Un contrôle qui se trompe de sujet
+    # coûte plus cher que l'absence de contrôle : on finit par passer outre,
+    # et le jour où il a raison, personne ne l'écoute.
+    eprouvants = [x for x in runs if x.get("event") != _EVENEMENT_INFRA]
+    ecartes = [
         x["name"] for x in runs
+        if x.get("event") == _EVENEMENT_INFRA and x.get("conclusion") == "failure"
+    ]
+    en_cours = [x["name"] for x in eprouvants if x.get("status") != "completed"]
+    echoues = [
+        x["name"] for x in eprouvants
         if x.get("status") == "completed" and x.get("conclusion") not in
         (None, "success", "skipped", "neutral")
     ]
+    if ecartes:
+        # Écarté du verdict, pas du rapport : une mise à jour de dépendance
+        # qui échoue reste à regarder, simplement pas avant de taguer.
+        r.note(
+            f"Hors verdict, {len(ecartes)} run(s) d'automatisation GitHub en "
+            f"échec : {', '.join(sorted(set(ecartes)))}",
+            "Ils ne construisent pas ce commit. À traiter à part.",
+        )
     if echoues:
         r.ko(
             f"CI en échec sur ce commit : {', '.join(sorted(set(echoues)))}",

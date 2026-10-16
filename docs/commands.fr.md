@@ -38,6 +38,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
 | `dsoxlab infra status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
 | `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |
+| `dsoxlab instructor audit` | Ce qu'un apprenant ne trouvera pas tout seul dans ce catalogue. |
 | `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |
 | `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
 | `dsoxlab new catalog` | Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/. |

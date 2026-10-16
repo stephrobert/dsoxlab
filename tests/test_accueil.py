@@ -12,6 +12,11 @@ donc les deux fonctions pures qui portent le raisonnement.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+
 import pytest
 
 from dsoxlab.i18n.strings import en, fr
@@ -34,6 +39,22 @@ CONNUS = [
 
 def _commandes(entrees: tuple[tuple[str, str], ...]) -> list[str]:
     return [commande for commande, _cle in entrees]
+
+
+@contextmanager
+def _dans(repertoire: Path) -> Iterator[None]:
+    """Joue le bloc depuis ce répertoire, et revient toujours au précédent.
+
+    `_machines_a_monter()` lit le catalogue du répertoire courant : le lui
+    changer est la seule façon de l'éprouver, et le laisser changé ferait
+    échouer les tests suivants dans un ordre imprévisible.
+    """
+    avant = Path.cwd()
+    os.chdir(repertoire)
+    try:
+        yield
+    finally:
+        os.chdir(avant)
 
 
 # ── La décision : quel geste pour quel état ─────────────────────────────────
@@ -155,3 +176,81 @@ def test_aucune_commande_de_l_accueil_n_est_traduite() -> None:
     for table, nom in ((en.STRINGS, "en"), (fr.STRINGS, "fr")):
         fautives = sorted(c for c in commandes if c in table.values())
         assert not fautives, f"{nom}.py traduit des commandes : {fautives}"
+
+
+# ── Le premier contact : ce qu'on montre à qui ne connaît pas l'outil ───────
+
+
+def test_le_premier_geste_propose_est_la_demonstration() -> None:
+    """L'ordre compte : `demo` avant `catalog add`.
+
+    Quelqu'un qui ne connaît pas l'outil n'a pas à choisir une formation parmi
+    six avant d'avoir vu à quoi ressemble un lab. `demo` ne clone rien, ne
+    provisionne rien, et tient en cinq minutes.
+    """
+    commandes = _commandes(gestes_pour(installes=[], actif=None))
+    assert commandes[0] == "dsoxlab demo"
+
+
+def test_un_catalogue_sans_machines_ne_declenche_pas_le_bloc_infra(
+    tmp_path: Path,
+) -> None:
+    """Le bloc qui nomme provider, hyperviseur et provision n'est pas pour tout
+    le monde : il était montré même à qui n'avait rien installé."""
+    from dsoxlab.cli._amorcage import _machines_a_monter
+
+    (tmp_path / "meta.yml").write_text(
+        "repo:\n  id: sans-machines\n  category: python\n", encoding="utf-8"
+    )
+    with _dans(tmp_path):
+        assert _machines_a_monter() is False
+
+
+def test_un_catalogue_a_machines_declenche_le_bloc_infra(tmp_path: Path) -> None:
+    """Le critère est celui de `doctor` depuis la 0.1.88 : `infra.hosts` non vide.
+
+    Deux écrans qui décideraient différemment de ce qu'est un catalogue « à
+    machines » finiraient par se contredire.
+    """
+    from dsoxlab.cli._amorcage import _machines_a_monter
+
+    (tmp_path / "meta.yml").write_text(
+        "repo:\n  id: avec-machines\n  category: linux\n"
+        "infra:\n  provider: kvm\n  hosts:\n    - name: web1.lab\n",
+        encoding="utf-8",
+    )
+    with _dans(tmp_path):
+        assert _machines_a_monter() is True
+
+
+def test_un_repertoire_sans_catalogue_ne_declenche_rien(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un accueil ne doit jamais être ce qui casse : sans catalogue, il se taît.
+
+    Le `XDG_STATE_HOME` est isolé, et ce n'est pas une précaution de forme :
+    `_machines_a_monter()` interroge `get_lab_home()`, qui suit le **catalogue
+    actif** de la machine avant le répertoire courant. Sans cette isolation, le
+    test lisait le catalogue réellement actif du poste et passait ou échouait
+    selon ce qu'un développeur y avait laissé.
+    """
+    from dsoxlab.cli._amorcage import _machines_a_monter
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.delenv("LAB_HOME", raising=False)
+    with _dans(tmp_path):
+        assert _machines_a_monter() is False
+
+
+def test_un_catalogue_actif_hors_de_catalogs_compte_quand_meme() -> None:
+    """`demo` pose son catalogue ailleurs, et il est actif : l'accueil le voit.
+
+    Le défaut se voyait en jouant le parcours : juste après `dsoxlab demo`,
+    l'accueil annonçait « Aucun catalogue installé pour l'instant » et
+    proposait `dsoxlab demo` à qui venait de le faire. `installes` ne liste que
+    `catalogs/`, et la démonstration vit sous `share/dsoxlab/demo`.
+    """
+    commandes = _commandes(gestes_pour(installes=[], actif="demo"))
+    assert "dsoxlab list-labs" in commandes
+    assert not any(c == "dsoxlab demo" for c in commandes)

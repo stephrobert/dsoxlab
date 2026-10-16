@@ -4,10 +4,12 @@ from .doctor import Check, DoctorReport, Fix, FixKind, collect_checks, uses_vm
 from .guide_service import guide_url
 from .lab_service import (
     CheckResult,
+    EchecDeTest,
     ScoreResult,
     check_lab,
     clean_lab,
     compute_score,
+    echecs_de_tests,
     evaluate_lab,
     find_lab,
     get_all_labs,
@@ -34,6 +36,7 @@ __all__ = [
     "Check",
     "CheckResult",
     "DoctorReport",
+    "EchecDeTest",
     "Fix",
     "FixKind",
     "ScoreResult",
@@ -42,6 +45,7 @@ __all__ = [
     "clean_lab",
     "collect_checks",
     "compute_score",
+    "echecs_de_tests",
     "evaluate_lab",
     "find_lab",
     "get_all_labs",

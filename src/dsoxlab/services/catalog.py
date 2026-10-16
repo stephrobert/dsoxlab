@@ -166,37 +166,71 @@ def installes() -> list[CatalogueInstalle]:
     return trouves
 
 
-def nom_actif() -> str | None:
-    """L'identifiant du catalogue actif, ou None.
-
-    Un actif qui ne correspond plus à rien d'installé est traité comme absent :
-    l'utilisateur a pu retirer le répertoire à la main, et une commande ne doit
-    pas échouer sur un état que l'outil peut recalculer.
-    """
-    fichier = _fichier_actif()
+def _actif_brut() -> str | None:
+    """Le contenu du pointeur, tel quel, ou None s'il est illisible."""
     try:
-        nom = fichier.read_text(encoding="utf-8").strip()
+        contenu = _fichier_actif().read_text(encoding="utf-8").strip()
     except OSError:
         return None
-    if not nom or not _ID_VALIDE.match(nom):
-        return None
-    return nom if _est_un_catalogue(racine_catalogues() / nom) else None
+    return contenu or None
 
 
 def racine_active() -> Path | None:
-    """La racine du catalogue actif, si elle existe encore."""
-    nom = nom_actif()
-    return racine_catalogues() / nom if nom else None
+    """La racine du catalogue actif, si elle existe encore.
+
+    Le pointeur porte **soit** un identifiant, résolu sous
+    ``racine_catalogues()``, **soit un chemin absolu**. Les deux formes sont
+    nécessaires, et la seconde l'est devenue en jouant le parcours d'un nouvel
+    arrivant : ``dsoxlab demo`` installe son catalogue sous
+    ``~/.local/share/dsoxlab/demo``, hors de ``catalogs/``, et ne pouvait donc
+    pas le rendre actif. Les trois commandes que ``demo`` affiche ensuite
+    (``course``, ``run``, ``check``) échouaient alors toutes les trois sur
+    « Lab introuvable », pour qui n'avait pas fait le ``cd`` que le message
+    glissait sur une ligne séparée.
+
+    Un actif qui ne correspond plus à rien est traité comme absent : le
+    répertoire a pu être retiré à la main, et une commande ne doit pas échouer
+    sur un état que l'outil sait recalculer.
+    """
+    brut = _actif_brut()
+    if brut is None:
+        return None
+    candidat = Path(brut) if brut.startswith("/") else racine_catalogues() / brut
+    if not brut.startswith("/") and not _ID_VALIDE.match(brut):
+        return None
+    return candidat if _est_un_catalogue(candidat) else None
 
 
-def definir_actif(identifiant: str) -> Path:
-    """Rend un catalogue actif. Il doit être installé."""
-    racine = racine_catalogues() / identifiant
-    if not _ID_VALIDE.match(identifiant) or not _est_un_catalogue(racine):
-        raise CatalogueError(_("catalog_absent", name=identifiant))
+def nom_actif() -> str | None:
+    """Le nom affichable du catalogue actif, ou None.
+
+    Pour un chemin, c'est le nom de son répertoire : l'utilisateur a besoin
+    d'un mot à lire, pas d'un chemin de quatre-vingts caractères dans un
+    bandeau d'état.
+    """
+    racine = racine_active()
+    return racine.name if racine else None
+
+
+def definir_actif(identifiant: str | Path) -> Path:
+    """Rend un catalogue actif, par son identifiant ou par son chemin.
+
+    Le chemin sert aux catalogues qui ne vivent pas sous ``catalogs/`` : celui
+    de la démonstration, posé par ``dsoxlab demo``, est le seul aujourd'hui.
+    """
+    if isinstance(identifiant, Path) or str(identifiant).startswith("/"):
+        racine = Path(identifiant).expanduser().resolve()
+        marque = racine.as_posix()
+    else:
+        racine = racine_catalogues() / identifiant
+        marque = str(identifiant)
+        if not _ID_VALIDE.match(marque):
+            raise CatalogueError(_("catalog_absent", name=marque))
+    if not _est_un_catalogue(racine):
+        raise CatalogueError(_("catalog_absent", name=racine.name))
     fichier = _fichier_actif()
     fichier.parent.mkdir(parents=True, exist_ok=True)
-    fichier.write_text(identifiant + "\n", encoding="utf-8")
+    fichier.write_text(marque + "\n", encoding="utf-8")
     return racine
 
 

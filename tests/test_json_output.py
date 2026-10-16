@@ -236,17 +236,24 @@ def test_next_dit_quand_tout_est_fait(catalogue: Path) -> None:
     assert document["remaining"] == 0
 
 
-def test_next_sans_contexte_ne_rend_rien(catalogue: Path) -> None:
-    """Erreur dure : rien sur la sortie standard, la cause sur l'autre, code 1.
+def test_next_sans_contexte_repond_sur_tout_le_catalogue(catalogue: Path) -> None:
+    """Sans contexte actif, `next` répond : il ne refuse plus.
 
-    C'est la règle du mode machine, et elle vaut mieux qu'un document inventé
-    pour l'occasion : l'appelant lit le code de retour d'abord.
+    Ce test défendait l'inverse jusqu'à la 0.4.0, et il avait tort. Le défaut
+    se voyait en jouant le parcours d'un nouvel arrivant : `catalog add`
+    affiche « dsoxlab next » parmi les deux gestes suivants, et `next` sortait
+    en 1 avec « Aucun contexte actif », en exigeant une commande dont rien
+    n'avait parlé.
+
+    Le garde-fou interdisait un cas qui fonctionne : l'ordre pédagogique vient
+    de la position des labs dans le `meta.yml`, pas d'une section active.
     """
     resultat = runner.invoke(app, ["next", "--json"])
 
-    assert resultat.exit_code == 1
-    assert resultat.stdout == ""
-    assert resultat.stderr.strip()
+    assert resultat.exit_code == 0, resultat.stderr
+    document = json.loads(resultat.stdout)
+    assert document["context"]["section"] is None
+    assert document["next"] is not None, "un catalogue non vide a toujours une suite"
 
 
 def test_doctor_rend_des_cles_stables(catalogue: Path, sans_hyperviseur: None) -> None:

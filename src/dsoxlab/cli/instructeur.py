@@ -23,9 +23,12 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from pathlib import Path
+from typing import Annotated
 
 import typer
 
+from ..exit_codes import ExitCode
 from ..i18n import _
 from ..reporting import (
     error,
@@ -34,6 +37,8 @@ from ..reporting import (
 )
 from ._commun import (
     LabHomeOption,
+    _catalogue,
+    _lang,
     _root,
 )
 from ._socle import instructor_app
@@ -127,3 +132,88 @@ def instructor_bootstrap(
 
 
 # ── demo ──────────────────────────────────────────────────────────────────────
+
+
+# ── instructor audit : ce qu'un apprenant ne trouvera pas tout seul ──────────
+
+
+@instructor_app.command("audit", help=_("cmd_instructor_audit_help"))
+def instructor_audit(
+    lab_home: LabHomeOption = None,
+    export: Annotated[Path | None, typer.Option("--export", help=_("opt_audit_export"))] = None,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+) -> None:
+    """La grille qu'un formateur applique avant de confier un catalogue.
+
+    Elle est née d'une lecture de labs à la place d'un apprenant, sur cinq
+    catalogues : `linux` et `terraform` donnent tout ce qu'il faut, tandis que
+    certains labs d'`ansible` ne portent **aucun** message d'assertion, et que
+    leurs missions ne disent pas comment valider. Un apprenant y voit quels
+    tests échouent, et rien sur ce qu'il doit corriger.
+
+    `validate-structure` répond à « ce catalogue respecte-t-il le contrat ? ».
+    Celle-ci répond à « un apprenant peut-il faire le travail avec ce qu'on lui
+    donne ? », et les deux sont séparées parce qu'un catalogue parfaitement
+    conforme peut être injouable.
+    """
+    from ..reporting import machine, note, print_audit_pedagogique
+    from ..services.audit_pedagogique import (
+        ATTENTION,
+        MANQUE,
+        dossier_pour_relecture,
+        examiner,
+    )
+
+    root = _root(lab_home)
+    lang = _lang(root)
+    labs = _catalogue(root, lang, quiet=as_json)
+    rapport = examiner(labs, lang)
+
+    if export is not None:
+        dossier = dossier_pour_relecture(labs, lang)
+        try:
+            export.write_text(dossier, encoding="utf-8")
+        except OSError as exc:
+            # La même clé que `export`, et pour la même situation : un fichier
+            # qu'on n'a pas pu écrire, nommé avec la cause rendue par l'OS.
+            error(_("export_fichier_erreur", path=str(export), error=str(exc)))
+            raise typer.Exit(ExitCode.IMPOSSIBLE) from None
+        note(_("audit_export_ecrit", path=export, lignes=len(dossier.splitlines())))
+
+    if as_json:
+        machine.emit({
+            "ok": rapport.ok,
+            "labs_examined": rapport.labs_examines,
+            "findings": [
+                {
+                    "lab": c.lab_id,
+                    "key": c.cle,
+                    "level": c.niveau,
+                    "message": c.phrase(),
+                    "params": c.params,
+                }
+                for c in rapport.constats
+            ],
+            "counts": {
+                MANQUE: len(rapport.par_niveau(MANQUE)),
+                ATTENTION: len(rapport.par_niveau(ATTENTION)),
+            },
+            # Le suivi de la parité des langues se fait ici, pas par des
+            # constats : un chiffre se compare d'une version à l'autre, et se
+            # garde en CI. Les noms sont stables, c'est un contrat public.
+            "assertions": {
+                "total": rapport.assertions.total,
+                "with_message": rapport.assertions.avec_message,
+                "without_message": rapport.assertions.sans_message,
+                "single_language": rapport.assertions.monolingues,
+                "both_languages": rapport.assertions.bilingues,
+                "unreachable_helper": rapport.assertions.helper_injoignable,
+            },
+        })
+        if not rapport.ok:
+            raise typer.Exit(ExitCode.ECHEC)
+        return
+
+    print_audit_pedagogique(rapport)
+    if not rapport.ok:
+        raise typer.Exit(ExitCode.ECHEC)

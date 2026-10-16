@@ -121,6 +121,27 @@ def test_un_fichier_cache_n_est_pas_une_fixture(tmp_path: Path) -> None:
     assert _cles(lab) == []
 
 
+def test_un_pycache_n_est_pas_une_fixture(tmp_path: Path) -> None:
+    """Ce qu'un OUTIL dépose dans `fixtures/` n'est pas du contenu pédagogique.
+
+    Un `__pycache__` apparaît dès que l'auteur joue la solution de son propre
+    lab, et il n'est pas caché : l'exemption des fichiers cachés ne l'attrapait
+    donc pas. Mesuré le 2026-10-16 sur `devsecops-dsoxlab-training` :
+    `validate-structure` y rendait 24 écarts, tous des `.pyc`, sur un catalogue
+    par ailleurs irréprochable. Un contrôle qui crie faux sur le dépôt le plus
+    discipliné est la façon la plus sûre de le faire désapprendre.
+    """
+    lab = _lab(tmp_path, declarees="  fixtures:\n    - tests/test_app.py\n",
+               sur_disque={
+                   "tests/test_app.py": "def test_x(): pass",
+                   "tests/__pycache__/test_app.cpython-314.pyc": "\x00",
+                   ".pytest_cache/CACHEDIR.TAG": "Signature",
+                   "tests/orphelin.pyc": "\x00",
+               })
+
+    assert _cles(lab) == []
+
+
 def test_un_lab_vm_n_est_pas_concerne(tmp_path: Path) -> None:
     """`fixtures` n'a de sens que pour le runtime shell."""
     lab = _lab(tmp_path, declarees="", sur_disque={"trace.log": "…"},

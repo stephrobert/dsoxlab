@@ -50,9 +50,6 @@ VALIDATED = "validated"
 #: Une dépendance déclarée est tombée : le lab est injouable en l'état.
 DEGRADED = "degraded"
 
-#: Ordre de parcours, pour les affichages qui veulent une progression.
-ETATS = (NOT_STARTED, READY, IN_PROGRESS, VALIDATED)
-
 
 @dataclass(frozen=True)
 class LabState:

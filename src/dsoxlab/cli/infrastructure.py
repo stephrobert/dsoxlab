@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -61,6 +61,13 @@ from ._commun import (
     _verrou,
 )
 from ._socle import app
+
+if TYPE_CHECKING:  # pragma: no cover - import de typage seulement
+    # Importé ici et pas au chargement : `infra.terraform` tire le wrapper
+    # subprocess et la lecture du state, dont une commande qui ne
+    # provisionne pas n'a aucun besoin.
+    from ..infra.terraform import ProvisionResult
+
 from ._validation import _undefine_command
 
 logger = logging.getLogger(__name__)
@@ -108,7 +115,7 @@ def provisionner(
     rendu la cause en une phrase traduite quand elle sort.
     """
     from ..infra import terraform as tf
-    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled, host_targets
+    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled
 
     repo_meta = _read_repo(root)
     if repo_meta is None:
@@ -117,79 +124,9 @@ def provisionner(
 
     provider = _require_provider(repo_meta)
 
-    # Garde-fou cohabitation : incus et KVM partagent le nom de réseau et le
-    # subnet du lab → ils ne peuvent pas coexister. Si un AUTRE provider a
-    # encore de l'infra debout, on guide l'apprenant (destroy) plutôt que de
-    # le laisser buter sur « Network is already in use ».
-    conflicts = tf.other_active_providers(repo_meta)
-    if conflicts:
-        error(_(
-            "provision_provider_conflict",
-            current=provider,
-            others=", ".join(conflicts),
-            other=conflicts[0],
-        ))
-        raise typer.Exit(ExitCode.ORPHELINS)
-
-    # Garde-fou « machines fantômes » : un provisionnement interrompu après la
-    # définition d'un domaine le laisse sur l'hyperviseur sans jamais l'inscrire
-    # au state. Terraform ne le voit donc pas, et tout apply suivant meurt sur
-    # « domain already exists », une phrase qui ne dit pas quoi faire. On nomme
-    # les machines et la commande qui les retire, avant de perdre une minute
-    # d'init et d'apply.
-    scan = tf.find_orphan_domains(repo_meta)
-    if scan.reason:
-        warn(_("orphan_check_skipped", error=scan.reason))
-    if scan.orphans:
-        error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
-        info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
-        raise typer.Exit(ExitCode.ORPHELINS)
-
-    # Garde-fou « nom de pont » : le noyau refuse une interface de plus de
-    # 15 caractères, et l'échec arrive APRÈS le téléchargement de l'image de
-    # base, sur un « Numerical result out of range » qui ne nomme rien. La cause
-    # est connue d'avance, elle se dit donc d'avance (issue #214). Avant même
-    # `init`, qui tire ~50 Mo de provider.
-    try:
-        verifier_nom_de_pont(repo_meta, provider)
-    except NomDePontTropLong as exc:
-        error(_(
-            "bridge_name_too_long",
-            network=exc.reseau, bridge=exc.pont,
-            length=len(exc.pont), limit=exc.limite,
-        ))
-        info(_(
-            "bridge_name_fix",
-            max_network=exc.max_reseau,
-            suggestion=reseau_raccourci(exc.reseau, exc.pont),
-        ))
-        raise typer.Exit(ExitCode.IMPOSSIBLE) from None
-
+    _refuser_ce_qui_echouerait_plus_tard(repo_meta, provider)
     info(_("provision_starting", provider=provider))
-
-    # Garde-fou : la clé SSH du repo doit exister avant tout provision.
-    # Sans elle, le keypair cloud serait créé avec une clé publique
-    # vide → VMs inaccessibles. Cas vécu sur Outscale lors d'un test
-    # initial.
-    ssh_key = repo_meta.path / "ssh" / "id_ed25519"
-    if not ssh_key.is_file():
-        error(_("provision_no_ssh_key", path=ssh_key))
-        raise typer.Exit(1)
-
-    # Construit la liste des targets Terraform pour les --host demandés.
-    targets: list[str] = []
-    if host:
-        known = {h.name for h in repo_meta.infra.hosts}
-        for fqdn in host:
-            if fqdn not in known:
-                error(_("host_unknown", fqdn=fqdn, known=", ".join(sorted(known))))
-                raise typer.Exit(1)
-            try:
-                targets.extend(host_targets(provider, fqdn))
-            except NotImplementedError as exc:
-                error(str(exc))
-                raise typer.Exit(2) from None
-        info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
+    targets = _cibles_terraform(repo_meta, provider, host)
 
     try:
         # Étape 1 : terraform init (peut télécharger ~50 MB de provider
@@ -243,84 +180,10 @@ def provisionner(
     for message in result.warnings:
         warn(message)
 
-    # Déclaré ici, avant tout branchement : quand il n'y a aucun hôte à
-    # attendre, le bloc plus bas n'est pas entré, et la boucle d'affichage
-    # doit quand même avoir une liste à parcourir.
-    avertissements_cloud_init: list[str] = []
-
-    # Étape 3 : attendre que les VMs soient réellement joignables (sshd +
-    # compte student + cloud-init terminé). Sans ça, le premier `dsoxlab run`
-    # échoue en « unreachable » car la VM boote encore.
-    from ..infra.inventory import (
-        EXIT_HOTES_INJOIGNABLES,
-        HostReadyTimeout,
-        wait_for_hosts_ready,
+    ready_hosts = _hotes_a_attendre(result, host)
+    avertissements_cloud_init, attente_depassee = _attendre_les_hotes(
+        repo_meta, ready_hosts
     )
-
-    attente_depassee = False
-
-    # L'output `hosts` du template dérive de `var.hosts`, donc de TOUS les
-    # hôtes déclarés au meta.yml, et non de ceux que cet apply a créés. Avec
-    # `--host`, attendre cette liste revient à réclamer une réponse à des
-    # machines qu'on a explicitement demandé de ne pas monter : `provision`
-    # sortait alors en 8 à tous les coups dès qu'un dépôt déclare plus d'un
-    # hôte, c'est-à-dire presque toujours (issue #246).
-    #
-    # L'output garde son sens — la topologie déclarée avec ses adresses — et
-    # c'est ici qu'on sait ce qui a été ciblé.
-    ready_hosts = sorted(result.hosts)
-    if host:
-        cibles = set(host)
-        ready_hosts = [fqdn for fqdn in ready_hosts if fqdn in cibles]
-    if ready_hosts:
-        from rich.progress import (
-            Progress,
-            SpinnerColumn,
-            TextColumn,
-            TimeElapsedColumn,
-        )
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold]{task.description}"),
-            TimeElapsedColumn(),
-            transient=True,
-            console=console,
-        ) as progress:
-            task = progress.add_task(_("provision_waiting_ssh"), total=None)
-
-            def _on_attempt(fqdn: str, attempt: int) -> None:
-                progress.update(
-                    task,
-                    description=_(
-                        "provision_waiting_ssh_host", host=fqdn, attempt=attempt
-                    ),
-                )
-
-            try:
-                with interruptible(Stage.HOSTS_WAIT):
-                    # Les hôtes sont joignables, mais leur cloud-init a
-                    # peut-être mal fini : sans ces avertissements, les labs
-                    # échoueraient plus tard sur des paquets absents, sans que
-                    # rien ne relie l'échec au provisionnement.
-                    avertissements_cloud_init = wait_for_hosts_ready(
-                        repo_meta, ready_hosts, on_attempt=_on_attempt
-                    )
-            except HostReadyTimeout as exc:
-                progress.stop()
-                warn(_("provision_ssh_timeout", error=str(exc)))
-                # Retenu pour la fin : le fragment SSH et les autres gestes qui
-                # suivent restent utiles, mais la commande ne doit pas conclure
-                # au succès. Annoncer « ✔ N hôtes provisionnés » puis sortir en
-                # 0 rendait l'échec invisible à tout script — et le `run`
-                # suivant échouait en « unreachable » sans lien avec la cause.
-                attente_depassee = True
-            except Interrupted as exc:
-                # L'infrastructure existe déjà : c'est l'attente qui a été
-                # coupée, pas la création. Rejouer `provision` est idempotent
-                # et reprend exactement ici.
-                progress.stop()
-                _interrompu(exc, "dsoxlab provision")
 
     # Les hôtes répondent, mais leur configuration a peut-être mal fini. Le dire
     # ici, à l'écran, et non dans un journal : c'est la seule occasion de relier
@@ -328,38 +191,11 @@ def provisionner(
     for message in avertissements_cloud_init:
         warn(message)
 
-    # Le fragment SSH, écrit à CHAQUE provision et non seulement quand des
-    # machines viennent d'être créées : relancer un provision sur une infra
-    # déjà en place laissait sinon l'apprenant sans fragment, alors que c'est
-    # le moment où il en a besoin. Il doit refléter l'état courant, pas le
-    # delta du dernier terraform apply.
-    from ..infra.inventory import (
-        build_inventory,
-        read_terraform_outputs,
-        ssh_config_include_present,
-        user_ssh_config_path,
-        write_ssh_config,
-        write_user_ssh_config,
-    )
-
-    fragment = user_ssh_config_path(repo_meta)
-    try:
-        inv = build_inventory(
-            repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
-        )
-        write_ssh_config(inv, repo_meta)
-        write_user_ssh_config(inv, repo_meta)
-    except (OSError, RuntimeError) as exc:
-        # Un fragment manquant ne doit pas faire échouer un provision réussi.
-        warn(_("ssh_fragment_failed", error=str(exc)))
-
-    if fragment.is_file():
-        if ssh_config_include_present():
-            info(_("ssh_fragment_written", path=fragment))
-        else:
-            warn(_("ssh_fragment_no_include", path=fragment))
+    _ecrire_le_fragment_ssh(repo_meta)
 
     if attente_depassee:
+        from ..infra.inventory import EXIT_HOTES_INJOIGNABLES
+
         error(_("provision_incomplet"))
         info(_("provision_incomplet_suite"))
         raise typer.Exit(EXIT_HOTES_INJOIGNABLES)
@@ -382,6 +218,207 @@ def provisionner(
         success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
         info(f"  {fqdn} → {ip}")
+
+
+def _ecrire_le_fragment_ssh(repo_meta: RepoMetadata) -> None:
+    """Écrit l'inventaire et le fragment `ssh_config`, puis dit où il est.
+
+    À CHAQUE provision, et non seulement quand des machines viennent d'être
+    créées : relancer un provision sur une infrastructure déjà en place
+    laissait sinon l'apprenant sans fragment, alors que c'est le moment où il
+    en a besoin. Il doit refléter l'état courant, pas le delta du dernier
+    `terraform apply`.
+    """
+    from ..infra.inventory import (
+        build_inventory,
+        read_terraform_outputs,
+        ssh_config_include_present,
+        user_ssh_config_path,
+        write_ssh_config,
+        write_user_ssh_config,
+    )
+
+    fragment = user_ssh_config_path(repo_meta)
+    try:
+        inv = build_inventory(
+            repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
+        )
+        write_ssh_config(inv, repo_meta)
+        write_user_ssh_config(inv, repo_meta)
+    except (OSError, RuntimeError) as exc:
+        # Un fragment manquant ne doit pas faire échouer un provision réussi.
+        warn(_("ssh_fragment_failed", error=str(exc)))
+
+    if not fragment.is_file():
+        return
+    if ssh_config_include_present():
+        info(_("ssh_fragment_written", path=fragment))
+    else:
+        warn(_("ssh_fragment_no_include", path=fragment))
+
+
+def _hotes_a_attendre(result: ProvisionResult, host: list[str] | None) -> list[str]:
+    """Les hôtes dont on attend une réponse, et eux seuls.
+
+    L'output `hosts` du template dérive de `var.hosts`, donc de TOUS les hôtes
+    déclarés au meta.yml, et non de ceux que cet apply a créés. Avec `--host`,
+    attendre cette liste revient à réclamer une réponse à des machines qu'on a
+    explicitement demandé de ne pas monter : `provision` sortait alors en 8 à
+    tous les coups dès qu'un dépôt déclare plus d'un hôte, c'est-à-dire presque
+    toujours (issue #246). L'output garde son sens, la topologie déclarée avec
+    ses adresses, et c'est ici qu'on sait ce qui a été ciblé.
+    """
+    hotes = sorted(result.hosts)
+    if not host:
+        return hotes
+    cibles = set(host)
+    return [fqdn for fqdn in hotes if fqdn in cibles]
+
+
+def _attendre_les_hotes(
+    repo_meta: RepoMetadata, ready_hosts: list[str]
+) -> tuple[list[str], bool]:
+    """Attend que les machines répondent vraiment : sshd, comptes, cloud-init.
+
+    Rend les avertissements de cloud-init et si l'attente a été dépassée. Ce
+    second booléen n'est pas levé en exception tout de suite : le fragment SSH
+    et les gestes qui suivent restent utiles. Mais la commande ne doit pas
+    conclure au succès, sans quoi elle annonce « N hôtes provisionnés » puis
+    sort en 0, et le `run` suivant échoue en « unreachable » sans lien visible
+    avec la cause.
+    """
+    if not ready_hosts:
+        return [], False
+
+    from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+
+    from ..infra.inventory import HostReadyTimeout, wait_for_hosts_ready
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold]{task.description}"),
+        TimeElapsedColumn(),
+        transient=True,
+        console=console,
+    ) as progress:
+        task = progress.add_task(_("provision_waiting_ssh"), total=None)
+
+        def _on_attempt(fqdn: str, attempt: int) -> None:
+            progress.update(
+                task,
+                description=_(
+                    "provision_waiting_ssh_host", host=fqdn, attempt=attempt
+                ),
+            )
+
+        try:
+            with interruptible(Stage.HOSTS_WAIT):
+                # Les hôtes sont joignables, mais leur cloud-init a peut-être
+                # mal fini : sans ces avertissements, les labs échoueraient
+                # plus tard sur des paquets absents, sans que rien ne relie
+                # l'échec au provisionnement.
+                return wait_for_hosts_ready(
+                    repo_meta, ready_hosts, on_attempt=_on_attempt
+                ), False
+        except HostReadyTimeout as exc:
+            progress.stop()
+            warn(_("provision_ssh_timeout", error=str(exc)))
+            return [], True
+        except Interrupted as exc:
+            # L'infrastructure existe déjà : c'est l'attente qui a été coupée,
+            # pas la création. Rejouer `provision` est idempotent et reprend
+            # exactement ici.
+            progress.stop()
+            _interrompu(exc, "dsoxlab provision")
+            raise  # inatteignable : `_interrompu` sort toujours
+
+
+def _refuser_ce_qui_echouerait_plus_tard(
+    repo_meta: RepoMetadata, provider: str
+) -> None:
+    """Les quatre causes d'échec connues d'avance, dites avant de perdre du temps.
+
+    Chacune vient d'un échec observé **après** `init` et son téléchargement de
+    provider, parfois après l'image de base, sur un message de Terraform ou du
+    noyau qui ne nommait ni la cause ni le geste. Les mesurer coûte quelques
+    millisecondes ; les découvrir plus loin coûte plusieurs minutes et une
+    infrastructure à moitié montée.
+    """
+    from ..infra import terraform as tf
+
+    # Incus et KVM partagent le nom de réseau et le subnet du lab : ils ne
+    # peuvent pas coexister. Si un AUTRE provider a encore de l'infra debout,
+    # on guide vers `destroy` plutôt que de laisser buter sur « Network is
+    # already in use ».
+    conflicts = tf.other_active_providers(repo_meta)
+    if conflicts:
+        error(_(
+            "provision_provider_conflict",
+            current=provider,
+            others=", ".join(conflicts),
+            other=conflicts[0],
+        ))
+        raise typer.Exit(ExitCode.ORPHELINS)
+
+    # Machines fantômes : un provisionnement interrompu après la définition
+    # d'un domaine le laisse sur l'hyperviseur sans jamais l'inscrire au state.
+    # Terraform ne le voit donc pas, et tout apply suivant meurt sur « domain
+    # already exists », une phrase qui ne dit pas quoi faire.
+    scan = tf.find_orphan_domains(repo_meta)
+    if scan.reason:
+        warn(_("orphan_check_skipped", error=scan.reason))
+    if scan.orphans:
+        error(_("provision_orphan_domains", hosts=", ".join(sorted(scan.orphans))))
+        info(_("provision_orphan_fix", cmd=_undefine_command(scan.orphans)))
+        raise typer.Exit(ExitCode.ORPHELINS)
+
+    # Nom de pont : le noyau refuse une interface de plus de 15 caractères, et
+    # l'échec arrive APRÈS le téléchargement de l'image de base, sur un
+    # « Numerical result out of range » qui ne nomme rien (issue #214).
+    try:
+        verifier_nom_de_pont(repo_meta, provider)
+    except NomDePontTropLong as exc:
+        error(_(
+            "bridge_name_too_long",
+            network=exc.reseau, bridge=exc.pont,
+            length=len(exc.pont), limit=exc.limite,
+        ))
+        info(_(
+            "bridge_name_fix",
+            max_network=exc.max_reseau,
+            suggestion=reseau_raccourci(exc.reseau, exc.pont),
+        ))
+        raise typer.Exit(ExitCode.IMPOSSIBLE) from None
+
+    # Clé SSH du dépôt : sans elle, le keypair cloud serait créé avec une clé
+    # publique vide, donc des VM inaccessibles. Vécu sur Outscale.
+    ssh_key = repo_meta.path / "ssh" / "id_ed25519"
+    if not ssh_key.is_file():
+        error(_("provision_no_ssh_key", path=ssh_key))
+        raise typer.Exit(1)
+
+
+def _cibles_terraform(
+    repo_meta: RepoMetadata, provider: str, host: list[str] | None
+) -> list[str]:
+    """Les adresses Terraform des `--host` demandés, ou rien pour tout monter."""
+    from ..infra.terraform import host_targets
+
+    if not host:
+        return []
+    targets: list[str] = []
+    known = {h.name for h in repo_meta.infra.hosts}
+    for fqdn in host:
+        if fqdn not in known:
+            error(_("host_unknown", fqdn=fqdn, known=", ".join(sorted(known))))
+            raise typer.Exit(1)
+        try:
+            targets.extend(host_targets(provider, fqdn))
+        except NotImplementedError as exc:
+            error(str(exc))
+            raise typer.Exit(2) from None
+    info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
+    return targets
 
 
 def _poser_le_socle(
@@ -420,6 +457,10 @@ def _poser_le_socle(
     info(_("bootstrap_starting", playbook=playbook.name, count=len(hosts)))
 
     try:
+        # L'inventaire du socle est celui du dépôt entier, sans réduction : un
+        # socle vise le CATALOGUE, pas un lab, donc il n'y a pas de groupe
+        # `lab_target` à respecter ici. Les playbooks de socle ciblent `all` ou
+        # `labenv`, les deux groupes que l'inventaire porte déjà.
         inventaire = build_inventory(
             repo_meta, terraform_outputs=read_terraform_outputs(repo_meta)
         )

@@ -49,6 +49,36 @@ class InfraNotProvisioned(RuntimeError):
     """
 
 
+def _dire_l_hote_sans_ip(nom: str, tf_hosts: dict[str, str]) -> None:
+    """Journalise un hôte sans adresse, au niveau que la situation mérite.
+
+    Deux situations qu'un seul message confondait, et qui n'appellent pas le
+    même ton :
+
+    * **aucun output Terraform** : rien n'est provisionné. C'est l'état NORMAL
+      avant `provision`, et l'appelant le dit proprement juste après, si bien
+      qu'un avertissement par hôte doublait l'interface en moins lisible.
+    * **des outputs, mais pas celui-ci** : l'infrastructure est debout et il
+      manque une machine. Là, il faut crier, et nommer ce que Terraform
+      connaît pour que la comparaison soit immédiate.
+
+    Le journal garde les deux, son handler étant en DEBUG, et `-v` les montre.
+    """
+    if tf_hosts:
+        logger.warning(
+            "Host %s has no IP although Terraform has outputs for %s: "
+            "the stack is up and this host is missing from it.",
+            nom,
+            sorted(tf_hosts),
+        )
+    else:
+        logger.info(
+            "Host %s has no IP: no Terraform output at all, so nothing is "
+            "provisioned yet. Run 'dsoxlab provision' first.",
+            nom,
+        )
+
+
 def build_inventory(
     repo_meta: RepoMetadata,
     *,
@@ -128,11 +158,7 @@ def build_inventory(
     for host_def in repo_meta.infra.hosts:
         ip = tf_hosts.get(host_def.name) or host_def.ip
         if not ip:
-            logger.warning(
-                "Host %s has no IP: neither Terraform outputs nor meta.yml ip:. "
-                "Run 'dsoxlab provision' first.",
-                host_def.name,
-            )
+            _dire_l_hote_sans_ip(host_def.name, tf_hosts)
             continue
 
         inventory_hosts[host_def.name] = {
@@ -667,7 +693,21 @@ def read_terraform_outputs(repo_meta: RepoMetadata) -> dict[str, Any] | None:
         logger.debug("Cannot read Terraform outputs: %s", exc)
         return None
 
-    if not result.ok or not result.stdout.strip():
+    if not result.ok:
+        # Le state EXISTE et la lecture a échoué : ce n'est pas « rien n'est
+        # provisionné ». Sans ce message, l'appelant annonce une
+        # infrastructure absente et propose de la monter, alors qu'elle tourne.
+        logger.warning(
+            "Terraform state exists in %s but 'terraform output' failed: %s. "
+            "Nothing can be concluded about what is running. A plugin cache "
+            "emptied since the apply is the usual cause: run "
+            "'terraform -chdir=%s init' to reinstall the providers.",
+            tf_dir,
+            (result.stderr or result.stdout).strip()[:300],
+            tf_dir,
+        )
+        return None
+    if not result.stdout.strip():
         return None
 
     try:

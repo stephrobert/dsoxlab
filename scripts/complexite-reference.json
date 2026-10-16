@@ -1,0 +1,110 @@
+{
+  "_lire": "Relevé de dette de complexité, produit par « python3 scripts/complexite.py --figer ». Il ne peut que descendre : toute aggravation fait échouer le hook. Les blocs absents de ce relevé sont tenus par les seuils déclarés ci-dessous. La complexité cyclomatique n'est pas ici : elle appartient à ruff C901.",
+  "seuils": {
+    "cognitive": 20,
+    "profondeur": 5,
+    "lignes": 80
+  },
+  "blocs": {
+    "src/dsoxlab/cli/_validation.py::_run_check": {
+      "cognitive": 22,
+      "profondeur": 5,
+      "lignes": 64
+    },
+    "src/dsoxlab/cli/_validation.py::_run_check_with_progress": {
+      "cognitive": 25,
+      "profondeur": 6,
+      "lignes": 75
+    },
+    "src/dsoxlab/cli/contexte.py::list_labs": {
+      "cognitive": 21,
+      "profondeur": 2,
+      "lignes": 39
+    },
+    "src/dsoxlab/cli/destruction.py::destroy": {
+      "cognitive": 23,
+      "profondeur": 4,
+      "lignes": 106
+    },
+    "src/dsoxlab/cli/infrastructure.py::provisionner": {
+      "cognitive": 15,
+      "profondeur": 3,
+      "lignes": 117
+    },
+    "src/dsoxlab/infra/ansible.py::run_playbook": {
+      "cognitive": 49,
+      "profondeur": 4,
+      "lignes": 202
+    },
+    "src/dsoxlab/infra/inventory.py::build_inventory": {
+      "cognitive": 27,
+      "profondeur": 4,
+      "lignes": 133
+    },
+    "src/dsoxlab/infra/inventory.py::wait_for_hosts_ready": {
+      "cognitive": 25,
+      "profondeur": 4,
+      "lignes": 127
+    },
+    "src/dsoxlab/infra/snapshot/kvm.py::_snapshot_layers": {
+      "cognitive": 24,
+      "profondeur": 2,
+      "lignes": 53
+    },
+    "src/dsoxlab/infra/terraform.py::_domains_in_state": {
+      "cognitive": 21,
+      "profondeur": 3,
+      "lignes": 32
+    },
+    "src/dsoxlab/infra/terraform.py::_ensure_kvm_dhcp_leases": {
+      "cognitive": 21,
+      "profondeur": 3,
+      "lignes": 94
+    },
+    "src/dsoxlab/infra/terraform.py::_stream_terraform": {
+      "cognitive": 25,
+      "profondeur": 3,
+      "lignes": 88
+    },
+    "src/dsoxlab/infra/terraform.py::apply": {
+      "cognitive": 10,
+      "profondeur": 2,
+      "lignes": 102
+    },
+    "src/dsoxlab/infra/terraform.py::write_tfvars": {
+      "cognitive": 9,
+      "profondeur": 2,
+      "lignes": 90
+    },
+    "src/dsoxlab/models/repo.py::RepoMetadata.from_yaml": {
+      "cognitive": 14,
+      "profondeur": 1,
+      "lignes": 138
+    },
+    "src/dsoxlab/models/repo.py::_resolve_provider": {
+      "cognitive": 26,
+      "profondeur": 3,
+      "lignes": 78
+    },
+    "src/dsoxlab/reporting/console.py::print_progress_table": {
+      "cognitive": 22,
+      "profondeur": 3,
+      "lignes": 53
+    },
+    "src/dsoxlab/services/lab_service.py::check_lab": {
+      "cognitive": 18,
+      "profondeur": 3,
+      "lignes": 136
+    },
+    "src/dsoxlab/validators/content.py::check_doc_url": {
+      "cognitive": 21,
+      "profondeur": 6,
+      "lignes": 82
+    },
+    "src/dsoxlab/validators/contract.py::_unknown_paths": {
+      "cognitive": 24,
+      "profondeur": 4,
+      "lignes": 16
+    }
+  }
+}

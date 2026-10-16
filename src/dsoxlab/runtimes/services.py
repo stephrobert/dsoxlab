@@ -248,9 +248,13 @@ def _run_post_start(service: Service, name: str) -> None:
                 "err_service_container_stopped",
                 name=service.name, container=name, code=code, logs=logs,
             ))
+        # Le nom du CONTENEUR, et pas seulement celui du service : selon
+        # l'instant, docker rend « No such object: <conteneur> » ou « cannot
+        # exec in a stopped state », et la seconde forme ne le nomme pas. Or
+        # c'est le conteneur qu'il faut inspecter.
         raise ServiceError(_(
             "err_service_post_start_failed",
-            name=service.name, command=" ".join(argv),
+            name=service.name, command=" ".join(argv), container=name,
             detail=(res.stderr or res.stdout).strip(),
         ))
 

@@ -4,7 +4,7 @@ Tout ce que le paquet partage pour **noter et diagnostiquer** vit ici : jouer
 pytest en streamant les verdicts (``_run_check_with_progress``), enregistrer
 la note sous verrou (``_run_check`` / ``_valider``), compter les anomalies de
 ``validate-structure`` (``_compter``), et composer la phrase actionnable d'un
-échec d'infrastructure (``_undefine_command``, ``_diagnostic_message``).
+échec d'infrastructure (``_undefine_command``).
 
 Même convention que ``_commun`` : un ``except`` qui a déjà rendu la cause en
 une phrase traduite (``error(...)``) sort par ``raise typer.Exit(n) from
@@ -21,19 +21,21 @@ import typer
 from ..config import read_context
 from ..i18n import _
 from ..infra.inventory import InfraNotProvisioned
+from ..logging_setup import verbosite
 from ..models import LabDefinition, ProviderUnresolved
 from ..reporting import (
     console,
     error,
     info,
     print_check_result,
+    print_echecs_de_tests,
 )
 from ..security.terminal import texte_affichable
 from ..services import (
     CheckResult,
     check_lab,
+    echecs_de_tests,
     evaluate_lab,
-    host_diagnosis,
 )
 from ._commun import _ensure_services, _verrou
 
@@ -215,15 +217,27 @@ def _valider(
         info(_("validating", lab_id=texte_affichable(lab.id)))
     result = _run_check_with_progress(lab, target, quiet=quiet)
     if not result.ok and not quiet:
-        # En cas d'échec, dump l'output brut (tracebacks, summary pytest)
-        # pour que l'apprenant voie les erreurs détaillées.
-        #
         # « and not quiet » : sans lui, la sortie pytest précédait le document
         # JSON sur stdout dès qu'un test échouait, et le flux n'était plus
         # analysable. Le cas le plus fréquent en usage réel, et le plus facile
         # à manquer : un lab qui passe n'emprunte jamais cette branche.
         # L'appelant en mode machine retrouve ce texte dans check.output.
-        console.print(result.output)
+        #
+        # Par défaut, les NOMS des tests en échec, pas leurs tracebacks. Mesuré
+        # sur le lab de démonstration : la sortie brute valait 26 lignes
+        # d'`assert False` et de `+ where exists = PosixPath(...)`, affichées à
+        # quelqu'un qui apprend l'administration système. Les labs de ce contrat
+        # nomment leurs tests en phrases, c'est donc là qu'est l'information.
+        #
+        # La sortie brute reste accessible, et à deux endroits plutôt qu'un :
+        # `-v` pour un humain qui veut creuser, `--json` pour un programme.
+        # La retirer serait perdre un diagnostic ; l'imposer, le noyer.
+        echecs = echecs_de_tests(result.output)
+        if echecs and not verbosite():
+            print_echecs_de_tests(echecs)
+            info(_("check_sortie_complete", lab_id=texte_affichable(lab.id)))
+        else:
+            console.print(result.output)
 
     evaluation = evaluate_lab(root, lab, result)
     if not lab.is_exercise:
@@ -269,33 +283,3 @@ def _undefine_command(orphans: dict[str, str]) -> str:
     return "; ".join(
         f"sudo virsh undefine --nvram {domain}" for domain in sorted(orphans.values())
     )
-
-
-def _diagnostic_message(hote: dict[str, Any]) -> str:
-    """La phrase qui nomme la cause d'un hôte muet, et le geste qui la corrige.
-
-    Une cause, un message, une action. L'ancien texte en proposait deux à la
-    fois — « cloud-init tourne peut-être encore, ou alors reprovisionne » — pour
-    tous les hôtes et toutes les pannes : l'apprenant devait trancher lui-même
-    entre deux conseils dont l'un coûtait une infrastructure entière.
-    """
-    cause = hote["cause"]
-    domaine = hote.get("domain") or hote["fqdn"]
-    if cause == host_diagnosis.CAUSE_DOMAIN_ABSENT:
-        return _("status_cause_domain_absent", host=hote["fqdn"])
-    if cause == host_diagnosis.CAUSE_DOMAIN_NOT_RUNNING:
-        return _("status_cause_domain_not_running",
-                 domain=domaine, state=hote.get("domain_state") or "?")
-    if cause == host_diagnosis.CAUSE_DOMAIN_NO_LEASE:
-        return _("status_cause_domain_no_lease", domain=domaine)
-    if cause == host_diagnosis.CAUSE_BOOTING:
-        return _("status_cause_booting", domain=domaine)
-    if cause == host_diagnosis.CAUSE_SSH_REFUSED:
-        return _("status_cause_ssh_refused", ip=hote["ip"])
-    if cause == host_diagnosis.CAUSE_UNREACHABLE:
-        return _("status_cause_unreachable", ip=hote["ip"])
-    if cause == host_diagnosis.CAUSE_SSH_TIMEOUT:
-        return _("status_cause_ssh_timeout", ip=hote["ip"])
-    if cause == host_diagnosis.CAUSE_SSH_DENIED:
-        return _("status_cause_ssh_denied", ip=hote["ip"])
-    return _("status_cause_unknown", reason=hote.get("reason") or "?")

@@ -16,9 +16,12 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
+
+if TYPE_CHECKING:
+    from ..discovery.scanner import CatalogScan
 
 from ..config import (
     get_lab_home,
@@ -40,8 +43,10 @@ from ..models import (
     UnsupportedSchemaVersion,
 )
 from ..reporting import (
+    err_console,
     error,
     info,
+    note,
     success,
     warn,
 )
@@ -163,7 +168,65 @@ def _catalogue(root: Path, lang: str, *, quiet: bool = False) -> list[LabDefinit
                 "schema_version_lab_skipped",
                 path=ecarte.source, found=ecarte.found, supported=ecarte.supported,
             ))
+        if not scan.labs:
+            _dire_pourquoi_aucun_lab(root, scan)
     return scan.labs
+
+
+def _premiere_ligne(raison: str) -> str:
+    """La première ligne d'une erreur de parsing, et rien de plus.
+
+    Un ``ParserError`` de PyYAML porte le chemin absolu du fichier **deux
+    fois**, sur des lignes « in "…" » qui suivent le message. Affiché tel quel
+    à côté du chemin relatif qu'on vient d'écrire, cela donnait sept lignes
+    repliées pour un fichier, dont six de redite. Le détail entier reste dans
+    le journal, que la phrase suivante nomme.
+    """
+    premiere = raison.strip().splitlines()[0] if raison.strip() else raison
+    return premiere[:160]
+
+
+def _dire_pourquoi_aucun_lab(root: Path, scan: CatalogScan) -> None:
+    """Nommer la cause d'un catalogue vide, et le geste qui en sort.
+
+    « Aucun lab trouvé. » en sortant en 0 était la réponse de `list-labs`,
+    `status`, `progress` et `scores` sur un poste sans catalogue : un écran
+    léger, et une impasse. Rien n'y disait qu'aucun catalogue n'était actif, ni
+    quoi faire, alors que `catalog use` sur un catalogue absent savait déjà le
+    dire parfaitement. La bonne phrase existait, elle n'était pas prononcée là
+    où l'apprenant arrive.
+
+    Le code de retour ne change pas : un catalogue vide n'est pas une erreur,
+    et un script qui lisait 0 continue de lire 0.
+
+    Tout part sur **stderr**, par `note` et `err_console` : `info` écrit sur la
+    sortie standard, et `dsoxlab list-labs | grep` y attend des labs, pas un
+    conseil. Le mode `--json` est déjà protégé par `quiet`, mais s'appuyer sur
+    ce seul garde-fou aurait fait dépendre la propreté de stdout de l'endroit
+    d'où l'on appelle.
+
+    Trois causes, trois gestes, et l'ordre compte : un `lab.yaml` illisible est
+    la cause la plus coûteuse à diagnostiquer de tout le contrat, c'est donc
+    celle qu'on nomme en premier.
+    """
+    if scan.illisibles:
+        error(_("labs_illisibles", count=len(scan.illisibles), vus=scan.fichiers_vus))
+        for chemin, raison in scan.illisibles[:5]:
+            try:
+                relatif: Path | str = chemin.relative_to(root)
+            except ValueError:
+                relatif = chemin
+            err_console.print(f"  [red]✘[/red] {relatif} : {_premiere_ligne(raison)}")
+        note(_("labs_illisibles_suite"))
+        return
+
+    from ..discovery.repo import find_meta_yml
+
+    if (root / "meta.yml").is_file() or find_meta_yml(root) is not None:
+        note(_("catalogue_sans_lab", path=root))
+        return
+
+    note(_("aucun_catalogue_actif"))
 
 
 def _lab(root: Path, lab_id: str, lang: str) -> LabDefinition:

@@ -475,14 +475,31 @@ def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
 #: Un fichier caché de `fixtures/` n'est pas une fixture pédagogique : un
 #: `.gitkeep` y sert à versionner un répertoire vide, et le signaler comme non
 #: déclaré serait un faux positif que chaque auteur devrait apprendre à ignorer.
+#:
+#: Même raisonnement pour ce qu'un OUTIL dépose : un `__pycache__` apparaît dès
+#: que l'auteur joue la solution de son propre lab, et il n'est pas caché.
+#: Mesuré le 2026-10-16, cela faisait 24 écarts sur `devsecops`, tous des
+#: `.pyc`, sur un catalogue par ailleurs irréprochable.
+_REPERTOIRES_D_OUTIL = frozenset({"__pycache__", ".pytest_cache", ".ruff_cache"})
+_SUFFIXES_D_OUTIL = frozenset({".pyc", ".pyo"})
+
+
+def _est_un_artefact(relatif: Path) -> bool:
+    """Vrai si ce chemin a été écrit par un outil, et non par l'auteur."""
+    return (
+        any(p.startswith(".") for p in relatif.parts)
+        or any(p in _REPERTOIRES_D_OUTIL for p in relatif.parts)
+        or relatif.suffix in _SUFFIXES_D_OUTIL
+    )
+
+
 def _fixtures_sur_disque(racine: Path) -> set[str]:
     if not racine.is_dir():
         return set()
     return {
         str(chemin.relative_to(racine))
         for chemin in racine.rglob("*")
-        if chemin.is_file() and not any(p.startswith(".") for p in
-                                        chemin.relative_to(racine).parts)
+        if chemin.is_file() and not _est_un_artefact(chemin.relative_to(racine))
     }
 
 

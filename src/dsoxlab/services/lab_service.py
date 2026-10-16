@@ -101,6 +101,137 @@ def _parse_counts(output: str) -> tuple[int, int]:
     return passed, total
 
 
+@dataclass(frozen=True)
+class EchecDeTest:
+    """Un test en échec, tel qu'on peut le dire à un apprenant.
+
+    ``message`` est l'assertion que l'AUTEUR DU LAB a écrite, et c'est la pièce
+    la plus précieuse : les labs de ce contrat y mettent le geste de réparation
+    (« Crée le fichier, par exemple : mkdir -p reponses && echo … »). Il vaut
+    ``None`` quand l'échec n'en portait pas, ce qui est le cas d'une erreur de
+    collecte.
+    """
+
+    nom: str
+    message: str | None = None
+
+    @property
+    def phrase(self) -> str:
+        """Le nom du test, lu comme une phrase.
+
+        Les labs nomment leurs tests en phrases (``test_le_mot_du_cours``)
+        précisément pour qu'ils se lisent : il n'y a qu'à retirer le préfixe et
+        les tirets bas.
+        """
+        return self.nom.removeprefix("test_").replace("_", " ")
+
+
+#: Début d'une section de la zone FAILURES : ``____ test_nom ____``.
+_SECTION_ECHEC = re.compile(r"^_{3,}\s*(?:[\w\[\]./-]+::)?(\w+)\s*_{3,}$")
+
+#: Première ligne du message d'assertion dans cette section.
+_MESSAGE_ECHEC = re.compile(r"^E\s{2,}(?:\w*(?:Error|Exception|Failed)\s*:\s*)?(.+)$")
+
+
+def echecs_de_tests(output: str) -> list[EchecDeTest]:
+    """Les tests que pytest a déclarés en échec, avec leur message, sans trace.
+
+    Pourquoi cette fonction existe
+    ------------------------------
+
+    ``check`` déversait ``result.output`` en entier dès qu'un test échouait.
+    Mesuré sur le lab de démonstration et ses trois tests rouges : **26 lignes**
+    de traceback avant le panneau de résultat, dont deux chemins absolus repliés
+    sur trois lignes chacun, un ``assert False``, un
+    ``+ where exists = PosixPath(...).exists`` et deux séparateurs de section.
+
+    Mais **tout** n'était pas du bruit, et c'est le piège : au milieu de ces 26
+    lignes se trouvait la phrase que l'auteur du lab avait écrite dans son
+    ``assert``, avec le geste de réparation. La première version de cette
+    fonction ne rendait que les noms des tests, et jetait donc l'information la
+    plus utile de l'écran. C'est une capture avant/après qui l'a montré, pas une
+    mesure : le compteur de lignes de trace, lui, était satisfait.
+
+    Deux formats de nodeid sont lus, parce que pytest produit l'un ou l'autre
+    selon la largeur du terminal et la présence de ``-q`` :
+
+    - la section « short test summary info » : ``FAILED chemin::test_nom`` ;
+    - les verdicts par test : ``chemin::test_nom FAILED``.
+
+    Et le message est repris de la zone ``FAILURES``, qui est la seule à le
+    porter. Un test sans section ``FAILURES`` (erreur de collecte) rend donc un
+    ``EchecDeTest`` sans message, et l'appelant n'a qu'un nom à montrer.
+
+    Rend une liste vide quand rien n'est reconnaissable, ce qui est le cas si
+    pytest a planté avant de collecter : l'appelant doit alors montrer la sortie
+    brute, puisqu'elle est tout ce qui existe.
+    """
+    messages = _messages_par_test(output)
+    noms: list[str] = []
+    for ligne in output.splitlines():
+        depouillee = ligne.strip()
+        if depouillee.startswith(("FAILED", "ERROR")) or re.search(
+            r"::\S+\s+(FAILED|ERROR)\b", depouillee
+        ):
+            # Le nodeid peut être replié par pytest sur un terminal étroit :
+            # on cherche le nom du test, pas la ligne entière.
+            trouve = re.search(r"::(\w+)", depouillee)
+            if trouve and trouve.group(1) not in noms:
+                noms.append(trouve.group(1))
+    return [EchecDeTest(nom=nom, message=messages.get(nom)) for nom in noms]
+
+
+def _sections_dechec(output: str) -> dict[str, list[str]]:
+    """La zone ``FAILURES`` découpée par test : nom du test, lignes brutes.
+
+    Séparé de l'extraction du message pour une raison mesurable : la version
+    qui faisait les deux dans une seule boucle atteignait une complexité
+    cognitive de 23, pour cinq ``continue`` et un état à trois variables. Le
+    garde-fou du dépôt l'a refusée, et il avait raison.
+    """
+    sections: dict[str, list[str]] = {}
+    courant: str | None = None
+    for ligne in output.splitlines():
+        entete = _SECTION_ECHEC.match(ligne.strip())
+        if entete:
+            courant = entete.group(1)
+            sections[courant] = []
+        elif courant is not None:
+            sections[courant].append(ligne)
+    return sections
+
+
+def _message_de_section(lignes: list[str]) -> str | None:
+    """Ce que l'auteur du lab a écrit dans son ``assert``, et rien d'autre.
+
+    Seules les lignes préfixées par ``E`` portent le message. La lecture
+    s'arrête au premier ``assert`` : ce qui suit est la reconstruction que
+    pytest fait de l'expression (``+ where False = exists()``), utile à un
+    développeur et illisible pour qui apprend l'administration d'un système.
+    """
+    retenues: list[str] = []
+    for ligne in lignes:
+        if not ligne.startswith("E"):
+            continue
+        corps = _MESSAGE_ECHEC.match(ligne)
+        if corps is None:
+            continue
+        texte = corps.group(1).strip()
+        if texte.startswith(("assert", "+ where", "+  where")):
+            break
+        retenues.append(texte)
+    return "\n".join(retenues).strip() or None
+
+
+def _messages_par_test(output: str) -> dict[str, str]:
+    """Le message d'assertion de chaque test en échec, s'il en a un."""
+    trouves = {
+        nom: _message_de_section(lignes)
+        for nom, lignes in _sections_dechec(output).items()
+    }
+    return {nom: message for nom, message in trouves.items() if message}
+
+
 def compute_score(passed: int, total: int, max_score: int, hints_cost: int) -> int:
     """Note un lab : proportion de tests réussis, appliquée au barème amputé des indices.
 
