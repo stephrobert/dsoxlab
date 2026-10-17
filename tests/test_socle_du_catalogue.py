@@ -277,3 +277,100 @@ def test_le_meta_garde_ses_commentaires(catalogue: Path) -> None:
     assert apres.count("#") == nombre_avant, (
         "l'inscription du lab a effacé des commentaires du meta.yml"
     )
+
+
+def _liste_bash(script: str, nom: str) -> list[str]:
+    """Les éléments d'un tableau bash déclaré sur une ou plusieurs lignes."""
+    trouve = re.search(rf"^\s*{nom}=\((.*?)\)\s*$", script, re.MULTILINE | re.DOTALL)
+    assert trouve is not None, f"le tableau {nom} est absent du workflow"
+    return trouve.group(1).split()
+
+
+def _script_du_bundle(catalogue: Path) -> str:
+    workflow = yaml.safe_load(
+        (catalogue / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    )
+    for job in workflow["jobs"].values():
+        for step in job.get("steps") or []:
+            if step.get("id") == "bundle":
+                return str(step["run"])
+    raise AssertionError("aucun step `bundle` dans release.yml")
+
+
+def test_la_chaine_de_release_est_produite(catalogue: Path) -> None:
+    """Un catalogue neuf peut publier, sinon il faut tout recopier à la main.
+
+    Mesuré le 2026-10-17 : `new catalog` ne produisait que `ci.yml`, et quatre
+    catalogues ont dû recevoir leur chaîne de publication par copie depuis un
+    dépôt frère. Un tag posé sur un dépôt sans `release.yml` ne publie rien, et
+    ne le dit pas.
+    """
+    for chemin in (
+        ".github/workflows/release.yml",
+        ".github/workflows/attester.yml",
+        "RELEASING.md",
+        "RELEASING.fr.md",
+    ):
+        assert (catalogue / chemin).is_file(), f"{chemin} manque au socle"
+
+    workflow = yaml.safe_load(
+        (catalogue / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    )
+    # Le déclencheur est un tag : c'est ce qui fait qu'on republie en DÉPLAÇANT
+    # le tag, et non en relançant un run.
+    assert workflow[True]["push"]["tags"] == ["v*"], "le workflow ne part pas sur un tag"
+    # L'attestation est appelée, pas recopiée dans le job de build : c'est la
+    # frontière qu'exige SLSA Build Level 3.
+    appels = [
+        str(job.get("uses", ""))
+        for job in workflow["jobs"].values()
+        if job.get("uses")
+    ]
+    assert any("attester.yml" in appel for appel in appels), (
+        "release.yml n'appelle pas attester.yml : la provenance serait signée "
+        "par le processus qui construit l'archive, soit le niveau 2 et non 3."
+    )
+
+
+def test_le_bundle_n_exige_que_ce_que_le_socle_produit(catalogue: Path) -> None:
+    """LE CLIQUET. Chaque chemin REQUIS du bundle existe dans un catalogue neuf.
+
+    C'est la faute exacte qui a fait qu'un premier tag n'a rien publié : le
+    workflow copié réclamait `meta.fr.yml` et `curriculums.yml`, absents du
+    dépôt cible, et `tar` sortait en 2 sous `set -euo pipefail`. Le message
+    « Cannot stat » se perdait au milieu d'un job de build.
+
+    Sans ce test, la dette revient au premier chemin ajouté au bundle sans être
+    ajouté au socle.
+    """
+    script = _script_du_bundle(catalogue)
+    absents = [
+        chemin for chemin in _liste_bash(script, "REQUIS")
+        if not (catalogue / chemin).exists()
+    ]
+    assert not absents, (
+        f"le bundle exige {absents}, qu'un catalogue neuf ne porte pas. "
+        "Soit le socle doit les produire, soit ils sont FACULTATIFS."
+    )
+
+
+def test_le_bundle_refuse_un_requis_manquant_en_le_nommant(catalogue: Path) -> None:
+    """Un REQUIS absent doit arrêter la publication, et dire lequel.
+
+    Un bundle tolérant publierait une archive amputée, ce qui est pire : elle a
+    l'air d'une release. On vérifie donc les deux moitiés du contrat, le refus
+    ET le message.
+    """
+    script = _script_du_bundle(catalogue)
+    assert 'printf ' in script and "Release impossible" in script, (
+        "le bundle ne nomme pas le chemin manquant"
+    )
+    assert "exit 1" in script, "le bundle ne s'arrête pas sur un REQUIS absent"
+    # Et les facultatifs sont bien testés avant d'être ajoutés.
+    for chemin in _liste_bash(script, "FACULTATIFS"):
+        assert chemin not in _liste_bash(script, "REQUIS"), (
+            f"{chemin} est à la fois requis et facultatif"
+        )
+    assert '[ -e "$chemin" ] && A_EMPAQUETER+=("$chemin")' in script, (
+        "un facultatif est ajouté sans être testé"
+    )

@@ -7,6 +7,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-10-17
+
+### Added
+
+- **`new catalog` produces the publishing chain, not just a CI.** A catalog it
+  created carried **one** workflow, `ci.yml`. No `release.yml`, no
+  `attester.yml`, no `RELEASING.md`: it had no way to publish at all. Measured
+  on 2026-10-17, four catalogs had to receive these files by hand, copied from a
+  sibling repository, and **the copy failed**: the `release.yml` of the source
+  repository packaged `meta.fr.yml` and `curriculums.yml`, absent from the
+  target, so `tar` exited 2 under `set -euo pipefail` and the first tag of one
+  catalog published nothing. The « Cannot stat » message was lost in the middle
+  of a build job.
+
+  The socle now produces `.github/workflows/release.yml`,
+  `.github/workflows/attester.yml`, `RELEASING.md` and `RELEASING.fr.md`. The
+  bundle distinguishes **required** paths from **optional** ones: a missing
+  required path is still an error, and the message names it rather than letting
+  `tar` speak from the middle of its list; a missing optional path is nothing.
+  `curriculums.yml` is a certification syllabus, `mise.toml` and
+  `validation-labs.json` are tooling, `scripts` and `uv.lock` do not exist yet
+  in a catalog that has just been created.
+
+### Fixed
+
+- **The ratchet that keeps the debt from coming back.**
+  `tests/test_socle_du_catalogue.py` now reads the `REQUIRED` array of the
+  produced `release.yml` and checks that **every** path in it exists in a
+  freshly created catalog. It also checks that the workflow triggers on a tag,
+  that it calls `attester.yml` rather than attesting from the build job (which
+  is what SLSA Build Level 3 requires), and that no path is both required and
+  optional. Proved by three mutations, each caught.
+
+  Without it, the debt returns with the first path added to the bundle and not
+  to the socle.
+
 ## [0.5.0] - 2026-10-17
 
 ### Added
