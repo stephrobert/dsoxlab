@@ -27,6 +27,14 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   contredisent, et un apprenant lisait « tous les tests sont passés » sous un
   « 0 / 100 ».
 
+  Le code de sortie dit la même chose dans les deux modes. La première passe
+  n'avait fermé que le chemin humain, parce que le chemin machine retourne
+  avant lui et que sa condition de sortie était `not result.ok` : vraie d'un
+  échec, fausse d'une suite entièrement skippée. La même exécution sortait donc
+  en 0 sous `--json` et en 1 sans, ce qui est précisément la double conclusion
+  que cette correction ferme. `ok` ne peut servir de verdict nulle part,
+  `--json` compris.
+
   La notion existait pourtant, `a_mesure()`, et un seul endroit décidait. C'est
   son implémentation qui était fausse : `total > 0` est vrai pour cinq tests
   skippés, puisque le total les compte. **Mesurer, c'est exécuter.** Une suite

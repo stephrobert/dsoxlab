@@ -20,6 +20,12 @@ skippés, puisque le total les compte. Mesurer, c'est EXÉCUTER.
 
 from __future__ import annotations
 
+import pathlib
+
+import pytest
+from typer.testing import CliRunner
+
+from dsoxlab.cli import app
 from dsoxlab.services.lab_service import CheckResult, a_mesure, compute_score
 
 RESUME_TOUT_SKIPPE = """\
@@ -91,3 +97,83 @@ def test_le_score_d_une_suite_skippee_ne_vaut_pas_zero_sur_le_fond() -> None:
     exercice raté. C'est la raison d'être de `enregistre` dans `ScoreResult`.
     """
     assert compute_score(passed=0, total=5, max_score=100, hints_cost=0) == 0
+
+
+# ── Le code de sortie, qui doit dire la même chose que le JSON ───────────────
+
+
+def _depot_minimal(racine: pathlib.Path) -> pathlib.Path:
+    """Un dépôt de labs réel, le plus petit possible : un meta.yml, un lab shell."""
+    racine.mkdir(parents=True, exist_ok=True)
+    (racine / "meta.yml").write_text(
+        "repo:\n  id: skip-demo\n  category: demo\n", encoding="utf-8",
+    )
+    lab = racine / "labs" / "demo" / "premier"
+    lab.mkdir(parents=True)
+    (lab / "lab.yaml").write_text(
+        "id: premier\n"
+        "title: Premier\n"
+        "level: l1\n"
+        "skills: [rien]\n"
+        "distros: [alma10]\n"
+        "doc_url: https://example.test/doc\n"
+        "runtime:\n"
+        "  type: shell\n"
+        "  workdir: challenge/work\n",
+        encoding="utf-8",
+    )
+    return racine
+
+
+def _check(
+    racine: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    json: bool,
+) -> int:
+    """`dsoxlab check` sur une exécution entièrement skippée, et son code de retour.
+
+    Seul `_run_check` est remplacé : tout le reste du chemin de la commande
+    joue, puisque c'est lui qui décide, et c'est ce qu'on mesure.
+    """
+    from dsoxlab.cli import progression
+
+    resultat = _resultat(RESUME_TOUT_SKIPPE, ok=True)
+    monkeypatch.setattr(
+        progression, "_run_check",
+        lambda root, lab, target, quiet=False: (resultat, 0, 100),
+    )
+
+    args = ["check", "premier", "--lab-home", str(racine)]
+    return CliRunner().invoke(app, [*args, "--json"] if json else args).exit_code
+
+
+def test_une_suite_skippee_sort_en_code_non_nul(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un appelant qui lit le code de retour ne doit pas lire un succès."""
+    racine = _depot_minimal(tmp_path / "depot")
+
+    assert _check(racine, monkeypatch, json=False) != 0
+
+
+def test_le_mode_json_rend_le_meme_code_que_le_mode_humain(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La 0.4.1 n'avait fermé que le chemin humain.
+
+    Le chemin machine retourne AVANT lui, et sa condition de sortie était
+    `not result.ok` : vraie d'un échec, fausse d'une suite entièrement skippée,
+    puisque pytest sort en 0 quand tout skippe. La même situation rendait donc
+    0 en `--json` et 1 sans. C'est `ok` qui ne peut pas servir de verdict, et
+    le chemin machine l'écrivait pourtant dans son propre commentaire.
+    """
+    racine = _depot_minimal(tmp_path / "depot")
+
+    humain = _check(racine, monkeypatch, json=False)
+    machine = _check(racine, monkeypatch, json=True)
+
+    assert machine == humain != 0, (
+        f"--json rend {machine}, le mode humain {humain} : deux conclusions "
+        "opposées sur la même exécution"
+    )

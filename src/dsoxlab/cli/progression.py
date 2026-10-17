@@ -131,7 +131,12 @@ def check(
                 "output": result.output,
             },
         })
-        if not result.ok:
+        # Le code de sortie dit la même chose que `status`, et la même chose
+        # que le chemin humain : une suite qui n'a rien mesuré n'est pas un
+        # succès. `result.ok` seul ne peut pas en juger, c'est tout l'objet de
+        # la correction — un appelant qui lit le code de retour et un appelant
+        # qui lit le JSON doivent conclure pareil.
+        if not a_mesure(result) or not result.ok:
             raise typer.Exit(1)
         return
     if not a_mesure(result):

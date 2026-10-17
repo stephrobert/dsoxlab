@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ok: true` and `score: 0`, which contradict each other, and a learner read
   "All tests passed" under a "0 / 100".
 
+  The exit code says the same thing in both modes. The first pass only closed
+  the human path, because the machine path returns earlier and its exit
+  condition was `not result.ok`: true of a failure, false of a fully skipped
+  suite. The same run therefore exited 0 under `--json` and 1 without it, which
+  is the very double conclusion this fix is about. `ok` cannot serve as the
+  verdict anywhere, `--json` included.
+
   The notion already existed, `a_mesure()`, with a single place deciding. Its
   implementation was what was wrong: `total > 0` is true for five skipped
   tests, because the total counts them. **Measuring means running.** A fully
