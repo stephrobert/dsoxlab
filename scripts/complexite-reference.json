@@ -94,7 +94,7 @@
     "src/dsoxlab/services/lab_service.py::check_lab": {
       "cognitive": 18,
       "profondeur": 3,
-      "lignes": 136
+      "lignes": 134
     },
     "src/dsoxlab/validators/content.py::check_doc_url": {
       "cognitive": 21,

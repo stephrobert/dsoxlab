@@ -1064,6 +1064,14 @@ hors ligne, elle se tait.
     # ── check ─────────────────────────────────────────────────────────────────
     "validating":         "Validation de [bold]{lab_id}[/bold]…",
     "check_result_saved": "Résultat enregistré dans l'historique ({score}/{max_score} pts).",
+    "check_tout_skippe":
+        "Aucun des {total} tests collectés n'a tourné : ils ont tous skippé, "
+        "donc rien n'a été mesuré. Ce n'est ni une réussite ni un échec, et "
+        "aucune note n'a été enregistrée.",
+    "check_tout_skippe_suite":
+        "Un test skippe quand son lab n'est pas prêt : le répertoire de travail "
+        "n'a pas été préparé, ou un service dont il a besoin ne tourne pas. "
+        "Démarre-le d'abord : dsoxlab run {lab_id}",
     "all_tests_passed":   "Tous les tests sont passés.",
     "tests_failed":       "Des tests ont échoué.",
     "check_tip_submit":   "Score sauvegardé. Lancez [bold]dsoxlab submit[/bold] pour valider définitivement et terminer la session.",

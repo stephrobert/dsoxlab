@@ -35,6 +35,10 @@ class CheckResult:
     output: str
     passed: int
     total: int
+    #: Les tests collectés qui n'ont PAS été exécutés. Sans ce compte, une
+    #: suite entièrement skippée se confondait avec une suite entièrement
+    #: ratée : `total` les comptait, donc `a_mesure()` répondait oui.
+    skipped: int = 0
 
 
 @dataclass(frozen=True)
@@ -62,8 +66,8 @@ class ScoreResult:
     """
 
 
-def _parse_counts(output: str) -> tuple[int, int]:
-    """Extrait (passed, total) depuis la sortie de pytest.
+def _parse_counts(output: str) -> tuple[int, int, int]:
+    """Extrait (passed, total, skipped) depuis la sortie de pytest.
 
     On lit la ligne de RÉSUMÉ que pytest produit lui-même ("3 failed, 1 passed
     in 0.02s") : c'est la seule source fiable.
@@ -89,16 +93,31 @@ def _parse_counts(output: str) -> tuple[int, int]:
         return int(m.group(1)) if m else 0
 
     passed = _compte("passed")
-    total = passed + _compte("failed") + _compte("error") + _compte("skipped")
+    skipped = _compte("skipped")
+    total = passed + _compte("failed") + _compte("error") + skipped
 
     if total == 0:
         # Aucun résumé exploitable (pytest a planté avant) : on retombe sur le
         # comptage des verdicts, ancré sur le format "<nodeid> VERDICT" pour ne
         # pas ramasser les mots présents dans les messages.
-        verdicts = re.findall(r"::\S+\s+(PASSED|FAILED|ERROR)\b", output)
+        verdicts = re.findall(r"::\S+\s+(PASSED|FAILED|ERROR|SKIPPED)\b", output)
         passed = verdicts.count("PASSED")
+        skipped = verdicts.count("SKIPPED")
         total = len(verdicts)
-    return passed, total
+    return passed, total, skipped
+
+
+def _resultat(output: str, *, ok: bool) -> CheckResult:
+    """Un CheckResult lu dans une sortie de pytest, comptes compris.
+
+    Les deux chemins d'exécution de `check_lab` en construisent un, et ils
+    répétaient le même trio. Un seul endroit compte, donc un seul endroit à
+    corriger le jour où pytest change le format de son résumé.
+    """
+    passed, total, skipped = _parse_counts(output)
+    return CheckResult(
+        ok=ok, output=output, passed=passed, total=total, skipped=skipped,
+    )
 
 
 @dataclass(frozen=True)
@@ -258,7 +277,11 @@ def a_mesure(result: CheckResult) -> bool:
     dire à un programme si la note vaut quelque chose. Dupliquer la règle la
     ferait diverger le jour où elle change.
     """
-    return result.total > 0
+    # Mesurer, c'est EXÉCUTER. Cinq tests collectés puis skippés donnent un
+    # `total` de cinq et n'ont rien mesuré : l'ancien `total > 0` répondait
+    # oui, et le moteur inscrivait un 0 dans l'historique d'un lab que
+    # personne n'avait joué, sous une ligne annonçant le succès.
+    return result.total > result.skipped
 
 
 def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreResult:
@@ -587,8 +610,7 @@ def check_lab(
                 env=env,
             )
             output = result.stdout + result.stderr
-            passed, total = _parse_counts(output)
-            return CheckResult(ok=result.ok, output=output, passed=passed, total=total)
+            return _resultat(output, ok=result.ok)
         except CommandError as exc:
             return CheckResult(ok=False, output=str(exc), passed=0, total=0)
 
@@ -637,8 +659,7 @@ def check_lab(
 
     rc = proc.wait(timeout=300)
     output = "\n".join(output_lines)
-    passed, total = _parse_counts(output)
-    return CheckResult(ok=(rc == 0), output=output, passed=passed, total=total)
+    return _resultat(output, ok=(rc == 0))
 
 
 def validate_all_structure(root: Path) -> list[StructureReport]:
