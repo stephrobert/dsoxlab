@@ -398,6 +398,7 @@ STRINGS: dict[str, str] = {
     "scaffold_catalogue_suite":
         "Pour commencer :\n"
         "  cd {path}\n"
+        "  uv lock               # le verrou, qu'un hook contrôle au commit\n"
         "  dsoxlab new lab <id>\n"
         "  dsoxlab validate-structure",
     "scaffold_lab_cree": "Lab « {name} » créé dans {path} ({runtime})",
