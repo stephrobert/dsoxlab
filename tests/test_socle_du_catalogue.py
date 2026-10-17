@@ -26,6 +26,7 @@ import pytest
 import yaml
 
 from dsoxlab.services.scaffold import creer_catalogue, creer_lab
+from dsoxlab.services.scaffold_socle import version_du_moteur
 
 #: Les quatorze sections de la structure de référence, dans l'ordre. Elle n'est
 #: pas inventée : c'est celle que `terraform`, `linux` et `devsecops`
@@ -373,4 +374,77 @@ def test_le_bundle_refuse_un_requis_manquant_en_le_nommant(catalogue: Path) -> N
         )
     assert '[ -e "$chemin" ] && A_EMPAQUETER+=("$chemin")' in script, (
         "un facultatif est ajouté sans être testé"
+    )
+
+
+#: Les fichiers du socle qui EXÉCUTENT le moteur, par opposition à ceux qui
+#: disent à un apprenant de l'installer.
+_EXECUTABLES = (".github/workflows/ci.yml", ".pre-commit-config.yaml")
+
+#: Un appel nu : le moteur invoqué sans contrainte de version. `uvx dsoxlab`,
+#: `uv tool install dsoxlab` et `entry: dsoxlab` en sont, et chacun prend une
+#: version que personne n'a déclarée.
+_APPEL_NU = re.compile(
+    r"(?:uvx|uv tool install)\s+(?:'dsoxlab'|dsoxlab)(?![>=\w.-])"
+    r"|entry:\s+dsoxlab\b"
+)
+
+
+def _lignes_de_code(texte: str) -> list[str]:
+    """Les lignes qui ne sont pas des commentaires.
+
+    Un commentaire qui CITE `uvx dsoxlab` pour expliquer pourquoi on ne
+    l'emploie pas ne doit pas faire rougir le test : sinon la justification
+    devient impossible à écrire.
+    """
+    return [ligne for ligne in texte.splitlines()
+            if not ligne.lstrip().startswith("#")]
+
+
+def test_le_socle_ne_lance_jamais_le_moteur_sans_borne(catalogue: Path) -> None:
+    """LE CLIQUET. Aucun appel au moteur n'est nu dans ce qui s'exécute.
+
+    Mesuré le 2026-10-17 sur sept catalogues fraîchement créés : leur CI
+    portait `uv tool install dsoxlab` et leur pre-commit
+    `entry: dsoxlab validate-structure`. Le second est le pire, car il emploie
+    le moteur du PATH, c'est-à-dire ce qui traîne sur la machine du
+    contributeur.
+
+    Les douze catalogues établis venaient d'être alignés le même jour sur une
+    borne commune. Sans ce test, tout catalogue neuf naît avec la dette qu'on
+    vient de solder.
+    """
+    nus: list[str] = []
+    for relatif in _EXECUTABLES:
+        chemin = catalogue / relatif
+        assert chemin.is_file(), f"{relatif} manque au socle"
+        for rang, ligne in enumerate(_lignes_de_code(chemin.read_text("utf-8")), 1):
+            if _APPEL_NU.search(ligne):
+                nus.append(f"{relatif}:{rang} → {ligne.strip()}")
+    assert not nus, (
+        "le socle lance le moteur sans borne de version :\n  "
+        + "\n  ".join(nus)
+        + "\n\nUne version non déclarée est « ce que PyPI publie aujourd'hui », "
+        "ou pire, ce qui traîne sur la machine."
+    )
+
+
+def test_la_borne_du_socle_est_la_version_qui_ecrit(catalogue: Path) -> None:
+    """La borne vaut la version du moteur, pas une valeur figée au gabarit.
+
+    Un catalogue produit par une version suppose au moins cette version : c'est
+    la seule borne affirmable sans analyser son contenu. Une valeur écrite en
+    dur dans le gabarit se périmerait au premier contrat qui gagne un champ,
+    et c'est exactement le défaut qu'on corrige.
+    """
+    attendue = version_du_moteur()
+    bornes: set[str] = set()
+    for relatif in _EXECUTABLES:
+        texte = (catalogue / relatif).read_text(encoding="utf-8")
+        for ligne in _lignes_de_code(texte):
+            bornes |= set(re.findall(r"dsoxlab>=([0-9][0-9.]*)", ligne))
+    assert bornes, "aucune borne trouvée dans ce qui s'exécute"
+    assert bornes == {attendue}, (
+        f"les bornes valent {sorted(bornes)}, attendu {attendue} : la version "
+        "qui écrit le catalogue."
     )
