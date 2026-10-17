@@ -294,7 +294,7 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
     "repo", "infra", "learning", "sections",
     "learning.portal_url",
     "repo.id", "repo.category", "repo.title", "repo.blog_url", "repo.description",
-    "repo.issues_url",
+    "repo.issues_url", "repo.solutions",
     "infra.provider", "infra.network", "infra.cidr", "infra.hosts", "infra.providers",
     "infra.bootstrap",
     "infra.hosts[].name", "infra.hosts[].distro", "infra.hosts[].role",

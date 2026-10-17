@@ -35,6 +35,7 @@ from ..reporting import (
     machine,
     print_validation,
     success,
+    warn,
 )
 from ..services.validation_service import RapportValidation
 from ._commun import (
@@ -141,6 +142,11 @@ def new_catalog(
         raise typer.Exit(1) from None
 
     success(_("scaffold_catalogue_cree", name=identifiant, path=str(creation.racine)))
+    info(_("scaffold_socle_pose", count=len(creation.fichiers)))
+    # La licence est une décision, pas un détail : l'outil en pose une parce
+    # qu'un catalogue public sans licence n'est pas réutilisable, mais il le
+    # dit pour que l'auteur la remplace si la sienne diffère.
+    info(_("scaffold_licence_posee"))
     info(_("scaffold_catalogue_suite", path=str(creation.racine)))
 
 
@@ -167,4 +173,10 @@ def new_lab(
 
     success(_("scaffold_lab_cree", name=identifiant,
               path=str(creation.racine), runtime=runtime))
+    if creation.section is not None:
+        info(_("scaffold_lab_section", section=creation.section))
+    else:
+        # Ne pas laisser croire à une inscription qui n'a pas eu lieu : le lab
+        # est jouable, mais il n'a aucune place dans la progression.
+        warn(_("scaffold_lab_sans_section"))
     info(_("scaffold_lab_suite"))

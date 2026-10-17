@@ -36,6 +36,7 @@ l'ignoreraient. On nomme la cause avant les conséquences.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -234,6 +235,10 @@ def _anomalies_de_contenu(root: Path, labs: list[LabDefinition]) -> list[Anomali
 
     # Les cibles vm se valident contre `infra.hosts` : un FQDN inconnu ne se
     # voyait qu'au run, sur la machine de l'apprenant, après provisionnement.
+    # `meta` est lié AVANT le try : sans cela, un `meta.yml` illisible le
+    # laisserait non défini, et le premier contrôle qui le lit lèverait un
+    # NameError au lieu de se passer de lui.
+    meta = None
     try:
         meta = read_repo_metadata(root)
         hotes = {h.name for h in meta.infra.hosts} if meta else set()
@@ -254,16 +259,21 @@ def _anomalies_de_contenu(root: Path, labs: list[LabDefinition]) -> list[Anomali
             validate_targets(lab, hotes),
             validate_prerequisites(lab, identifiants),
         ]
-        # « solution/<chemin du lab depuis labs/> » : convention des dépôts qui
-        # tiennent leurs corrigés hors des labs. Absent = pas de contrôle.
-        try:
-            relatif = lab.path.relative_to(root / "labs")
-        except ValueError:
-            relatif = None
-        if relatif is not None:
-            rapports.append(
-                validate_solutions_encrypted(lab, root / "solution" / relatif)
-            )
+        # Deux dispositions coexistent : « solution/<chemin du lab> » à la
+        # racine, et « labs/<lab>/solution/ » dans le lab. Le contrôle ne
+        # regardait que la première, et passait donc au vert sur les dépôts qui
+        # emploient la seconde, sans avoir regardé.
+        #
+        # `repo.solutions: plaintext` le désarme, pour les catalogues qui
+        # enchaînent leurs labs : le point de départ de l'un y est la solution
+        # du précédent, donc le fichier doit pouvoir être copié comme fixture.
+        if meta is None or meta.solutions != "plaintext":
+            racines = [lab.path / "solution"]
+            # Un lab hors de `labs/` n'a pas de chemin relatif : il n'a alors
+            # que la disposition « dans le lab », et c'est tout.
+            with contextlib.suppress(ValueError):
+                racines.append(root / "solution" / lab.path.relative_to(root / "labs"))
+            rapports.append(validate_solutions_encrypted(lab, *racines))
         anomalies += [
             Anomalie(
                 "content", s.key, s.params, lab=lab.id, chemin=s.path,

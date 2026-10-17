@@ -1062,6 +1062,49 @@ def _gestes(entrees: tuple[tuple[str, str], ...], *, style: str = "cyan") -> Non
     console.print(Padding(grille, (0, 0, 0, 4)))
 
 
+def _noms_replies(noms: list[str], indentation: str = "    ") -> None:
+    """Imprime une liste de noms repliée, en gardant son indentation.
+
+    Le repli est fait ici et non laissé à Rich : Rich replie à la colonne 0,
+    donc la continuation perdait les quatre espaces et la liste ne se lisait
+    plus comme une liste. Mesuré à 80 colonnes, qui est la largeur que le
+    cliquet d'écran simule.
+    """
+    largeur = max(40, console.width - len(indentation) - 2)
+    ligne = ""
+    for nom in noms:
+        morceau = nom if not ligne else f", {nom}"
+        if len(ligne) + len(morceau) > largeur:
+            console.print(f"{indentation}[cyan]{ligne}[/cyan],")
+            ligne = nom
+        else:
+            ligne += morceau
+    if ligne:
+        console.print(f"{indentation}[cyan]{ligne}[/cyan]")
+
+
+def _bloc_catalogues(restants: list[tuple[str, str]]) -> None:
+    """Les catalogues qu'il reste à installer, nommés et non déroulés.
+
+    Les IDENTIFIANTS, pas les descriptions. La collection est passée de six à
+    douze catalogues, et les dérouler avec leur description tenait 31 lignes
+    sur un écran de 24, dont deux tronquées par le repli et un alignement
+    cassé par l'identifiant le plus long. Un écran d'accueil oriente, il ne
+    catalogue pas : `catalog list` donne les descriptions à qui les veut.
+
+    Rien n'est affiché quand il ne reste rien à installer : lister ce qui est
+    déjà là serait du bruit.
+    """
+    if not restants:
+        return
+    console.print(f"  [bold]{_('accueil_titre_catalogues')}[/bold]")
+    console.print()
+    _noms_replies([cle for cle, _description in restants])
+    console.print()
+    console.print(f"    [dim]{_('accueil_catalogues_detail')}[/dim]")
+    console.print()
+
+
 def afficher_accueil(
     *,
     version: str,
@@ -1110,13 +1153,7 @@ def afficher_accueil(
     #
     # Les lister TOUS quand tout est déjà posé serait du bruit : on ne montre
     # que ce qui manque, et rien du tout s'il ne manque rien.
-    restants = catalogues_restants(connus, installes, depots_installes)
-    if restants:
-        console.print(f"  [bold]{_('accueil_titre_catalogues')}[/bold]")
-        console.print()
-        for cle, description in restants:
-            console.print(f"    [cyan]{cle:<12}[/cyan] [dim]{description}[/dim]")
-        console.print()
+    _bloc_catalogues(catalogues_restants(connus, installes, depots_installes))
 
     # ── 4. Le parcours des machines, pour qui en a ───────────────────────
     #

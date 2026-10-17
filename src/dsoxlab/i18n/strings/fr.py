@@ -14,6 +14,8 @@ STRINGS: dict[str, str] = {
     "accueil_geste_liste": "lister les labs disponibles",
     "accueil_geste_start": "en jouer un, de bout en bout",
     "accueil_geste_doctor": "ce que cette machine peut faire, et ce qui manque",
+    "accueil_catalogues_detail":
+        "dsoxlab catalog list les décrit un par un",
     "accueil_titre_catalogues": "Catalogues installables",
     "accueil_pied": "dsoxlab --help · dsoxlab fullhelp pour le guide complet",
     "accueil_titre_parcours": "Le parcours entier, si vous préférez le conduire vous-même",
@@ -378,6 +380,21 @@ STRINGS: dict[str, str] = {
     "opt_new_runtime":
         "Runtime du lab : shell (atelier local) ou vm (machine dédiée).",
     "scaffold_catalogue_cree": "Catalogue « {name} » créé dans {path}",
+    "scaffold_socle_pose":
+        "{count} fichiers écrits : le README de référence dans les deux "
+        "langues, les documents de gouvernance, un conftest.py avec le helper "
+        "bilingue message(), un workflow de CI et les garde-fous du dépôt.",
+    "scaffold_licence_posee":
+        "LICENSE porte CC BY 4.0, la licence de la collection. Remplace le "
+        "fichier si ton catalogue en emploie une autre : GitHub ne reconnaît "
+        "une licence qu'à son texte officiel nu.",
+    "scaffold_lab_section":
+        "Inscrit dans la section « {section} » du meta.yml. Cette position est "
+        "l'ordre pédagogique, celui que suit « dsoxlab next ».",
+    "scaffold_lab_sans_section":
+        "La forme du meta.yml n'a pas été reconnue : le lab n'est inscrit dans "
+        "AUCUNE section. Il est jouable, mais il n'a aucune place dans la "
+        "progression. Ajoute son chemin sous une entrée sections[].labs[].",
     "scaffold_catalogue_suite":
         "Pour commencer :\n"
         "  cd {path}\n"

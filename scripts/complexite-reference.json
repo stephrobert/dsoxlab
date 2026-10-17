@@ -79,7 +79,7 @@
     "src/dsoxlab/models/repo.py::RepoMetadata.from_yaml": {
       "cognitive": 14,
       "profondeur": 1,
-      "lignes": 138
+      "lignes": 139
     },
     "src/dsoxlab/models/repo.py::_resolve_provider": {
       "cognitive": 26,

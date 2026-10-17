@@ -113,6 +113,36 @@ on **[the appliance page](docs/appliance.md)**.
 
 ---
 
+## The catalogues
+
+Twelve catalogs are played by this engine, and dsoxlab knows none of their
+subjects: each one declares everything in its own `meta.yml` and its
+`lab.yaml` files. The table below is **measured on disk**, never written by
+hand, because a written list of six once hid six others.
+
+<!-- CATALOGUES:START -->
+
+| Catalog | Labs | What it teaches |
+|---|---:|---|
+| [`ansible-training`](https://github.com/stephrobert/ansible-training) | 113 | Ansible, from first playbook to collections |
+| [`terraform-dsoxlab-training`](https://github.com/stephrobert/terraform-dsoxlab-training) | 91 | Terraform and infrastructure as code |
+| [`linux-dsoxlab-training`](https://github.com/stephrobert/linux-dsoxlab-training) | 89 | Linux administration, RHCSA and LFCS |
+| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 64 | Kubernetes on a kubeadm cluster, for CKA, CKAD and CKS |
+| [`iam-dsoxlab-training`](https://github.com/stephrobert/iam-dsoxlab-training) | 16 | Identity and access management, with Keycloak and a directory |
+| [`devsecops-dsoxlab-training`](https://github.com/stephrobert/devsecops-dsoxlab-training) | 13 | DevSecOps, one application hardened version after version |
+| [`dev-pour-ops-dsoxlab-training`](https://github.com/stephrobert/dev-pour-ops-dsoxlab-training) | 10 | Development for ops engineers, around one inherited tool |
+| [`python-dsoxlab-training`](https://github.com/stephrobert/python-dsoxlab-training) | 7 | Python, building a security tool step by step |
+| [`cicd-dsoxlab-training`](https://github.com/stephrobert/cicd-dsoxlab-training) | 5 | CI/CD pipelines, on a local forge and no online account |
+| [`cloud-dsoxlab-training`](https://github.com/stephrobert/cloud-dsoxlab-training) | 4 | The cloud, practised against a local emulator |
+| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 1 | Containers, Docker, Compose and Swarm |
+| [`github-actions-training`](https://github.com/stephrobert/github-actions-training) | 1 | GitHub Actions, workflows replayed locally |
+
+_414 labs across 12 catalogs. This table is generated from `src/dsoxlab/templates/catalogues.yml` by `scripts/gen-catalogues.py`, the same manifest `dsoxlab catalog list` reads._
+
+<!-- CATALOGUES:END -->
+
+---
+
 ## Documentation
 
 Every page names its audience in its first lines, and

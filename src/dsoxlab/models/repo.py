@@ -396,6 +396,16 @@ class LearningDefinition:
     n'affiche alors aucun lien et n'invente aucune adresse."""
 
 
+def _coercer_solutions(valeur: object) -> str:
+    """`repo.solutions`, ramené aux deux seules valeurs que le contrôle lit.
+
+    Une valeur inconnue vaut ``encrypted`` : un contrôle ne se relâche pas sur
+    une faute de frappe. `plaintext` est donc le seul mot qui le désarme, et il
+    faut l'écrire exactement.
+    """
+    return "plaintext" if str(valeur or "").strip() == "plaintext" else "encrypted"
+
+
 @dataclass
 class RepoMetadata:
     """Contrat déclaratif du dépôt fournisseur (`meta.yml` racine).
@@ -420,6 +430,20 @@ class RepoMetadata:
     blog_url: str = ""
     description: str = ""
     issues_url: str = ""
+
+    solutions: str = "encrypted"
+    """Comment ce dépôt tient ses solutions de référence : ``encrypted`` ou
+    ``plaintext``.
+
+    Le défaut est ``encrypted``, parce qu'une solution livrée en clair gâche le
+    lab et que git la garde pour toujours. Mais deux catalogues de la
+    collection enchaînent leurs labs, le point de départ de l'un étant la
+    solution du précédent : le fichier doit alors pouvoir être copié comme
+    fixture, et le clair est un choix de conception, pas un oubli. Ils le
+    déclarent, et le contrôle ne les accuse plus.
+
+    Une valeur inconnue vaut ``encrypted`` : on ne relâche pas un contrôle sur
+    une faute de frappe."""
     """Où déposer une issue qui concerne **ce catalogue**, et non le moteur.
 
     Optionnel. Absent, ``dsoxlab support --issue`` retombe sur le remote ``origin``
@@ -574,6 +598,7 @@ class RepoMetadata:
             blog_url=str(repo.get("blog_url", "")),
             description=str(repo.get("description", "")),
             issues_url=str(repo.get("issues_url") or ""),
+            solutions=_coercer_solutions(repo.get("solutions")),
             infra=infra,
             learning=learning,
             sections=sections,

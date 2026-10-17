@@ -7,6 +7,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-17
+
+### Added
+
+- **`new catalog` produces a whole catalog, not a seed.** It wrote **two**
+  files, `meta.yml` and `.gitignore`. Everything else — README, governance,
+  tooling, continuous integration — was therefore built by hand twelve times,
+  and twelve times differently. Measured at the root of the twelve catalogs
+  before writing this:
+
+  ```
+  invariant (12/12) : .gitignore, LICENSE, README.md, README.fr.md,
+                      conftest.py, labs/, meta.yml, pyproject.toml, scripts/
+  drift (10-11/12)  : .github/, .pre-commit-config.yaml, tests/, CHANGELOG,
+                      CODE_OF_CONDUCT, CONTRIBUTING, SECURITY
+  the last two      : 14 and 19 entries, against 28 to 43 for the other ten
+  ```
+
+  And on the READMEs: 1 931 bytes without a single level-2 heading on one side,
+  33 000 on the other. A generator that only produces the seed lets that drift
+  recreate itself with every catalog.
+
+  It now writes **twenty** files, and the result passes `validate-structure`
+  and its own guardrails **without a single edit**. The README carries the
+  fourteen sections of the reference structure in both languages, and seven of
+  those fourteen describe dsoxlab rather than the domain, so they are
+  identical in every catalog. The other seven carry an explicit "TO FILL IN".
+
+- **`new lab` produces a bilingual lab, and registers it in a section.** Three
+  defects, all caught by the guardrails `new catalog` now produces, which is
+  exactly what they are for: the lab was in **no** section of `meta.yml`, so
+  `next` had no place for it in the progression; it had **no French version**,
+  so a lab created by the tool was immediately non-compliant with the project's
+  bilingual rule; and its `README.md` and `scenario.md` templates were written
+  **in French**, where the convention reserves the unsuffixed file for English.
+
+- **`repo.solutions`** in `meta.yml`, `encrypted` (the default) or `plaintext`.
+  See below.
+
+### Fixed
+
+- **The solution check looked at one layout out of two.**
+  `validators/content.py` only read `solution/<lab path>` at the **root** of
+  the repository. Four catalogs keep their answers **inside** the lab,
+  `labs/<lab>/solution/`, and the check therefore passed green on them
+  **without having looked**: 58 clear-text files in one, 11 in another, 1 in
+  two more. A check that could not look never concludes green.
+
+  It now reads both layouts. And because in two of those catalogs the clear
+  text is **deliberate** — the labs are chained, each one's starting point *is*
+  the previous one's solution, so the file has to be copyable as a fixture —
+  the contract gains `repo.solutions: plaintext` to say so. An unknown value
+  falls back to `encrypted`: a check does not relax on a typo.
+
+- **`templates/catalogues.yml` announced six catalogs out of twelve.** That
+  manifest is what `dsoxlab catalog list` shows a learner, and its own header
+  already recorded the same failure for 2026-10-10 (three announced, six
+  existing). It happened again, because a list kept by hand goes stale and
+  nothing measured it. The six missing ones are added, each confronted with the
+  GitHub API first, and two controls now hold the list: one compares the README
+  to the manifest and runs in CI, the other compares the manifest to the
+  **disk** and can only run where the catalogs are cloned. Without them it
+  abstains instead of concluding.
+
 ## [0.4.1] - 2026-10-17
 
 ### Fixed

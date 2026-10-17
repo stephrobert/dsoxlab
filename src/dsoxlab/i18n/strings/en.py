@@ -14,6 +14,8 @@ STRINGS: dict[str, str] = {
     "accueil_geste_liste": "list the labs available",
     "accueil_geste_start": "play one, from end to end",
     "accueil_geste_doctor": "what this machine can do, and what is missing",
+    "accueil_catalogues_detail":
+        "dsoxlab catalog list describes each one",
     "accueil_titre_catalogues": "Catalogs you can add",
     "accueil_pied": "dsoxlab --help · dsoxlab fullhelp for the full guide",
     "accueil_titre_parcours": "The whole path, if you would rather drive it yourself",
@@ -373,6 +375,21 @@ STRINGS: dict[str, str] = {
     "opt_new_runtime":
         "Lab runtime: shell (local workshop) or vm (dedicated machine).",
     "scaffold_catalogue_cree": "Catalog '{name}' created in {path}",
+    "scaffold_socle_pose":
+        "{count} files written: the reference README in both languages, the "
+        "governance documents, a conftest.py with the bilingual message() "
+        "helper, a CI workflow and the repository guardrails.",
+    "scaffold_licence_posee":
+        "LICENSE is CC BY 4.0, the licence of the collection. Replace the file "
+        "if your catalog uses another one: GitHub only recognises a licence "
+        "from its bare official text.",
+    "scaffold_lab_section":
+        "Added to section '{section}' of meta.yml. That position is the "
+        "teaching order, which 'dsoxlab next' follows.",
+    "scaffold_lab_sans_section":
+        "meta.yml was not in a recognised shape: the lab is NOT listed in any "
+        "section. It is playable, but it has no place in the progression. Add "
+        "its path under a sections[].labs[] entry.",
     "scaffold_catalogue_suite":
         "To get started:\n"
         "  cd {path}\n"
