@@ -881,8 +881,15 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # LICENSE est EXCLUE des deux hooks d'espaces. Le texte d'une licence se
+      # reconnaît au caractère près : GitHub l'identifie en le comparant, et
+      # `end-of-file-fixer` lui retirait sa ligne finale à chaque passage.
+      # Mesuré sur sept catalogues neufs : `git status` affichait `M LICENSE`
+      # sans qu'aucun humain y ait touché.
       - id: trailing-whitespace
+        exclude: '^LICENSE$'
       - id: end-of-file-fixer
+        exclude: '^LICENSE$'
       - id: check-yaml
       - id: check-merge-conflict
       - id: detect-private-key
@@ -899,6 +906,20 @@ repos:
         entry: uvx 'dsoxlab>={moteur}' validate-structure
         language: system
         pass_filenames: false
+
+      # Le verrou décrit ce qui s'installe, et c'est lui que les scanners de
+      # vulnérabilités lisent. Un verrou qui dérive de son `pyproject.toml` ne
+      # verrouille plus rien.
+      #
+      # PREMIER GESTE après la création du catalogue : `uv lock`. Le socle ne
+      # peut pas produire ce fichier, puisque le résoudre demande le réseau ;
+      # ce hook échouera donc jusqu'à ce que vous l'ayez lancé, et il le dira.
+      - id: verrou-a-jour
+        name: uv.lock décrit bien le pyproject
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        files: '^(pyproject\\.toml|uv\\.lock)$'
 
       - id: garde-fous
         name: les garde-fous du dépôt passent

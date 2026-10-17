@@ -101,6 +101,17 @@ ssh/id_ed25519
 # Répertoires de travail des labs `shell` : ce que l'apprenant y écrit lui
 # appartient, et le catalogue les recrée à chaque `run`.
 labs/**/challenge/work/
+
+# Artefacts des outils Python. Ils apparaissent au premier `pytest` ou au
+# premier `uv run`, et un `git status` encombré fait manquer les vrais
+# changements. Mesuré sur sept catalogues neufs : les trois premiers
+# répertoires y étaient en non-suivi dès leur première suite de tests.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
 """
 
 _LAB_COMMUN = """\

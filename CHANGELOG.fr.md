@@ -7,6 +7,43 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.5.3] - 2026-10-17
+
+### Corrigé
+
+- **Le `.gitignore` d'un catalogue neuf ne couvrait aucun artefact Python.**
+  Mesuré sur sept catalogues fraîchement créés : `__pycache__/`,
+  `.pytest_cache/` et `.venv/` y apparaissaient en non-suivi dès la première
+  suite de tests, parce que le gabarit ne couvrait que la progression, la clé
+  privée et les répertoires de travail. Un `git status` encombré est ce qui
+  fait manquer les vrais changements. Six motifs ajoutés.
+
+- **Les hooks d'espaces réécrivaient `LICENSE`.** `end-of-file-fixer` lui
+  retirait sa ligne finale à chaque passage : sur ces mêmes sept catalogues,
+  `git status` affichait `M LICENSE` sans qu'aucun humain y ait touché. Le
+  texte d'une licence se reconnaît au caractère près, et c'est ainsi que GitHub
+  l'identifie : les deux hooks l'excluent désormais. Le même défaut avait été
+  corrigé dans ce dépôt plus tôt le même jour, pour les licences packagées.
+
+- **Un catalogue neuf ne contrôlait pas son verrou.** Les treize dépôts
+  établis portent tous le hook `uv lock --check` ; le socle n'en produisait
+  aucun. Un verrou qui dérive de son `pyproject.toml` ne verrouille plus rien,
+  et c'est lui que les scanners de vulnérabilités lisent.
+
+  Le socle ne peut pas produire un verrou, puisque le résoudre demande le
+  réseau. Le hook est donc posé AVEC sa consigne, et `new catalog` nomme
+  désormais `uv lock` comme premier geste, dans les deux langues.
+
+### Ajouté
+
+- **Trois cliquets.** `tests/test_socle_du_catalogue.py` vérifie que le
+  `.gitignore` couvre les artefacts des outils, qu'aucun hook d'espaces ne
+  touche `LICENSE`, et que le verrou est contrôlé au commit avec sa consigne
+  énoncée. Prouvé par trois mutations, toutes attrapées, et par le
+  comportement : un catalogue créé avec cette branche affiche **zéro** fichier
+  non suivi après une suite de tests et **zéro** fichier modifié après les
+  hooks d'espaces.
+
 ## [0.5.2] - 2026-10-17
 
 ### Corrigé

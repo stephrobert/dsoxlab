@@ -393,6 +393,7 @@ STRINGS: dict[str, str] = {
     "scaffold_catalogue_suite":
         "To get started:\n"
         "  cd {path}\n"
+        "  uv lock               # the lockfile, checked by a hook on commit\n"
         "  dsoxlab new lab <id>\n"
         "  dsoxlab validate-structure",
     "scaffold_lab_cree": "Lab '{name}' created in {path} ({runtime})",

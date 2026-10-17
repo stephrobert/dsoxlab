@@ -7,6 +7,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-10-17
+
+### Fixed
+
+- **The `.gitignore` of a new catalog covers no Python artefact.** Measured on
+  seven freshly created catalogs: `__pycache__/`, `.pytest_cache/` and `.venv/`
+  showed up as untracked from the first test run, because the template only
+  covered progress files, the private key and the working directories. A
+  cluttered `git status` is how real changes get missed. Six patterns added.
+
+- **The whitespace hooks were rewriting `LICENSE`.** `end-of-file-fixer`
+  stripped its final newline on every run: on the same seven catalogs,
+  `git status` showed `M LICENSE` with no human having touched it. A licence
+  text is recognised character for character, which is how GitHub identifies
+  it, so both hooks now exclude it. The same defect had been fixed in this
+  repository earlier the same day, for the packaged licence templates.
+
+- **A new catalog did not check its lockfile.** The thirteen established
+  repositories all carry the `uv lock --check` hook; the socle produced none.
+  A lockfile that drifts from its `pyproject.toml` no longer locks anything,
+  and it is the file vulnerability scanners read.
+
+  The socle cannot produce a lockfile, since resolving one needs the network.
+  The hook therefore ships with its instruction, and `new catalog` now names
+  `uv lock` as the first step, in both languages.
+
+### Added
+
+- **Three ratchets.** `tests/test_socle_du_catalogue.py` now checks that the
+  `.gitignore` covers the tool artefacts, that neither whitespace hook touches
+  `LICENSE`, and that the lockfile is checked on commit with its instruction
+  spelled out. Proved by three mutations, each caught, and by behaviour: a
+  catalog created with this branch shows **zero** untracked file after a test
+  run and **zero** modified file after the whitespace hooks.
+
 ## [0.5.2] - 2026-10-17
 
 ### Fixed

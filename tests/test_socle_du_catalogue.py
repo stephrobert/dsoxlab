@@ -448,3 +448,66 @@ def test_la_borne_du_socle_est_la_version_qui_ecrit(catalogue: Path) -> None:
         f"les bornes valent {sorted(bornes)}, attendu {attendue} : la version "
         "qui écrit le catalogue."
     )
+
+
+def test_le_gitignore_couvre_les_artefacts_des_outils(catalogue: Path) -> None:
+    """Un `git status` encombré fait manquer les vrais changements.
+
+    Mesuré le 2026-10-17 sur sept catalogues neufs : `__pycache__/`,
+    `.pytest_cache/` et `.venv/` y étaient en non-suivi dès la première suite
+    de tests, parce que le `.gitignore` du socle ne couvrait que la progression,
+    la clé privée et les répertoires de travail.
+    """
+    motifs = set((catalogue / ".gitignore").read_text(encoding="utf-8").split())
+    attendus = {"__pycache__/", "*.py[cod]", ".pytest_cache/", ".ruff_cache/",
+                ".mypy_cache/", ".venv/"}
+    manquants = sorted(attendus - motifs)
+    assert not manquants, (
+        f"le .gitignore ne couvre pas {manquants} : ces artefacts "
+        "apparaîtront au premier `pytest` ou `uv run`."
+    )
+
+
+def test_les_hooks_d_espaces_epargnent_la_licence(catalogue: Path) -> None:
+    """Le texte d'une licence se reconnaît au caractère près.
+
+    GitHub identifie une licence en comparant son texte. `end-of-file-fixer`
+    retirait la ligne finale de `LICENSE` à chaque passage : mesuré sur sept
+    catalogues neufs, `git status` affichait `M LICENSE` sans qu'aucun humain
+    y ait touché.
+    """
+    config = yaml.safe_load(
+        (catalogue / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    )
+    sans_exclusion = []
+    for repo in config.get("repos", []):
+        for hook in repo.get("hooks", []):
+            if hook["id"] not in {"trailing-whitespace", "end-of-file-fixer"}:
+                continue
+            if "LICENSE" not in str(hook.get("exclude", "")):
+                sans_exclusion.append(hook["id"])
+    assert not sans_exclusion, (
+        f"{sans_exclusion} modifient LICENSE : son texte doit rester intact, "
+        "sinon GitHub cesse de reconnaître la licence."
+    )
+
+
+def test_le_verrou_est_controle_au_commit(catalogue: Path) -> None:
+    """Les treize dépôts établis le contrôlent ; un catalogue neuf aussi.
+
+    Un verrou qui dérive de son `pyproject.toml` ne verrouille plus rien, et
+    c'est lui que les scanners de vulnérabilités lisent. Le hook dit aussi quoi
+    faire : le socle ne peut pas produire un `uv.lock`, puisque le résoudre
+    demande le réseau.
+    """
+    texte = (catalogue / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    config = yaml.safe_load(texte)
+    verrou = [
+        hook for repo in config.get("repos", []) for hook in repo.get("hooks", [])
+        if "uv lock --check" in str(hook.get("entry", ""))
+    ]
+    assert verrou, "aucun hook ne contrôle que le verrou décrit le pyproject"
+    assert "uv lock" in texte and "PREMIER GESTE" in texte, (
+        "le hook ne dit pas quoi faire : un catalogue neuf n'a pas de `uv.lock`, "
+        "et le hook échouera jusqu'à ce que son auteur le crée."
+    )
