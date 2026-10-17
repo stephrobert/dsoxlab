@@ -154,18 +154,29 @@ def validate_internal_links(lab: LabDefinition) -> ContentReport:
 
 
 def validate_solutions_encrypted(
-    lab: LabDefinition, solutions_root: Path
+    lab: LabDefinition, *solutions_roots: Path
 ) -> ContentReport:
     """Aucun fichier de solution ne doit être lisible en clair.
 
-    Le contrôle ne s'applique qu'aux dépôts qui tiennent un répertoire de
-    solutions : un dépôt sans `solution/` n'est pas en faute, il a simplement
-    fait un autre choix.
+    PLUSIEURS RACINES, PARCE QU'IL Y A PLUSIEURS DISPOSITIONS
+
+    Deux conventions coexistent dans la collection : `solution/<chemin du lab>`
+    à la racine du dépôt, et `labs/<lab>/solution/` dans le lab. Ce contrôle ne
+    regardait que la première, et passait donc au vert sur quatre catalogues
+    sans avoir regardé — 71 fichiers en clair invisibles. Un contrôle qui n'a
+    pas pu regarder ne conclut jamais au vert.
+
+    Une racine absente n'est pas une faute : un dépôt qui ne tient aucun
+    répertoire de solutions a simplement fait un autre choix.
     """
     report = ContentReport(lab_id=lab.id)
-    if not solutions_root.is_dir():
-        return report
-    for fichier in sorted(solutions_root.rglob("*")):
+    fichiers = sorted(
+        chemin
+        for racine in solutions_roots
+        if racine.is_dir()
+        for chemin in racine.rglob("*")
+    )
+    for fichier in fichiers:
         if not fichier.is_file() or fichier.suffix not in _EXTENSIONS_SOLUTION:
             continue
         try:

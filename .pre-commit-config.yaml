@@ -19,7 +19,11 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '(^LICENSE$|\.md$)'
+        # `templates/licences/` porte des textes de licence qui doivent rester
+        # tels qu'ils sont publiés : GitHub ne reconnaît une licence qu'à son
+        # texte officiel nu, et un catalogue qui reçoit une copie reformatée
+        # serait rapporté en NOASSERTION.
+        exclude: '(^LICENSE$|\.md$|^src/dsoxlab/templates/licences/)'
       # `fuzz/corpus/` est hors du périmètre de l'hygiène, et pas par
       # commodité : ce sont des graines DÉLIBÉRÉMENT malformées, qui existent
       # pour être données à un fuzzer. Un JSON tronqué au milieu d'une chaîne
@@ -27,7 +31,7 @@ repos:
       # refuser retire au corpus le cas qu'il porte. Le contrat des documents,
       # lui, est tenu par les harnais eux-mêmes, pas par ces hooks.
       - id: end-of-file-fixer
-        exclude: '(^LICENSE$|^fuzz/corpus/)'
+        exclude: '(^LICENSE$|^fuzz/corpus/|^src/dsoxlab/templates/licences/)'
       - id: check-yaml
         exclude: '^fuzz/corpus/'
       - id: check-json
@@ -94,6 +98,30 @@ repos:
         language: system
         pass_filenames: false
         files: '^(src/dsoxlab/.*\.py|docs/.*\.md|[A-Z]+(\.fr)?\.md|scripts/generer-doc\.py)$'
+
+      # La liste des catalogues ne s'écrit pas, elle se mesure. Elle a été
+      # écrite une fois, avec six dépôts, alors que le disque en portait douze :
+      # une campagne menée sur ces six a sauté 901 messages dans les six autres,
+      # sans qu'aucun contrôle le dise. Ce hook relit le disque et refuse une
+      # table périmée. Sans catalogue cloné à côté, il s'abstient au lieu de
+      # conclure, ce qui est le cas en CI.
+      - id: catalogues-readme
+        name: le README dit la même chose que le manifeste des catalogues
+        entry: python3 scripts/gen-catalogues.py --check
+        language: system
+        pass_filenames: false
+        files: '^(README(\.fr)?\.md|src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
+
+      # Le contrôle qui compte, et le seul qui ne peut pas tourner en CI : le
+      # manifeste dit-il la même chose que le DISQUE ? C'est lui qui attrape
+      # le défaut réel, six catalogues oubliés sur douze. Sans catalogue cloné
+      # à côté, il s'abstient au lieu de conclure.
+      - id: catalogues-mesures
+        name: le manifeste des catalogues est mesuré sur le disque
+        entry: python3 scripts/gen-catalogues.py --mesurer
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
 
       # ── Qualité : la dette se paie en même temps qu'on produit ──────────────
       #

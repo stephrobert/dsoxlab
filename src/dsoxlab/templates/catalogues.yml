@@ -23,38 +23,97 @@
 # dépôt ci-dessous a été confronté à l'API GitHub avant d'être écrit : il
 # existe, il est public, et son nom est le nom canonique — pas une redirection.
 #
-# `containers-dsoxlab-training` existe mais reste PRIVÉ : l'inscrire ici
-# proposerait un catalogue que personne ne peut cloner.
+# CE QUI TIENT LA LISTE DÉSORMAIS
+#
+# Le défaut s'est reproduit : le 2026-10-17, ce fichier annonçait SIX
+# catalogues alors que douze existaient, tous publics. `catalog list` montrait
+# donc la moitié de l'offre. Deux contrôles le tiennent maintenant, et ils ne
+# mesurent pas la même chose :
+#
+#   `scripts/gen-catalogues.py --check`    le README de dsoxlab dit la même
+#                                          chose que ce fichier. Jouable en CI,
+#                                          puisque les deux y sont.
+#   `scripts/gen-catalogues.py --mesurer`  ce fichier dit la même chose que le
+#                                          DISQUE. Jouable seulement là où les
+#                                          catalogues sont clonés, donc en
+#                                          pre-commit : sans eux, il s'abstient
+#                                          au lieu de conclure.
+#
+# Le second est celui qui compte, et c'est aussi celui qui ne peut pas tourner
+# en CI. Un contrôle qui n'a pas pu regarder ne conclut jamais au vert : il le
+# dit.
 
 schema_version: 1
 
 catalogues:
   - id: linux
     depot: https://github.com/stephrobert/linux-dsoxlab-training
+    labs: 89
     description_en: Linux administration, RHCSA and LFCS
     description_fr: Administration Linux, RHCSA et LFCS
 
   - id: ansible
     depot: https://github.com/stephrobert/ansible-training
+    labs: 113
     description_en: Ansible, from first playbook to collections
     description_fr: Ansible, du premier playbook aux collections
 
   - id: terraform
     depot: https://github.com/stephrobert/terraform-dsoxlab-training
+    labs: 91
     description_en: Terraform and infrastructure as code
     description_fr: Terraform et l'infrastructure as code
 
   - id: kubernetes
     depot: https://github.com/stephrobert/kubernetes-dsoxlab-training
+    labs: 64
     description_en: Kubernetes on a kubeadm cluster, for CKA, CKAD and CKS
     description_fr: Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS
 
   - id: devsecops
     depot: https://github.com/stephrobert/devsecops-dsoxlab-training
+    labs: 13
     description_en: DevSecOps, one application hardened version after version
     description_fr: DevSecOps, une application durcie version après version
 
   - id: python
     depot: https://github.com/stephrobert/python-dsoxlab-training
+    labs: 7
     description_en: Python, building a security tool step by step
     description_fr: Python, la construction pas à pas d'un outil de sécurité
+
+  - id: iam
+    depot: https://github.com/stephrobert/iam-dsoxlab-training
+    labs: 16
+    description_en: Identity and access management, with Keycloak and a directory
+    description_fr: Gestion des identités et des accès, avec Keycloak et un annuaire
+
+  - id: dev-pour-ops
+    depot: https://github.com/stephrobert/dev-pour-ops-dsoxlab-training
+    labs: 10
+    description_en: Development for ops engineers, around one inherited tool
+    description_fr: Le développement pour les Ops, autour d'un outil hérité
+
+  - id: cicd
+    depot: https://github.com/stephrobert/cicd-dsoxlab-training
+    labs: 5
+    description_en: CI/CD pipelines, on a local forge and no online account
+    description_fr: Les pipelines CI/CD, sur une forge locale et sans compte en ligne
+
+  - id: cloud
+    depot: https://github.com/stephrobert/cloud-dsoxlab-training
+    labs: 4
+    description_en: The cloud, practised against a local emulator
+    description_fr: Le cloud, pratiqué contre un émulateur local
+
+  - id: containers
+    depot: https://github.com/stephrobert/containers-dsoxlab-training
+    labs: 1
+    description_en: Containers, Docker, Compose and Swarm
+    description_fr: Les conteneurs, Docker, Compose et Swarm
+
+  - id: github-actions
+    depot: https://github.com/stephrobert/github-actions-training
+    labs: 1
+    description_en: GitHub Actions, workflows replayed locally
+    description_fr: GitHub Actions, des workflows rejoués en local

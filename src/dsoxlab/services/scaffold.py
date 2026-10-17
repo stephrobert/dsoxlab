@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..i18n import _
+from .scaffold_socle import fichiers_du_socle
 
 #: Un identifiant sert de nom de répertoire et de clé CLI : on le borne pour
 #: qu'il ne puisse ni remonter l'arborescence, ni porter d'espace.
@@ -44,6 +45,10 @@ class Creation:
 
     racine: Path
     fichiers: tuple[Path, ...]
+    #: La section du `meta.yml` où le lab a été inscrit, ou `None` si la forme
+    #: du fichier n'a pas été reconnue. L'appelant le dit alors, plutôt que de
+    #: laisser croire à une inscription qui n'a pas eu lieu.
+    section: str | None = None
 
 
 _META = """\
@@ -141,6 +146,30 @@ validation:
 _README = """\
 # {id}
 
+**Audience:** the learner.
+
+TO FILL IN: what this lab teaches, in one sentence.
+
+## What you will be able to do
+
+- TO FILL IN.
+"""
+
+#: La version française de l'énoncé. Le fichier SANS suffixe porte l'anglais,
+#: parce que c'est la langue par défaut de l'outil ; `.fr.md` porte le
+#: français. Les produire tous les deux est la seule façon qu'un lab créé par
+#: l'outil soit conforme à la règle bilingue sans retouche.
+_LAB_FR = """\
+# Surcharge française du lab {id}. Elle ne porte QUE `title` et
+# `description` : tout autre champ y est ignoré en silence, parce que le
+# contrat ne se traduit pas.
+title: "À remplir"
+description: "À remplir : ce que l'apprenant saura faire à la fin."
+"""
+
+_README_FR = """\
+# {id}
+
 **Public :** l'apprenant.
 
 À remplir : ce que ce lab apprend, en une phrase.
@@ -151,6 +180,19 @@ _README = """\
 """
 
 _SCENARIO = """\
+# Scenario
+
+TO FILL IN: the situation, as the learner would meet it.
+
+A scenario says **where we are and what is wrong**, not the steps to take:
+finding those is the learner's work.
+
+## Mission
+
+TO FILL IN.
+"""
+
+_SCENARIO_FR = """\
 # Scénario
 
 À remplir : la situation, telle que l'apprenant la rencontrerait.
@@ -242,9 +284,75 @@ def creer_catalogue(identifiant: str, destination: Path) -> Creation:
         _ecrire(racine / "meta.yml", _META.format(id=identifiant)),
         _ecrire(racine / ".gitignore", _GITIGNORE),
     ]
+    # Le socle : tout ce qu'un catalogue de la collection porte en plus du
+    # contrat. Il vit dans son propre module, parce que ce sont des gabarits et
+    # non de la logique, et parce qu'un seul endroit doit décider de ce qu'un
+    # catalogue porte — le jour où la collection en ajoute un, il s'ajoute là
+    # et tous les nouveaux catalogues l'ont.
+    fichiers += [
+        _ecrire(racine / relatif, contenu)
+        for relatif, contenu in fichiers_du_socle(identifiant).items()
+    ]
     (racine / "labs").mkdir(parents=True, exist_ok=True)
+    # `ssh/` ne sert qu'aux labs `vm`, mais le créer vide ne coûte rien et
+    # évite au formateur de se demander où `instructor bootstrap` écrira.
     (racine / "ssh").mkdir(parents=True, exist_ok=True)
     return Creation(racine=racine, fichiers=tuple(fichiers))
+
+
+def _inscrire_dans_une_section(meta: Path, chemin_relatif: str) -> str | None:
+    """Ajoute le lab aux `labs:` de la PREMIÈRE section, et dit laquelle.
+
+    Pourquoi par texte et non par un aller-retour YAML : un `yaml.safe_load`
+    suivi d'un `yaml.dump` perd tous les commentaires du `meta.yml`, et ce
+    fichier est à moitié fait de commentaires qui expliquent le contrat. Les
+    effacer pour ajouter une ligne serait un mauvais échange.
+
+    Rend l'identifiant de la section, ou `None` si la forme du fichier n'est
+    pas reconnue. Dans ce cas on ne touche à rien et l'appelant le dit : un lab
+    non inscrit reste jouable, mais `next` ne sait pas où le placer, et le
+    deviner en silence serait pire que de demander.
+    """
+    source = meta.read_text(encoding="utf-8")
+    marqueur = "\nsections:\n"
+    if marqueur not in source:
+        return None
+
+    # La première section déclarée, et son `labs:`.
+    debut = source.index(marqueur) + len(marqueur)
+    tete = source[debut:]
+    if not tete.lstrip().startswith("- id:"):
+        return None
+    section = tete[tete.index("- id:") + len("- id:"):].split("\n", 1)[0].strip()
+
+    # Une section neuve, telle que `new catalog` l'écrit : la liste est vide.
+    if "    labs: []\n" in tete:
+        position = debut + tete.index("    labs: []\n")
+        meta.write_text(
+            source[:position]
+            + f"    labs:\n      - {chemin_relatif}\n"
+            + source[position + len("    labs: []\n"):],
+            encoding="utf-8",
+        )
+        return section
+
+    # Une section qui porte déjà des labs : on ajoute à la FIN de sa liste, et
+    # non en tête. Cette position EST l'ordre pédagogique, dont
+    # `discovery/scanner.py` dérive `bloc_order` et dont `next` se sert : un
+    # lab créé en second doit venir en second.
+    if "    labs:\n" not in tete:
+        return None
+    position = debut + tete.index("    labs:\n") + len("    labs:\n")
+    fin = position
+    for ligne in source[position:].splitlines(keepends=True):
+        if not ligne.startswith("      - "):
+            break
+        fin += len(ligne)
+    meta.write_text(
+        source[:fin] + f"      - {chemin_relatif}\n" + source[fin:],
+        encoding="utf-8",
+    )
+    return section
 
 
 def creer_lab(identifiant: str, racine_catalogue: Path, *, runtime: str) -> Creation:
@@ -270,6 +378,13 @@ def creer_lab(identifiant: str, racine_catalogue: Path, *, runtime: str) -> Crea
         _ecrire(base / "lab.yaml", _LAB_COMMUN.format(id=identifiant) + corps),
         _ecrire(base / "README.md", _README.format(id=identifiant)),
         _ecrire(base / "scenario.md", _SCENARIO),
+        # Les versions françaises : la règle du projet veut tout ce qui
+        # s'affiche en deux langues, et `validators/content.py` signale un
+        # document traduit d'un seul côté. Un lab créé sans elles était donc
+        # immédiatement non conforme.
+        _ecrire(base / "README.fr.md", _README_FR.format(id=identifiant)),
+        _ecrire(base / "scenario.fr.md", _SCENARIO_FR),
+        _ecrire(base / "lab.fr.yaml", _LAB_FR.format(id=identifiant)),
         _ecrire(base / "challenge" / "tests" / "test_functional.py",
                 _TEST.format(id=identifiant)),
     ]
@@ -283,4 +398,13 @@ def creer_lab(identifiant: str, racine_catalogue: Path, *, runtime: str) -> Crea
         # est conforme mais `run` n'a rien à préparer.
         (base / "challenge" / "work").mkdir(parents=True, exist_ok=True)
         (base / "fixtures").mkdir(parents=True, exist_ok=True)
-    return Creation(racine=base, fichiers=tuple(fichiers))
+
+    # Le lab entre dans une section : sans cela il reste jouable, mais il
+    # n'appartient à aucun bloc, et `next` ne sait pas où le placer dans la
+    # progression. `discovery/scanner.py` dérive `bloc` et `bloc_order` de
+    # cette position, donc l'omettre prive le lab de son ordre pédagogique.
+    section = _inscrire_dans_une_section(
+        racine_catalogue / "meta.yml",
+        base.relative_to(racine_catalogue / "labs").as_posix(),
+    )
+    return Creation(racine=base, fichiers=tuple(fichiers), section=section)

@@ -34,7 +34,13 @@
         "title": { "type": "string", "description": "Human-readable name." },
         "blog_url": { "type": "string", "description": "Home page of the online course." },
         "description": { "type": "string", "description": "One paragraph about the repository." },
-        "issues_url": { "type": "string", "description": "Where to file an issue about THIS catalogue rather than about the engine. Read by `dsoxlab support --issue`. Optional: without it the tool falls back to the repository's `origin` remote." }
+        "issues_url": { "type": "string", "description": "Where to file an issue about THIS catalogue rather than about the engine. Read by `dsoxlab support --issue`. Optional: without it the tool falls back to the repository's `origin` remote." },
+        "solutions": {
+          "type": "string",
+          "enum": ["encrypted", "plaintext"],
+          "default": "encrypted",
+          "description": "How this catalogue keeps its reference solutions. `encrypted` (the default) means every file under `solution/<lab path>` or `labs/<lab>/solution/` must be ansible-vault encrypted, and `validate-structure` reports any that is not: a solution shipped in clear text spoils the lab, and git keeps it forever. `plaintext` disarms that check, for a catalogue whose labs are chained, where one lab's starting point IS the previous lab's solution and the file therefore has to be copyable as a fixture. An unknown value falls back to `encrypted`: a check does not relax on a typo."
+        }
       }
     },
 

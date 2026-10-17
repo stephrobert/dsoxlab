@@ -7,6 +7,74 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.5.0] - 2026-10-17
+
+### Ajouté
+
+- **`new catalog` produit un catalogue entier, plus une graine.** Il écrivait
+  **deux** fichiers, `meta.yml` et `.gitignore`. Tout le reste — README,
+  gouvernance, outillage, intégration continue — était donc bâti à la main
+  douze fois, et douze fois différemment. Mesuré à la racine des douze
+  catalogues avant d'écrire ceci :
+
+  ```
+  invariant (12/12) : .gitignore, LICENSE, README.md, README.fr.md,
+                      conftest.py, labs/, meta.yml, pyproject.toml, scripts/
+  dérive (10-11/12) : .github/, .pre-commit-config.yaml, tests/, CHANGELOG,
+                      CODE_OF_CONDUCT, CONTRIBUTING, SECURITY
+  les deux derniers : 14 et 19 entrées, contre 28 à 43 pour les dix autres
+  ```
+
+  Et sur les README : 1 931 octets sans un seul titre de niveau 2 d'un côté,
+  33 000 de l'autre. Un générateur qui ne produit que la graine laisse cette
+  dérive se recréer à chaque catalogue.
+
+  Il écrit désormais **vingt** fichiers, et le résultat passe
+  `validate-structure` et ses propres garde-fous **sans une retouche**. Le
+  README porte les quatorze sections de la structure de référence dans les deux
+  langues, et sept de ces quatorze décrivent dsoxlab et non le domaine : elles
+  sont donc identiques dans tous les catalogues. Les sept autres portent un
+  « À remplir » explicite.
+
+- **`new lab` produit un lab bilingue, et l'inscrit dans une section.** Trois
+  défauts, tous attrapés par les garde-fous que `new catalog` produit
+  désormais, ce qui est exactement leur raison d'être : le lab n'était inscrit
+  dans **aucune** section du `meta.yml`, donc `next` ne savait pas où le placer
+  dans la progression ; il n'avait **aucune version française**, donc un lab
+  créé par l'outil était immédiatement non conforme à la règle bilingue du
+  projet ; et ses gabarits `README.md` et `scenario.md` étaient écrits **en
+  français**, alors que la convention réserve le fichier sans suffixe à
+  l'anglais.
+
+- **`repo.solutions`** dans `meta.yml`, `encrypted` (le défaut) ou
+  `plaintext`. Voir plus bas.
+
+### Corrigé
+
+- **Le contrôle des solutions regardait une disposition sur deux.**
+  `validators/content.py` ne lisait que `solution/<chemin du lab>` à la
+  **racine** du dépôt. Quatre catalogues rangent leurs corrigés **dans** le
+  lab, `labs/<lab>/solution/`, et le contrôle y passait donc au vert **sans
+  avoir regardé** : 58 fichiers en clair dans l'un, 11 dans un autre, 1 dans
+  deux de plus. Un contrôle qui n'a pas pu regarder ne conclut jamais au vert.
+
+  Il lit maintenant les deux dispositions. Et parce que chez deux de ces
+  catalogues le clair est **délibéré** — leurs labs sont enchaînés, et le point
+  de départ de chacun *est* la solution du précédent, donc le fichier doit
+  pouvoir être copié comme fixture — le contrat gagne
+  `repo.solutions: plaintext` pour le dire. Une valeur inconnue retombe sur
+  `encrypted` : un contrôle ne se relâche pas sur une faute de frappe.
+
+- **`templates/catalogues.yml` annonçait six catalogues sur douze.** Ce
+  manifeste est ce que `dsoxlab catalog list` montre à un apprenant, et son
+  propre en-tête consignait déjà la même panne pour le 2026-10-10 (trois
+  annoncés, six existants). Elle s'est reproduite, parce qu'une liste tenue à
+  la main se périme et que rien ne la mesurait. Les six manquants sont ajoutés,
+  chacun confronté à l'API GitHub d'abord, et deux contrôles tiennent
+  désormais la liste : l'un compare le README au manifeste et tourne en CI,
+  l'autre compare le manifeste au **disque** et ne peut tourner que là où les
+  catalogues sont clonés. Sans eux, il s'abstient au lieu de conclure.
+
 ## [0.4.1] - 2026-10-17
 
 ### Corrigé
