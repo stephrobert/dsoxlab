@@ -154,18 +154,29 @@ def validate_internal_links(lab: LabDefinition) -> ContentReport:
 
 
 def validate_solutions_encrypted(
-    lab: LabDefinition, solutions_root: Path
+    lab: LabDefinition, *solutions_roots: Path
 ) -> ContentReport:
     """Aucun fichier de solution ne doit être lisible en clair.
 
-    Le contrôle ne s'applique qu'aux dépôts qui tiennent un répertoire de
-    solutions : un dépôt sans `solution/` n'est pas en faute, il a simplement
-    fait un autre choix.
+    PLUSIEURS RACINES, PARCE QU'IL Y A PLUSIEURS DISPOSITIONS
+
+    Deux conventions coexistent dans la collection : `solution/<chemin du lab>`
+    à la racine du dépôt, et `labs/<lab>/solution/` dans le lab. Ce contrôle ne
+    regardait que la première, et passait donc au vert sur quatre catalogues
+    sans avoir regardé — 71 fichiers en clair invisibles. Un contrôle qui n'a
+    pas pu regarder ne conclut jamais au vert.
+
+    Une racine absente n'est pas une faute : un dépôt qui ne tient aucun
+    répertoire de solutions a simplement fait un autre choix.
     """
     report = ContentReport(lab_id=lab.id)
-    if not solutions_root.is_dir():
-        return report
-    for fichier in sorted(solutions_root.rglob("*")):
+    fichiers = sorted(
+        chemin
+        for racine in solutions_roots
+        if racine.is_dir()
+        for chemin in racine.rglob("*")
+    )
+    for fichier in fichiers:
         if not fichier.is_file() or fichier.suffix not in _EXTENSIONS_SOLUTION:
             continue
         try:
@@ -475,14 +486,31 @@ def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
 #: Un fichier caché de `fixtures/` n'est pas une fixture pédagogique : un
 #: `.gitkeep` y sert à versionner un répertoire vide, et le signaler comme non
 #: déclaré serait un faux positif que chaque auteur devrait apprendre à ignorer.
+#:
+#: Même raisonnement pour ce qu'un OUTIL dépose : un `__pycache__` apparaît dès
+#: que l'auteur joue la solution de son propre lab, et il n'est pas caché.
+#: Mesuré le 2026-10-16, cela faisait 24 écarts sur `devsecops`, tous des
+#: `.pyc`, sur un catalogue par ailleurs irréprochable.
+_REPERTOIRES_D_OUTIL = frozenset({"__pycache__", ".pytest_cache", ".ruff_cache"})
+_SUFFIXES_D_OUTIL = frozenset({".pyc", ".pyo"})
+
+
+def _est_un_artefact(relatif: Path) -> bool:
+    """Vrai si ce chemin a été écrit par un outil, et non par l'auteur."""
+    return (
+        any(p.startswith(".") for p in relatif.parts)
+        or any(p in _REPERTOIRES_D_OUTIL for p in relatif.parts)
+        or relatif.suffix in _SUFFIXES_D_OUTIL
+    )
+
+
 def _fixtures_sur_disque(racine: Path) -> set[str]:
     if not racine.is_dir():
         return set()
     return {
         str(chemin.relative_to(racine))
         for chemin in racine.rglob("*")
-        if chemin.is_file() and not any(p.startswith(".") for p in
-                                        chemin.relative_to(racine).parts)
+        if chemin.is_file() and not _est_un_artefact(chemin.relative_to(racine))
     }
 
 

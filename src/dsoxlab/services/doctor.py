@@ -535,6 +535,53 @@ def _check_terraform() -> Check:
     return _check("terraform", True, first)
 
 
+def _check_collections(root: Path) -> Check:
+    """Les collections Ansible que les playbooks du catalogue appellent.
+
+    Rapporté par deux utilisateurs (kubernetes-dsoxlab-training#94) : sur une
+    machine fraîche, **tous** les labs de ce catalogue échouaient au `run`, sur
+    un `couldn't resolve module/action 'community.general.modprobe'`.
+    `ansible-core` ne fournit que `ansible.builtin`, les collections ne sont
+    pas des paquets Python, et rien ne les installe.
+
+    Le défaut est resté invisible chez le mainteneur, dont la machine portait
+    douze collections accumulées au fil des années. C'est exactement ce qu'un
+    diagnostic doit dire à sa place, et il le dit en lisant le catalogue : pas
+    de liste écrite ici, donc rien de spécifique à un domaine.
+    """
+    from .collections_ansible import geste_d_installation, mesurer
+
+    besoins = mesurer(root)
+    if not besoins.exigees:
+        return _check("collections", True, _("detail_collections_aucune"))
+    if not besoins.mesurable:
+        # `ansible-galaxy` n'a pas répondu : on ne peint pas en rouge ce qu'on
+        # n'a pas pu regarder, et `--strict` a son propre code pour cela.
+        return _check(
+            "collections", False, _("detail_collections_non_mesure"),
+            forced_state=STATE_UNKNOWN,
+        )
+    if not besoins.manquantes:
+        # Un vrai pluriel, pas un « (s) » : un diagnostic qu'on lit vingt fois
+        # par semaine se lit mieux écrit comme on parle.
+        exigees = len(besoins.exigees)
+        return _check(
+            "collections", True,
+            _("detail_collections_ok") if exigees == 1
+            else _("detail_collections_ok_n", count=exigees),
+        )
+    manquantes = besoins.manquantes
+    cle = (
+        "detail_collections_manquantes" if len(manquantes) == 1
+        else "detail_collections_manquantes_n"
+    )
+    return _check(
+        "collections", False,
+        _(cle, names=", ".join(manquantes), file=besoins.exigees[manquantes[0]]),
+        fix=_fix(geste_d_installation(besoins)),
+    )
+
+
 def _check_ansible() -> Check:
     """``run`` sur un lab vm joue un playbook : il faut ``ansible-playbook``.
 
@@ -1204,13 +1251,26 @@ def _check_labs(
     if not labs and infra_declaree:
         return _check("labs", True, _("detail_labs_infra_seule", root=root))
 
-    detail = _("detail_labs_count", count=len(labs), root=root)
+    detail = _("detail_labs_count", count=len(labs))
     if ecart > 0:
         detail += " " + _("detail_labs_ecart", ecart=ecart, presents=vus)
     # Seul un écart POSITIF dit quelque chose : des fichiers présents que le
     # moteur n'a pas su charger. L'inverse ne peut pas venir d'un catalogue réel,
     # et vaut zéro information.
-    return _check("labs", len(labs) > 0 and ecart <= 0, detail)
+    #
+    # La remédiation n'est pas la même selon la cause, et c'est tout l'intérêt
+    # de la distinguer : **aucun** fichier vu, c'est qu'il n'y a pas de
+    # catalogue ici, et le geste est d'en poser un ; des fichiers vus mais non
+    # chargés, c'est un contrat à corriger. Sans elle, ce rouge arrivait nu sur
+    # un poste neuf, juste après une installation réussie, et rien ne disait
+    # quoi faire.
+    if vus == 0:
+        geste = _("remediation_labs_aucun_catalogue")
+    elif ecart > 0:
+        geste = _("remediation_labs_illisibles")
+    else:
+        geste = ""
+    return _check("labs", len(labs) > 0 and ecart <= 0, detail, hint=geste)
 
 
 def _check_lab_home(root: Path) -> Check:
@@ -1393,139 +1453,197 @@ def _sort_hypervisors(names: list[str]) -> list[Check]:
     return [checks[n] for n in names if n in checks]
 
 
+@dataclass(frozen=True)
+class _CeQueLeDepotDemande:
+    """Les quatre faits dont dépend le classement requis/informatif.
+
+    Aucun ne relève du domaine du dépôt : ce sont des propriétés de son
+    contrat. Les rassembler ici évite que chaque phase du diagnostic les
+    recalcule, et dit d'un coup sur quoi repose tout le classement.
+    """
+
+    root: Path
+    repo_meta: RepoMetadata | None
+    #: Un hôte déclaré est un engagement : il sera provisionné. Regarder les
+    #: seuls labs (issue #230) rangeait terraform et l'hyperviseur en
+    #: informatifs sur un dépôt qui ne fait *que* provisionner.
+    declare_des_hotes: bool
+    needs_vm: bool
+    active: str
+    candidates: list[str]
+
+
+def _ranger_docker(report: DoctorReport, labs: list[LabDefinition]) -> None:
+    """docker dépend de ce que le catalogue déclare, jamais de son domaine.
+
+    Un dépôt sans `runtime.services` n'a aucune raison de voir du rouge pour un
+    moteur qu'il n'utilise pas.
+    """
+    if uses_services(labs):
+        report.required.append(_check_docker())
+        return
+    report.optional.append(_check_docker())
+    report.notes.append(_("reason_docker_no_services"))
+
+
+def _ranger_sortie_reseau(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> None:
+    """Le provisionnement télécharge une image puis laisse cloud-init installer
+    des paquets : sans accès sortant, l'hôte est déclaré prêt et les labs
+    échouent plus tard sur des commandes absentes. Un dépôt entièrement `shell`
+    ne provisionne rien, donc n'a pas à en voir du rouge.
+    """
+    if not ctx.needs_vm:
+        report.optional.append(_check_egress())
+        report.notes.append(_("reason_egress_sans_vm"))
+        return
+    report.required.append(_check_egress())
+    # Informatif, mais affiché là où on le regarde : c'est la version qui
+    # décide du comportement de `provision`, et elle n'était nulle part.
+    report.optional.append(_check_tf_providers(ctx.repo_meta))
+
+
+def _ranger_hyperviseurs(
+    report: DoctorReport,
+    ctx: _CeQueLeDepotDemande,
+    hypervisors: dict[str, Check],
+) -> None:
+    """Quel hyperviseur bloque ici, et lesquels ne font qu'informer."""
+    if not ctx.needs_vm:
+        # Catalogue entièrement `shell` : aucun hyperviseur n'est requis, et le
+        # dire évite le rouge décourageant du premier lancement.
+        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
+        report.notes.append(_("doctor_note_no_vm"))
+        return
+
+    if ctx.active in hypervisors:
+        report.required.append(_check("provider", True, ctx.active))
+        report.required.append(hypervisors[ctx.active])
+        report.optional.extend(
+            _sort_hypervisors([n for n in _LOCAL_HYPERVISORS if n != ctx.active])
+        )
+        report.notes.append(_("doctor_note_other_providers", provider=ctx.active))
+        return
+
+    if ctx.active:
+        # Provider distant (outscale…) : rien à vérifier localement.
+        report.required.append(_check("provider", True, ctx.active))
+        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
+        report.notes.append(_("doctor_note_remote_provider", provider=ctx.active))
+        return
+
+    # Plusieurs candidats déclarés, aucun choisi. On ne devine pas à la place
+    # de l'apprenant : on nomme le choix qui reste à faire.
+    #
+    # On arrive ici avec `needs_vm` vrai : un hyperviseur EST indispensable.
+    # Les checks restent pourtant hors du requis, et c'est délibéré : les y
+    # mettre ferait proposer à `--fix` d'installer kvm **et** incus, pour un
+    # choix que l'apprenant n'a pas encore fait. C'est le libellé du tableau
+    # qui mentait, en annonçant « non requis ici » et « ces composants ne
+    # bloquent rien » au-dessus du composant qui bloque 64 labs sur 84.
+    premier = ctx.candidates[0] if ctx.candidates else "kvm"
+    report.required.append(_check(
+        "provider", False,
+        _("detail_provider_unresolved", candidates=", ".join(ctx.candidates) or "?"),
+        hint=f"dsoxlab use --provider {premier}",
+        forced_state=STATE_CHOICE_REQUIRED,
+    ))
+    report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
+    report.optional_title_key = "doctor_choose_title"
+    report.optional_hint_key = "doctor_choose_hint"
+    report.notes.append(_("doctor_note_provider_unresolved"))
+
+
+def _ranger_materiel_local(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> None:
+    """Prérequis matériels d'un hyperviseur local : virtualisation, architecture,
+    ressources, nom du pont.
+
+    Ils ne dépendent d'aucun binaire installé (`/dev/kvm` et `/proc/meminfo` se
+    lisent sans virsh), donc ils parlent même quand l'hyperviseur manque :
+    c'est une cause DIFFÉRENTE, pas le même rouge répété. Un provider distant
+    provisionne ailleurs : rien de tout cela ne concerne alors ce poste.
+    """
+    report.required.append(_check_hw_virt())
+    report.required.append(_check_cpu_arch(ctx.active))
+    if ctx.repo_meta is None:
+        return
+    if ctx.repo_meta.infra.hosts:
+        report.required.append(_check_resources(ctx.repo_meta.infra, ctx.active))
+    # Le nom du pont ne dépend que du contrat : aucune sonde, donc aucune
+    # raison de le taire quand l'hyperviseur manque. Il vaut mieux ici qu'au
+    # premier `provision`, où l'échec arrive après le téléchargement de
+    # l'image de base (issue #214).
+    report.required.append(_check_bridge_name(ctx.repo_meta, ctx.active))
+
+
+def _ranger_outillage_vm(
+    report: DoctorReport,
+    ctx: _CeQueLeDepotDemande,
+    hypervisors: dict[str, Check],
+) -> None:
+    """Ce que `provision` et `run` exigent dès qu'un lab a besoin d'une VM.
+
+    `terraform` et `ansible-playbook` manquaient au diagnostic, et leur absence
+    ne se manifestait qu'au premier échec, en langage Terraform ou en `rc=127`.
+    """
+    report.required.append(_check_terraform())
+    report.required.append(_check_ansible())
+    # Les collections viennent juste après `ansible-playbook` : sans elles, il
+    # est là et ne sait pas résoudre les modules que les playbooks appellent.
+    report.required.append(_check_collections(ctx.root))
+    if ctx.active in _LOCAL_HYPERVISORS:
+        _ranger_materiel_local(report, ctx)
+
+    # Ces contrôles-ci portent sur la CONFIGURATION d'un hyperviseur déjà
+    # installé. Les jouer quand l'hyperviseur lui-même manque empilerait trois
+    # lignes rouges pour une seule cause, et noierait celle qui compte : c'est
+    # exactement ce qui décourageait au premier lancement.
+    if ctx.active == "kvm" and hypervisors["kvm"].ok:
+        # Même lecture que `_check_resources` et que le template Terraform :
+        # une seule fonction la porte, sinon les trois divergent un jour.
+        pool = nom_du_pool(ctx.repo_meta.infra) if ctx.repo_meta else "default"
+        report.required.append(_check_libvirt_pool(pool))
+    elif ctx.active == "incus" and hypervisors["incus"].ok:
+        # Symétrie avec la branche kvm : elle contrôle son pool de stockage,
+        # celle-ci ne contrôlait que l'outil ISO.
+        report.required.append(_check_incus_pool())
+        report.required.append(_check_iso_tool())
+
+
 def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     """Construit le diagnostic pour le dépôt de labs situé en ``root``.
 
-    Le classement requis/optionnel dépend de trois faits du dépôt, et
-    d'aucune connaissance de son domaine : a-t-il des labs ``vm``, quel
-    provider est actif, et quels providers déclare-t-il.
+    Le classement requis/optionnel dépend de quatre faits du dépôt, et
+    d'aucune connaissance de son domaine : a-t-il des labs ``vm``, déclare-t-il
+    des hôtes, quel provider est actif, et lesquels déclare-t-il. Ces faits
+    sont rassemblés dans :class:`_CeQueLeDepotDemande`, et chaque phase du
+    diagnostic les lit plutôt que de les recalculer.
     """
     labs = get_all_labs(root)
+    declare_des_hotes = bool(repo_meta and repo_meta.infra.hosts)
+    ctx = _CeQueLeDepotDemande(
+        root=root,
+        repo_meta=repo_meta,
+        declare_des_hotes=declare_des_hotes,
+        # `terraform-training` est le contre-exemple qui tient cette ligne :
+        # aucun bloc `infra:`, tous ses labs `shell`, donc aucun hyperviseur
+        # requis. `doctor --strict` y sortait en 0 sur un environnement
+        # incapable de monter quoi que ce soit (issue #230).
+        needs_vm=uses_vm(labs) or declare_des_hotes,
+        active=repo_meta.infra.provider if repo_meta else "",
+        candidates=list(repo_meta.infra.providers_available) if repo_meta else [],
+    )
+    hypervisors = _hypervisor_checks()
+
     report = DoctorReport()
     report.required.extend([_check_python(), _check_pytest(root), _check_shell()])
     # git sert au parcours d'accueil (`catalog add` clone), quel que soit le
     # domaine du dépôt : il est requis partout.
     report.required.append(_check_git())
-
-    # docker, lui, dépend de ce que le catalogue déclare — jamais de son
-    # domaine. Un dépôt sans `runtime.services` n'a aucune raison de voir du
-    # rouge pour un moteur qu'il n'utilise pas.
-    if uses_services(labs):
-        report.required.append(_check_docker())
-    else:
-        report.optional.append(_check_docker())
-        report.notes.append(_("reason_docker_no_services"))
-
-    # Un hôte déclaré est un engagement : il sera provisionné. Regarder les
-    # seuls labs (issue #230) rangeait terraform et l'hyperviseur en informatifs
-    # sur un dépôt qui ne fait *que* provisionner, c'est-à-dire sur le seul dont
-    # ils conditionnent la commande principale. `doctor --strict` y rendait 0 sur
-    # un environnement incapable de monter quoi que ce soit.
-    #
-    # `terraform-training` reste le contre-exemple : aucun bloc `infra:`, 87 labs
-    # `shell`, donc toujours aucun hyperviseur requis.
-    declare_des_hotes = bool(repo_meta and repo_meta.infra.hosts)
-    needs_vm = uses_vm(labs) or declare_des_hotes
-    # Le provisionnement télécharge une image puis laisse cloud-init installer
-    # des paquets : sans accès sortant, l'hôte est déclaré prêt et les labs
-    # échouent plus tard sur des commandes absentes. Un dépôt entièrement
-    # `shell` ne provisionne rien, donc n'a pas à en voir du rouge.
-    if needs_vm:
-        report.required.append(_check_egress())
-        # Informatif, mais affiché là où on le regarde : c'est la version qui
-        # décide du comportement de `provision`, et elle n'était nulle part.
-        report.optional.append(_check_tf_providers(repo_meta))
-    else:
-        report.optional.append(_check_egress())
-        report.notes.append(_("reason_egress_sans_vm"))
-    active = repo_meta.infra.provider if repo_meta else ""
-    candidates = list(repo_meta.infra.providers_available) if repo_meta else []
-    hypervisors = _hypervisor_checks()
-
-    if not needs_vm:
-        # Cas d'un catalogue entièrement `shell` : aucun hyperviseur n'est
-        # requis, et le dire évite le rouge décourageant du premier lancement.
-        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
-        report.notes.append(_("doctor_note_no_vm"))
-    elif active in hypervisors:
-        report.required.append(_check("provider", True, active))
-        report.required.append(hypervisors[active])
-        report.optional.extend(
-            _sort_hypervisors([n for n in _LOCAL_HYPERVISORS if n != active])
-        )
-        report.notes.append(_("doctor_note_other_providers", provider=active))
-    elif active:
-        # Provider distant (outscale…) : rien à vérifier localement.
-        report.required.append(_check("provider", True, active))
-        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
-        report.notes.append(_("doctor_note_remote_provider", provider=active))
-    else:
-        # Plusieurs candidats déclarés, aucun choisi. On ne devine pas à la
-        # place de l'apprenant : on nomme le choix qui reste à faire.
-        #
-        # On arrive ici avec `needs_vm` vrai : un hyperviseur EST indispensable.
-        # Les checks restent pourtant hors du requis, et c'est délibéré : les y
-        # mettre ferait proposer à `--fix` d'installer kvm **et** incus, pour un
-        # choix que l'apprenant n'a pas encore fait. C'est le libellé du tableau
-        # qui mentait, en annonçant « non requis ici » et « ces composants ne
-        # bloquent rien » au-dessus du composant qui bloque 64 labs sur 84.
-        first = candidates[0] if candidates else "kvm"
-        report.required.append(_check(
-            "provider", False,
-            _("detail_provider_unresolved", candidates=", ".join(candidates) or "—"),
-            hint=f"dsoxlab use --provider {first}",
-            forced_state=STATE_CHOICE_REQUIRED,
-        ))
-        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
-        report.optional_title_key = "doctor_choose_title"
-        report.optional_hint_key = "doctor_choose_hint"
-        report.notes.append(_("doctor_note_provider_unresolved"))
-
-    # Outillage exigé par `provision` et `run` dès qu'un lab a besoin d'une VM,
-    # quel que soit le provider. Ces deux-là manquaient au diagnostic, et leur
-    # absence ne se manifestait qu'au premier échec, en langage Terraform ou en
-    # `rc=127`.
-    if needs_vm:
-        report.required.append(_check_terraform())
-        report.required.append(_check_ansible())
-        # Prérequis matériels d'un hyperviseur local : virtualisation,
-        # architecture, ressources. Ils ne dépendent d'aucun binaire installé
-        # (/dev/kvm et /proc/meminfo se lisent sans virsh), donc ils parlent
-        # même quand l'hyperviseur manque : c'est une cause DIFFÉRENTE, pas le
-        # même rouge répété. Un provider distant (outscale…) provisionne
-        # ailleurs : rien de tout cela ne concerne alors ce poste.
-        if active in _LOCAL_HYPERVISORS:
-            report.required.append(_check_hw_virt())
-            report.required.append(_check_cpu_arch(active))
-            if repo_meta is not None and repo_meta.infra.hosts:
-                report.required.append(
-                    _check_resources(repo_meta.infra, active)
-                )
-            # Le nom du pont, qui ne dépend que du contrat : aucune sonde, donc
-            # aucune raison de le taire quand l'hyperviseur manque. Il vaut mieux
-            # ici qu'au premier `provision`, où l'échec arrive après le
-            # téléchargement de l'image de base (issue #214).
-            if repo_meta is not None:
-                report.required.append(_check_bridge_name(repo_meta, active))
-        # Contrôles propres à un hyperviseur : ils n'ont de sens qu'une fois le
-        # provider choisi, sinon ils affichent du rouge pour un backend que ce
-        # poste n'utilisera peut-être jamais.
-        # Ces contrôles-ci portent sur la CONFIGURATION d'un hyperviseur déjà
-        # installé. Les jouer quand l'hyperviseur lui-même manque empilerait
-        # trois lignes rouges pour une seule cause, et noierait celle qui
-        # compte : c'est exactement ce qui décourageait au premier lancement.
-        if active == "kvm" and hypervisors["kvm"].ok:
-            # Même lecture que `_check_resources` et que le template Terraform :
-            # une seule fonction la porte, sinon les trois divergent un jour.
-            pool = "default"
-            if repo_meta is not None:
-                pool = nom_du_pool(repo_meta.infra)
-            report.required.append(_check_libvirt_pool(pool))
-        elif active == "incus" and hypervisors["incus"].ok:
-            # Symétrie avec la branche kvm juste au-dessus : elle contrôle son
-            # pool de stockage, celle-ci ne contrôlait que l'outil ISO.
-            report.required.append(_check_incus_pool())
-            report.required.append(_check_iso_tool())
+    _ranger_docker(report, labs)
+    _ranger_sortie_reseau(report, ctx)
+    _ranger_hyperviseurs(report, ctx, hypervisors)
+    if ctx.needs_vm:
+        _ranger_outillage_vm(report, ctx, hypervisors)
 
     report.required.append(_check_labs(
         root, labs, compter_fichiers_labs(root), infra_declaree=declare_des_hotes,

@@ -105,43 +105,57 @@ def build_progress(
     blocs: dict[int, list[LabDefinition]] = {}
     for lab in labs:
         blocs.setdefault(lab.bloc, []).append(lab)
+    return [_resumer_un_bloc(numero, blocs[numero], scores) for numero in sorted(blocs)]
 
-    progress: list[BlocProgress] = []
-    for bloc_num in sorted(blocs):
-        bloc_labs = sorted(blocs[bloc_num], key=lambda lab: lab.bloc_order)
-        plain = [lab for lab in bloc_labs if lab.lab_type == "lab"]
-        challenges = [lab for lab in bloc_labs if lab.lab_type == "challenge"]
-        capstones = [lab for lab in bloc_labs if lab.lab_type == "capstone"]
 
-        validated = [lab for lab in plain if lab.id in scores]
+def _moyenne_des_valides(
+    valides: list[LabDefinition], scores: dict[str, tuple[int, int]]
+) -> int | None:
+    """La moyenne des pourcentages des seuls labs validés.
 
-        # Moyenne des pourcentages des seuls labs validés. Un lab dont le
-        # max_score serait 0 (contrat incomplet) compte pour 0 % au lieu de
-        # lever une ZeroDivisionError sur la commande de progression.
-        average_pct: int | None = None
-        if validated:
-            total_pct = sum(
-                int(scores[lab.id][0] * 100 / scores[lab.id][1]) if scores[lab.id][1] else 0
-                for lab in validated
-            )
-            average_pct = total_pct // len(validated)
+    Un lab dont le `max_score` vaut 0, cas d'un contrat incomplet, compte pour
+    0 % au lieu de lever une `ZeroDivisionError` au milieu de la commande de
+    progression. Aucun lab validé ne donne `None`, qui se distingue de 0 % :
+    « rien tenté » n'est pas « tout raté ».
+    """
+    if not valides:
+        return None
+    total = sum(
+        int(scores[lab.id][0] * 100 / scores[lab.id][1]) if scores[lab.id][1] else 0
+        for lab in valides
+    )
+    return total // len(valides)
 
-        # Nom lisible du bloc (titre de section du meta.yml). Un lab rattaché à
-        # aucune section ne porte pas de nom : on retombe sur le numéro.
-        bloc_name = next((lab.bloc_name for lab in bloc_labs if lab.bloc_name), "")
 
-        progress.append(
-            BlocProgress(
-                bloc=bloc_num,
-                label=bloc_name or (str(bloc_num) if bloc_num else ""),
-                validated=len(validated),
-                total=len(plain),
-                average_pct=average_pct,
-                challenge_validated=(challenges[0].id in scores) if challenges else None,
-                capstone_validated=(capstones[0].id in scores) if capstones else None,
-            )
-        )
-    return progress
+def _resumer_un_bloc(
+    numero: int,
+    labs_du_bloc: list[LabDefinition],
+    scores: dict[str, tuple[int, int]],
+) -> BlocProgress:
+    """Ce qu'un bloc vaut : ses labs notés, son challenge, son capstone."""
+    ordonnes = sorted(labs_du_bloc, key=lambda lab: lab.bloc_order)
+    par_type: dict[str, list[LabDefinition]] = {"lab": [], "challenge": [], "capstone": []}
+    for lab in ordonnes:
+        par_type.setdefault(lab.lab_type, []).append(lab)
+
+    notes = par_type["lab"]
+    valides = [lab for lab in notes if lab.id in scores]
+    challenges = par_type["challenge"]
+    capstones = par_type["capstone"]
+
+    # Nom lisible du bloc (titre de section du meta.yml). Un lab rattaché à
+    # aucune section ne porte pas de nom : on retombe sur le numéro.
+    nom = next((lab.bloc_name for lab in ordonnes if lab.bloc_name), "")
+
+    return BlocProgress(
+        bloc=numero,
+        label=nom or (str(numero) if numero else ""),
+        validated=len(valides),
+        total=len(notes),
+        average_pct=_moyenne_des_valides(valides, scores),
+        challenge_validated=(challenges[0].id in scores) if challenges else None,
+        capstone_validated=(capstones[0].id in scores) if capstones else None,
+    )
 
 
 def next_pending_lab(

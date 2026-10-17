@@ -933,7 +933,18 @@ def _read_outputs(tf_dir: Path, *, env: dict[str, str] | None = None) -> Provisi
     )
 
     outputs: dict[str, dict[str, Any]] = {}
-    if result.ok and result.stdout.strip():
+    if not result.ok:
+        # Un échec de lecture n'est pas une absence d'infrastructure. Le taire
+        # faisait annoncer « rien n'est provisionné » sur une stack debout, et
+        # proposer un `provision` qui l'aurait dupliquée.
+        logger.warning(
+            "'terraform output -json' failed in %s: %s. What is running cannot "
+            "be read; a plugin cache emptied since the apply is the usual "
+            "cause, and 'terraform init' reinstalls the providers.",
+            tf_dir,
+            (result.stderr or result.stdout).strip()[:300],
+        )
+    elif result.stdout.strip():
         try:
             outputs = json.loads(result.stdout)
         except json.JSONDecodeError:

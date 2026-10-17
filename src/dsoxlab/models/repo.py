@@ -78,23 +78,46 @@ def _apply_translation(data: dict[str, Any], meta_path: Path, lang: str) -> None
     """
     if not lang or lang == "en":
         return
-    lang_path = meta_path.parent / f"meta.{lang[:2].lower()}.yml"
-    if not lang_path.is_file():
+    overrides = _lire_la_traduction(meta_path.parent / f"meta.{lang[:2].lower()}.yml")
+    if overrides is None:
         return
+    _surcharger_le_depot(data, overrides)
+    _surcharger_les_sections(data, overrides)
+
+
+def _lire_la_traduction(chemin: Path) -> dict[str, Any] | None:
+    """Le document de traduction, ou ``None`` s'il n'y a rien d'exploitable.
+
+    Absent, illisible, ou d'une forme inattendue : les trois donnent la même
+    réponse, parce qu'ils appellent le même geste. Un catalogue ne doit jamais
+    devenir illisible parce que sa traduction l'est.
+    """
+    if not chemin.is_file():
+        return None
     try:
-        overrides = yaml.safe_load(lang_path.read_text(encoding="utf-8"))
+        overrides = yaml.safe_load(chemin.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
-        return
-    if not isinstance(overrides, dict):
-        return
+        return None
+    return overrides if isinstance(overrides, dict) else None
 
-    base_repo = data.get("repo")
-    over_repo = overrides.get("repo")
-    if isinstance(base_repo, dict) and isinstance(over_repo, dict):
-        for champ in _TRANSLATABLE_REPO:
-            if champ in over_repo:
-                base_repo[champ] = over_repo[champ]
 
+def _surcharger_le_depot(data: dict[str, Any], overrides: dict[str, Any]) -> None:
+    base = data.get("repo")
+    traduit = overrides.get("repo")
+    if not isinstance(base, dict) or not isinstance(traduit, dict):
+        return
+    for champ in _TRANSLATABLE_REPO:
+        if champ in traduit:
+            base[champ] = traduit[champ]
+
+
+def _surcharger_les_sections(data: dict[str, Any], overrides: dict[str, Any]) -> None:
+    """Appariement par ``id``, jamais par position.
+
+    Une section insérée dans ``meta.yml`` décalerait sinon toutes les
+    traductions suivantes, en silence : les titres se poseraient sur les
+    mauvaises sections, et aucun contrôle ne pourrait le voir.
+    """
     base_sections = data.get("sections")
     over_sections = overrides.get("sections")
     if not isinstance(base_sections, list) or not isinstance(over_sections, list):
@@ -373,6 +396,16 @@ class LearningDefinition:
     n'affiche alors aucun lien et n'invente aucune adresse."""
 
 
+def _coercer_solutions(valeur: object) -> str:
+    """`repo.solutions`, ramené aux deux seules valeurs que le contrôle lit.
+
+    Une valeur inconnue vaut ``encrypted`` : un contrôle ne se relâche pas sur
+    une faute de frappe. `plaintext` est donc le seul mot qui le désarme, et il
+    faut l'écrire exactement.
+    """
+    return "plaintext" if str(valeur or "").strip() == "plaintext" else "encrypted"
+
+
 @dataclass
 class RepoMetadata:
     """Contrat déclaratif du dépôt fournisseur (`meta.yml` racine).
@@ -397,6 +430,20 @@ class RepoMetadata:
     blog_url: str = ""
     description: str = ""
     issues_url: str = ""
+
+    solutions: str = "encrypted"
+    """Comment ce dépôt tient ses solutions de référence : ``encrypted`` ou
+    ``plaintext``.
+
+    Le défaut est ``encrypted``, parce qu'une solution livrée en clair gâche le
+    lab et que git la garde pour toujours. Mais deux catalogues de la
+    collection enchaînent leurs labs, le point de départ de l'un étant la
+    solution du précédent : le fichier doit alors pouvoir être copié comme
+    fixture, et le clair est un choix de conception, pas un oubli. Ils le
+    déclarent, et le contrôle ne les accuse plus.
+
+    Une valeur inconnue vaut ``encrypted`` : on ne relâche pas un contrôle sur
+    une faute de frappe."""
     """Où déposer une issue qui concerne **ce catalogue**, et non le moteur.
 
     Optionnel. Absent, ``dsoxlab support --issue`` retombe sur le remote ``origin``
@@ -551,6 +598,7 @@ class RepoMetadata:
             blog_url=str(repo.get("blog_url", "")),
             description=str(repo.get("description", "")),
             issues_url=str(repo.get("issues_url") or ""),
+            solutions=_coercer_solutions(repo.get("solutions")),
             infra=infra,
             learning=learning,
             sections=sections,

@@ -137,6 +137,61 @@ uv run pytest                                                # unit tests
 uv run pytest tests_e2e                                      # end-to-end, on the built wheel
 ```
 
+### Paying the debt while you ship
+
+Three checks measure **drift** rather than an absolute, which is what makes them
+bearable: an absolute threshold was not playable (35 blocks already exceed the
+thresholds, and failing them all at once would block every commit), a ratchet
+is.
+
+```bash
+python3 scripts/complexite.py              # the ranking, to read
+python3 scripts/code-mort.py               # symbols with no caller
+python3 scripts/complexite-ecran.py        # what the learner actually sees
+```
+
+Each carries a reference record under `scripts/*-reference.json`, and each
+**refuses two things**: a measurement going up, and a measurement going down
+without the record being updated. The second case is deliberate: debt that was
+paid but not recorded leaves the old value as a ceiling, and complexity can
+climb back up to it without any hook saying a word.
+
+```bash
+python3 scripts/complexite.py --figer      # after simplifying
+python3 scripts/code-mort.py --figer       # after removing or wiring up
+python3 scripts/complexite-ecran.py --figer
+```
+
+**What each one measures, and why adding one more lint would not have done.**
+
+`ruff C901` measures cyclomatic complexity. It does not see closures: measured
+on `cli/_barres.py`, `_run_ansible_with_progress` scores a cyclomatic complexity
+of **1** for 91 lines and three nested functions sharing mutable state. So
+`scripts/complexite.py` measures what ruff ignores: **cognitive** complexity,
+nesting depth and length.
+
+`scripts/code-mort.py` replaces vulture, which reported 108 lines on this
+repository, around 80 of them structural false positives: the 38 Typer commands,
+referenced only by a decorator, and some forty pytest fixtures, injected by
+name. This script knows about those mechanisms, plus `__all__`, the
+documentation, and the Python surface the lab repositories import. It can
+therefore fail a commit, which vulture could not.
+
+`scripts/complexite-ecran.py` is the only check that looks at **the output**
+rather than the code. It runs real commands at 80, 100, 120 and 160 columns and
+measures eight quantities: height, truncations, table columns, suggested next
+commands, jargon terms, lines of raw tool output, minimum readable width, and
+dead ends. The last one penalises brevity, so that "simplify" cannot be confused
+with "go quiet": a screen that answers in one line without offering a next step
+costs as much as an unreadable table.
+
+The scores are arbitrary and the breakdown is always printed next to them: they
+exist to compare two versions of the same screen, not to grade it.
+
+**A rise can be legitimate.** A screen that explains more is heavier, and that
+is sometimes the right call. You then freeze it knowingly, stating in the commit
+message why it was needed. What is forbidden is a rise nobody decided.
+
 ### The two suites, and why they are separate
 
 `tests/` imports the package and proves the functions do what they say.
@@ -226,8 +281,11 @@ uv run pre-commit install --install-hooks
 
 On each **commit** they run: hygiene checks (trailing whitespace, end-of-file,
 YAML/JSON/TOML validity, large files, merge conflicts), private-key detection,
-a TruffleHog secret scan, `ruff` (lint + security, autofix) and `mypy --strict`.
-The full `pytest` suite runs on **push**. Run everything by hand with:
+a TruffleHog secret scan, `ruff` (lint + security, autofix), `mypy --strict`,
+and the two debt ratchets (cognitive complexity, code with no caller). On
+**push**: the full `pytest` suite and the screen load of the learner journeys,
+which runs real commands and takes about ten seconds. Run everything by hand
+with:
 
 ```bash
 uv run pre-commit run --all-files
@@ -252,6 +310,38 @@ When you add, remove or change a command or option, update **simultaneously**:
 the command `help=_("…")` in its `cli/` module, the EN + FR keys, and the matching
 `fullhelp_commands` section in both languages. Never leave `fullhelp`
 describing a command that no longer exists.
+
+## Terminal rendering
+
+Six rules, each born from a defect measured on a real screen. They apply to
+everything going through `reporting/console.py`.
+
+- **One colour per state, never one per element.** The `check` verdict drew a
+  green bar next to a red score: two colours for a single fact, contradicting
+  each other at a glance. Green, amber or red, and both together.
+- **Colour semantics are fixed**: cyan for what you type, yellow for a warning,
+  green and red for an outcome. A welcome panel framed in yellow reads as
+  "careful" to anyone scanning.
+- **No line that says nothing.** "Hints: none" took up a third of a panel to
+  announce an absence. Information that is absent is not displayed.
+- **Aligned columns rather than wrapping sentences.** The `run` welcome listed
+  its commands as sentences: they wrapped mid-item and the remainder restarted
+  at the margin, reading like another entry. A two-column `Table.grid` fixes
+  it, and forces descriptions that fit.
+- **No gratuitous padding.** A screen that comes back after every command has
+  to earn its height: two blank lines added "for air" cost more than they give.
+- **Real plurals.** `hint(s) used` is the mark of text nobody proofread: use
+  two keys and let the caller pick by count.
+
+Two practical consequences. A command name (`dsoxlab check`) is not a
+translatable string: it is what the user types, it belongs in the code, and the
+i18n guard accepts it as soon as a named constant states what it is. And a
+table cell carries a measurement, not a sentence: if it wraps onto three lines,
+shorten the text rather than widening the column.
+
+To measure rather than judge, `python3 scripts/complexite-ecran.py` counts what
+each screen imposes on its reader. It measures **load**, never beauty: output
+can be short and ugly.
 
 ## Commit conventions
 

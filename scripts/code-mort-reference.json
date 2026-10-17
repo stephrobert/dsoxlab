@@ -1,0 +1,7 @@
+{
+  "_lire": "Code mort toléré, produit par « python3 scripts/code-mort.py --figer ». Chaque entrée doit porter un motif écrit à la main : un symbole toléré sans raison est un symbole que personne n'osera retirer. Tout nouveau mort fait échouer le hook.",
+  "tolere": {
+    "src/dsoxlab/infra/terraform.py::get_outputs": "Sursis, pas un oubli : « infra/ » est la couche que les dépôts de labs importent depuis leur conftest.py, et containers-dsoxlab-training n'était pas clonable au relevé du 2026-10-16. À retirer dès que ce catalogue a pu être vérifié.",
+    "src/dsoxlab/infra/terraform.py::provider_dir": "Même sursis que get_outputs, et le même catalogue à vérifier."
+  }
+}

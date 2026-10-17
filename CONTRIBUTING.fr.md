@@ -138,6 +138,61 @@ uv run pytest                                                # tests unitaires
 uv run pytest tests_e2e                                      # bout en bout, sur la roue construite
 ```
 
+### Payer la dette en même temps qu'on produit
+
+Trois contrôles mesurent la **dérive** plutôt qu'un absolu, et c'est ce qui les
+rend tenables : un seuil absolu n'était pas jouable (35 blocs dépassent déjà les
+seuils, et les interdire d'un coup bloquerait tout commit), un cliquet l'est.
+
+```bash
+python3 scripts/complexite.py              # le classement, pour lire
+python3 scripts/code-mort.py               # les symboles sans appelant
+python3 scripts/complexite-ecran.py        # ce que l'apprenant a sous les yeux
+```
+
+Chacun porte un relevé de référence dans `scripts/*-reference.json`, et chacun
+**refuse deux choses** : qu'une mesure monte, et qu'elle descende sans que le
+relevé soit mis à jour. Le second cas surprend, et il est délibéré : une dette
+payée qui n'est pas enregistrée laisse l'ancienne valeur comme plafond, et la
+complexité peut remonter jusqu'à elle sans qu'aucun hook ne bronche.
+
+```bash
+python3 scripts/complexite.py --figer      # après avoir simplifié
+python3 scripts/code-mort.py --figer       # après avoir retiré ou branché
+python3 scripts/complexite-ecran.py --figer
+```
+
+**Ce que chacun mesure, et pourquoi il ne suffisait pas d'ajouter un lint.**
+
+`ruff C901` mesure la complexité cyclomatique. Elle ne voit pas les fermetures :
+mesuré sur `cli/_barres.py`, `_run_ansible_with_progress` affiche une
+cyclomatique de **1** pour 91 lignes et trois fonctions emboîtées qui se passent
+un état mutable. `scripts/complexite.py` mesure donc ce que ruff ignore, la
+complexité **cognitive**, la profondeur d'imbrication et la longueur.
+
+`scripts/code-mort.py` remplace vulture, qui rendait 108 lignes sur ce dépôt
+dont environ 80 de faux positifs structurels : les 38 commandes Typer, qui ne
+sont référencées que par un décorateur, et une quarantaine de fixtures pytest,
+injectées par nom. Ce script connaît ces mécanismes, plus le `__all__`, la
+documentation et la surface Python que les dépôts de labs importent. Il peut
+donc faire échouer un commit, ce que vulture ne pouvait pas.
+
+`scripts/complexite-ecran.py` est le seul contrôle qui regarde **la sortie** et
+non le code. Il exécute de vraies commandes à 80, 100, 120 et 160 colonnes et
+mesure huit grandeurs : hauteur, troncatures, colonnes de tableau, gestes
+proposés, termes de jargon, lignes de sortie d'outil brute, largeur minimale
+lisible, et impasses. La dernière punit la brièveté, pour que « simplifier » ne
+puisse pas se confondre avec « se taire » : un écran qui répond en une ligne
+sans proposer de geste coûte autant qu'un tableau illisible.
+
+Les scores sont arbitraires et le détail est toujours affiché à côté : ils
+servent à comparer deux versions du même écran, pas à décerner une note.
+
+**Une hausse peut être légitime.** Un écran qui explique davantage est plus
+lourd, et c'est parfois le bon choix. On la fige alors sciemment, en disant dans
+le message de commit pourquoi elle était nécessaire. Ce qui est interdit, c'est
+qu'elle passe sans que personne l'ait décidée.
+
 ### Les deux suites, et pourquoi elles sont séparées
 
 `tests/` importe le paquet et prouve que les fonctions font ce qu'elles disent.
@@ -227,9 +282,11 @@ uv run pre-commit install --install-hooks
 
 À chaque **commit** : contrôles d'hygiène (espaces en fin de ligne, fin de
 fichier, validité YAML/JSON/TOML, gros fichiers, conflits de merge), détection
-de clé privée, scan de secrets TruffleHog, `ruff` (lint + sécurité, autofix) et
-`mypy --strict`. La suite `pytest` complète tourne au **push**. Tout lancer à la
-main :
+de clé privée, scan de secrets TruffleHog, `ruff` (lint + sécurité, autofix),
+`mypy --strict`, et les deux cliquets de dette (complexité cognitive, code sans
+appelant). Au **push** : la suite `pytest` complète et la charge d'écran des
+parcours, qui joue de vraies commandes et prend une dizaine de secondes. Tout
+lancer à la main :
 
 ```bash
 uv run pre-commit run --all-files
@@ -254,6 +311,42 @@ Quand vous ajoutez, retirez ou modifiez une commande ou une option, mettez à
 jour **simultanément** : l'aide `help=_("…")` dans son module de `cli/`, les clés EN + FR,
 et la section `fullhelp_commands` correspondante dans les deux langues. Ne
 laissez jamais `fullhelp` décrire une commande qui n'existe plus.
+
+## Rendu terminal
+
+Six règles, chacune née d'un défaut mesuré sur un écran réel. Elles valent pour
+tout ce qui passe par `reporting/console.py`.
+
+- **Une seule couleur par état, jamais une par élément.** Le verdict de `check`
+  affichait une barre verte à côté d'un score rouge : deux couleurs pour un
+  seul fait, qui se contredisaient à l'œil. Vert, jaune ou rouge, et les deux
+  ensemble.
+- **La sémantique des couleurs est fixe** : cyan pour ce qui se tape, jaune
+  pour un avertissement, vert et rouge pour un résultat. Un panneau d'accueil
+  encadré de jaune dit « attention » à qui lit vite.
+- **Aucune ligne qui ne dit rien.** « Hints : aucun » occupait un tiers d'un
+  panneau pour annoncer une absence. Une information absente ne s'affiche pas.
+- **Des colonnes alignées plutôt que des phrases qui se replient.** L'accueil
+  de `run` listait ses commandes en phrases : elles se repliaient au milieu et
+  la suite repartait en marge, où elle se lisait comme une autre entrée. Une
+  `Table.grid` à deux colonnes règle le cas, et elle impose d'écrire des
+  descriptions qui tiennent.
+- **Pas de rembourrage gratuit.** Un écran qui revient après chaque commande se
+  mérite court : deux lignes vides ajoutées « pour aérer » coûtent plus qu'elles
+  ne rendent.
+- **De vrais pluriels.** `indice(s) utilisé(s)` est la marque d'un texte que
+  personne n'a relu : deux clés, et l'appelant choisit selon le compte.
+
+Deux conséquences pratiques. Le nom d'une commande (`dsoxlab check`) n'est pas
+une chaîne traduisible : c'est ce que l'utilisateur tape, il vit dans le code,
+et le garde-fou i18n l'accepte dès qu'une constante nommée dit ce qu'il est.
+Et une cellule de tableau porte une mesure, pas une phrase : si elle se replie
+sur trois lignes, c'est le texte qu'il faut raccourcir, pas la colonne qu'il
+faut élargir.
+
+Pour mesurer plutôt que juger, `python3 scripts/complexite-ecran.py` compte ce
+que chaque écran impose au lecteur. Il mesure la **charge**, jamais la beauté :
+une sortie peut être courte et laide.
 
 ## Conventions de commit
 

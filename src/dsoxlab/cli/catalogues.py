@@ -22,6 +22,7 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -90,7 +91,34 @@ def catalog_add(
         raise typer.Exit(1) from None
 
     success(_("catalog_installe", name=pose.id, path=str(pose.racine)))
+    _dire_les_collections_a_installer(pose.racine)
     info(_("catalog_installe_suite"))
+
+
+def _dire_les_collections_a_installer(racine: Path) -> None:
+    """Les collections que ce catalogue exige, si elles manquent.
+
+    C'est ici que le trou se refermait mal (kubernetes-dsoxlab-training#94) :
+    le catalogue déclarait ses collections ET documentait leur installation
+    dans son README, mais `catalog add` clone sous `~/.local/share/`, où
+    personne ne lit ce README. Deux utilisateurs ont donc perdu six jours sur
+    un lab qui échouait faute d'une commande qu'un fichier qu'ils ne verraient
+    jamais leur demandait de taper.
+
+    L'avis est posé juste après le clone, parce que c'est le moment où l'on
+    acquiert le besoin. Il ne lève pas : un catalogue s'installe aussi pour
+    lire ses labs, et `doctor` redira la même chose avant de les jouer.
+    """
+    from ..services.collections_ansible import geste_d_installation, mesurer
+
+    besoins = mesurer(racine)
+    if not besoins.manquantes:
+        return
+    info(_("catalog_collections_manquantes", names=", ".join(besoins.manquantes)))
+    info(_(
+        "catalog_collections_geste",
+        command=" ".join(geste_d_installation(besoins)),
+    ))
 
 
 @catalog_app.command("update", help=_("cmd_catalog_update_help"))

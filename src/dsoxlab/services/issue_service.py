@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from enum import Enum
 from importlib import metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import yaml
@@ -472,12 +472,3 @@ def construire_lien(
             return Lien(url=url, repli=essai)
 
     return Lien(url=url, repli=repli)
-
-
-def rapport_sans_journal(rapport: dict[str, Any]) -> dict[str, Any]:
-    """Le même rapport, ses lignes de journal en moins.
-
-    Recollecter coûterait une nouvelle série d'appels à ``--version`` alors
-    qu'on cherche seulement à raccourcir une URL.
-    """
-    return {**rapport, "journal": []}

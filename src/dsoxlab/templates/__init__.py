@@ -56,6 +56,18 @@ def demo_catalog() -> Path:
     return template_root() / "demo"
 
 
+def licence(nom: str = "cc-by-4.0") -> Path:
+    """Le texte NU d'une licence, à copier tel quel dans un catalogue.
+
+    Nu, et c'est la contrainte : GitHub ne reconnaît une licence qu'à son texte
+    officiel sans en-tête. Un paragraphe d'attribution ajouté au-dessus rend le
+    fichier méconnaissable, le dépôt est rapporté en `NOASSERTION`, et le
+    contrôle License de Scorecard tombe de 10 à 9. L'attribution va donc dans
+    le README, pas ici.
+    """
+    return template_root() / "licences" / f"{nom}.txt"
+
+
 def catalogues_manifeste() -> Path:
     """Le manifeste des catalogues connus, packagé avec l'outil.
 

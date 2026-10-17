@@ -52,6 +52,13 @@ _ENV_NIVEAU = "DSOXLAB_LOG"
 #: chaque message apparaîtrait autant de fois.
 _MARQUEUR = "_dsoxlab_handler"
 
+#: Verbosité demandée, mémorisée pour que l'affichage puisse s'y accorder.
+#:
+#: Le journal n'est pas le seul concerné par ``-v`` : une commande peut avoir
+#: une sortie courte par défaut et une sortie complète en verbeux. ``check`` en
+#: est le cas type, et le déduire du niveau d'un handler serait fragile.
+_verbosite = 0
+
 
 def chemin_journal() -> Path:
     """Le fichier de journal, sous le répertoire d'état XDG.
@@ -123,6 +130,9 @@ def configurer(verbosite: int = 0, *, debug: bool = False) -> None:
     if debug:
         verbosite = max(verbosite, 2)
 
+    global _verbosite  # noqa: PLW0603 - un réglage de processus, posé une fois
+    _verbosite = verbosite
+
     niveau_console = _NIVEAUX.get(verbosite, logging.DEBUG)
     force = _niveau_depuis_env()
     if force is not None:
@@ -149,6 +159,17 @@ def configurer(verbosite: int = 0, *, debug: bool = False) -> None:
     if fichier is not None:
         setattr(fichier, _MARQUEUR, True)
         racine.addHandler(fichier)
+
+
+def verbosite() -> int:
+    """Combien de ``-v`` la commande en cours a reçus (``--debug`` en vaut deux).
+
+    Sert aux affichages qui ont une forme courte par défaut et une forme
+    complète en verbeux. Rend 0 quand ``configurer()`` n'a pas été appelé, ce
+    qui est le cas d'un appel direct au moteur depuis un ``conftest.py`` : une
+    bibliothèque ne doit pas supposer qu'une CLI l'a précédée.
+    """
+    return _verbosite
 
 
 def dernieres_lignes(nombre: int = 40) -> list[str]:

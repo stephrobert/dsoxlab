@@ -19,7 +19,11 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '(^LICENSE$|\.md$)'
+        # `templates/licences/` porte des textes de licence qui doivent rester
+        # tels qu'ils sont publiés : GitHub ne reconnaît une licence qu'à son
+        # texte officiel nu, et un catalogue qui reçoit une copie reformatée
+        # serait rapporté en NOASSERTION.
+        exclude: '(^LICENSE$|\.md$|^src/dsoxlab/templates/licences/)'
       # `fuzz/corpus/` est hors du périmètre de l'hygiène, et pas par
       # commodité : ce sont des graines DÉLIBÉRÉMENT malformées, qui existent
       # pour être données à un fuzzer. Un JSON tronqué au milieu d'une chaîne
@@ -27,7 +31,7 @@ repos:
       # refuser retire au corpus le cas qu'il porte. Le contrat des documents,
       # lui, est tenu par les harnais eux-mêmes, pas par ces hooks.
       - id: end-of-file-fixer
-        exclude: '(^LICENSE$|^fuzz/corpus/)'
+        exclude: '(^LICENSE$|^fuzz/corpus/|^src/dsoxlab/templates/licences/)'
       - id: check-yaml
         exclude: '^fuzz/corpus/'
       - id: check-json
@@ -95,6 +99,58 @@ repos:
         pass_filenames: false
         files: '^(src/dsoxlab/.*\.py|docs/.*\.md|[A-Z]+(\.fr)?\.md|scripts/generer-doc\.py)$'
 
+      # La liste des catalogues ne s'écrit pas, elle se mesure. Elle a été
+      # écrite une fois, avec six dépôts, alors que le disque en portait douze :
+      # une campagne menée sur ces six a sauté 901 messages dans les six autres,
+      # sans qu'aucun contrôle le dise. Ce hook relit le disque et refuse une
+      # table périmée. Sans catalogue cloné à côté, il s'abstient au lieu de
+      # conclure, ce qui est le cas en CI.
+      - id: catalogues-readme
+        name: le README dit la même chose que le manifeste des catalogues
+        entry: python3 scripts/gen-catalogues.py --check
+        language: system
+        pass_filenames: false
+        files: '^(README(\.fr)?\.md|src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
+
+      # Le contrôle qui compte, et le seul qui ne peut pas tourner en CI : le
+      # manifeste dit-il la même chose que le DISQUE ? C'est lui qui attrape
+      # le défaut réel, six catalogues oubliés sur douze. Sans catalogue cloné
+      # à côté, il s'abstient au lieu de conclure.
+      - id: catalogues-mesures
+        name: le manifeste des catalogues est mesuré sur le disque
+        entry: python3 scripts/gen-catalogues.py --mesurer
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
+
+      # ── Qualité : la dette se paie en même temps qu'on produit ──────────────
+      #
+      # Ces trois hooks ne mesurent pas un absolu, ils mesurent une DÉRIVE. Un
+      # seuil absolu n'était pas jouable (35 blocs dépassent déjà les seuils, et
+      # les interdire d'un coup bloquerait tout commit) ; un cliquet l'est. Les
+      # relevés de référence vivent dans `scripts/*-reference.json` et ne
+      # peuvent que descendre : une amélioration non entérinée fait échouer le
+      # hook elle aussi, parce qu'une dette payée qui n'est pas enregistrée se
+      # reprend en silence au commit suivant.
+      #
+      # Ils appellent `python3` et non `uv run` : ils n'ont aucune dépendance
+      # hors de la bibliothèque standard, à dessein, pour qu'un cache uv en
+      # lecture seule ne puisse pas les désarmer.
+
+      - id: complexite
+        name: la complexité cognitive ne monte pas
+        entry: python3 scripts/complexite.py --verifier
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/.*\.py|scripts/complexite(-reference\.json|\.py))$'
+
+      - id: code-mort
+        name: aucun symbole sans appelant n'est apparu
+        entry: python3 scripts/code-mort.py --verifier
+        language: system
+        pass_filenames: false
+        files: '^(src/dsoxlab/.*\.py|tests/.*\.py|docs/.*\.md|scripts/code-mort(-reference\.json|\.py))$'
+
       # Full test suite runs on push (kept off the per-commit path for speed).
       - id: pytest
         name: pytest
@@ -102,3 +158,28 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+
+      # Au push seulement : il exécute de VRAIES commandes à plusieurs largeurs
+      # de terminal, ce qui prend une dizaine de secondes. C'est le seul
+      # contrôle qui regarde ce que l'apprenant a sous les yeux plutôt que la
+      # forme du code, et il attrape ce qu'aucun lint ne voit : un tableau
+      # illisible à 80 colonnes, une sortie d'outil déversée telle quelle, un
+      # écran qui répond en une ligne sans dire quoi faire.
+      - id: complexite-ecran
+        name: la charge d'écran des parcours ne monte pas
+        entry: python3 scripts/complexite-ecran.py --verifier
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      # Le verrou porte la version du `pyproject.toml` : la bouger sans
+      # relocker le rend périmé. Ce contrôle existait en CI, donc il attrapait
+      # l'erreur APRÈS le push. Mesuré le 2026-10-17 : une version bougée sur
+      # les douze catalogues a fait rougir les douze CI, là où un hook l'aurait
+      # dit au premier commit. Il est instantané et hors ligne.
+      - id: verrou-a-jour
+        name: uv.lock décrit bien le pyproject
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        files: '^(pyproject\.toml|uv\.lock)$'

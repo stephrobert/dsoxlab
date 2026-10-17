@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import webbrowser
@@ -38,6 +37,7 @@ from ..reporting import (
     error,
     info,
     machine,
+    note,
     print_doctor,
     print_fullhelp,
     success,
@@ -46,7 +46,6 @@ from ..reporting import (
 from ..security.terminal import texte_affichable
 from ..services import (
     Fix,
-    FixKind,
     collect_checks,
 )
 from ..services.doctor import (
@@ -54,6 +53,7 @@ from ..services.doctor import (
     EXIT_DOCTOR_REQUIS_KO,
     DoctorReport,
 )
+from ..services.remediation import Application, appliquer, obstacle, planifier
 from ..utils.shell import CommandError, run_command
 from ._commun import (
     LabHomeOption,
@@ -258,84 +258,81 @@ def doctor(
         return
 
     print_doctor(report)
-
-    if fix:
-        correctifs = [
-            (c.label, c.fix) for c in report.fixable() if c.fix is not None
-        ]
-        if not correctifs:
-            info(_("fix_nothing"))
-            if strict:
-                _verdict_strict(report)
-            return
-
-        # Un correctif MANUAL n'est JAMAIS exécuté : le geste appartient à
-        # l'humain, `--fix` se contente de le nommer. Tout le reste s'exécute,
-        # y compris les catégories à effet différé : c'est le message d'après
-        # qui change, pas la décision de jouer la commande.
-        manuels = [
-            (label, correctif) for label, correctif in correctifs
-            if correctif.kind is FixKind.MANUAL
-        ]
-        executables = [
-            (label, correctif) for label, correctif in correctifs
-            if correctif.kind is not FixKind.MANUAL
-        ]
-        for label, correctif in manuels:
-            info(_("fix_manual", label=label, command=correctif.display))
-        if not executables:
-            if strict:
-                _verdict_strict(report)
-            return
-
-        # Pré-conditions sudo : si au moins un correctif passe par sudo, on
-        # vérifie que l'env est compatible avant d'attaquer (TTY pour
-        # taper le password, sudo dispo, et idéalement on cache le
-        # password une seule fois pour toute la cascade).
-        sudo_fixes = [c for _label, c in executables if c.requires_sudo]
-        if sudo_fixes:
-            if not sys.stdin.isatty():
-                error(_("fix_needs_tty"))
-                raise typer.Exit(1)
-            if shutil.which("sudo") is None:
-                error(_("fix_no_sudo"))
-                raise typer.Exit(1)
-
-            # Pré-cache les credentials sudo : un seul prompt password
-            # pour toute la cascade. Sans ce sudo -v, l'apprenant
-            # pourrait avoir à retaper son password à chaque commande
-            # (si sudo timestamp_timeout=0 ou si la cascade dépasse 5min).
-            info(_("fix_sudo_preauth", count=len(sudo_fixes)))
-            # check=False : un mot de passe refusé ou un Ctrl-C sur le prompt
-            # sudo est une réponse de l'utilisateur, pas une panne. On la
-            # traduit en message et en code de sortie, pas en trace Python.
-            preauth = subprocess.run(["sudo", "-v"], check=False)
-            if preauth.returncode != 0:
-                error(_("fix_sudo_failed"))
-                raise typer.Exit(1)
-
-        info(_("fix_count", count=len(executables)))
-        for label, correctif in executables:
-            info(f"[bold]{label}[/bold] → {correctif.display}")
-            code = _executer_correctif(correctif)
-            if code == 0:
-                success(_("fix_success", label=label))
-                # Dire l'effet différé au moment du succès, sans quoi le
-                # prochain `doctor` remontre la même ligne rouge et
-                # l'utilisateur conclut, à tort, que le correctif a échoué.
-                if correctif.kind is FixKind.NEEDS_RELOGIN:
-                    warn(_("fix_needs_relogin", label=label))
-                elif correctif.kind is FixKind.NEEDS_REBOOT:
-                    warn(_("fix_needs_reboot", label=label))
-            else:
-                error(_("fix_failure", label=label, code=code))
-        info(_("fix_rerun"))
+    joue = _reparer(report) if fix else False
 
     if strict:
         # Après des correctifs, l'état de la machine a changé : juger sur le
-        # rapport d'avant dirait faux, et dans le mauvais sens — un `--fix`
+        # rapport d'avant dirait faux, et dans le mauvais sens : un `--fix`
         # réussi sortirait quand même en échec. On remesure.
-        _verdict_strict(collect_checks(root, repo_meta) if fix else report)
+        _verdict_strict(collect_checks(root, repo_meta) if joue else report)
+
+
+def _reparer(report: DoctorReport) -> bool:
+    """Joue ce que `--fix` peut jouer, et dit si la machine a changé.
+
+    Le booléen rendu décide de la remesure : sans correctif joué, remesurer
+    coûterait un diagnostic complet pour un rapport identique.
+    """
+    plan = planifier(report)
+    if plan.vide:
+        info(_("fix_nothing"))
+        return False
+
+    for label, correctif in plan.manuels:
+        info(_("fix_manual", label=label, command=correctif.display))
+    if not plan.executables:
+        return False
+
+    empechement = obstacle(plan)
+    if empechement is not None:
+        error(_(empechement))
+        raise typer.Exit(1)
+    if plan.correctifs_sudo:
+        _preauthentifier(plan.correctifs_sudo)
+
+    info(_("fix_count", count=len(plan.executables)))
+    appliquer(
+        plan.executables,
+        _executer_correctif,
+        sur_debut=_dire_la_commande,
+        sur_resultat=_dire_le_resultat,
+    )
+    info(_("fix_rerun"))
+    return True
+
+
+def _dire_la_commande(label: str, correctif: Fix) -> None:
+    """La commande est nommée avant de partir : sa sortie arrive sur le même
+    terminal, et sans cette ligne rien ne dit à qui elle appartient."""
+    info(f"[bold]{label}[/bold] → {correctif.display}")
+
+
+def _preauthentifier(combien: int) -> None:
+    """Un seul mot de passe pour toute la cascade.
+
+    Sans ce `sudo -v`, l'utilisateur peut avoir à le retaper à chaque commande,
+    si `timestamp_timeout` vaut 0 ou si la cascade dépasse cinq minutes.
+    """
+    info(_("fix_sudo_preauth", count=combien))
+    # check=False : un mot de passe refusé ou un Ctrl-C sur le prompt sudo est
+    # une réponse de l'utilisateur, pas une panne. On la traduit en message et
+    # en code de sortie, pas en trace Python.
+    if subprocess.run(["sudo", "-v"], check=False).returncode != 0:
+        error(_("fix_sudo_failed"))
+        raise typer.Exit(1)
+
+
+def _dire_le_resultat(application: Application) -> None:
+    if not application.ok:
+        error(_("fix_failure", label=application.label, code=application.code))
+        return
+    success(_("fix_success", label=application.label))
+    # L'effet différé se dit au moment du succès, sans quoi le prochain
+    # `doctor` remontre la même ligne rouge et l'utilisateur conclut, à tort,
+    # que le correctif a échoué.
+    avis = application.avis_differe
+    if avis is not None:
+        warn(_(avis, label=application.label))
 
 
 def _executer_correctif(correctif: Fix) -> int:
@@ -398,10 +395,31 @@ def demo(
 
     success(_("demo_installee", path=str(installation.racine)))
 
+    # Rendre la démonstration ACTIVE, et c'est le parcours joué qui l'a imposé :
+    # sans cela, les trois commandes affichées juste en dessous échouaient
+    # toutes les trois sur « Lab introuvable » pour qui n'avait pas fait le
+    # `cd` que ce message glissait sur une ligne séparée. `catalog add` posait
+    # déjà son catalogue actif et le disait ; `demo` affichait un chemin de
+    # quatre-vingt-dix caractères et laissait l'apprenant le recopier.
+    #
+    # L'échec est volontairement silencieux : la démonstration est installée,
+    # et un pointeur qu'on n'a pas pu écrire ne doit pas transformer un succès
+    # en erreur. Le chemin reste affiché juste après, donc le `cd` demeure
+    # possible.
+    from ..services import catalog
+
+    try:
+        catalog.definir_actif(installation.racine)
+    except Exception:
+        # Un `except Exception` nu est accepté ici parce que la cause ne change
+        # pas le geste : la démonstration est posée, le pointeur est un confort.
+        logger.warning("could not mark the demo catalog as active", exc_info=True)
+
     # La marche à suivre est construite depuis le catalogue réellement
     # installé : elle ne peut donc pas décrire un lab qui n'y serait plus.
     premier = installation.labs[0] if installation.labs else ""
-    info(_("demo_suite", path=str(installation.racine), lab=premier))
+    info(_("demo_suite", lab=premier))
+    note(_("demo_repertoire", path=str(installation.racine)))
 
 
 # ── catalog ───────────────────────────────────────────────────────────────────

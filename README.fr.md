@@ -113,6 +113,36 @@ sont dans **[la page de l'appliance](docs/appliance.fr.md)**.
 
 ---
 
+## Les catalogues
+
+Douze catalogues sont joués par ce moteur, et dsoxlab ne connaît aucun de
+leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
+`lab.yaml`. La table ci-dessous est **mesurée sur le disque**, jamais écrite
+à la main, parce qu'une liste écrite de six en a caché six autres une fois.
+
+<!-- CATALOGUES:START -->
+
+| Catalogue | Labs | Ce qu'il enseigne |
+|---|---:|---|
+| [`ansible-training`](https://github.com/stephrobert/ansible-training) | 113 | Ansible, du premier playbook aux collections |
+| [`terraform-dsoxlab-training`](https://github.com/stephrobert/terraform-dsoxlab-training) | 91 | Terraform et l'infrastructure as code |
+| [`linux-dsoxlab-training`](https://github.com/stephrobert/linux-dsoxlab-training) | 89 | Administration Linux, RHCSA et LFCS |
+| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 64 | Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS |
+| [`iam-dsoxlab-training`](https://github.com/stephrobert/iam-dsoxlab-training) | 16 | Gestion des identités et des accès, avec Keycloak et un annuaire |
+| [`devsecops-dsoxlab-training`](https://github.com/stephrobert/devsecops-dsoxlab-training) | 13 | DevSecOps, une application durcie version après version |
+| [`dev-pour-ops-dsoxlab-training`](https://github.com/stephrobert/dev-pour-ops-dsoxlab-training) | 10 | Le développement pour les Ops, autour d'un outil hérité |
+| [`python-dsoxlab-training`](https://github.com/stephrobert/python-dsoxlab-training) | 7 | Python, la construction pas à pas d'un outil de sécurité |
+| [`cicd-dsoxlab-training`](https://github.com/stephrobert/cicd-dsoxlab-training) | 5 | Les pipelines CI/CD, sur une forge locale et sans compte en ligne |
+| [`cloud-dsoxlab-training`](https://github.com/stephrobert/cloud-dsoxlab-training) | 4 | Le cloud, pratiqué contre un émulateur local |
+| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 1 | Les conteneurs, Docker, Compose et Swarm |
+| [`github-actions-training`](https://github.com/stephrobert/github-actions-training) | 1 | GitHub Actions, des workflows rejoués en local |
+
+_414 labs dans 12 catalogues. Cette table est générée depuis `src/dsoxlab/templates/catalogues.yml` par `scripts/gen-catalogues.py`, le manifeste que lit `dsoxlab catalog list`._
+
+<!-- CATALOGUES:END -->
+
+---
+
 ## Documentation
 
 Chaque page nomme son public dès ses premières lignes, et

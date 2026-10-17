@@ -258,28 +258,31 @@ def run_playbook(
                 injoignable=nom == "runner_on_unreachable",
             ))
 
-        kwargs: dict[str, Any] = {}
-        if True:
-            def _safe_handler(event: dict[str, Any]) -> bool:
-                """ansible-runner event_handler : doit retourner True
-                pour continuer (False arrête le run). On wrap le
-                callback utilisateur pour ne pas tuer le playbook si
-                la CLI plante."""
-                # La collecte d'abord, et hors du try de l'appelant : perdre
-                # le diagnostic parce que la barre de progression a planté
-                # serait exactement le défaut qu'on corrige.
+        # Le handler est installé SANS CONDITION, et c'est le fond du sujet : il
+        # collecte les tâches en échec, ce dont le diagnostic a besoin même
+        # quand aucun appelant ne veut d'événements. Il était enveloppé dans un
+        # `if True:` resté d'une version où il ne servait qu'à `on_event` : la
+        # condition ne gardait plus rien, elle indentait 20 lignes pour rien.
+        def _safe_handler(event: dict[str, Any]) -> bool:
+            """ansible-runner event_handler : doit retourner True
+            pour continuer (False arrête le run). On wrap le
+            callback utilisateur pour ne pas tuer le playbook si
+            la CLI plante."""
+            # La collecte d'abord, et hors du try de l'appelant : perdre
+            # le diagnostic parce que la barre de progression a planté
+            # serait exactement le défaut qu'on corrige.
+            try:
+                _collecter(event)
+            except Exception:
+                logger.exception("could not collect the ansible failure event")
+            if on_event is not None:
                 try:
-                    _collecter(event)
-                except Exception:
-                    logger.exception("could not collect the ansible failure event")
-                if on_event is not None:
-                    try:
-                        on_event(event)
-                    except Exception:  # le callback ne doit pas tuer le playbook
-                        logger.exception("on_event callback failed")
-                return True
+                    on_event(event)
+                except Exception:  # le callback ne doit pas tuer le playbook
+                    logger.exception("on_event callback failed")
+            return True
 
-            kwargs["event_handler"] = _safe_handler
+        kwargs: dict[str, Any] = {"event_handler": _safe_handler}
 
         def _prevenir(rang: int) -> None:
             """Fait remonter le Ctrl-C dans le flux d'events du playbook.
