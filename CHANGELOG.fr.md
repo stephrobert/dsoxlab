@@ -7,6 +7,42 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.5.1] - 2026-10-17
+
+### Ajouté
+
+- **`new catalog` produit la chaîne de publication, et non la seule CI.** Un
+  catalogue qu'il créait portait **un** workflow, `ci.yml`. Pas de
+  `release.yml`, pas de `attester.yml`, pas de `RELEASING.md` : il n'avait
+  aucun moyen de publier. Mesuré le 2026-10-17, quatre catalogues ont dû
+  recevoir ces fichiers à la main, copiés depuis un dépôt frère, et **la copie
+  a échoué** : le `release.yml` du dépôt source empaquetait `meta.fr.yml` et
+  `curriculums.yml`, absents de la cible, si bien que `tar` sortait en 2 sous
+  `set -euo pipefail` et que le premier tag d'un catalogue n'a rien publié. Le
+  message « Cannot stat » se perdait au milieu d'un job de build.
+
+  Le socle produit désormais `.github/workflows/release.yml`,
+  `.github/workflows/attester.yml`, `RELEASING.md` et `RELEASING.fr.md`. Le
+  bundle distingue les chemins **requis** des chemins **facultatifs** : un
+  requis absent reste une erreur, et le message le nomme au lieu de laisser
+  `tar` parler depuis le milieu de sa liste ; un facultatif absent n'est rien.
+  `curriculums.yml` est un programme de certification, `mise.toml` et
+  `validation-labs.json` de l'outillage, `scripts` et `uv.lock` n'existent pas
+  encore dans un catalogue qui vient d'être créé.
+
+### Corrigé
+
+- **Le cliquet qui empêche la dette de revenir.**
+  `tests/test_socle_du_catalogue.py` lit désormais le tableau `REQUIS` du
+  `release.yml` produit et vérifie que **chacun** de ses chemins existe dans un
+  catalogue neuf. Il vérifie aussi que le workflow se déclenche sur un tag,
+  qu'il appelle `attester.yml` au lieu d'attester depuis le job de build, ce
+  qu'exige SLSA Build Level 3, et qu'aucun chemin n'est à la fois requis et
+  facultatif. Prouvé par trois mutations, toutes attrapées.
+
+  Sans lui, la dette revient au premier chemin ajouté au bundle sans être
+  ajouté au socle.
+
 ## [0.5.0] - 2026-10-17
 
 ### Ajouté
