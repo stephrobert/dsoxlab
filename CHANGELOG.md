@@ -7,6 +7,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-10-17
+
+### Fixed
+
+- **The socle no longer runs the engine without a version bound.** Seven freshly
+  created catalogs revealed it on 2026-10-17: their CI carried
+  `uv tool install dsoxlab` and their pre-commit
+  `entry: dsoxlab validate-structure`. The second is the worse of the two, since
+  it uses the `dsoxlab` on `PATH`, that is whatever happens to sit on the
+  contributor's machine. The twelve established catalogs had been aligned on a
+  common bound the very same day, so every new catalog was born carrying the
+  debt that had just been paid off, in a form the fix did not even cover.
+
+  Both now declare `dsoxlab>=<version that wrote the catalog>`. That is the only
+  bound one can assert without analysing the content: a socle produced by 0.5.2
+  assumes at least 0.5.2. A value frozen in the template would go stale with the
+  first contract that gains a field, which is precisely what is being fixed.
+
+  The `uv tool install dsoxlab` lines of the READMEs and CONTRIBUTING files stay
+  unbounded on purpose: they address a learner, who should take the latest
+  version. They are instructions, not calls.
+
+- **`scripts/gen-catalogues.py --mesurer` names what it leaves out.** It answered
+  « manifeste en accord avec le disque (12 catalogues) » while the disk held
+  **nineteen**: a single line, `if labs:`, skipped every catalog without labs in
+  silence. The filter is defensible, since `dsoxlab catalog list` has nothing to
+  offer from an empty catalog; the message was not, since it claimed agreement
+  having discarded a third of the disk.
+
+  A second defect hid behind the first: a catalog listed in the manifest that
+  dropped to zero labs was reported as « introuvable sur le disque : vérifie
+  qu'il n'a pas été renommé », sending the reader after a rename that never
+  happened.
+
+### Added
+
+- **A ratchet for each.** `tests/test_socle_du_catalogue.py` rejects any
+  unbounded engine call in what the socle *executes*, and checks that the bound
+  equals the engine version rather than a frozen value. Comments that quote
+  `uvx dsoxlab` to explain why it is not used are exempt, otherwise the
+  justification could not be written. Proved by three mutations, each caught,
+  two of them the exact defects observed on the seven new catalogs.
+
 ## [0.5.1] - 2026-10-17
 
 ### Added

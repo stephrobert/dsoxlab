@@ -7,6 +7,57 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.5.2] - 2026-10-17
+
+### Corrigé
+
+- **Le socle ne lance plus le moteur sans borne de version.** Sept catalogues
+  fraîchement créés l'ont révélé le 2026-10-17 : leur CI portait
+  `uv tool install dsoxlab` et leur pre-commit
+  `entry: dsoxlab validate-structure`. Le second est le pire, car il emploie le
+  `dsoxlab` du `PATH`, c'est-à-dire ce qui traîne sur la machine du
+  contributeur. Les douze catalogues établis venaient d'être alignés sur une
+  borne commune le même jour : tout catalogue neuf naissait donc avec la dette
+  qu'on venait de solder, et sous une forme que la correction ne couvrait même
+  pas.
+
+  Les deux déclarent désormais `dsoxlab>=<version qui a écrit le catalogue>`.
+  C'est la seule borne affirmable sans analyser le contenu : un socle produit
+  par la 0.5.2 suppose au moins la 0.5.2. Une valeur figée dans le gabarit se
+  périmerait au premier contrat qui gagne un champ, ce qui est exactement le
+  défaut corrigé.
+
+  Les `uv tool install dsoxlab` des README et des CONTRIBUTING restent nus à
+  dessein : ils s'adressent à un apprenant, qui doit prendre la dernière
+  version. Ce sont des instructions, pas des appels.
+
+- **`scripts/gen-catalogues.py --mesurer` nomme ce qu'il écarte.** Il répondait
+  « manifeste en accord avec le disque (12 catalogues) » quand le disque en
+  portait **dix-neuf** : une seule ligne, `if labs:`, sautait en silence tout
+  catalogue sans lab. Le filtre se défend, puisque `dsoxlab catalog list` n'a
+  rien à proposer d'un catalogue vide ; le message ne se défendait pas,
+  puisqu'il annonçait un accord en ayant écarté un tiers du disque.
+
+  C'est le défaut même que ce script existait pour empêcher : la liste des
+  catalogues avait déjà été écrite une fois avec six entrées quand le disque en
+  portait douze, et 901 messages avaient été sautés sans qu'aucun contrôle le
+  dise. Partir du disque ne suffit pas, il faut dire ce qu'on en écarte.
+
+  Un second défaut se cachait derrière le premier : un catalogue inscrit au
+  manifeste qui tombait à zéro lab était signalé « introuvable sur le disque :
+  vérifie qu'il n'a pas été renommé », envoyant chercher un renommage qui
+  n'avait pas eu lieu.
+
+### Ajouté
+
+- **Un cliquet pour chacun.** `tests/test_socle_du_catalogue.py` refuse tout
+  appel non borné dans ce que le socle EXÉCUTE, et vérifie que la borne vaut la
+  version du moteur et non une valeur figée. Les commentaires qui citent
+  `uvx dsoxlab` pour expliquer pourquoi on ne l'emploie pas sont exemptés, sans
+  quoi la justification serait impossible à écrire. Prouvé par trois mutations,
+  toutes attrapées, dont deux sont les défauts exactement observés sur les sept
+  nouveaux catalogues.
+
 ## [0.5.1] - 2026-10-17
 
 ### Ajouté

@@ -107,7 +107,13 @@ def _est_un_clone_local(racine: Path) -> bool:
 
 
 def _catalogues_du_disque() -> dict[str, int]:
-    """Les catalogues trouvés à côté de ce dépôt, et leur nombre de labs."""
+    """TOUS les catalogues trouvés à côté de ce dépôt, zéro lab compris.
+
+    Le filtrage des catalogues vides se fait chez l'appelant, et il s'ANNONCE.
+    Le faire ici revenait à écarter un tiers du disque en silence : le
+    2026-10-17, sept catalogues neufs existaient et le garde-fou annonçait
+    « en accord avec le disque (12 catalogues) ».
+    """
     trouves: dict[str, int] = {}
     for chemin in sorted(VOISINS.iterdir()):
         if not chemin.is_dir():
@@ -116,19 +122,28 @@ def _catalogues_du_disque() -> dict[str, int]:
             continue
         if _est_un_clone_local(chemin):
             continue
-        labs = _labs_sur_le_disque(chemin)
-        if labs:
-            trouves[chemin.name] = labs
+        trouves[chemin.name] = _labs_sur_le_disque(chemin)
     return trouves
 
 
 def _mesurer() -> int:
     """Le manifeste dit-il la même chose que le disque ?"""
-    disque = _catalogues_du_disque()
-    if not disque:
+    tout = _catalogues_du_disque()
+    if not tout:
         print("aucun catalogue cloné à côté de ce dépôt : rien n'a pu être "
               "mesuré, donc rien n'est conclu.", file=sys.stderr)
         return 0
+
+    # Un catalogue sans lab n'a rien à proposer dans `dsoxlab catalog list` :
+    # il n'est donc pas comparé au manifeste. Mais il est NOMMÉ, parce qu'un
+    # contrôle qui écarte sans le dire laisse croire qu'il a tout regardé.
+    disque = {nom: labs for nom, labs in tout.items() if labs}
+    vides = sorted(nom for nom, labs in tout.items() if not labs)
+    if vides:
+        print(f"{len(vides)} catalogue(s) sans lab, écarté(s) de la "
+              f"comparaison : {', '.join(vides)}")
+        print("   Ils n'ont rien à proposer dans `dsoxlab catalog list`. Ils "
+              "s'y inscriront dès leur premier lab.")
 
     inscrits = {}
     for entree in _manifeste():
@@ -149,6 +164,14 @@ def _mesurer() -> int:
                 f"en porte {labs}"
             )
     for nom in sorted(set(inscrits) - set(disque)):
+        if nom in tout:
+            # Il est bien là, mais il a perdu ses labs. Envoyer chercher un
+            # renommage ici serait un faux diagnostic.
+            ecarts.append(
+                f"{nom} est dans le manifeste mais ne porte plus AUCUN lab sur "
+                "le disque : `dsoxlab catalog list` le propose pour rien"
+            )
+            continue
         ecarts.append(
             f"{nom} est dans le manifeste mais introuvable sur le disque : "
             "vérifie qu'il n'a pas été renommé"
@@ -160,8 +183,9 @@ def _mesurer() -> int:
         for e in ecarts:
             print(f"  {e}", file=sys.stderr)
         return 1
-    print(f"manifeste en accord avec le disque ({len(disque)} catalogues, "
-          f"{sum(disque.values())} labs)")
+    print(f"manifeste en accord avec le disque : {len(disque)} catalogue(s) "
+          f"comparé(s), {sum(disque.values())} labs"
+          + (f", {len(vides)} sans lab écarté(s)" if vides else ""))
     return 0
 
 

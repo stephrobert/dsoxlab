@@ -33,6 +33,12 @@ pour ce qu'il exécute.
 
 from __future__ import annotations
 
+#: Le plancher commun aux douze catalogues établis, posé le 2026-10-17. Il ne
+#: sert que de repli quand la version du moteur est introuvable.
+from dsoxlab import __version__
+
+_PLANCHER_COMMUN = "0.5.0"
+
 # Les actions sont épinglées par SHA de 40 caractères, avec la version en
 # commentaire : un tag est déplaçable, un SHA non. Ces quatre-là sont celles
 # qui passent aujourd'hui dans la CI des douze catalogues, relevées plutôt
@@ -834,7 +840,16 @@ jobs:
         uses: astral-sh/setup-uv@{sha_uv} # v10.2.0
 
       - name: Install dsoxlab
-        run: uv tool install dsoxlab
+        # La borne est DÉCLARÉE, et non supposée. `uv tool install dsoxlab`
+        # installe « ce que PyPI publie aujourd'hui » : le jour où le contrat
+        # gagne un champ, le message accuse le catalogue (« cette clé n'est pas
+        # dans le contrat ») au lieu de dire que le moteur est trop ancien.
+        # Avec la borne, uv répond « aucune version ne satisfait la
+        # contrainte », ce qui nomme le bon coupable.
+        #
+        # La valeur est celle du moteur qui a ÉCRIT ce catalogue : c'est la
+        # seule qu'on puisse affirmer sans analyser son contenu.
+        run: uv tool install 'dsoxlab>={moteur}'
 
       - name: List the labs
         # D'ABORD : un `lab.yaml` qui lève au parsing disparaît du catalogue
@@ -876,7 +891,12 @@ repos:
     hooks:
       - id: contrat-valide
         name: le contrat du catalogue est valide
-        entry: dsoxlab validate-structure
+        # `entry: dsoxlab …` emploierait le moteur du PATH, c'est-à-dire ce qui
+        # traîne sur la machine du contributeur. `uvx` avec une borne prend une
+        # version DÉCLARÉE, la même qu'en CI, et les guillemets sont
+        # nécessaires : sans eux, la ligne recopiée dans un terminal crée un
+        # fichier nommé `=0.5.0` par redirection.
+        entry: uvx 'dsoxlab>={moteur}' validate-structure
         language: system
         pass_filenames: false
 
@@ -1916,6 +1936,28 @@ def licence_par_defaut() -> str:
     return licence().read_text(encoding="utf-8")
 
 
+def version_du_moteur() -> str:
+    """La version de dsoxlab qui écrit le catalogue, pour en borner les appels.
+
+    Un catalogue produit par une version suppose au moins cette version : c'est
+    la seule borne affirmable sans analyser son contenu. Une valeur figée dans
+    le gabarit se périmerait au premier contrat qui gagne un champ.
+
+    C'est la version INSTALLÉE qui est lue, par `importlib.metadata`, et non
+    celle du `pyproject.toml` du source. Juste après un bump, le socle borne
+    donc encore à la version précédente jusqu'à ce que le tool soit réinstallé.
+    C'est le comportement voulu : la borne doit nommer le moteur qui a
+    réellement écrit le catalogue, pas un numéro qui n'existe pas encore sur
+    PyPI et qu'aucun `uvx` ne saurait satisfaire.
+
+    Une version inconnue (`0.0.0+unknown`, quand la distribution n'est pas
+    installée) ne doit pas produire une borne absurde : on retombe alors sur le
+    plancher commun des douze catalogues établis, décidé le 2026-10-17.
+    """
+    brute = __version__.split("+")[0]
+    return brute if brute and brute != "0.0.0" else _PLANCHER_COMMUN
+
+
 def fichiers_du_socle(identifiant: str) -> dict[str, str]:
     """Les fichiers du socle, par chemin relatif à la racine du catalogue.
 
@@ -1940,12 +1982,13 @@ def fichiers_du_socle(identifiant: str) -> dict[str, str]:
         "CHANGELOG.fr.md": CHANGELOG_FR,
         ".github/workflows/ci.yml": CI.format(
             sha_harden=_SHA_HARDEN, sha_checkout=_SHA_CHECKOUT, sha_uv=_SHA_SETUP_UV,
+            moteur=version_du_moteur(),
         ),
         ".github/workflows/release.yml": RELEASE.format(id=identifiant),
         ".github/workflows/attester.yml": ATTESTER.format(id=identifiant),
         "RELEASING.md": RELEASING_EN.format(id=identifiant),
         "RELEASING.fr.md": RELEASING_FR.format(id=identifiant),
-        ".pre-commit-config.yaml": PRE_COMMIT,
+        ".pre-commit-config.yaml": PRE_COMMIT.format(moteur=version_du_moteur()),
         "tests/test_contrat_du_catalogue.py": TEST_CONTRAT,
         "tests/outils/pas_de_tiret_cadratin.py": TEST_TIRET,
     }
