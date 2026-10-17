@@ -251,8 +251,16 @@ def _valider(
     if not evaluation.enregistre and not quiet:
         # Rien n'a été mesuré : le dire, plutôt que d'afficher un 0 que
         # l'apprenant lirait comme un exercice raté.
-        error(_("check_rien_mesure"))
-        info(_("check_rien_mesure_suite"))
+        # Deux causes, deux phrases : un pytest qui n'a RIEN pu collecter
+        # n'est pas une suite collectée puis entièrement skippée. Les
+        # confondre envoyait chercher un conftest.py qui lève là où le lab
+        # n'était simplement pas démarré.
+        if result.total == 0:
+            error(_("check_rien_mesure"))
+            info(_("check_rien_mesure_suite"))
+        else:
+            error(_("check_tout_skippe", total=result.total))
+            info(_("check_tout_skippe_suite", lab_id=texte_affichable(lab.id)))
         return result, evaluation.score, evaluation.max_score
     if quiet:
         # Mode machine : le tableau Rich et le message de confirmation

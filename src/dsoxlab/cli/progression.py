@@ -116,12 +116,31 @@ def check(
                 # tableau de bord qui l'ignorerait afficherait un lab « raté »
                 # là où rien n'a pu être joué.
                 "recorded": a_mesure(result),
+                # Les tests collectés qui n'ont PAS tourné, et le verdict en
+                # un mot. `ok` reste ce qu'il était, « aucun test n'a
+                # échoué », ce qui est vrai d'une suite entièrement skippée :
+                # c'est `status` qui distingue une réussite d'une absence de
+                # mesure, et un lecteur qui s'arrêtait à `ok` notait 0 un lab
+                # que personne n'avait joué.
+                "skipped": result.skipped,
+                "status": (
+                    "not_measured" if not a_mesure(result)
+                    else "passed" if result.ok
+                    else "failed"
+                ),
                 "output": result.output,
             },
         })
         if not result.ok:
             raise typer.Exit(1)
         return
+    if not a_mesure(result):
+        # Ni vert ni rouge : rien n'a été mesuré, et `_run_check` l'a déjà dit
+        # avec la cause. Ce qui manquait était de ne PAS enchaîner sur la
+        # phrase du succès : les deux se contredisaient à l'écran, sous un
+        # « 0 / 100 ». pytest sort en 0 quand tout skippe, donc `result.ok`
+        # ne peut pas servir de verdict ici.
+        raise typer.Exit(1)
     if result.ok:
         success(_("all_tests_passed"))
         info(_("check_tip_submit"))

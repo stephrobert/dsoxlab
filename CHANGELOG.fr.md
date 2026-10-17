@@ -7,6 +7,41 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.4.1] - 2026-10-17
+
+### Corrigé
+
+- **Une suite entièrement skippée annonçait le succès, notait 0, et inscrivait
+  ce 0.** Trouvé le lendemain de la 0.4.0, par la session qui réatteste les labs
+  du site, sur un `check` dont les cinq tests avaient tous skippé :
+
+  ```json
+  "ok": true, "passed": 0, "total": 5, "score": 0, "recorded": true
+  ```
+
+  suivi de « Tous les tests sont passés. » Le moteur concluait trois fois, et
+  dans deux directions opposées : il annonçait le succès, parce que `ok`
+  reprenait le code de retour de pytest, qui sort en 0 quand tout skippe ; il
+  notait 0 ; et il écrivait ce 0 dans l'historique de l'apprenant. Un lecteur
+  automatisé devait choisir entre `ok: true` et `score: 0`, qui se
+  contredisent, et un apprenant lisait « tous les tests sont passés » sous un
+  « 0 / 100 ».
+
+  La notion existait pourtant, `a_mesure()`, et un seul endroit décidait. C'est
+  son implémentation qui était fausse : `total > 0` est vrai pour cinq tests
+  skippés, puisque le total les compte. **Mesurer, c'est exécuter.** Une suite
+  entièrement skippée n'est donc plus ni une réussite ni un échec : rien n'est
+  enregistré, le message le dit et nomme la cause habituelle (le lab n'a jamais
+  été démarré), et `check` sort en code non nul au lieu d'emprunter la phrase
+  du succès.
+
+  La sortie machine gagne `skipped` et `status` (`passed`, `failed`,
+  `not_measured`). `ok` ne change pas, parce que c'est un contrat public : il
+  dit toujours « aucun test n'a échoué », ce qui reste vrai d'une suite
+  skippée. C'est `status` qui tranche, et `recorded` qui dit si la note vaut
+  quelque chose. Un harnais qui s'arrêtait à `ok` notait 0 des labs que
+  personne n'avait joués.
+
 ## [0.4.0] - 2026-10-16
 
 ### Ajouté

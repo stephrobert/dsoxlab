@@ -7,6 +7,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-10-17
+
+### Fixed
+
+- **A fully skipped test suite claimed success, scored 0, and recorded that 0.**
+  Found the day after 0.4.0 shipped, by the session re-attesting the site's
+  labs, on a `check` whose five tests had all skipped:
+
+  ```json
+  "ok": true, "passed": 0, "total": 5, "score": 0, "recorded": true
+  ```
+
+  followed by `All tests passed.` The engine concluded three times, in two
+  opposite directions: it announced success, because `ok` echoed pytest's exit
+  code, and pytest exits 0 when everything skips; it scored 0; and it wrote
+  that 0 into the learner's history. An automated reader had to choose between
+  `ok: true` and `score: 0`, which contradict each other, and a learner read
+  "All tests passed" under a "0 / 100".
+
+  The notion already existed, `a_mesure()`, with a single place deciding. Its
+  implementation was what was wrong: `total > 0` is true for five skipped
+  tests, because the total counts them. **Measuring means running.** A fully
+  skipped run is now neither a pass nor a failure: nothing is recorded, the
+  message says so and names the usual cause (the lab was never started), and
+  `check` exits non-zero instead of borrowing the success line.
+
+  The machine output gains `skipped` and `status` (`passed`, `failed`,
+  `not_measured`). `ok` is unchanged, because it is a public contract: it still
+  means "no test failed", which is true of a skipped suite. `status` is what
+  settles it, and `recorded` says whether the score means anything. A harness
+  that stopped at `ok` was scoring 0 on labs nobody had played.
+
 ## [0.4.0] - 2026-10-16
 
 ### Added

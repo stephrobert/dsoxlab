@@ -1048,6 +1048,14 @@ silent.
     # ── check ─────────────────────────────────────────────────────────────────
     "validating":         "Validating [bold]{lab_id}[/bold]…",
     "check_result_saved": "Result saved to history ({score}/{max_score} pts).",
+    "check_tout_skippe":
+        "None of the {total} collected tests ran: they all skipped, so nothing "
+        "was measured. This is neither a pass nor a failure, and no score was "
+        "recorded.",
+    "check_tout_skippe_suite":
+        "A test skips when its lab is not ready: the working directory has not "
+        "been prepared, or a service it needs is down. Start it first: "
+        "dsoxlab run {lab_id}",
     "all_tests_passed":    "All tests passed.",
     "tests_failed":        "Some tests failed.",
     "check_tip_submit":    "Score saved. Run [bold]dsoxlab submit[/bold] to record your final attempt and end the session.",
