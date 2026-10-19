@@ -103,6 +103,54 @@ class TestSolutionsChiffrees:
         (sol / "README.md").write_text("Comment lire ces corrigés.", encoding="utf-8")
         assert content.validate_solutions_encrypted(_lab(tmp_path), sol).ok
 
+    @pytest.mark.parametrize(
+        "nom",
+        ["Dockerfile", "Makefile", "main.tf", "ci.yml", "reponses.json", "outil.go"],
+    )
+    def test_une_solution_sans_extension_connue_est_vue(
+        self, tmp_path: Path, nom: str
+    ) -> None:
+        """Le contrôle tenait une liste blanche de six extensions.
+
+        Un `Dockerfile` de solution n'était donc même pas ouvert, et le
+        contrôle concluait au vert sans l'avoir regardé. Mesuré sur les 22
+        catalogues : un cas réel passait ainsi, dans un dépôt qui ne déclare
+        pas ses solutions en clair. Une liste blanche de langages est toujours
+        en retard sur ce que les labs emploient.
+        """
+        sol = tmp_path / "solution"
+        sol.mkdir()
+        (sol / nom).write_text("FROM alpine\nRUN la reponse\n", encoding="utf-8")
+
+        rapport = content.validate_solutions_encrypted(_lab(tmp_path), sol)
+
+        assert not rapport.ok
+        assert rapport.issues[0].key == "content_solution_plaintext"
+
+    def test_un_binaire_dans_solution_n_est_pas_inquiete(
+        self, tmp_path: Path
+    ) -> None:
+        """Une archive ou une image ne révèle pas la réponse à la lecture.
+
+        Le chiffrer n'apprendrait rien à personne, et un contrôle qui crie
+        pour rien se fait désactiver.
+        """
+        sol = tmp_path / "solution"
+        sol.mkdir()
+        (sol / "depot.bundle").write_bytes(b"PK\x03\x04\x00\x00salut\x00")
+
+        assert content.validate_solutions_encrypted(_lab(tmp_path), sol).ok
+
+    def test_un_binaire_chiffre_reste_accepte(self, tmp_path: Path) -> None:
+        """Le cas de bord : chiffré, un ex-binaire devient du texte vault."""
+        sol = tmp_path / "solution"
+        sol.mkdir()
+        (sol / "archive.tar").write_text(
+            "$ANSIBLE_VAULT;1.1;AES256\n3462383\n", encoding="utf-8"
+        )
+
+        assert content.validate_solutions_encrypted(_lab(tmp_path), sol).ok
+
 
 class TestDocUrl:
     def test_url_qui_repond(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

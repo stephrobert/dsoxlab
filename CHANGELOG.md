@@ -7,6 +7,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-10-19
+
+### Fixed
+
+- **A solution file whose extension was not on a list of six was never even
+  opened.** `validate_solutions_encrypted` kept an allow-list (`.yaml`,
+  `.yml`, `.sh`, `.py`, `.bash`, `.txt`), so a `solution/Dockerfile`, a
+  `main.tf`, a `Makefile` or a `reponses.json` went through in silence and the
+  check concluded green without having looked at them. It is the same fault
+  the function's own docstring already records one level up, where it only
+  looked at one of the two solution layouts and reported green on four
+  catalogues holding 71 plaintext files.
+
+  The filter is now a deny-list: every text file is checked, except what is
+  written to be read (`.md` and friends) and binaries, which reveal no answer
+  by being opened and would gain nothing from encryption. An allow-list of
+  languages is always behind what the labs actually use.
+
+  Measured on the 22 catalogues before being enforced: exactly one real case
+  surfaces, a `solution/Dockerfile` in a catalogue that does not declare its
+  solutions as plaintext. The three catalogues that do declare it stay exempt,
+  so there is no false alarm.
+
+### Added
+
+- **A passing score on a lab that does not assess is now refused.** Four labs
+  of a catalog served as the exam closing a curriculum level while being
+  declared `lab_type: lab`; the mismatch only surfaced downstream, in the site
+  that lays out those levels. That particular case cannot be caught upstream:
+  nothing in a `lab.yaml` states that a lab closes a level, so the check that
+  found it belongs where the declaration lives. The audit did however reveal a
+  contradiction the catalog carries on its own and that nothing checked:
+  `exam_passing_score` on a form that does not assess. The engine renders the
+  verdict `submit` displays, while everything that sorts labs by form files it
+  among the exercises, and the two readings of one file diverge without either
+  failing. Measured on the 424 labs of 22 catalogs before being enforced: the
+  21 labs declaring a score are all a `challenge` or a `capstone`, so the
+  invariant was already held and no catalog owes anything. The message names
+  the way out, not just the fault, so the check is not worked around by
+  dropping the field.
+
 ## [0.5.3] - 2026-10-17
 
 ### Fixed

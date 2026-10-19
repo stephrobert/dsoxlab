@@ -1158,6 +1158,10 @@ silent.
     "metadata_exam_score_invalid":
         "Invalid value '{value}'. Expected a percentage of the lab scale, "
         "between 1 and 100 (omit the field for a lab that is not an exam).",
+    "metadata_exam_score_sans_epreuve":
+        "A {score}% passing score on lab_type '{value}', which does not "
+        "assess. The forms that assess are: {expected}. Declare the lab as "
+        "one of them, or drop exam_passing_score.",
 
     "content_broken_links": "{count} dead relative link(s): {links}",
     "content_solution_unreadable": "unreadable: {error}",

@@ -44,9 +44,16 @@ _LIEN_RELATIF = re.compile(r"\[[^\]]*\]\((\.\.?/[^)]+)\)")
 #: Le vérifier vaut mieux que faire confiance à l'auteur.
 _ENTETE_VAULT = "$ANSIBLE_VAULT"
 
-#: Extensions considérées comme du contenu de solution. Une image ou un
-#: README dans `solution/` n'a pas à être chiffré.
-_EXTENSIONS_SOLUTION = {".yaml", ".yml", ".sh", ".py", ".bash", ".txt"}
+#: Ce qui, dans un répertoire de solutions, n'a pas à être chiffré : ce qui est
+#: écrit POUR ÊTRE LU. C'est une liste d'exclusion, et c'est le point : elle
+#: remplace la liste blanche d'extensions qui l'a précédée (`.yaml`, `.yml`,
+#: `.sh`, `.py`, `.bash`, `.txt`), sous laquelle un `Dockerfile`, un `.tf`, un
+#: `Makefile` ou un `.json` de solution passaient en silence. Une liste blanche
+#: de langages est toujours en retard sur ce que les labs emploient, et le
+#: contrôle concluait alors au vert sans avoir regardé ces fichiers. Mesuré sur
+#: les 22 catalogues du 2026-10-19 : un `solution/Dockerfile` échappait ainsi au
+#: contrôle dans un catalogue qui ne déclare pas ses solutions en clair.
+_EXTENSIONS_FAITES_POUR_ETRE_LUES = {".md", ".rst", ".adoc"}
 
 _TIMEOUT_HTTP = 10.0
 
@@ -153,6 +160,22 @@ def validate_internal_links(lab: LabDefinition) -> ContentReport:
     return report
 
 
+def _est_binaire(chemin: Path) -> bool:
+    """Un octet nul dans les premiers kilo-octets : ce n'est pas du texte.
+
+    Un binaire n'est pas lisible en clair de façon utile, et le chiffrer
+    n'apprendrait rien à personne : une image ou une archive posée dans
+    `solution/` ne révèle pas la réponse en s'ouvrant dans un éditeur. Un
+    fichier illisible rend False, pour que la lecture qui suit le signale
+    comme illisible plutôt que de le faire passer pour binaire.
+    """
+    try:
+        with chemin.open("rb") as flux:
+            return b"\0" in flux.read(4096)
+    except OSError:
+        return False
+
+
 def validate_solutions_encrypted(
     lab: LabDefinition, *solutions_roots: Path
 ) -> ContentReport:
@@ -168,6 +191,14 @@ def validate_solutions_encrypted(
 
     Une racine absente n'est pas une faute : un dépôt qui ne tient aucun
     répertoire de solutions a simplement fait un autre choix.
+
+    CE QUE LE CONTRÔLE REGARDE
+
+    Tout fichier texte de ces racines, sauf ce qui est écrit pour être lu
+    (`.md` et compagnie). Il tenait auparavant une liste blanche de six
+    extensions, sous laquelle un `Dockerfile` de solution n'était même pas
+    ouvert : la même faute que celle du paragraphe précédent, un cran plus
+    bas.
     """
     report = ContentReport(lab_id=lab.id)
     fichiers = sorted(
@@ -177,7 +208,11 @@ def validate_solutions_encrypted(
         for chemin in racine.rglob("*")
     )
     for fichier in fichiers:
-        if not fichier.is_file() or fichier.suffix not in _EXTENSIONS_SOLUTION:
+        if not fichier.is_file():
+            continue
+        if fichier.suffix.lower() in _EXTENSIONS_FAITES_POUR_ETRE_LUES:
+            continue
+        if _est_binaire(fichier):
             continue
         try:
             with fichier.open("r", encoding="utf-8", errors="ignore") as flux:
