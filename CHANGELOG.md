@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.4] - 2026-10-19
 
+### Fixed
+
+- **A solution file whose extension was not on a list of six was never even
+  opened.** `validate_solutions_encrypted` kept an allow-list (`.yaml`,
+  `.yml`, `.sh`, `.py`, `.bash`, `.txt`), so a `solution/Dockerfile`, a
+  `main.tf`, a `Makefile` or a `reponses.json` went through in silence and the
+  check concluded green without having looked at them. It is the same fault
+  the function's own docstring already records one level up, where it only
+  looked at one of the two solution layouts and reported green on four
+  catalogues holding 71 plaintext files.
+
+  The filter is now a deny-list: every text file is checked, except what is
+  written to be read (`.md` and friends) and binaries, which reveal no answer
+  by being opened and would gain nothing from encryption. An allow-list of
+  languages is always behind what the labs actually use.
+
+  Measured on the 22 catalogues before being enforced: exactly one real case
+  surfaces, a `solution/Dockerfile` in a catalogue that does not declare its
+  solutions as plaintext. The three catalogues that do declare it stay exempt,
+  so there is no false alarm.
+
 ### Added
 
 - **A passing score on a lab that does not assess is now refused.** Four labs

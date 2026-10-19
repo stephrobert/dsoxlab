@@ -9,6 +9,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.5.4] - 2026-10-19
 
+### Corrigé
+
+- **Un fichier de solution dont l'extension n'était pas dans une liste de six
+  n'était même pas ouvert.** `validate_solutions_encrypted` tenait une liste
+  blanche (`.yaml`, `.yml`, `.sh`, `.py`, `.bash`, `.txt`) : un
+  `solution/Dockerfile`, un `main.tf`, un `Makefile` ou un `reponses.json`
+  passaient en silence, et le contrôle concluait au vert sans les avoir
+  regardés. C'est la faute que la docstring de cette même fonction consigne
+  déjà un cran plus haut, où elle ne regardait qu'une des deux dispositions de
+  solutions et rendait du vert sur quatre catalogues qui portaient 71 fichiers
+  en clair.
+
+  Le filtre est désormais une liste d'exclusion : tout fichier texte est
+  contrôlé, sauf ce qui est écrit pour être lu (`.md` et compagnie) et les
+  binaires, qui ne révèlent aucune réponse en s'ouvrant et que le chiffrement
+  n'améliorerait pas. Une liste blanche de langages est toujours en retard sur
+  ce que les labs emploient.
+
+  Mesuré sur les 22 catalogues avant d'être imposé : un seul cas réel
+  apparaît, un `solution/Dockerfile` dans un catalogue qui ne déclare pas ses
+  solutions en clair. Les trois catalogues qui le déclarent restent exemptés,
+  donc aucune fausse alerte.
+
 ### Ajouté
 
 - **Un seuil de réussite sur un lab qui n'évalue pas est désormais refusé.**
