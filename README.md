@@ -26,7 +26,7 @@ the declarative contract. It also scores progress and keeps the history
 locally, per catalog.
 
 > Originally built for the tutorials on
-> [blog.stephane-robert.info](https://blog.stephane-robert.info), and usable
+> [www.stephane-robert.info](https://www.stephane-robert.info), and usable
 > without them.
 
 <p align="center">
@@ -274,7 +274,7 @@ Licensed under the **Apache License 2.0** — see [LICENSE](./LICENSE) and
 
 You may use, share and adapt this project, including commercially, **provided
 you give appropriate credit to Stephane Robert and link back to
-<https://blog.stephane-robert.info>**, and indicate whether changes were made.
+<https://www.stephane-robert.info>**, and indicate whether changes were made.
 Apache-2.0 keeps those same two obligations — attribution and stating your
 changes — and adds an express patent grant.
 

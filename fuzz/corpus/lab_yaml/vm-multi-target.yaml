@@ -6,7 +6,7 @@ section: linux
 description: Create, activate and persist a swap file.
 skills: [swap, fstab, systemd]
 distros: [alma10, ubuntu24]
-doc_url: https://blog.stephane-robert.info/docs/linux/swap/
+doc_url: https://www.stephane-robert.info/docs/linux/swap/
 track: [rhcsa]
 difficulty: intermediate
 estimated_time: "30m"

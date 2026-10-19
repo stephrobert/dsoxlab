@@ -3,7 +3,7 @@ title: Ship a local module as a fixture
 level: intermediate
 skills: [terraform, modules]
 distros: [any]
-doc_url: https://blog.stephane-robert.info/docs/infra-as-code/provisionnement/terraform/
+doc_url: https://www.stephane-robert.info/docs/infra-as-code/provisionnement/terraform/
 runtime:
   type: shell
   workdir: challenge/work

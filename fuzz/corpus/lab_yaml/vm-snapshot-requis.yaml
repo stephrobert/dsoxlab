@@ -6,7 +6,7 @@ section: linux
 description: A lab that breaks the machine on purpose, so it asks for a net.
 skills: [selinux, semanage, restorecon]
 distros: [alma10]
-doc_url: https://blog.stephane-robert.info/docs/linux/selinux/
+doc_url: https://www.stephane-robert.info/docs/linux/selinux/
 difficulty: advanced
 estimated_time: "45m"
 runtime:
