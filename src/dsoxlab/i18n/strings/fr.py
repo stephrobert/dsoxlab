@@ -1178,8 +1178,8 @@ hors ligne, elle se tait.
         "lab, entre 1 et 100 (omets le champ pour un lab qui n'est pas un examen).",
     "metadata_exam_score_sans_epreuve":
         "Un seuil de réussite de {score} % sur un lab_type « {value} », qui "
-        "n'évalue pas. Déclare le lab en {expected}, ou retire "
-        "exam_passing_score.",
+        "n'évalue pas. Les formes qui évaluent sont : {expected}. Déclare le "
+        "lab en l'une d'elles, ou retire exam_passing_score.",
 
     "content_broken_links": "{count} lien(s) relatif(s) mort(s) : {links}",
     "content_solution_unreadable": "illisible : {error}",
