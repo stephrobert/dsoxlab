@@ -3,7 +3,7 @@ title: Query a local cloud emulator
 level: intermediate
 skills: [terraform]
 distros: [any]
-doc_url: https://blog.stephane-robert.info/docs/terraform/aws/
+doc_url: https://www.stephane-robert.info/docs/terraform/aws/
 runtime:
   type: shell
   workdir: challenge/work

@@ -26,7 +26,7 @@ respecte le contrat déclaratif. Il score aussi la progression et conserve
 l'historique en local, par catalogue.
 
 > Né pour accompagner les tutoriels de
-> [blog.stephane-robert.info](https://blog.stephane-robert.info), et utilisable
+> [www.stephane-robert.info](https://www.stephane-robert.info), et utilisable
 > sans eux.
 
 <p align="center">
@@ -282,7 +282,7 @@ Distribué sous **licence Apache 2.0**, voir [LICENSE](./LICENSE) et
 
 Vous pouvez utiliser, partager et adapter ce projet, y compris à des fins
 commerciales, **à condition de créditer Stéphane Robert et de renvoyer par un
-lien vers <https://blog.stephane-robert.info>**, en indiquant si des
+lien vers <https://www.stephane-robert.info>**, en indiquant si des
 modifications ont été apportées. Apache-2.0 conserve ces deux mêmes obligations,
 l'attribution et la mention des modifications, et y ajoute une concession de
 brevet explicite.

@@ -60,7 +60,7 @@ dependencies = [
 dsoxlab = "dsoxlab.cli:main"
 
 [project.urls]
-Homepage = "https://blog.stephane-robert.info/"
+Homepage = "https://www.stephane-robert.info/"
 Documentation = "https://github.com/stephrobert/dsoxlab/blob/main/docs/README.md"
 Repository = "https://github.com/stephrobert/dsoxlab"
 Issues = "https://github.com/stephrobert/dsoxlab/issues"
