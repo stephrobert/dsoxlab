@@ -221,6 +221,7 @@ la suite.
 | `metadata_doc_url_scheme` | `doc_url` n'est pas en http(s) |
 | `metadata_lab_type_invalid` | `lab_type` sort de l'énuméré |
 | `metadata_exam_score_invalid` | `exam_passing_score` est hors bornes |
+| `metadata_exam_score_sans_epreuve` | `exam_passing_score` est déclaré sur un `lab_type` qui n'évalue pas : seuls `challenge` et `capstone` le font |
 | `content_broken_links` | un lien relatif ne pointe sur rien |
 | `content_missing_english` | un document n'est traduit que d'un côté |
 | `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |

@@ -21,6 +21,14 @@ from ..models.lab import LabDefinition
 #: même dépôt peut porter les deux (une stack d'infra et ses assertions).
 _VALID_LAB_TYPES = {"lab", "challenge", "capstone", "validation"}
 
+#: Les deux formes qui ÉVALUENT, et les seules où un seuil de réussite
+#: veut dire quelque chose. Mesuré sur les 424 labs des 22 catalogues du
+#: 2026-10-19 : les 21 labs qui déclarent `exam_passing_score` sont tous
+#: l'un de ces deux types, aucun n'est un `lab`. L'invariant est donc
+#: déjà tenu, et ce contrôle le rend opposable au lieu de reposer sur
+#: l'attention de l'auteur.
+_TYPES_QUI_EVALUENT = {"challenge", "capstone"}
+
 
 @dataclass
 class MetadataIssue:
@@ -93,6 +101,32 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
                 "exam_passing_score",
                 "metadata_exam_score_invalid",
                 {"value": lab.exam_passing_score},
+            )
+        )
+    # Un seuil de réussite sur un lab qui n'évalue pas est une contradiction,
+    # et elle ne se voit pas : le moteur rend le verdict que `submit` affiche,
+    # pendant que tout ce qui range les labs par forme (un parcours à niveaux,
+    # un sommaire) classe celui-ci parmi les exercices. Les deux lectures du
+    # même fichier divergent sans qu'aucune échoue.
+    #
+    # Un seuil absurde est déjà signalé pour lui-même, juste au-dessus : en
+    # discuter la forme par-dessus ferait deux messages pour une seule ligne,
+    # dont l'un porte sur une valeur qui n'a de toute façon pas de sens. Les
+    # deux contrôles sont donc exclusifs.
+    if (
+        lab.exam_passing_score
+        and 1 <= lab.exam_passing_score <= 100
+        and lab.lab_type in _VALID_LAB_TYPES - _TYPES_QUI_EVALUENT
+    ):
+        report.issues.append(
+            MetadataIssue(
+                "lab_type",
+                "metadata_exam_score_sans_epreuve",
+                {
+                    "value": lab.lab_type,
+                    "score": lab.exam_passing_score,
+                    "expected": ", ".join(sorted(_TYPES_QUI_EVALUENT)),
+                },
             )
         )
 

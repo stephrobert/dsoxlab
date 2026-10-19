@@ -7,6 +7,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-10-19
+
+### Added
+
+- **A passing score on a lab that does not assess is now refused.** Four labs
+  of a catalog served as the exam closing a curriculum level while being
+  declared `lab_type: lab`; the mismatch only surfaced downstream, in the site
+  that lays out those levels. That particular case cannot be caught upstream:
+  nothing in a `lab.yaml` states that a lab closes a level, so the check that
+  found it belongs where the declaration lives. The audit did however reveal a
+  contradiction the catalog carries on its own and that nothing checked:
+  `exam_passing_score` on a form that does not assess. The engine renders the
+  verdict `submit` displays, while everything that sorts labs by form files it
+  among the exercises, and the two readings of one file diverge without either
+  failing. Measured on the 424 labs of 22 catalogs before being enforced: the
+  21 labs declaring a score are all a `challenge` or a `capstone`, so the
+  invariant was already held and no catalog owes anything. The message names
+  the way out, not just the fault, so the check is not worked around by
+  dropping the field.
+
 ## [0.5.3] - 2026-10-17
 
 ### Fixed

@@ -215,6 +215,7 @@ step with the code: adding a check without documenting it here fails the suite.
 | `metadata_doc_url_scheme` | `doc_url` is not http(s) |
 | `metadata_lab_type_invalid` | `lab_type` is outside the enumeration |
 | `metadata_exam_score_invalid` | `exam_passing_score` is out of range |
+| `metadata_exam_score_sans_epreuve` | `exam_passing_score` is declared on a `lab_type` that does not assess: only `challenge` and `capstone` do |
 | `content_broken_links` | a relative link points at nothing |
 | `content_missing_english` | a document is translated on one side only |
 | `content_scoring_points_mismatch` | the tasks total a different number of points than announced |
