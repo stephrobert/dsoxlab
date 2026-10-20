@@ -1,0 +1,28 @@
+# L'ordre des catalogues d'une campagne, et les raisons qui le fixent.
+#
+# Mesuré le 2026-10-19 sur les huit `meta.yml` : une seule collision de nom
+# d'hôte dans toute la collection, `db1.lab`, revendiqué par `ansible` et par
+# `bdd`. Les huit réseaux libvirt sont en revanche distincts, de
+# `10.10.20.0/24` à `10.10.110.0/24`, donc aucun autre couple ne se gêne.
+#
+# Un seul catalogue à la fois, avec destruction entre chaque : les huit stacks
+# cumulées réclament 41 Go là où la machine en offre 46.
+
+ordre:
+  # D'abord ceux qui n'exigent rien de particulier et qui ont déjà réussi :
+  # ils valident le harnais avant d'engager les gros catalogues.
+  - devsecops-dsoxlab-training
+  - cicd-dsoxlab-training
+
+  # Puis ceux qui demandent une base figée, dont ils portent le script.
+  - publier-service-dsoxlab-training
+  - bdd-dsoxlab-training
+  - linux-dsoxlab-training
+
+  # Puis le plus lourd, qui exige en plus un `run` préalable.
+  - kubernetes-dsoxlab-training
+
+  # `ansible` en dernier : collision `db1.lab` avec `bdd`.
+  - ansible-training
+
+  # `iam` n'est PAS dans l'ordre : son descripteur le déclare bloqué.

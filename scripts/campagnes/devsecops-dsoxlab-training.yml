@@ -1,0 +1,16 @@
+# Campagne : devsecops-dsoxlab-training
+#
+# Le plus simple des huit : un seul lab `vm` sur treize, aucun socle partagé à
+# monter, aucune base figée à figer. La campagne du 2026-10-19 y a rendu
+# 13 VALIDE sans préparation particulière.
+
+catalogue: devsecops-dsoxlab-training
+labs_vm: 1
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: campagne
+  - nom: destroy
+
+pieges: []

@@ -1,0 +1,48 @@
+# Campagne : iam-dsoxlab-training
+#
+# BLOQUÉ. Une question de conception doit être tranchée avant toute campagne,
+# et ce n'est pas à une copie de fichier de le faire.
+
+catalogue: iam-dsoxlab-training
+labs_vm: 16
+bloque: true
+raison_du_blocage: |
+  Son `scripts/isolation_vm.py` exige une base figée, mais le
+  `scripts/rebase-vms.sh` qui la crée est ABSENT du dépôt, et son CLAUDE.md
+  note cette absence comme une QUESTION OUVERTE, pas comme un oubli :
+
+    « scripts/isolation_vm.py cite aussi scripts/rebase-vms.sh, absent du
+      dépôt (à vérifier : l'isolation par overlay qcow2 est-elle utilisable
+      ici ?) »
+
+  La question est légitime : ce catalogue a un socle que ses deux épreuves
+  DÉMONTENT (elles retirent celui qu'un autre lab a laissé, volumes compris,
+  parce qu'il occupe leurs ports), et `iam-14` monte un cluster k3d dans la
+  VM. Copier le script d'un catalogue frère traiterait le symptôme sans
+  répondre.
+
+  Tant que la réponse n'est pas écrite, une campagne ici rend 16 ROUGE
+  identiques sur « isolation impossible : idp.lab n'a pas de base figée »,
+  comme le 2026-10-19. Son relevé n'a donc pas été commité.
+
+etapes_prevues_si_debloque:
+  - nom: provision
+  - nom: rebase
+  - nom: campagne
+  - nom: destroy
+
+a_savoir_aussi:
+  - quoi: le socle n'est pas dans tous les setup.yaml
+    detail: |
+      `shared/socle-iam.yml` est inclus par chaque setup.yaml SAUF celui de
+      `iam-02-keycloak-installer`, dont le sujet est d'écrire ce montage. Et
+      les deux épreuves retirent le socle. L'ordre des labs compte donc ici,
+      ce qui est rare.
+    source: CLAUDE.md
+  - quoi: validation-labs.json n'existe pas
+    detail: |
+      Les verdicts VALIDE du 2026-10-16 ne vivent que dans
+      `preparation/RAPPORT-PRODUCTION.md`, que le site ne peut ni lire ni
+      dater. Ne jamais écrire « validé » ni « attesté » pour un lab de ce
+      dépôt sans l'avoir rejoué à la main.
+    source: CLAUDE.md

@@ -1,0 +1,27 @@
+# Campagne : cicd-dsoxlab-training
+#
+# Son isolation n'est pas celle des autres, et c'est délibéré.
+
+catalogue: cicd-dsoxlab-training
+labs_vm: 5
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: campagne
+    pourquoi: |
+      Aucun `run` préalable n'est nécessaire : le socle est importé en tête de
+      CHAQUE setup.yaml et il est idempotent, donc chaque lab le repose. C'est
+      ce qui explique les 5 VALIDE du 2026-10-19 sans préparation, là où
+      kubernetes échouait.
+    source: "CLAUDE.md : « le socle labs/_commun/socle.yaml est importé en tête de chaque setup.yaml. Il est idempotent »"
+  - nom: destroy
+
+interdits:
+  - quoi: poser un scripts/rebase-vms.sh
+    pourquoi: |
+      Son `isolation_vm.py` est un no-op VOLONTAIRE. Un script qui fige des
+      bases irait contre sa conception. L'absence de ce fichier est voulue.
+    source: "CLAUDE.md : « Isolation par le setup, pas par snapshot : scripts/isolation_vm.py est donc un no-op volontaire »"
+
+pieges: []

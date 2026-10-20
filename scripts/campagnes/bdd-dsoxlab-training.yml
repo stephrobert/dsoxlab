@@ -1,0 +1,64 @@
+# Campagne : bdd-dsoxlab-training
+#
+# Catalogue en construction : ses labs sont écrits et éprouvés un par un, et le
+# relevé ci-dessous se mesure, il ne se recopie pas.
+#
+#     cd ~/Projets/bdd-dsoxlab-training && dsoxlab list-labs
+
+catalogue: bdd-dsoxlab-training
+labs_vm: 4
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: rebase
+    pourquoi: |
+      OBLIGATOIRE APRÈS CHAQUE PROVISION, ET PAS SEULEMENT LA PREMIÈRE.
+
+      L'isolation de ce catalogue repose sur une base figée par VM. Cette base
+      référence le DOMAINE libvirt, pas seulement son disque : un `destroy`
+      puis `provision` recrée les domaines, et la base figée pointe alors sur
+      un domaine qui n'existe plus. Le pilote refuse de jouer, lab par lab, sur
+      « l'état figé appartient à un domaine disparu ».
+
+      C'est un refus, pas un faux rouge : le verdict dit l'isolation, pas le
+      lab. Mais il consomme une campagne entière si on le découvre au bout.
+    source: "scripts/rebase-vms.sh (son en-tête), et l'erreur rencontrée le 2026-10-19"
+  - nom: campagne
+  - nom: destroy
+
+pieges:
+  - symptome: "ROUGE, « isolation impossible : l'état figé appartient à un domaine disparu »"
+    cause: |
+      Un `provision` a eu lieu depuis le dernier `rebase-vms.sh`. Rejouer le
+      rebase suffit : ne rien détruire, contrairement à ce que le message
+      suggère, puisque les VM viennent justement d'être créées.
+    source: "mesuré le 2026-10-19, sur pg-03-configurer"
+
+  - symptome: "ROUGE N -> None, « N test(s) sur M passent AVANT tout travail »"
+    cause: |
+      Ce n'est pas une panne du harnais, c'est le pilote qui fait son travail.
+      Un test vert sur l'état de départ énonce une hypothèse du setup au lieu
+      de mesurer un travail.
+
+      Les deux causes rencontrées ici, et elles ne se corrigent pas de la même
+      façon :
+
+      - le test contrôle une CONTRAINTE sur le travail et non le travail
+        (« le serveur n'a pas redémarré », vert puisque c'est le setup qui
+        ouvre la session témoin). Sa place est dans l'assertion qu'il garde,
+        pas dans un test à lui ;
+      - le test contrôle un état que la DISTRIBUTION fournit déjà (`ssl = on`
+        sur Debian, `CREATE` révoqué sur `public` depuis PG 15). Il note alors
+        le paquet Debian, pas l'apprenant : il n'a pas sa place dans la note,
+        et le README du lab doit dire pourquoi.
+    source: "mesuré le 2026-10-19, sur pg-03-configurer"
+
+  - symptome: "Un lab insoluble, dont la solution de référence elle-même échoue"
+    cause: |
+      Un paramètre de contexte `postmaster` laissé à défaire par un lab qui
+      interdit le redémarrage. Avant d'écrire un lab de configuration, relever
+      la colonne `context` de `pg_settings` pour chaque paramètre visé : ce qui
+      exige un redémarrage ne peut pas être demandé en même temps qu'une
+      contrainte de continuité de service.
+    source: "mesuré le 2026-10-19, sur pg-03-configurer"

@@ -1,0 +1,37 @@
+# Campagne : kubernetes-dsoxlab-training
+#
+# Le plus lourd, et celui qui a coûté 59 faux ROUGE le 2026-10-19 faute d'un
+# `run` préalable. C'est le descripteur à lire en premier pour comprendre
+# pourquoi ce dossier existe.
+
+catalogue: kubernetes-dsoxlab-training
+labs_vm: 64
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: run_prealable
+    lab: cka-kubectl-debug
+    pourquoi: |
+      LE CLUSTER N'EXISTE PAS APRÈS LE PROVISIONNEMENT. Le socle
+      `shared/kubeadm-cluster.yml` monte le control plane et joint les workers,
+      et il est inclus par CHAQUE setup.yaml, faute de point d'accroche
+      post-provision (dsoxlab#213). Or le validateur photographie le cluster
+      AVANT de jouer le lab : sur des VM neuves, `kubectl` n'existe pas encore
+      sur k8s-cp.lab, la photographie lève, et chaque lab rend ROUGE en deux
+      secondes sans avoir été joué.
+
+      N'importe quel lab convient pour ce `run` : tous incluent le socle. Il
+      prend plusieurs minutes, le temps que kubeadm installe le cluster.
+    source: "CLAUDE.md, section « Le socle partagé » et « Aucun point d'accroche après le provisionnement »"
+  - nom: campagne
+  - nom: destroy
+
+pieges:
+  - symptome: "FileNotFoundError: [Errno 2] No such file or directory: 'kubectl'"
+    cause: |
+      Le cluster n'est pas monté, donc la photographie du validateur échoue.
+      59 labs sur 64 ont rendu ROUGE ainsi le 2026-10-19, et le relevé qui
+      portait 64 VALIDE a dû être restauré par `git checkout`.
+    remede: jouer l'étape run_prealable avant la campagne
+    source: journal de campagne du 2026-10-19, 19:31

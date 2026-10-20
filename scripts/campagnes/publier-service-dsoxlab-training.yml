@@ -1,0 +1,28 @@
+# Campagne : publier-service-dsoxlab-training
+#
+# Deux labs, une VM, mais une base figée exigée et un rebase qui a dépassé son
+# délai le 2026-10-19.
+
+catalogue: publier-service-dsoxlab-training
+labs_vm: 2
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: rebase
+    pourquoi: |
+      Le validateur refuse de jouer sans base figée, et tout provisionnement
+      l'invalide : les domaines sont recréés avec un UUID neuf, et libvirt
+      refuse alors de restaurer l'ancien état mémoire.
+    source: scripts/rebase-vms.sh (son en-tête)
+  - nom: campagne
+  - nom: destroy
+
+pieges:
+  - symptome: "IsolationEteinte: boot non terminé après basing : edge.lab"
+    cause: |
+      La VM n'a pas fini de rebooter dans le délai que le rebase s'accorde.
+      Ce n'est pas un défaut de lab : le catalogue a été SAUTÉ le 2026-10-19
+      pour cette raison, et c'est le bon geste.
+    remede: réessayer, la VM bootant plus vite sur une machine moins chargée
+    source: journal de campagne du 2026-10-19, 18:16
