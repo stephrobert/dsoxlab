@@ -1,0 +1,32 @@
+# Campagne : linux-dsoxlab-training
+#
+# Le plus gros des catalogues à base figée, et il marche : 87 VALIDE sur 89 le
+# 2026-10-19.
+
+catalogue: linux-dsoxlab-training
+labs_vm: 69
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: rebase
+    pourquoi: |
+      Mesuré le 2026-10-03 par le catalogue lui-même : 23 labs sur 86 rendaient
+      des points AVANT tout travail faute d'isolation, et le résidu ne se
+      distinguait pas d'un test mal conçu.
+    source: "scripts/valider-labs.py, commentaire de snapshot_reset"
+  - nom: campagne
+  - nom: destroy
+
+pieges:
+  - symptome: "ROUGE 17 -> None sur l1-first-terminal"
+    cause: |
+      1 test sur 6 passe sur l'état de départ. Vrai défaut de lab, de la même
+      famille que terraform/state-terraform-state-list.
+    source: journal de campagne du 2026-10-19
+  - symptome: "la solution n'a pas pu être posée, sur l3-service-diagnose"
+    cause: |
+      Même motif que bdd/pg-01-installer, avec un ERROR sur
+      test_service_is_active. Deux occurrences valent mieux qu'une pour
+      diagnostiquer : à reprendre ensemble, infra debout.
+    source: journal de campagne du 2026-10-19

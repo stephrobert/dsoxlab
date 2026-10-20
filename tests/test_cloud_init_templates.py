@@ -95,3 +95,67 @@ def test_le_pool_libvirt_n_est_plus_code_en_dur() -> None:
     assert main_tf.count("pool = local.storage_pool") + main_tf.count(
         "pool     = local.storage_pool"
     ) == 4, "les quatre emplacements doivent tous passer par le local"
+
+
+# ── Les paquets déclarés doivent exister sur les distributions du contrat ────
+#
+# Ajouté le 2026-10-19, après un provisionnement Debian 13 sorti en
+# « status: error » : la liste citait `dnsutils`, un simple paquet de transition
+# retiré de Debian 13 et d'Ubuntu 26. Il n'avait plus de candidat, cloud-init
+# échouait sur son module de paquets, et `dig` comme `nslookup` manquaient sur
+# chaque VM.
+#
+# CE QUE CE CONTRÔLE EST, ET CE QU'IL N'EST PAS
+#
+# C'est un lint, pas une mesure : rien ici n'interroge un miroir Debian, donc il
+# ne peut pas dire qu'un paquet existe. Il dit seulement qu'aucun paquet connu
+# pour avoir DISPARU ne figure dans la liste. La seule mesure qui vaut reste un
+# provisionnement, et c'est lui qui a trouvé celui-ci : la liste ci-dessous
+# s'allonge d'un nom chaque fois qu'un provisionnement en désigne un.
+
+_PAQUETS_DISPARUS = {
+    # nom retiré: ce qu'il faut écrire à la place
+    "dnsutils": "bind9-dnsutils",
+    "iproute": "iproute2",
+    "netcat": "netcat-openbsd",
+    "python-is-python3": "python3",
+}
+
+_PACKAGES_RE = re.compile(r"^packages:\s*$(.*?)^\S", re.DOTALL | re.MULTILINE)
+
+
+def _paquets_declares(stem: str) -> list[str]:
+    """Les paquets du bloc ``packages:`` d'un cloud-init packagé."""
+    texte = cloud_init_template(stem).read_text(encoding="utf-8")
+    bloc = _PACKAGES_RE.search(texte)
+    if bloc is None:  # un template sans bloc packages est légitime
+        return []
+    return [
+        ligne.strip().removeprefix("-").strip()
+        for ligne in bloc.group(1).splitlines()
+        if ligne.strip().startswith("-")
+    ]
+
+
+@pytest.mark.parametrize("stem", ("debian", "ubuntu", "almalinux"))
+def test_aucun_paquet_de_transition_disparu(stem: str) -> None:
+    fautifs = {
+        paquet: _PAQUETS_DISPARUS[paquet]
+        for paquet in _paquets_declares(stem)
+        if paquet in _PAQUETS_DISPARUS
+    }
+    assert not fautifs, (
+        f"{stem}.yaml.tmpl déclare un paquet qui n'a plus de candidat : "
+        + ", ".join(f"{mauvais} (écrire {bon})" for mauvais, bon in fautifs.items())
+        + ". cloud-init échoue alors sur TOUT son module de paquets, et le "
+        "provisionnement sort en « status: error »."
+    )
+
+
+@pytest.mark.parametrize("stem", ("debian", "ubuntu"))
+def test_les_outils_de_resolution_dns_sont_la(stem: str) -> None:
+    """`dig` est l'outil de diagnostic d'un lab réseau : il doit être posé."""
+    assert "bind9-dnsutils" in _paquets_declares(stem), (
+        f"{stem}.yaml.tmpl ne pose plus d'outil de résolution DNS : dig et "
+        "nslookup manqueront sur chaque VM."
+    )

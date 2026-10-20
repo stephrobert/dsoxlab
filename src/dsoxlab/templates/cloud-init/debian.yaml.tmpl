@@ -52,7 +52,13 @@ packages:
   - lsof
   - strace
   - tcpdump
-  - dnsutils
+  # bind9-dnsutils et non dnsutils : ce dernier n'était qu'un paquet de
+  # transition, retiré de Debian 13 et d'Ubuntu 26. Il n'y a plus de
+  # candidat, donc cloud-init sort en « status: error » à chaque
+  # provisionnement, et dig comme nslookup manquent. bind9-dnsutils
+  # existe depuis Debian 11 et Ubuntu 21.04 : il couvre donc aussi les
+  # distributions plus anciennes du contrat.
+  - bind9-dnsutils
   - net-tools
   - ufw
   - apparmor

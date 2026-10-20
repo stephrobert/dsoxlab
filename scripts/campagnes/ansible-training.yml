@@ -1,0 +1,31 @@
+# Campagne : ansible-training
+#
+# Le plus gros catalogue de la collection, et il n'a JAMAIS été attesté : 113
+# labs sans aucun verdict, donc un coût de campagne entièrement inconnu. La
+# campagne du 2026-10-19 ne l'a pas atteint.
+
+catalogue: ansible-training
+labs_vm: 88
+bloque: false
+
+etapes:
+  - nom: provision
+  - nom: rebase
+    source: scripts/rebase-vms.sh (son en-tête)
+  - nom: campagne
+  - nom: destroy
+
+contraintes:
+  - quoi: passer en DERNIER dans l'ordre
+    pourquoi: |
+      Il revendique `db1.lab`, comme `bdd`. C'est la seule collision de nom
+      d'hôte des huit meta.yml de la collection : provisionner l'un détruit
+      l'autre.
+    source: mesure du 2026-10-19 sur les huit meta.yml
+
+pieges:
+  - symptome: aucun connu
+    cause: |
+      Ce catalogue n'a jamais été joué par une campagne, donc ses pièges ne
+      sont pas connus. Éprouver sur UN lab avant d'engager les 113, et
+      surveiller la série de rouges de près.

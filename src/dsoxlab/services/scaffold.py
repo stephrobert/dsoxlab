@@ -336,6 +336,30 @@ def _inscrire_dans_une_section(meta: Path, chemin_relatif: str) -> str | None:
         return None
     section = tete[tete.index("- id:") + len("- id:"):].split("\n", 1)[0].strip()
 
+    # Borner la recherche à la PREMIÈRE section, et à elle seule.
+    #
+    # Sans cette borne, `tete` couvrait tout le reste du fichier : la branche
+    # « section neuve » ci-dessous trouvait alors le premier `labs: []` de
+    # N'IMPORTE QUELLE section. La fonction annonçait donc la première section,
+    # dont elle venait de lire le nom, et écrivait dans une autre.
+    #
+    # Ce n'est pas une erreur de rangement, c'est un message qui MENT, et la
+    # position dont il parle EST l'ordre pédagogique : `discovery/scanner.py`
+    # en dérive `bloc_order`, et `next` s'en sert.
+    #
+    # Mesuré le 2026-10-19 sur bdd-dsoxlab-training : deux labs sont partis
+    # dans une autre section que celle annoncée, et ce sont exactement les
+    # deux qui ont été créés tant qu'une section vide subsistait. Les suivants
+    # ont été rangés dans la première section, ce qui est le comportement
+    # documenté, et non le défaut.
+    #
+    # Le défaut demande donc DEUX sections dont une vide pour se montrer, et
+    # un meta.yml d'une seule section ne le montre jamais : c'est ce qui lui a
+    # permis de survivre.
+    suivante = re.search(r"^  - id:", tete[1:], re.MULTILINE)
+    if suivante is not None:
+        tete = tete[: suivante.start() + 1]
+
     # Une section neuve, telle que `new catalog` l'écrit : la liste est vide.
     if "    labs: []\n" in tete:
         position = debut + tete.index("    labs: []\n")
