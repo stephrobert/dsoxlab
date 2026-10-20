@@ -228,3 +228,101 @@ def test_le_generateur_ne_cite_aucun_nom_de_domaine() -> None:
             assert "ansible.builtin" in ligne, (
                 f"« ansible » cité hors d'un module de playbook : {ligne.strip()}"
             )
+
+
+# ── L'inscription au meta.yml : la section annoncée est celle écrite ─────────
+#
+# Ajouté le 2026-10-19 après un défaut mesuré sur bdd-dsoxlab-training :
+# `_inscrire_dans_une_section` lisait le nom de la PREMIÈRE section, puis
+# cherchait `labs: []` dans TOUT le reste du fichier. Sur un catalogue à
+# plusieurs sections dont une vide, elle annonçait donc une section et écrivait
+# dans une autre.
+#
+# Ce n'est pas un défaut de rangement, c'est un message qui mentait, et la
+# position dont il parlait est l'ordre pédagogique dont `next` se sert.
+
+_META_DEUX_SECTIONS = """schema_version: 1
+repo:
+  id: deux-sections
+  category: exemple
+
+sections:
+  - id: premiere
+    title: "Celle qui doit recevoir"
+    labs:
+      - deja-la
+  - id: seconde
+    title: "Celle qui ne doit rien recevoir"
+    labs: []
+"""
+
+_META_PREMIERE_VIDE = """schema_version: 1
+repo:
+  id: premiere-vide
+  category: exemple
+
+sections:
+  - id: premiere
+    title: "Vide, et elle doit recevoir"
+    labs: []
+  - id: seconde
+    title: "Vide aussi, et elle ne doit rien recevoir"
+    labs: []
+"""
+
+
+def _inscrire(tmp_path: Path, contenu: str) -> tuple[str | None, dict]:
+    """Joue l'inscription et rend la section annoncée, et le meta.yml relu."""
+    from dsoxlab.services.scaffold import _inscrire_dans_une_section
+
+    meta = tmp_path / "meta.yml"
+    meta.write_text(contenu, encoding="utf-8")
+    annoncee = _inscrire_dans_une_section(meta, "nouveau-lab")
+    return annoncee, yaml.safe_load(meta.read_text(encoding="utf-8"))
+
+
+def test_une_section_vide_plus_bas_ne_detourne_pas_l_inscription(
+    tmp_path: Path,
+) -> None:
+    """Le lab va dans la première section, celle dont le nom est rendu.
+
+    C'est le défaut exact : la seconde section portait `labs: []`, et le lab y
+    partait alors que la fonction annonçait la première.
+    """
+    annoncee, document = _inscrire(tmp_path, _META_DEUX_SECTIONS)
+    sections = {s["id"]: s["labs"] for s in document["sections"]}
+
+    assert annoncee == "premiere"
+    assert sections["premiere"] == ["deja-la", "nouveau-lab"], (
+        "le lab n'a pas été ajouté à la fin de la première section"
+    )
+    assert sections["seconde"] in ([], None), (
+        "le lab est parti dans la seconde section, que rien ne désignait"
+    )
+
+
+def test_la_section_annoncee_est_toujours_celle_qui_recoit(tmp_path: Path) -> None:
+    """L'invariant, et il vaut pour les deux formes de première section.
+
+    Qu'elle porte déjà des labs ou qu'elle soit vide, la section rendue est
+    celle où le lab a été écrit. Un appelant qui affiche cette valeur ne peut
+    donc plus mentir.
+    """
+    for contenu in (_META_DEUX_SECTIONS, _META_PREMIERE_VIDE):
+        annoncee, document = _inscrire(tmp_path, contenu)
+        recues = [
+            s["id"] for s in document["sections"] if "nouveau-lab" in (s["labs"] or [])
+        ]
+        assert recues == [annoncee], (
+            f"section annoncée {annoncee!r}, sections ayant reçu le lab {recues!r}"
+        )
+
+
+def test_une_premiere_section_vide_recoit_le_lab(tmp_path: Path) -> None:
+    """Le cas que `new catalog` produit : toutes les listes sont vides."""
+    annoncee, document = _inscrire(tmp_path, _META_PREMIERE_VIDE)
+    sections = {s["id"]: s["labs"] for s in document["sections"]}
+
+    assert annoncee == "premiere"
+    assert sections["premiere"] == ["nouveau-lab"]
+    assert sections["seconde"] in ([], None)
