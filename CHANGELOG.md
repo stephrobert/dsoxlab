@@ -7,6 +7,55 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-10-19
+
+### Fixed
+
+- **`dsoxlab new lab` announced one section and wrote into another.**
+  `_inscrire_dans_une_section` read the name of the FIRST section, then looked
+  for `labs: []` across the WHOLE rest of the file. On a catalog with several
+  sections of which one was empty, the lab went into that empty one while the
+  message named the first.
+
+  It is not a filing mistake, it is a message that lied, and the position it
+  spoke of IS the teaching order: `discovery/scanner.py` derives `bloc_order`
+  from it, and `next` uses that. Measured on bdd-dsoxlab-training the same day:
+  two labs went into a section other than the announced one, and they are
+  exactly the two created while an empty section still remained.
+
+  The search is now bounded to the first section. The defect needs TWO sections
+  of which one is empty in order to show, and a single-section `meta.yml` never
+  shows it, which is how it survived.
+
+  Three tests in `tests/test_scaffold.py` hold the invariant: the announced
+  section is always the one that received the lab. Two of them go red when the
+  bound is removed.
+
+- **Every Debian 13 and Ubuntu 26 provision ended with cloud-init in
+  `status: error`, and no `dig` on any VM.** The packaged cloud-init templates
+  for Debian and Ubuntu listed `dnsutils`, which was only a transitional
+  package: it was removed from Debian 13 and Ubuntu 26, so it has no candidate
+  there. cloud-init then fails its whole package module, reports the error, and
+  the provision carries on and announces its hosts as ready.
+
+  Measured on a freshly provisioned Debian 13.7 VM: `apt-cache policy dnsutils`
+  answers `Candidate: (none)`, while `bind9-dnsutils` answers
+  `1:9.20.29-1~deb13u1`. The other packages on the list were installed, so the
+  damage is bounded to `dig` and `nslookup` being absent, plus an error message
+  printed on every provision. A message one learns to ignore protects nobody,
+  and the next removed package would hide behind the same noise.
+
+  `bind9-dnsutils` has existed since Debian 11 and Ubuntu 21.04, so it also
+  covers the older distributions the contract declares (`debian12`,
+  `ubuntu22`).
+
+  `tests/test_cloud_init_templates.py` now refuses a known-removed transitional
+  package in any packaged cloud-init, and requires a DNS resolution tool in the
+  Debian and Ubuntu ones. It is a lint, not a measurement: nothing here queries
+  a mirror, so it only says that no package known to have disappeared is
+  listed. The list gains a name each time a provision names one, which is how
+  this one was found.
+
 ## [0.5.4] - 2026-10-19
 
 ### Fixed
