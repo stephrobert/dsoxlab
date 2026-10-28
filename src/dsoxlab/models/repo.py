@@ -36,6 +36,7 @@ cette langue — même convention que ``lab.<lang>.yaml``. Voir
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -369,6 +370,69 @@ class SectionDefinition:
 
 
 @dataclass
+class SyncDefinition:
+    """L'API de synchronisation que ce catalogue déclare, et son client OAuth.
+
+    **Quatre adresses publiques, aucun secret.** Un client OAuth *public* avec
+    PKCE n'en a pas besoin, et c'est pour cela que ce bloc peut vivre dans un
+    dépôt versionné sans rien y exposer. Si un jour un champ ressemblant à un
+    secret apparaît ici, c'est que la conception a dérivé.
+
+    Le protocole est **nommé**, pas supposé : un catalogue dit à quel contrat il
+    parle, et le moteur refuse ce qu'il ne sait pas parler plutôt que d'envoyer
+    une charge qu'un autre portail ne relira pas.
+    """
+
+    protocol: str = ""
+    """Le contrat de synchronisation. Seul ``learner-sync/1`` est implémenté.
+
+    Une valeur inconnue fait refuser l'envoi en nommant ce qui est attendu : une
+    charge émise au hasard serait acceptée par la passerelle puis illisible, et
+    l'apprenant croirait avoir synchronisé."""
+
+    api: str = ""
+    """Racine de l'API, en ``https``. Les chemins sont ceux du protocole."""
+
+    issuer: str = ""
+    """L'``issuer`` OIDC. Il identifie le portail et **nomme la session** locale.
+
+    Distinct de ``oauth_domain`` : chez Cognito, un domaine personnalisé sert
+    les points d'entrée OAuth alors que l'émetteur reste l'URL du pool. Les
+    confondre mène à un 404 sur l'autorisation, mesuré."""
+
+    oauth_domain: str = ""
+    """Racine des points d'entrée OAuth (``/oauth2/authorize``, ``/oauth2/token``)."""
+
+    client_id: str = ""
+    """Identifiant du client OAuth **public** dédié à la CLI.
+
+    Pas celui du site : un client web n'autorise que son propre retour. Il en
+    faut un second, déclarant l'adresse que l'un des deux champs ci-dessous
+    nomme."""
+
+    callback_url: str = ""
+    """Adresse ``https`` où l'autorisation revient, quand il n'y a pas de boucle.
+
+    Le fournisseur y renvoie l'apprenant avec le code dans l'URL ; une page
+    l'affiche, et l'apprenant le recopie dans la CLI. Plus lent qu'une boucle
+    locale, mais **parfois le seul chemin** : la page de connexion gérée de
+    Cognito, version 2, refuse de servir une autorisation dont le retour est en
+    ``http``, y compris vers la boucle locale, et répond 403. Mesuré sur un pool
+    réel : même client, retour en ``https`` 302, retour en
+    ``http://127.0.0.1:…`` 403. Enregistrer l'adresse ne suffit donc pas, et
+    l'API, elle, l'accepte sans broncher.
+
+    Exclusif de ``callback_port`` : déclarer les deux ne dit pas lequel sert."""
+
+    callback_port: int = 0
+    """Port de la boucle locale où revient l'autorisation.
+
+    **Fixe, et non éphémère** : le fournisseur compare les URL de retour à
+    l'identique, port compris. Il doit figurer tel quel dans la configuration du
+    client. ``0`` veut dire « non déclaré »."""
+
+
+@dataclass
 class LearningDefinition:
     """Où ce catalogue attend qu'on remette une preuve d'apprentissage.
 
@@ -376,17 +440,26 @@ class LearningDefinition:
     pas l'identité du dépôt, et ce qui viendra ensuite (une page de reprise, un
     format attendu) tiendra ici sans étaler ``repo.*``.
 
-    **Ce que cette URL ne dit pas.** Elle ne dit pas que dsoxlab envoie quoi que
-    ce soit — il n'envoie rien, jamais —, ni que le portail est joignable depuis
-    la machine où l'outil tourne, ni que le navigateur y tourne aussi. Un
-    apprenant dans WSL, dans une VM ou derrière SSH lit un lien et décide. Elle
-    ne dit pas non plus que ce portail est approuvé par qui que ce soit : il est
-    **déclaré par ce catalogue**, et c'est ainsi que la CLI le présente.
+    **Ce que ``portal_url`` ne dit pas.** Elle ne dit pas que le portail est
+    joignable depuis la machine où l'outil tourne, ni que le navigateur y tourne
+    aussi. Un apprenant dans WSL, dans une VM ou derrière SSH lit un lien et
+    décide. Elle ne dit pas non plus que ce portail est approuvé par qui que ce
+    soit : il est **déclaré par ce catalogue**, et c'est ainsi que la CLI le
+    présente.
 
-    Rien d'autre n'a sa place ici : pas de jeton, pas de clé d'API, pas d'en-tête
-    d'autorisation, pas de webhook, pas de commande. Un dépôt versionné n'est pas
-    un endroit où poser un secret, et un catalogue ne donne pas d'ordres au
-    moteur.
+    **Et elle ne déclenche aucun envoi.** C'est ``sync`` qui en rend un
+    possible, et lui seul : cette docstring affirmait « il n'envoie rien,
+    jamais », ce qui était vrai du seul lien de remise et l'est resté. Un envoi
+    demande désormais trois coïncidences, et il en manque toujours deux par
+    défaut : un bloc ``sync`` déclaré, un ``dsoxlab login`` joué, un
+    ``dsoxlab push`` tapé.
+
+    Ce qui n'a pas changé, et qui comptait : **pas de jeton, pas de clé d'API,
+    pas d'en-tête d'autorisation, pas de webhook, pas de commande.** Un dépôt
+    versionné n'est pas un endroit où poser un secret, et un catalogue ne donne
+    pas d'ordres au moteur. ``sync`` ne déclare que des adresses publiques et un
+    identifiant de client **public**, celui que PKCE permet d'employer sans
+    secret.
     """
 
     portal_url: str = ""
@@ -394,6 +467,40 @@ class LearningDefinition:
 
     Vide veut dire « aucun portail », et c'est le cas par défaut : dsoxlab
     n'affiche alors aucun lien et n'invente aucune adresse."""
+
+    sync: SyncDefinition | None = None
+    """Comment remettre les preuves **sans** passer par le navigateur.
+
+    ``None`` est le défaut et le reste pour tout catalogue qui ne l'écrit pas :
+    ``dsoxlab login`` et ``dsoxlab push`` répondent alors que ce catalogue ne
+    déclare aucune synchronisation, et rien ne quitte la machine."""
+
+
+def _coercer_sync(
+    learning_data: Mapping[str, Any], meta_path: Path
+) -> SyncDefinition | None:
+    """``learning.sync``, ou ``None`` quand le catalogue n'en déclare pas.
+
+    ``None`` plutôt qu'un objet aux champs vides : « ce catalogue ne
+    synchronise pas » et « il le déclare à moitié » appellent deux messages, et
+    un objet vide les confondrait. Aucune validation ici — le parseur du
+    contrat v1 charge, il ne refuse pas un catalogue ; la politique s'applique
+    au point d'usage, dans ``services/sync_service.configuration``.
+    """
+    sync_data = as_mapping(learning_data.get("sync"), "learning.sync", meta_path)
+    if not sync_data:
+        return None
+    return SyncDefinition(
+        protocol=str(sync_data.get("protocol") or ""),
+        api=str(sync_data.get("api") or ""),
+        issuer=str(sync_data.get("issuer") or ""),
+        oauth_domain=str(sync_data.get("oauth_domain") or ""),
+        client_id=str(sync_data.get("client_id") or ""),
+        callback_url=str(sync_data.get("callback_url") or ""),
+        callback_port=as_int(
+            sync_data.get("callback_port"), 0, "learning.sync.callback_port", meta_path
+        ),
+    )
 
 
 def _coercer_solutions(valeur: object) -> str:
@@ -578,6 +685,7 @@ class RepoMetadata:
         learning_data = as_mapping(data.get("learning"), "learning", meta_path)
         learning = LearningDefinition(
             portal_url=str(learning_data.get("portal_url") or ""),
+            sync=_coercer_sync(learning_data, meta_path),
         )
 
         sections = [

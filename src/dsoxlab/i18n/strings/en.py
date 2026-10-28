@@ -814,6 +814,17 @@ Each lab declares:
     [dim]--out <file>[/dim]         Write it to a file; standard output stays empty.
                        Never overwrites without [bold]--force[/bold].
 
+  [cyan]login[/cyan]                Sign in to the portal this catalog declares. Nothing
+                       is ever sent without it, and nothing is sent by it either.
+    [dim]--no-browser[/dim]         No browser here: print the URL to open elsewhere,
+                       then paste back the URL you land on.
+
+  [cyan]push[/cyan]                 Send your recorded attempts to your account. Merged,
+                       never overwritten: the account may hold attempts played on
+                       another machine, and they are kept.
+    [dim]--dry-run[/dim]            Say what would be sent and stop there.
+
+  [cyan]logout[/cyan]               Forget the local session for this portal.
   [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch
                        (with confirmation: work in progress is lost).
     [dim]--yes / -y[/dim]           Skip confirmation.
@@ -1894,4 +1905,121 @@ silent.
     "fixture_hors_workdir":
         "'{fixture}' escapes the workdir: a fixture path is relative to "
         "fixtures/, with no '..' and no absolute path",
+    # ── Compte et envoi des preuves ───────────────────────────────────────────
+    'cmd_login_help':
+        'Sign in to the portal this catalog declares, so proofs can be pushed',
+    'cmd_logout_help':
+        'Forget the local session for this portal',
+    'cmd_push_help':
+        'Send your recorded attempts to your account, merged with what it holds',
+    'opt_login_no_browser':
+        'No browser here: print the URL to open elsewhere, then paste back the URL you land on',
+    'opt_push_dry_run':
+        'Say what would be sent and stop there: nothing leaves this machine, and no session is needed',
+    'login_ouvrir_cette_url':
+        'Open this URL on a machine that has a browser. The page you land on '
+        'will stay blank, or report that it cannot connect, and that is '
+        'expected: in this mode nothing listens at the return address. Only '
+        'the address you land on matters.',
+    'login_coller_le_retour':
+        'Paste the address the browser ends up on, read from its address bar '
+        '(or just the code)',
+    'login_echoue':
+        'Sign-in failed: {code}.',
+    'login_ouvrir_puis_recopier':
+        'Open this URL in a browser and sign in. The page you land on shows '
+        'your code: copy it, and paste it below.',
+    'sync_session_autre_portail':
+        'The saved session for this issuer was obtained for a different '
+        'portal: this catalog declares another API, OAuth domain or client. '
+        'Nothing was sent. Sign in again if you trust this catalog.',
+    'sync_retour_ambigu':
+        'This catalog declares both learning.sync.callback_url and '
+        'learning.sync.callback_port. Only one of them can be the registered '
+        'return address: keep the one the OAuth client declares.',
+    'sync_retour_absent':
+        'This catalog declares no return address: set learning.sync.'
+        'callback_url for a page that shows the code, or learning.sync.'
+        'callback_port for a local loopback.',
+    'login_echoue_suite':
+        'The usual cause is a return URL that was cut short or rewritten on '
+        'the way: copy it whole from the address bar, and run dsoxlab login '
+        'again.',
+    'login_port_occupe':
+        'Port {port} is already in use, and it is the only one the portal accepts as a return address. Free it, or sign in with --no-browser.',
+    'login_reussi':
+        'Signed in to {portail}.',
+    'login_ou_vit_le_jeton':
+        'The session is kept under XDG_STATE_HOME, readable by you only, and never in the catalog. dsoxlab logout forgets it.',
+    'logout_fait':
+        'Local session for {portail} forgotten.',
+    'logout_rien_a_faire':
+        'No local session for this portal: nothing to do.',
+    'logout_revocation':
+        'This only erases the local file. To revoke the token itself, sign out from the portal in your browser.',
+    'push_essai':
+        '{preuves} attempt(s) would be sent. Nothing has left this machine.',
+    'push_connectez_vous':
+        'Run dsoxlab login first.',
+    'push_charge_refusee_suite':
+        'The portal keeps a bounded history. Hand the proof over as a file instead: dsoxlab export --out proof.json.',
+    'push_refuse':
+        'The portal refused the write: {statut} {code}.',
+    'push_refuse_suite':
+        'Nothing was written. Your local results are untouched.',
+    'push_rejoue':
+        'The portal had already recorded this very write: replayed, with no second effect.',
+    'push_rien_a_ajouter':
+        'The account already held exactly these {total} attempt(s): nothing written, revision {revision} unchanged.',
+    'push_reussi':
+        '{ajoutees} attempt(s) added. The account now holds {total}, at revision {revision}.',
+    'push_doublons':
+        '{doublons} attempt(s) were already on the account, and were left as they are.',
+    'push_injoignable':
+        'The portal did not answer. Nothing was written, so running dsoxlab push again is safe.',
+    'push_conflit_persistant':
+        'Someone wrote to this account while we were merging, three times in a row. Nothing was lost; run dsoxlab push again.',
+    'push_operation_reutilisee':
+        'The portal saw this write identifier used for different content. That is a defect in dsoxlab, not something to retry: please report it.',
+    'push_compte_supprime':
+        'This account has been deleted on the portal. Run dsoxlab logout to drop the local session.',
+    'push_ecart_lab_absent_du_catalogue':
+        '{count} attempt(s) were not sent: their lab is no longer in this catalog, renamed, moved or removed. The portal cannot file them, and sending them would hide every other attempt. Nothing to fix on your side.',
+    'push_ecart_type_validation':
+        '{count} attempt(s) were not sent: a validation lab defends a guide and grades nobody.',
+    'push_ecart_type_inconnu':
+        '{count} attempt(s) were not sent: the portal does not know their lab type.',
+    'push_ecart_champ_hors_contrat':
+        '{count} attempt(s) were not sent: a field falls outside what the portal accepts.',
+    'push_ecart_catalogue_reserve':
+        "{count} attempt(s) were not sent: this catalog's id falls in a namespace the portal reserves.",
+    'push_ecart_compte_incoherent':
+        '{count} attempt(s) were not sent: more tests passed than were played, or a score above its own scale.',
+    'push_ecart_verdict_contradictoire':
+        '{count} attempt(s) were not sent: validated with a failed test, which the portal refuses for the whole document.',
+    'push_ecart_ligne_illisible':
+        '{count} line(s) of the local history could not be read.',
+    'push_ecart_document_illisible':
+        'The local history could not be read at all: nothing was sent.',
+    'sync_non_declare':
+        'This catalog declares no synchronization, so there is nothing to sign in to and nothing to send. dsoxlab export writes the same proof to a file, with no account.',
+    'sync_protocole_inconnu':
+        'This catalog declares the protocol {declare}, which this version does not speak. Expected: {attendu}. Nothing was sent: a payload emitted at random would be accepted and then unreadable.',
+    'sync_declaration_incomplete':
+        "The learning.sync block of this catalog is incomplete: {champs} missing. This is for the catalog's author to fix.",
+    'sync_url_refusee':
+        'learning.sync.{champ} cannot be used: {raison}',
+    'sync_sans_session':
+        'No session for this portal: dsoxlab login opens one.',
+    'sync_session_expiree':
+        'The session for this portal has expired and could not be renewed. Run dsoxlab login again.',
+    'sync_trop_de_lignes':
+        'The account would hold {lignes} attempts, above the {max} the portal keeps. It refuses in one block rather than truncating.',
+    'sync_charge_trop_grosse':
+        'The payload weighs {taille} bytes, above the {max} the portal accepts.',
+    'sync_charge_compressee_trop_grosse':
+        'Compressed, the payload weighs {taille} bytes, above the {max} the portal stores.',
+    'sync_corps_trop_gros':
+        'The request body weighs {taille} bytes, above the {max} allowed.',
+
 }

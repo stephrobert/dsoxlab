@@ -829,6 +829,17 @@ Chaque lab déclare :
     [dim]--out <fichier>[/dim]      L'écrire dans un fichier ; la sortie standard reste
                        vide. N'écrase jamais sans [bold]--force[/bold].
 
+  [cyan]login[/cyan]                Se connecter au portail que ce catalogue déclare. Rien
+                       ne part jamais sans lui, et rien ne part par lui non plus.
+    [dim]--no-browser[/dim]         Pas de navigateur ici : afficher l'URL à ouvrir
+                       ailleurs, puis recopier l'URL d'arrivée.
+
+  [cyan]push[/cyan]                 Envoyer ses tentatives enregistrées vers son compte.
+                       Fusionnées, jamais écrasées : le compte peut porter des
+                       tentatives jouées sur une autre machine, qui sont gardées.
+    [dim]--dry-run[/dim]            Dire ce qui partirait, et s'arrêter là.
+
+  [cyan]logout[/cyan]               Oublier la session locale de ce portail.
   [cyan]reset <id>[/cyan]           Nettoie et redémarre le lab depuis zéro
                        (avec confirmation : le travail en cours est perdu).
     [dim]--yes / -y[/dim]           Passe la confirmation.
@@ -1943,4 +1954,122 @@ hors ligne, elle se tait.
     "fixture_hors_workdir":
         "« {fixture} » sort du workdir : un chemin de fixture est relatif à "
         "fixtures/, sans « .. » ni chemin absolu",
+    # ── Compte et envoi des preuves ───────────────────────────────────────────
+    'cmd_login_help':
+        'Se connecter au portail que ce catalogue déclare, pour pouvoir y envoyer ses preuves',
+    'cmd_logout_help':
+        'Oublier la session locale de ce portail',
+    'cmd_push_help':
+        "Envoyer ses tentatives enregistrées vers son compte, fusionnées avec ce qu'il porte déjà",
+    'opt_login_no_browser':
+        "Pas de navigateur ici : afficher l'URL à ouvrir ailleurs, puis recopier l'URL d'arrivée",
+    'opt_push_dry_run':
+        "Dire ce qui partirait et s'arrêter là : rien ne quitte cette machine, et aucune session n'est demandée",
+    'login_ouvrir_cette_url':
+        "Ouvrez cette URL sur une machine qui a un navigateur. La page "
+        "d'arrivée restera blanche, ou dira qu'elle ne peut pas se connecter, "
+        "et c'est normal : dans ce mode, rien n'écoute à l'adresse de retour. "
+        "Seule compte l'adresse où vous arrivez.",
+    'login_coller_le_retour':
+        "Collez l'adresse où le navigateur est arrivé, lue dans sa barre "
+        "d'adresse (ou le code seul)",
+    'login_echoue':
+        'La connexion a échoué : {code}.',
+    'login_ouvrir_puis_recopier':
+        "Ouvrez cette URL dans un navigateur et connectez-vous. La page "
+        "d'arrivée affiche votre code : recopiez-le ci-dessous.",
+    'sync_session_autre_portail':
+        "La session enregistrée pour cet émetteur a été obtenue pour un autre "
+        "portail : ce catalogue déclare une autre API, un autre domaine OAuth "
+        "ou un autre client. Rien n'a été envoyé. Reconnectez-vous si vous "
+        "faites confiance à ce catalogue.",
+    'sync_retour_ambigu':
+        "Ce catalogue déclare à la fois learning.sync.callback_url et "
+        "learning.sync.callback_port. Une seule des deux peut être l'adresse "
+        "de retour enregistrée : gardez celle que déclare le client OAuth.",
+    'sync_retour_absent':
+        "Ce catalogue ne déclare aucune adresse de retour : renseignez "
+        "learning.sync.callback_url pour une page qui affiche le code, ou "
+        "learning.sync.callback_port pour une boucle locale.",
+    'login_echoue_suite':
+        "La cause habituelle est une URL de retour tronquée ou réécrite en "
+        "chemin : recopiez-la entière depuis la barre d'adresse, et relancez "
+        "dsoxlab login.",
+    'login_port_occupe':
+        "Le port {port} est déjà pris, et c'est le seul que le portail accepte comme adresse de retour. Libérez-le, ou connectez-vous avec --no-browser.",
+    'login_reussi':
+        'Connecté à {portail}.',
+    'login_ou_vit_le_jeton':
+        "La session est gardée sous XDG_STATE_HOME, lisible par vous seul, et jamais dans le catalogue. dsoxlab logout l'oublie.",
+    'logout_fait':
+        'Session locale de {portail} oubliée.',
+    'logout_rien_a_faire':
+        'Aucune session locale pour ce portail : rien à faire.',
+    'logout_revocation':
+        "Ceci n'efface que le fichier local. Pour révoquer le jeton lui-même, déconnectez-vous du portail dans votre navigateur.",
+    'push_essai':
+        "{preuves} tentative(s) partiraient. Rien n'a quitté cette machine.",
+    'push_connectez_vous':
+        "Jouez d'abord dsoxlab login.",
+    'push_charge_refusee_suite':
+        'Le portail garde un historique borné. Remettez la preuve en fichier plutôt : dsoxlab export --out preuve.json.',
+    'push_refuse':
+        "Le portail a refusé l'écriture : {statut} {code}.",
+    'push_refuse_suite':
+        "Rien n'a été écrit. Vos résultats locaux sont intacts.",
+    'push_rejoue':
+        'Le portail avait déjà enregistré cette écriture exacte : rejouée, sans second effet.',
+    'push_rien_a_ajouter':
+        "Le compte portait déjà exactement ces {total} tentative(s) : rien d'écrit, révision {revision} inchangée.",
+    'push_reussi':
+        '{ajoutees} tentative(s) ajoutée(s). Le compte en porte désormais {total}, en révision {revision}.',
+    'push_doublons':
+        '{doublons} tentative(s) étaient déjà sur le compte, et y ont été laissées telles quelles.',
+    'push_injoignable':
+        "Le portail n'a pas répondu. Rien n'a été écrit, donc rejouer dsoxlab push est sans risque.",
+    'push_conflit_persistant':
+        "Quelqu'un a écrit sur ce compte pendant notre fusion, trois fois de suite. Rien n'est perdu ; rejouez dsoxlab push.",
+    'push_operation_reutilisee':
+        "Le portail a vu cet identifiant d'écriture servir pour un autre contenu. C'est un défaut de dsoxlab, pas quelque chose à réessayer : merci de le signaler.",
+    'push_compte_supprime':
+        'Ce compte a été supprimé sur le portail. Jouez dsoxlab logout pour retirer la session locale.',
+    'push_ecart_lab_absent_du_catalogue':
+        "{count} tentative(s) n'ont pas été envoyées : leur lab n'est plus dans ce catalogue, renommé, déplacé ou supprimé. Le portail ne sait pas les ranger, et les envoyer masquerait toutes les autres. Rien à corriger de votre côté.",
+    'push_ecart_type_validation':
+        "{count} tentative(s) n'ont pas été envoyées : un lab de validation défend un guide et ne note personne.",
+    'push_ecart_type_inconnu':
+        "{count} tentative(s) n'ont pas été envoyées : le portail ne connaît pas leur type de lab.",
+    'push_ecart_champ_hors_contrat':
+        "{count} tentative(s) n'ont pas été envoyées : un champ sort de ce que le portail accepte.",
+    'push_ecart_catalogue_reserve':
+        "{count} tentative(s) n'ont pas été envoyées : l'identifiant de ce catalogue tombe dans un espace que le portail se réserve.",
+    'push_ecart_compte_incoherent':
+        "{count} tentative(s) n'ont pas été envoyées : plus de tests réussis que joués, ou une note au-dessus de son propre barème.",
+    'push_ecart_verdict_contradictoire':
+        "{count} tentative(s) n'ont pas été envoyées : validées avec un test raté, ce que le portail refuse pour le document entier.",
+    'push_ecart_ligne_illisible':
+        "{count} ligne(s) de l'historique local n'ont pas pu être lues.",
+    'push_ecart_document_illisible':
+        "L'historique local n'a pas pu être lu du tout : rien n'a été envoyé.",
+    'sync_non_declare':
+        "Ce catalogue ne déclare aucune synchronisation : il n'y a rien où se connecter, et rien à envoyer. dsoxlab export écrit la même preuve dans un fichier, sans aucun compte.",
+    'sync_protocole_inconnu':
+        "Ce catalogue déclare le protocole {declare}, que cette version ne parle pas. Attendu : {attendu}. Rien n'a été envoyé : une charge émise au hasard serait acceptée puis illisible.",
+    'sync_declaration_incomplete':
+        "Le bloc learning.sync de ce catalogue est incomplet : {champs} manquant(s). C'est à l'auteur du catalogue de le corriger.",
+    'sync_url_refusee':
+        "learning.sync.{champ} ne peut pas être utilisé : {raison}",
+    'sync_sans_session':
+        'Aucune session pour ce portail : dsoxlab login en ouvre une.',
+    'sync_session_expiree':
+        "La session de ce portail a expiré et n'a pas pu être renouvelée. Rejouez dsoxlab login.",
+    'sync_trop_de_lignes':
+        'Le compte porterait {lignes} tentatives, au-delà des {max} que le portail garde. Il refuse en bloc plutôt que de tronquer.',
+    'sync_charge_trop_grosse':
+        'La charge pèse {taille} octets, au-delà des {max} que le portail accepte.',
+    'sync_charge_compressee_trop_grosse':
+        'Compressée, la charge pèse {taille} octets, au-delà des {max} que le portail stocke.',
+    'sync_corps_trop_gros':
+        'Le corps de la requête pèse {taille} octets, au-delà des {max} permis.',
+
 }
