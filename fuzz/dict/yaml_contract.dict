@@ -119,3 +119,26 @@ persistence="persistence_after_reboot:"
 lab="lab"
 challenge="challenge"
 capstone="capstone"
+
+# ── meta.yml : learning (portail de progression) ──
+# Les URL sont relues par une politique stricte (https, hôte non local, pas de
+# cote d'écoute, pas de requête) : le fuzzer doit pouvoir écrire les deux côtés
+# de chaque frontière, donc une valeur acceptée ET une refusée.
+learning="learning:"
+portal_url="portal_url:"
+sync="sync:"
+issuer="issuer:"
+api="api:"
+oauth_domain="oauth_domain:"
+client_id="client_id:"
+callback_url="callback_url:"
+callback_port="callback_port:"
+protocol="protocol:"
+url_https="https://exemple.test/"
+url_http="http://exemple.test/"
+url_locale="https://127.0.0.1/"
+url_avec_port="https://exemple.test:8443/"
+url_avec_requete="https://exemple.test/?a=1"
+port_valide="callback_port: 14123"
+port_hors_bornes="callback_port: 70000"
+port_refuse="callback_port: \x2214123\x22"
