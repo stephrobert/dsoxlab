@@ -1,0 +1,19 @@
+repo:
+  id: catalogue-avec-portail
+  category: linux
+
+learning:
+  portal_url: https://exemple.test/apprendre/
+  sync:
+    protocol: learner-sync/1
+    issuer: https://issuer.exemple.test
+    api: https://api.exemple.test
+    oauth_domain: https://connexion.exemple.test
+    client_id: 0123456789abcdefghijkl
+    callback_url: https://exemple.test/auth/cli/
+
+sections:
+  - id: l1
+    title: Fondamentaux
+    labs:
+      - linux/l1/l1-log-parsing

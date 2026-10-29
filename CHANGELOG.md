@@ -7,6 +7,91 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-28
+
+### Added
+
+- **`dsoxlab login`, `dsoxlab push`, `dsoxlab logout`: hand proofs over without
+  a browser.** Until now a proof reached a portal by hand: `dsoxlab export`
+  wrote a file, and the learner imported it in a browser. Measured on the
+  portal this release targets, that gave **12 synchronized proofs for 242
+  learners**, while 232 had opened a course and 141 taken a quiz. That 12 did
+  not measure practice; it measured who performed an extra manual step.
+
+  The new path is **opt-in from end to end**, and nothing is sent unless three
+  things coincide: the catalog declares a `learning.sync` block, the learner has
+  run `dsoxlab login`, and they type `dsoxlab push`. No `check`, no `submit`, no
+  path command sends anything.
+
+- **`learning.sync` in `meta.yml`**: the synchronisation API a catalog declares,
+  with `protocol`, `api`, `issuer`, `oauth_domain`, `client_id` and
+  `callback_url` **or** `callback_port`. Four public addresses and a **public**
+  OAuth client id, which
+  PKCE allows to use with no secret: that is why this block can live in a
+  versioned repository without exposing anything. A catalog that declares
+  nothing keeps working exactly as before.
+
+- **Authorization Code + PKCE S256**, with a fallback for a machine that has no
+  browser (`login --no-browser`): the URL is printed, opened elsewhere, and the
+  return URL pasted back. The PKCE verifier never leaves the machine and no
+  token ever passes through shell history, which is why no `--token` option
+  exists.
+
+- **Two shapes of return address, because one is not enough.**
+  `callback_port` listens on a loopback and completes on its own.
+  `callback_url` names a portal page that displays the code to copy back:
+  slower, and **sometimes the only path**. Measured on 2026-10-28 against a
+  real Cognito pool whose managed login is version 2: same client, an `https`
+  return yields 302 and `http://127.0.0.1:14123/` yields **403**. Registering
+  the address is therefore not enough, and the Cognito API accepts it without
+  complaint. The two shapes are mutually exclusive, and a catalog declaring
+  both, or neither, is told so.
+
+- **A session is bound to the whole portal, not just its issuer.**
+  The session file now carries the `api`, OAuth domain and client it was
+  obtained for, and `push` refuses a session whose three fields do not match
+  the current catalog. Without that, a catalog installed through `catalog add`,
+  hence cloned from an arbitrary address, only had to declare the real portal's
+  `issuer` alongside its own `api`: on the first `push`, and **before any
+  write**, the access token went to the host of its choosing, then the refresh
+  token to its `oauth_domain`. Measured on this branch before the fix. A
+  session written by an earlier version lacks these fields and calls for a new
+  sign-in.
+
+- **No redirect is followed, and no response is read unbounded.**
+  `urllib` follows redirects while keeping the `Authorization` header, and
+  accepts an `http` target: a portal answering `302` to a `GET` sent the token
+  in the clear, bypassing the URL policy that had only checked the starting
+  address. Responses are now read up to 8 MB, no further.
+
+- **The authorization code no longer reaches the log.** The local return server
+  logged its request line, `code=` included, into the file `dsoxlab support`
+  collects and `support --issue` publishes. Only the status is written now.
+
+- **A merge, never an overwrite.** The account may hold attempts played on
+  another machine. `push` reads, merges by the portal's own deduplication key
+  (catalog, lab, attempt timestamp) and writes under condition; on a revision
+  conflict it re-reads and re-merges, up to three times.
+
+### Changed
+
+- **`LearningDefinition` no longer claims that dsoxlab never sends anything.**
+  Its docstring and the `meta.schema.json` description said so, and it was true
+  of `portal_url` alone, which stays a link the learner reads and decides to
+  open. What has not changed, and was the point: no token, API key,
+  authorization header, webhook or command in a catalog.
+
+### Fixed
+
+- **A proof the portal would discard is no longer emitted.** The portal re-reads
+  its store **all or nothing**: a single discarded line makes it return an
+  *empty* store, so the learner's whole displayed history would vanish, with no
+  message. Two ordinary cases produced such a line: a lab that is no longer in
+  the catalog (renamed, moved, removed), whose `lab_type` is then `null`, and a
+  `validation` lab. They are now filtered before sending, **counted**, and
+  named: an attempt that will never appear on the account is said, not deduced
+  from a total that does not add up.
+
 ## [0.5.5] - 2026-10-19
 
 ### Fixed

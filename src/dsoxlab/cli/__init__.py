@@ -44,6 +44,7 @@ from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
     _amorcage,
     auteur,
     catalogues,
+    compte,
     contexte,
     demarrage,
     destruction,
@@ -84,6 +85,9 @@ _ORDRE_COMMANDES = (
     "use", "list-labs", "show",
     "start", "run", "course", "challenge", "guide", "hint",
     "check", "submit", "scores", "export", "progress", "next", "reset", "clean",
+    # Le compte vient après l'export : on remet une preuve qu'on a d'abord
+    # gagnée, et `export` reste la voie qui ne demande aucun compte.
+    "login", "push", "logout",
     "validate-structure",
     "doctor",
     "provision", "destroy", "status", "ssh",

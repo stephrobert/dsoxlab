@@ -4,7 +4,9 @@
   "title": "dsoxlab meta.yml (contract v1)",
   "description": "Declarative contract of a lab-hosting repository, read by dsoxlab from <repo>/meta.yml. Contract version 1. Point your editor at this schema with a first line: # yaml-language-server: $schema=https://raw.githubusercontent.com/stephrobert/dsoxlab/main/schemas/meta.schema.json",
   "type": "object",
-  "required": ["repo"],
+  "required": [
+    "repo"
+  ],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -14,10 +16,11 @@
       "default": 1,
       "description": "Version of the INPUT contract this file follows. Leave it out and it is read as 1. Unrelated to the version of the JSON dsoxlab emits (reporting/machine.py: SCHEMA)."
     },
-
     "repo": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "description": "Identity of the repository. The only block dsoxlab requires.",
       "properties": {
@@ -31,31 +34,81 @@
           "minLength": 1,
           "description": "Technical category of the repository. Becomes the default section of every lab. Free-form: dsoxlab knows no list of domains. Optional since 0.1.88, because a repository that only provisions infrastructure has no lab to place; validate-structure asks for it as soon as labs exist."
         },
-        "title": { "type": "string", "description": "Human-readable name." },
-        "blog_url": { "type": "string", "description": "Home page of the online course." },
-        "description": { "type": "string", "description": "One paragraph about the repository." },
-        "issues_url": { "type": "string", "description": "Where to file an issue about THIS catalogue rather than about the engine. Read by `dsoxlab support --issue`. Optional: without it the tool falls back to the repository's `origin` remote." },
+        "title": {
+          "type": "string",
+          "description": "Human-readable name."
+        },
+        "blog_url": {
+          "type": "string",
+          "description": "Home page of the online course."
+        },
+        "description": {
+          "type": "string",
+          "description": "One paragraph about the repository."
+        },
+        "issues_url": {
+          "type": "string",
+          "description": "Where to file an issue about THIS catalogue rather than about the engine. Read by `dsoxlab support --issue`. Optional: without it the tool falls back to the repository's `origin` remote."
+        },
         "solutions": {
           "type": "string",
-          "enum": ["encrypted", "plaintext"],
+          "enum": [
+            "encrypted",
+            "plaintext"
+          ],
           "default": "encrypted",
           "description": "How this catalogue keeps its reference solutions. `encrypted` (the default) means every file under `solution/<lab path>` or `labs/<lab>/solution/` must be ansible-vault encrypted, and `validate-structure` reports any that is not: a solution shipped in clear text spoils the lab, and git keeps it forever. `plaintext` disarms that check, for a catalogue whose labs are chained, where one lab's starting point IS the previous lab's solution and the file therefore has to be copyable as a fixture. An unknown value falls back to `encrypted`: a check does not relax on a typo."
         }
       }
     },
-
     "learning": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Where this catalogue expects a proof of practice to be handed in. Optional, and a catalogue without it keeps working: dsoxlab then shows no link and invents no address. Nothing else belongs here \u2014 no token, API key, authorization header, webhook or command: a versioned repository is no place for a secret, and a catalogue gives the engine no orders.",
+      "description": "Where this catalogue expects a proof of practice to be handed in. Optional, and a catalogue without it keeps working: dsoxlab then shows no link, invents no address and sends nothing. Nothing that looks like a secret belongs here, in either block: no token, API key, authorization header, webhook or command. A versioned repository is no place for a secret, and a catalogue gives the engine no orders.",
       "properties": {
         "portal_url": {
           "type": "string",
-          "description": "Hand-in URL, in https. It does NOT mean dsoxlab sends anything (it never does), nor that the portal is reachable from the machine running dsoxlab, nor that it is approved by anyone: it is declared by this catalogue, and the CLI says so. http is refused, except towards localhost with DSOXLAB_PORTAL_LOCAL set \u2014 a decision of the machine playing the lab, never of the catalogue."
+          "description": "Hand-in URL, in https. It does NOT trigger any sending: it is a link the learner reads and decides to open, and `sync` below is what makes a push possible. It does not mean the portal is reachable from the machine running dsoxlab, nor that it is approved by anyone: it is declared by this catalogue, and the CLI says so. http is refused, except towards localhost with DSOXLAB_PORTAL_LOCAL set — a decision of the machine playing the lab, never of the catalogue."
+        },
+        "sync": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The synchronisation API this catalogue declares, so that `dsoxlab push` can hand proofs over without a browser. Optional, and absent by default: without it, `dsoxlab login` and `dsoxlab push` say this catalogue declares no synchronisation and nothing leaves the machine. Four public addresses and a PUBLIC OAuth client id, which PKCE allows to use with no secret: that is why this block can live in a versioned repository without exposing anything. A sending needs three things to coincide, and two are missing by default: this block, a `dsoxlab login`, and a `dsoxlab push` typed by the learner.",
+          "properties": {
+            "protocol": {
+              "type": "string",
+              "description": "The synchronisation contract spoken by the portal. Only `learner-sync/1` is implemented. An unknown value makes the push refuse while naming what is expected: a payload emitted at random would be accepted by the gateway and then unreadable, and the learner would believe it synchronised."
+            },
+            "api": {
+              "type": "string",
+              "description": "Root of the API, in https. Paths come from the protocol, not from here."
+            },
+            "issuer": {
+              "type": "string",
+              "description": "The OIDC issuer, in https. It identifies the portal and names the local session file. Distinct from `oauth_domain`: with Cognito a custom domain serves the OAuth endpoints while the issuer stays the pool URL, and confusing the two yields a 404 on authorization."
+            },
+            "oauth_domain": {
+              "type": "string",
+              "description": "Root of the OAuth endpoints (/oauth2/authorize, /oauth2/token), in https."
+            },
+            "client_id": {
+              "type": "string",
+              "description": "Id of the PUBLIC OAuth client dedicated to the CLI. Not the site's own client: a web client only allows its own return URL. A second client is needed, declaring whichever return address callback_url or callback_port names."
+            },
+            "callback_url": {
+              "type": "string",
+              "description": "The https address where authorization returns, when no loopback is possible. The provider sends the learner there with the code in the URL, a page displays it, and the learner pastes it into the CLI. Sometimes the ONLY path: Cognito managed login version 2 refuses to serve an authorization whose return address is in http, loopback included, and answers 403 - measured on a real pool, same client, https 302 and http://127.0.0.1 403. Registering the address is therefore not enough, and the API accepts it without complaint. Mutually exclusive with callback_port."
+            },
+            "callback_port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Port of the loopback address where authorization returns. FIXED, not ephemeral: the provider compares return URLs exactly, port included, so it must appear verbatim in the client configuration. Absent means not declared, and the connection says so rather than inventing one."
+            }
+          }
         }
       }
     },
-
     "infra": {
       "type": "object",
       "additionalProperties": false,
@@ -65,8 +118,18 @@
           "description": "Infrastructure provider, or the list of candidates the learner may choose from. Providers packaged with dsoxlab: kvm, incus, outscale. Resolution order: DSOXLAB_PROVIDER, then the session context set by dsoxlab use --provider, then a bare string or a single-item list. Left unresolved is not an error: only infrastructure commands require one.",
           "default": "kvm",
           "oneOf": [
-            { "type": "string", "minLength": 1 },
-            { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           ]
         },
         "bootstrap": {
@@ -87,7 +150,9 @@
           "description": "The VMs of the repository. Every runtime.targets[].host and every roles value of a lab must appear here by name.",
           "items": {
             "type": "object",
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -103,9 +168,21 @@
                 "type": "string",
                 "description": "Free-form role, exposed as an Ansible host_var."
               },
-              "ram_mb": { "type": "integer", "minimum": 1, "default": 1024 },
-              "vcpu": { "type": "integer", "minimum": 1, "default": 1 },
-              "disk_gb": { "type": "integer", "minimum": 1, "default": 10 },
+              "ram_mb": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1024
+              },
+              "vcpu": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1
+              },
+              "disk_gb": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 10
+              },
               "extra_disk_gb": {
                 "type": "integer",
                 "minimum": 0,
@@ -124,7 +201,10 @@
           "type": "object",
           "description": "Per-provider overrides, read by the matching Terraform module. Keys are provider names; values are free-form mappings, because each provider has its own variables. The keys described below are the ones the packaged templates read; any other key is passed through untouched.",
           "additionalProperties": {
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "storage_pool": {
                 "type": "string",
@@ -137,21 +217,34 @@
         }
       }
     },
-
     "sections": {
       "type": "array",
       "description": "Teaching order of the catalog. Optional. It orders and names the blocs; it never decides whether a lab exists, which is settled by the presence of labs/**/lab.yaml.",
       "items": {
         "type": "object",
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "minLength": 1, "description": "Slug of the section." },
-          "title": { "type": "string", "description": "Human-readable name, shown as the bloc name." },
-          "description": { "type": "string", "description": "One short line." },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Slug of the section."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable name, shown as the bloc name."
+          },
+          "description": {
+            "type": "string",
+            "description": "One short line."
+          },
           "labs": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Paths relative to <repo>/labs/, in teaching order. The match is on the path, never on the lab id."
           }
         }

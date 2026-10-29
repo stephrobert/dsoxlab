@@ -40,11 +40,14 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab instructor audit` | What a learner will not work out alone in this catalog. |
 | `dsoxlab instructor bootstrap` | Generate the lab SSH key (if missing) and check that terraform/ansible-runner are installed. |
 | `dsoxlab list-labs` | List all available labs (filtered by active context if set). |
+| `dsoxlab login` | Sign in to the portal this catalog declares, so proofs can be pushed |
+| `dsoxlab logout` | Forget the local session for this portal |
 | `dsoxlab new catalog` | Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/. |
 | `dsoxlab new lab` | Scaffold a lab, discovered by the next list-labs. |
 | `dsoxlab next` | Recommend the next lab or challenge to complete in the active context. |
 | `dsoxlab progress` | Show progression by bloc (labs completed, average score, challenges and capstones). |
 | `dsoxlab provision` | Provision the lab infrastructure (terraform apply on the current provider). |
+| `dsoxlab push` | Send your recorded attempts to your account, merged with what it holds |
 | `dsoxlab reset` | Reset the lab to its initial state (clean + restart). |
 | `dsoxlab run` | Prepare and start the lab environment. |
 | `dsoxlab scores` | Show recorded scores history. |
