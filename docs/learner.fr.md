@@ -210,6 +210,37 @@ dsoxlab export -o historique.json            # tout ce que ce catalogue a enregi
 Ce que contient le document, champ par champ, est sur [la sortie
 machine](./machine-output.fr.md#export).
 
+### Ou un compte, quand le catalogue en déclare un
+
+Un catalogue peut aller plus loin et déclarer un **compte où se synchroniser**.
+Trois commandes existent alors, et ce sont les seules qui lui parlent :
+
+```bash
+dsoxlab login     # se connecter, une fois
+dsoxlab push      # envoyer vos tentatives enregistrées
+dsoxlab logout    # oublier la session sur cette machine
+```
+
+Rien ne part avant que vous tapiez `push`. `check` et `submit` enregistrent en
+local et n'envoient rien, comme avant.
+
+`push` fusionne : il lit ce que le compte porte déjà, ajoute ce qui lui manque,
+et **n'écrit rien du tout** quand le compte est déjà exactement à jour. Il le
+dit, plutôt que de brûler une révision. Il rapporte aussi ce qu'il n'a pas
+envoyé, et pourquoi.
+
+`login` ouvre la page de connexion du portail dans votre navigateur, par un
+flux OAuth standard avec PKCE. En SSH, ou dès qu'aucun navigateur n'est
+joignable, `--no-browser` affiche l'URL à ouvrir ailleurs et vous demande de
+recopier l'adresse sur laquelle vous atterrissez. C'est le portail qui décide de
+la forme de ce retour : le message dit donc laquelle attendre.
+
+La session vit dans `~/.local/state/dsoxlab/sessions/`, un fichier par portail,
+lisible de vous seul (mode `0600`). Elle est liée au portail qui l'a émise : un
+autre catalogue, même déclarant le même émetteur, ne peut pas s'en servir.
+`logout` supprime le fichier ; il ne révoque rien côté portail, ce qui se fait
+depuis votre compte.
+
 ## Langue
 
 Chaque message existe en anglais et en français.

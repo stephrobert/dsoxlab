@@ -48,6 +48,7 @@ elle.
 | `~/.local/share/dsoxlab/catalogs/` | Catalogues installés par `dsoxlab catalog add`, un sous-répertoire par identifiant | `XDG_DATA_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/labs/` | Points de départ du travail, pour distinguer un lab *prêt* d'un lab *en cours* | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/catalogue-actif` | Identifiant du catalogue actif, celui qu'on utilise sans se placer dans son répertoire | `XDG_STATE_HOME` |
+| `~/.local/state/dsoxlab/sessions/<portail>-<empreinte>.json` | Session de portail ouverte par `dsoxlab login` : les jetons qui autorisent `push` à écrire sur votre compte. Mode `0600`, un fichier par portail, supprimé par `dsoxlab logout` | `XDG_STATE_HOME` |
 | `~/.ssh/config.d/<catalog-id>.conf` | Fragment SSH des hôtes du lab, pour que `ssh`, `scp` et votre IDE les atteignent par leur nom | aucune |
 
 `<catalog-id>` est le `repo.id` du `meta.yml` du catalogue. Le verrou retombe
