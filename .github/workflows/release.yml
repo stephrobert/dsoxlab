@@ -37,7 +37,7 @@ jobs:
       attestations: write   # record the SLSA build provenance for the artifacts
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 
@@ -47,7 +47,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
         with:
           version: "0.11.26"
           enable-cache: false   # no cache in the publishing path (cache-poisoning hardening)
@@ -140,7 +140,7 @@ jobs:
       id-token: write   # OIDC token for Trusted Publishing — the only scope needed
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 
@@ -151,7 +151,7 @@ jobs:
           path: dist/
 
       - name: Publish to PyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           attestations: true
           print-hash: true
@@ -167,7 +167,7 @@ jobs:
       contents: write   # create the Release and upload the built artifacts
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 

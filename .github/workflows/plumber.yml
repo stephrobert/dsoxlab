@@ -42,7 +42,7 @@ jobs:
       id-token: write          # OIDC to publish the score to score.getplumber.io
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 
@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
 
       - name: Plumber compliance scan
-        uses: getplumber/plumber@326eb09497b27dbbe7f2664682d55c845acf4bd9 # v0.5.23
+        uses: getplumber/plumber@d1133cdac48cfdf0c0004637ae4af38bcf9f16c7 # v0.7.11
         with:
           version: "v0.4.3"
           verify-attestation: "true"   # check the binary's SLSA provenance before running
