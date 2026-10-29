@@ -7,6 +7,96 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.6.0] - 2026-10-28
+
+### Ajouté
+
+- **`dsoxlab login`, `dsoxlab push`, `dsoxlab logout` : remettre ses preuves
+  sans navigateur.** Jusqu'ici une preuve arrivait au portail à la main :
+  `dsoxlab export` écrivait un fichier, que l'apprenant importait dans son
+  navigateur. Mesuré sur le portail que cette version vise, cela donnait
+  **12 preuves synchronisées pour 242 apprenants**, alors que 232 avaient ouvert
+  une formation et 141 passé un quiz. Ce 12 ne mesurait pas la pratique : il
+  mesurait qui avait fait une manipulation de plus.
+
+  La voie nouvelle est **opt-in de bout en bout**, et rien ne part sans que
+  trois choses coïncident : le catalogue déclare un bloc `learning.sync`,
+  l'apprenant a joué `dsoxlab login`, et il tape `dsoxlab push`. Aucun `check`,
+  aucun `submit`, aucune commande de parcours n'envoie quoi que ce soit.
+
+- **`learning.sync` dans `meta.yml`** : l'API de synchronisation qu'un catalogue
+  déclare, avec `protocol`, `api`, `issuer`, `oauth_domain`, `client_id` et
+  `callback_url` **ou** `callback_port`. Quatre adresses publiques et un
+  identifiant de client OAuth
+  **public**, que PKCE permet d'employer sans secret : c'est pour cela que ce
+  bloc peut vivre dans un dépôt versionné sans rien y exposer. Un catalogue qui
+  ne déclare rien fonctionne exactement comme avant.
+
+- **Authorization Code + PKCE S256**, avec un repli pour une machine sans
+  navigateur (`login --no-browser`) : l'URL s'affiche, l'apprenant l'ouvre
+  ailleurs, et recopie l'URL de retour. Le vérificateur PKCE ne quitte jamais la
+  machine et aucun jeton ne passe par l'historique du shell, raison pour
+  laquelle aucune option `--jeton` n'existe.
+
+- **Deux formes d'adresse de retour, parce qu'une seule ne suffit pas.**
+  `callback_port` écoute une boucle locale et rend la main tout seul.
+  `callback_url` nomme une page du portail qui affiche le code à recopier :
+  plus lent, et **parfois le seul chemin**. Mesuré le 2026-10-28 sur un pool
+  Cognito réel, dont la page de connexion gérée est en version 2 : même client,
+  retour en `https` 302, retour en `http://127.0.0.1:14123/` **403**.
+  Enregistrer l'adresse ne suffit donc pas, et l'API Cognito, elle, l'accepte
+  sans broncher. Les deux formes sont exclusives, et un catalogue qui déclare
+  les deux, ou aucune, se le voit dire.
+
+- **Une session est liée au portail entier, pas à son seul émetteur.**
+  Le fichier de session porte désormais l'`api`, le domaine OAuth et le client
+  pour lesquels il a été obtenu, et `push` refuse d'employer une session dont
+  ces trois champs ne correspondent pas au catalogue courant. Sans cela, un
+  catalogue installé par `catalog add`, donc cloné depuis une adresse
+  quelconque, n'avait qu'à déclarer l'`issuer` du vrai portail et sa propre
+  `api` : au premier `push`, et **avant toute écriture**, le jeton d'accès
+  partait vers l'hôte de son choix, puis le jeton de rafraîchissement vers son
+  `oauth_domain`. Mesuré sur cette branche avant correction. Une session écrite
+  par une version antérieure n'a pas ces champs et appelle une reconnexion.
+
+- **Aucune redirection n'est suivie, et aucune réponse n'est lue sans borne.**
+  `urllib` suit les redirections en conservant l'en-tête `Authorization`, et
+  accepte une cible en `http` : un portail répondant `302` sur un `GET` faisait
+  partir le jeton en clair, en contournant la politique d'URL qui n'avait
+  contrôlé que l'adresse de départ. Les réponses sont désormais lues jusqu'à
+  8 Mo, pas au-delà.
+
+- **Le code d'autorisation ne va plus au journal.** Le serveur de retour local
+  journalisait sa ligne de requête, `code=` compris, dans le fichier que
+  `dsoxlab support` ramasse et qu'un `support --issue` publie. Seul le statut
+  y est écrit.
+
+- **Une fusion, jamais un écrasement.** Le compte peut porter des tentatives
+  jouées sur une autre machine. `push` relit, fusionne par la clé de
+  dédoublonnage du portail lui-même (catalogue, lab, date de tentative) et écrit
+  sous condition ; sur un conflit de révision, il relit et refusionne, jusqu'à
+  trois fois.
+
+### Modifié
+
+- **`LearningDefinition` n'affirme plus que dsoxlab n'envoie jamais rien.** Sa
+  docstring et la description de `meta.schema.json` le disaient, et c'était vrai
+  du seul `portal_url`, qui reste un lien que l'apprenant lit et décide
+  d'ouvrir. Ce qui n'a pas changé, et qui comptait : aucun jeton, aucune clé
+  d'API, aucun en-tête d'autorisation, aucun webhook, aucune commande dans un
+  catalogue.
+
+### Corrigé
+
+- **Une preuve que le portail écarterait n'est plus émise.** Le portail relit son
+  magasin en **tout ou rien** : une seule ligne écartée lui fait rendre un
+  magasin *vide*, donc tout l'historique affiché de l'apprenant disparaîtrait,
+  sans message. Deux cas ordinaires produisaient une telle ligne : un lab qui
+  n'est plus dans le catalogue (renommé, déplacé, supprimé), dont le `lab_type`
+  vaut alors `null`, et un lab de type `validation`. Ils sont désormais filtrés
+  avant l'envoi, **comptés**, et nommés : une tentative qui ne paraîtra jamais
+  sur le compte se dit, elle ne se déduit pas d'un total qui ne tombe pas juste.
+
 ## [0.5.5] - 2026-10-19
 
 ### Corrigé
