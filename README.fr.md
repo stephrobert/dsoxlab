@@ -143,6 +143,37 @@ _414 labs dans 12 catalogues. Cette table est générée depuis `src/dsoxlab/tem
 
 ---
 
+## Remettre votre résultat
+
+Une preuve de ce que vous avez fait existe sous trois formes, et **aucune ne
+part d'elle-même** : ni `check`, ni `submit` n'envoie quoi que ce soit.
+
+```bash
+dsoxlab submit <id>             # affiche un lien qui porte le résultat
+dsoxlab export -o preuve.json   # la même preuve en fichier, portail ou pas
+```
+
+Quand un catalogue déclare un compte où se synchroniser, trois commandes
+apparaissent :
+
+```bash
+dsoxlab login     # se connecter au portail que le catalogue déclare
+dsoxlab push      # envoyer vos tentatives, fusionnées avec ce que le compte porte
+dsoxlab logout    # oublier la session locale
+```
+
+`push` est la seule commande qui écrive sur votre compte, et elle n'écrit rien
+quand le compte porte déjà exactement vos tentatives. La connexion est un flux
+OAuth standard avec PKCE, et la session est liée au portail qui l'a émise : un
+catalogue ne peut pas désigner un compte qui n'est pas le sien.
+
+Ces trois commandes exigent un bloc `learning.sync` dans le `meta.yml` du
+catalogue. **Aucun catalogue public n'en déclare aujourd'hui** : elles disent
+donc qu'il n'y a nulle part où se connecter et nomment `dsoxlab export`, plutôt
+que d'échouer obscurément.
+
+---
+
 ## Documentation
 
 Chaque page nomme son public dès ses premières lignes, et
@@ -151,7 +182,7 @@ Chaque page nomme son public dès ses premières lignes, et
 | Je veux… | Lire |
 | --- | --- |
 | Installer dsoxlab, jouer des labs, comprendre ma note | **[Pour l'apprenant](docs/learner.fr.md)** |
-| Remettre un résultat à un portail, ou le garder en fichier | [Pour l'apprenant](docs/learner.fr.md#remettre-votre-résultat) |
+| Remettre un résultat : un lien, un fichier, ou un compte où `push` | [Pour l'apprenant](docs/learner.fr.md#remettre-votre-résultat) |
 | Jouer des labs sous Windows ou macOS, sans rien installer | **[L'appliance](docs/appliance.fr.md)**, une VM prête à jouer |
 | Écrire mon propre catalogue de labs | **[Pour l'auteur de catalogue](docs/catalog-author.fr.md)**, puis [le contrat v1](docs/contract-v1.fr.md) champ par champ |
 | Monter les machines dont les labs ont besoin | **[Pour le formateur](docs/trainer.fr.md)** |

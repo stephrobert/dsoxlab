@@ -46,6 +46,7 @@ must never be, and the public one is useless without it.
 | `~/.local/share/dsoxlab/catalogs/` | catalogs installed by `dsoxlab catalog add`, one subdirectory per id | `XDG_DATA_HOME` |
 | `~/.local/state/dsoxlab/<catalog-id>/labs/` | work starting points, to tell a *ready* lab from one *in progress* | `XDG_STATE_HOME` |
 | `~/.local/state/dsoxlab/catalogue-actif` | id of the active catalog, the one used without sitting in its directory | `XDG_STATE_HOME` |
+| `~/.local/state/dsoxlab/sessions/<portal>-<digest>.json` | portal session opened by `dsoxlab login`: the tokens that let `push` write to your account. Mode `0600`, one file per portal, removed by `dsoxlab logout` | `XDG_STATE_HOME` |
 | `~/.ssh/config.d/<catalog-id>.conf` | SSH fragment for the lab hosts, so `ssh`, `scp` and your IDE reach them by name | none |
 
 `<catalog-id>` is `repo.id` from the catalog's `meta.yml`. The lock falls back

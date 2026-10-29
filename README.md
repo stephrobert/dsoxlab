@@ -143,6 +143,35 @@ _414 labs across 12 catalogs. This table is generated from `src/dsoxlab/template
 
 ---
 
+## Handing your result over
+
+A proof of what you did exists in three shapes, and **not one of them leaves on
+its own**: no `check`, no `submit` ever sends anything.
+
+```bash
+dsoxlab submit <id>             # prints a link that carries the result
+dsoxlab export -o proof.json    # the same proof as a file, portal or no portal
+```
+
+When a catalog declares an account to synchronize with, three commands appear:
+
+```bash
+dsoxlab login     # sign in to the portal the catalog declares
+dsoxlab push      # send your recorded attempts, merged with what the account holds
+dsoxlab logout    # forget the local session
+```
+
+`push` is the only command that ever writes to your account, and it writes
+nothing when the account already holds exactly your attempts. Signing in is a
+standard OAuth flow with PKCE, and the session is bound to the portal that
+issued it: a catalog cannot name an account that is not its own.
+
+Those three need a `learning.sync` block in the catalog's `meta.yml`. **No
+public catalog declares one today**, so they say there is nothing to sign in to
+and name `dsoxlab export` instead, rather than failing obscurely.
+
+---
+
 ## Documentation
 
 Every page names its audience in its first lines, and
@@ -151,7 +180,7 @@ Every page names its audience in its first lines, and
 | I want to… | Read |
 | --- | --- |
 | Install dsoxlab, play labs, understand my score | **[For the learner](docs/learner.md)** |
-| Hand a result to a training portal, or keep it as a file | [For the learner](docs/learner.md#handing-your-result-over) |
+| Hand a result over: a link, a file, or an account to `push` to | [For the learner](docs/learner.md#handing-your-result-over) |
 | Play labs on Windows or macOS, without installing anything | **[The appliance](docs/appliance.md)**, a ready-to-play VM |
 | Write my own catalog of labs | **[For the catalog author](docs/catalog-author.md)**, then [the v1 contract](docs/contract-v1.md) field by field |
 | Run the machines the labs need | **[For the trainer](docs/trainer.md)** |

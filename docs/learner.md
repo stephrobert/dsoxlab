@@ -204,6 +204,37 @@ dsoxlab export -o history.json            # everything recorded in this catalog
 What the document contains, field by field, is on [the machine
 output](./machine-output.md#export).
 
+### Or an account, when the catalog declares one
+
+A catalog may go further and declare an **account to synchronize with**. Then
+three commands exist, and they are the only ones that talk to it:
+
+```bash
+dsoxlab login     # sign in, once
+dsoxlab push      # send your recorded attempts
+dsoxlab logout    # forget the session on this machine
+```
+
+Nothing is sent until you type `push`. `check` and `submit` record locally and
+send nothing, as before.
+
+`push` merges: it reads what the account already holds, adds what it does not,
+and **writes nothing at all** when the account is already exactly up to date —
+it says so rather than burning a revision. It also reports what it did not
+send, and why.
+
+`login` opens the portal's sign-in page in your browser, as a standard OAuth
+flow with PKCE. Over SSH, or whenever no browser can be reached, `--no-browser`
+prints the URL for you to open elsewhere and asks you to paste back the address
+you land on. The portal decides the shape of that return, so the message says
+which one to expect.
+
+The session is kept in `~/.local/state/dsoxlab/sessions/`, one file per portal,
+readable by you alone (mode `0600`). It is bound to the portal that issued it:
+another catalog, even one declaring the same issuer, cannot use it. `logout`
+deletes the file; it does not revoke anything on the portal's side, which is
+done from your account.
+
 ## Language
 
 Every message exists in English and French.
