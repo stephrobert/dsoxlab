@@ -7,6 +7,39 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.6.1] - 2026-10-30
+
+### Corrigé
+
+- **`run` n'annonce plus que `check` n'enregistre rien.** Son panneau d'accueil
+  disait « Rien n'est enregistré », alors que `check` enregistre le score et
+  l'annonce (`check_result_saved`). Un apprenant qui croyait le panneau se
+  trompait sur sa propre progression. Signalé dans #333, relevé en documentant
+  la CLI pour la formation.
+
+- **Le lab de démonstration et `hint` disent désormais la même chose.** Son
+  énoncé promettait que `hint` annonce son coût *avant* ; le code enregistre le
+  coût, puis affiche l'indice. C'est le texte qui est corrigé, et non le
+  comportement : ajouter une confirmation changerait la CLI pour tous ses
+  appelants, ce qui déborde une issue sur les messages, et demander un indice,
+  c'est le payer.
+
+- **Plus aucune chaîne française ne porte de tiret cadratin.** Vingt-six en
+  portaient, et la charte du site l'interdit : une sortie de la CLI recopiée
+  dans une page faisait échouer son contrôle de relecture. Chacune a été
+  traitée selon le rôle du tiret, deux-points quand il introduisait une
+  explication, virgule ou point ailleurs, jamais mécaniquement.
+
+- **`hint_label` est traduit.** Le fichier français affichait
+  `💡 Hint {index}/{total}`.
+
+### Retiré
+
+- **`next_no_context`, une chaîne morte.** Elle n'était appelée nulle part, et
+  c'est délibéré : le garde-fou de contexte de `next` a été retiré à dessein,
+  puisque sans contexte il propose le premier lab non fait. La chaîne n'avait
+  plus d'emploi à retrouver.
+
 ## [0.6.0] - 2026-10-28
 
 ### Ajouté

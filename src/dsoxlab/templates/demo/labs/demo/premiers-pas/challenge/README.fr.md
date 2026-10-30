@@ -1,4 +1,4 @@
-# Challenge — premiers-pas
+# Challenge : premiers-pas
 
 ## Mission
 
@@ -25,7 +25,7 @@ Le mot de cette mission est :
 Les fichiers, et rien d'autre. Ni votre historique, ni les commandes tapées.
 Toute façon de les créer compte.
 
-Notez que `dsoxlab hint` coûte des points, et vous le dit avant. Prenez-le : ce
+Notez que `dsoxlab hint` coûte des points : le coût est retenu dès que vous demandez l'indice, et il s'affiche avec lui. Prenez-le : ce
 lab est fait pour être terminé, et `dsoxlab scores` vous montrera ce que coûte
 un indice.
 

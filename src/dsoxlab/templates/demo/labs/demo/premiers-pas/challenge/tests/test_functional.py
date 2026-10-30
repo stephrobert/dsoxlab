@@ -1,4 +1,4 @@
-"""test_functional.py — premiers-pas
+"""test_functional.py : premiers-pas
 
 Prouve l'ÉTAT produit, jamais les commandes tapées : ce sont les trois fichiers
 de `reponses/` qui sont lus. C'est la règle de tous les labs dsoxlab, et ce lab
