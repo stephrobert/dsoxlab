@@ -1,4 +1,4 @@
-"""conftest.py — premiers-pas
+"""conftest.py : premiers-pas
 
 `dsoxlab check` lance pytest depuis la RACINE du catalogue, pas depuis le
 répertoire de travail du lab. Sans cette fixture, un test qui écrit

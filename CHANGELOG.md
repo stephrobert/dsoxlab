@@ -7,6 +7,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-10-30
+
+### Fixed
+
+- **`run` no longer claims that `check` saves nothing.** Its welcome panel read
+  "Nothing is saved", while `check` records the score and says so
+  (`check_result_saved`). A learner who trusted the panel was wrong about their
+  own progress. Reported in #333, found while documenting the CLI for the
+  course.
+
+- **The demo lab and `hint` now say the same thing.** The lab's brief promised
+  that `hint` announces its cost *beforehand*; the code records the cost, then
+  prints the hint. The text is corrected rather than the behaviour: adding a
+  confirmation would change the CLI for every caller, which is beyond an issue
+  about messages, and asking for a hint is paying for it.
+
+- **No French string carries an em dash any more.** Twenty-six did, and the
+  site's style forbids it: a CLI output pasted into a page failed its
+  proofreading check. Each one was replaced according to the dash's role, a
+  colon where it introduced an explanation, a comma or a full stop elsewhere,
+  never mechanically.
+
+- **`hint_label` is translated.** The French file displayed
+  `💡 Hint {index}/{total}`.
+
+### Removed
+
+- **`next_no_context`, a dead string.** It was called nowhere, and that is
+  deliberate: `next` had its context guard removed on purpose, since without a
+  context it proposes the first unfinished lab. The string had no use left to
+  recover.
+
 ## [0.6.0] - 2026-10-28
 
 ### Added

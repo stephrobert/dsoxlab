@@ -2,7 +2,7 @@
 
 STRINGS: dict[str, str] = {
     # ── App ───────────────────────────────────────────────────────────────────
-    "app_help": "dsoxlab — DevSecOps XL Labs. Pilotez vos labs depuis le terminal.",
+    "app_help": "dsoxlab : DevSecOps XL Labs. Pilotez vos labs depuis le terminal.",
     "accueil_baseline": "Des labs vérifiables, pilotés depuis le terminal.",
     "accueil_etat_aucun": "Aucun catalogue installé pour l'instant.",
     "accueil_etat_actif": "Catalogue actif :",
@@ -39,7 +39,7 @@ STRINGS: dict[str, str] = {
     "opt_top":        "Nombre de résultats affichés",
     "opt_doctor_strict":
         "sort en 9 si un contrôle requis échoue, en 10 s'il n'a pas pu être "
-        "mesuré — pour un script, pas pour un humain",
+        "mesuré (pour un script, pas pour un humain)",
     "opt_fix":        "Tenter la remédiation automatique des composants manquants.",
     "opt_no_pager":   "Tout afficher d'un bloc au lieu de paginer ce qui dépasse l'écran.",
     "opt_use_provider":
@@ -84,7 +84,7 @@ STRINGS: dict[str, str] = {
     "opt_use_reset":      "Efface le contexte actif.",
     "opt_target":         "Nom de la cible d'exécution par défaut (doit matcher runtime.targets[].name dans lab.yaml).",
     "opt_run_target":     "Cible pour cette exécution (override le défaut de 'use'). Doit matcher un runtime.targets[].name.",
-    "opt_check_target":   "Cible sur laquelle valider (override la cible de session). Doit matcher un runtime.targets[].name — les tests tournent sur cet hôte.",
+    "opt_check_target":   "Cible sur laquelle valider (override la cible de session). Doit matcher un runtime.targets[].name : les tests tournent sur cet hôte.",
     "unknown_target":     "Cible '{target}' inconnue pour ce lab. Cibles déclarées : {declared}.",
     "infra_not_provisioned": "Ce lab a besoin d'une VM, et aucune ne tourne : l'infrastructure du lab n'est pas provisionnée.\nMonte-la d'abord :\n  dsoxlab provision",
     "opt_lang":           "Langue pour le contenu des labs (ex: en, fr). Remplace l'auto-détection.",
@@ -107,7 +107,7 @@ STRINGS: dict[str, str] = {
         "Identifiant du lab. Omis, celui que « next » suggère dans la section "
         "active.",
     "start_plan":
-        "[bold]Démarrage de {lab_id}[/bold] — {total} étapes, chacune annoncée "
+        "[bold]Démarrage de {lab_id}[/bold] : {total} étapes, chacune annoncée "
         "avec sa commande.",
     "start_step":
         "\n[bold cyan]▶ {number}/{total} · {name}[/bold cyan]  [dim]({command})[/dim]",
@@ -139,7 +139,7 @@ STRINGS: dict[str, str] = {
     "cmd_course_arg":    "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_course_opt_section": "Section à afficher : numéro (1, 2 …) ou identifiant (navigation, permissions …).",
     "cmd_course_list":   "Liste tous les labs et indique si un cours (scenario.md) est disponible.",
-    "course_toc_title":  "Cours — {title}",
+    "course_toc_title":  "Cours : {title}",
     "course_toc_col_n":  "#",
     "course_toc_col_id": "ID section",
     "course_toc_col_title": "Titre",
@@ -211,7 +211,7 @@ STRINGS: dict[str, str] = {
     "course_nav_progress": "Section {pos}/{total}",
     "course_nav_prev":     "← [bold]dsoxlab course {id} --prev[/bold]",
     "course_nav_next":     "→ [bold]dsoxlab course {id} --next[/bold]",
-    "course_end_title":    "Fin du cours — {id}",
+    "course_end_title":    "Fin du cours : {id}",
     "course_end_body":     "Vous avez lu les [bold]{total}[/bold] sections du cours.\n\nPassez au challenge : [bold cyan]dsoxlab challenge {id}[/bold cyan]",
     "course_section_not_found": "Section '{name}' introuvable. Utilisez [bold]dsoxlab course {id}[/bold] pour lister les sections.",
     "course_section_file_missing": "Fichier de section introuvable : {file}",
@@ -565,9 +565,9 @@ STRINGS: dict[str, str] = {
     "provision_starting":  "Provisionnement de l'infrastructure (provider : {provider})…",
     "provision_no_ssh_key": "Clé SSH du lab manquante : {path}\nSans elle, le keypair cloud serait vide et les VMs inaccessibles.\nLance d'abord : dsoxlab instructor bootstrap",
     "provision_done_cible":
-        "Provisionnement terminé — {count} hôte(s) ciblé(s) sur {total} déclaré(s), "
+        "Provisionnement terminé : {count} hôte(s) ciblé(s) sur {total} déclaré(s), "
         "prêt(s). Les autres n'ont pas été montés, donc pas vérifiés.",
-    "provision_done":      "Provisionnement terminé — {count} hôte(s) prêt(s).",
+    "provision_done":      "Provisionnement terminé : {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
     "provision_lease_refused":
         "Bail DHCP refusé pour {host} ({mac}) : {error}\n"
@@ -630,7 +630,7 @@ STRINGS: dict[str, str] = {
         "result out of range ».",
     "bridge_name_fix":
         "Avec ce provider, infra.network doit faire au plus {max_network} "
-        "caractères — « {suggestion} » tiendrait déjà, mais un nom plus court se "
+        "caractères : « {suggestion} » tiendrait déjà, mais un nom plus court se "
         "lit mieux. Le nom du pont est dérivé de celui du réseau, c'est pourquoi "
         "il n'apparaît nulle part dans ton fichier. Un « bridge_name » sous "
         "infra.providers.<provider> remplace cette dérivation.",
@@ -706,7 +706,7 @@ STRINGS: dict[str, str] = {
     "bootstrap_ansible_runner_ok":    "ansible-runner : OK",
 
     # ── fullhelp contenu ──────────────────────────────────────────────────────
-    "fullhelp_title":   "dsoxlab — DevSecOps XL Labs",
+    "fullhelp_title":   "dsoxlab : DevSecOps XL Labs",
     "fullhelp_concept": """\
 [bold]Qu'est-ce que dsoxlab ?[/bold]
 
@@ -731,15 +731,15 @@ Chaque lab déclare :
     "fullhelp_workflow": """\
 [bold]Workflow typique[/bold]
 
-  1. [bold]dsoxlab list-labs[/bold]                   — parcourir les labs disponibles
-  2. [bold]dsoxlab use linux/l1[/bold]                — se concentrer sur une section/un niveau
-  3. [bold]dsoxlab show <id>[/bold]                   — lire les objectifs et le détail du lab
-  4. [bold]dsoxlab run <id>[/bold]                    — démarrer l'environnement du lab
+  1. [bold]dsoxlab list-labs[/bold]                   : parcourir les labs disponibles
+  2. [bold]dsoxlab use linux/l1[/bold]                : se concentrer sur une section/un niveau
+  3. [bold]dsoxlab show <id>[/bold]                   : lire les objectifs et le détail du lab
+  4. [bold]dsoxlab run <id>[/bold]                    : démarrer l'environnement du lab
   5. Travailler dans l'environnement…
-  6. [bold]dsoxlab hint <id>[/bold]                   — obtenir un indice (coûte des points)
-  7. [bold]dsoxlab check <id>[/bold]                  — lancer les tests auto et obtenir son score
-  8. [bold]dsoxlab reset <id>[/bold]                  — remettre à zéro et recommencer
-  9. [bold]dsoxlab clean <id>[/bold]                  — détruire l'environnement une fois terminé""",
+  6. [bold]dsoxlab hint <id>[/bold]                   : obtenir un indice (coûte des points)
+  7. [bold]dsoxlab check <id>[/bold]                  : lancer les tests auto et obtenir son score
+  8. [bold]dsoxlab reset <id>[/bold]                  : remettre à zéro et recommencer
+  9. [bold]dsoxlab clean <id>[/bold]                  : détruire l'environnement une fois terminé""",
 
     "fullhelp_commands": """\
 [bold]Référence des commandes[/bold]
@@ -763,7 +763,7 @@ Chaque lab déclare :
   [cyan]start[/cyan] [dim][<id>][/dim]         Joue un lab de bout en bout. Annonce chaque étape avec la
                        commande unique qui la rejoue seule : contexte, prérequis,
                        infrastructure quand le lab en a besoin, puis la session.
-                       Il raccourcit la frappe, jamais la compréhension — un échec
+                       Il raccourcit la frappe, jamais la compréhension : un échec
                        nomme l'étape qui a cassé et comment la rejouer seule.
     [dim]--target / -t[/dim]        Cible pour cette exécution, comme pour [bold]run[/bold].
                        [dim]<id>[/dim] est optionnel : sans lui, le lab que [bold]next[/bold] suggère.
@@ -1017,26 +1017,26 @@ hors ligne, elle se tait.
   [bold]dsoxlab check[/bold] calcule le score final et le sauvegarde.
   [bold]dsoxlab scores[/bold] affiche votre historique.
   [bold]dsoxlab export[/bold] écrit tous les résultats en un document JSON, sans
-  limite et avec un verdict explicite par lab — pour les relire ailleurs.""",
+  limite et avec un verdict explicite par lab, pour les relire ailleurs.""",
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installé : {path}  →  {source}",
     "install_wrapper_deja":
         "Un lanceur mène déjà à ce binaire ({path}) : il vient probablement de « uv tool install » ou de pipx. On n'y touche pas, l'écraser ne ferait que défaire ce que leur prochaine mise à jour remettra.",
     "install_completion":           "Script de complétion : {path}",
-    "install_rc":                   "Config shell mise à jour : {path} — rechargez avec : exec $SHELL",
+    "install_rc":                   "Config shell mise à jour : {path}. Rechargez avec : exec $SHELL",
     "install_completion_unsupported": "Auto-complétion non supportée pour le shell : {shell} (bash et zsh uniquement).",
     "install_reload":               "Rechargez votre shell pour activer les changements : [bold]exec $SHELL[/bold]",
 
     # ── use ───────────────────────────────────────────────────────────────────
     "context_set":      "Contexte actif : [bold]{label}[/bold]",
     "context_set_info": "Les commandes list-labs et validate-structure utilisent maintenant ce filtre par défaut.",
-    "context_lang_set": "Langue définie : [bold]{lang}[/bold] — les titres et descriptions des labs seront affichés dans cette langue.",
-    "context_target_set": "Cible par défaut : [bold]{target}[/bold] — 'dsoxlab run' l'utilisera sauf si --target est spécifié.",
+    "context_lang_set": "Langue définie : [bold]{lang}[/bold]. Les titres et descriptions des labs seront affichés dans cette langue.",
+    "context_target_set": "Cible par défaut : [bold]{target}[/bold]. 'dsoxlab run' l'utilisera sauf si --target est spécifié.",
     "context_provider_set": "Provider actif : [bold]{provider}[/bold]",
     "meta_read_failed": "Lecture du meta.yml impossible : {error}",
-    "context_cleared":  "Contexte réinitialisé — tous les labs sont maintenant visibles.",
-    "context_active":   "Contexte actif : [bold]{label}[/bold] — utilisez [bold]dsoxlab use --reset[/bold] pour tout voir.",
+    "context_cleared":  "Contexte réinitialisé : tous les labs sont maintenant visibles.",
+    "context_active":   "Contexte actif : [bold]{label}[/bold]. Utilisez [bold]dsoxlab use --reset[/bold] pour tout voir.",
 
     # ── show ──────────────────────────────────────────────────────────────────
     "runtime_unavailable": "runtime indisponible",
@@ -1057,7 +1057,7 @@ hors ligne, elle se tait.
     "lab_welcome_title":  "Comment fonctionne ce lab",
     "lab_welcome_course": "Les exercices guidés du cours.",
     "lab_welcome_challenge": "La mission : ce qu'il faut produire.",
-    "lab_welcome_check":  "Lance les tests. [bold]Rien n'est enregistré.[/bold]",
+    "lab_welcome_check":  "Lance les tests. [bold]Le score est enregistré.[/bold]",
     "lab_welcome_submit": "Soumission finale : [bold]enregistre[/bold], puis quitte.",
     "lab_welcome_hint":   "Révèle l'indice suivant, [red]contre des points[/red].",
     "lab_welcome_session_local": "Vous êtes sur [bold]votre poste[/bold], à la racine du dépôt : c'est d'ici que vous écrivez votre code et lancez vos commandes vers les hôtes du lab.",
@@ -1082,7 +1082,7 @@ hors ligne, elle se tait.
     # ── hint ──────────────────────────────────────────────────────────────────
     "check_validation_sans_note":
         "Ce lab défend un guide publié : ses tests mesurent des faits, pas "
-        "vous. Rien n'est enregistré et aucune note n'est donnée — un test "
+        "vous. Rien n'est enregistré et aucune note n'est donnée : un test "
         "rouge signale un guide à rafraîchir.",
     "hint_sans_objet":
         "Pas d'indice ici : ce lab défend un guide publié plutôt que de vous "
@@ -1371,7 +1371,7 @@ hors ligne, elle se tait.
     "detail_pytest_missing": "introuvable",
     "detail_pytest_bundled": "embarqué avec dsoxlab",
     "detail_pytest_via":     "via {cmd}",
-    "detail_provider_unresolved": "candidats déclarés : {candidates} — aucun choisi",
+    "detail_provider_unresolved": "candidats déclarés : {candidates} , aucun choisi",
     # ── git et docker : deux outils que rien ne déclarait ───────────────────
     "check_git": "git",
     "check_docker": "Docker",
@@ -1436,13 +1436,13 @@ hors ligne, elle se tait.
         "{device} est absent et ce système tourne lui-même dans une machine "
         "virtuelle ({hypervisor}) : la virtualisation imbriquée n'est pas "
         "disponible, donc les labs vm ne peuvent pas tourner ici. Elle "
-        "s'active sur l'hyperviseur HÔTE, cette machine éteinte — il n'y a "
+        "s'active sur l'hyperviseur HÔTE, cette machine éteinte : il n'y a "
         "rien à changer à l'intérieur.",
     "detail_hw_virt_nested":
         "{device} est absent et ce système tourne lui-même dans une machine "
         "virtuelle : la virtualisation imbriquée n'est pas disponible, donc "
         "les labs vm ne peuvent pas tourner ici. Elle s'active sur "
-        "l'hyperviseur HÔTE, cette machine éteinte — il n'y a rien à changer "
+        "l'hyperviseur HÔTE, cette machine éteinte : il n'y a rien à changer "
         "à l'intérieur.",
     "detail_hw_virt_bare_metal":
         "{device} est absent sur une machine physique : la virtualisation "
@@ -1579,11 +1579,11 @@ hors ligne, elle se tait.
     "col_challenge":         "Challenge",
     "col_capstone":          "Capstone",
     "progress_validated":    "[green]✔ validé[/green]",
-    "progress_pending":      "[dim]—[/dim]",
+    "progress_pending":      "[dim]-[/dim]",
     "progress_no_labs":      "Aucun lab trouvé pour ce contexte (utilisez [bold]dsoxlab use <section>[/bold] d’abord).",
 
     # ── console — next ─────────────────────────────────────────────────────
-    "next_suggestion":   "Prochain recommandé : [bold cyan]{lab_id}[/bold cyan] — {title}",
+    "next_suggestion":   "Prochain recommandé : [bold cyan]{lab_id}[/bold cyan] , {title}",
     "next_all_done":     "[green]Tous les labs validés dans ce contexte ![/green] Lancez [bold]dsoxlab progress[/bold] pour un résumé.",
     "remediation_labs_aucun_catalogue":
         "dsoxlab demo, ou dsoxlab catalog add linux",
@@ -1603,7 +1603,6 @@ hors ligne, elle se tait.
         "dsoxlab catalog add linux pour une formation complète.",
     "next_catalogue_vide":
         "Ce catalogue ne contient aucun lab. Vérifie son installation : dsoxlab doctor",
-    "next_no_context":   "Aucun contexte actif. Lancez [bold]dsoxlab use <section>[/bold] d’abord.",
     # ── console — détail lab ──────────────────────────────────────────────────
     "field_section":    "[bold]Section :[/bold]",
     "field_title":      "[bold]Titre :[/bold]",
@@ -1662,7 +1661,7 @@ hors ligne, elle se tait.
 
     # ── console — indice ──────────────────────────────────────────────────────
     "hint_panel_title": "[bold]Indice[/bold]",
-    "hint_label":       "💡 Hint {index}/{total}",
+    "hint_label":       "💡 Indice {index}/{total}",
     "hint_costs":       "[dim]Coût : [red]-{cost} pts[/red]   Pénalité totale hints : [red]-{total} pts[/red][/dim]",
 
     # ── console — scores ──────────────────────────────────────────────────────
@@ -1893,10 +1892,10 @@ hors ligne, elle se tait.
         "\n[bold red]Labs que le moteur ne voit pas :[/bold red]",
     "lab_yaml_illisible":
         "ce lab.yaml existe mais le moteur ne sait pas le charger ({raison}), "
-        "il est donc absent de tous les autres contrôles — et de « list-labs »",
+        "il est donc absent de tous les autres contrôles , et de « list-labs »",
     "lab_yaml_illisible_position":
         "ce lab.yaml existe mais le moteur ne sait pas le charger, il est donc "
-        "absent de tous les autres contrôles — et de « list-labs ». {raison} "
+        "absent de tous les autres contrôles , et de « list-labs ». {raison} "
         "(ligne {ligne}, colonne {colonne})",
     "lab_declare_absent":
         "la section « {section} » déclare « {chemin} », or il n'y a aucun "

@@ -1041,7 +1041,7 @@ silent.
     "lab_welcome_title":  "How this lab works",
     "lab_welcome_course": "The guided exercises of the course.",
     "lab_welcome_challenge": "The mission: what you have to produce.",
-    "lab_welcome_check":  "Run the tests. [bold]Nothing is saved.[/bold]",
+    "lab_welcome_check":  "Run the tests. [bold]The score is saved.[/bold]",
     "lab_welcome_submit": "Final submission: [bold]saves[/bold], then leaves.",
     "lab_welcome_hint":   "Reveal the next hint, [red]at the cost of points[/red].",
     "lab_welcome_session_local": "You are on [bold]your own machine[/bold], at the repository root: this is where you write your code and run your commands against the lab hosts.",
@@ -1561,7 +1561,6 @@ silent.
         "catalog add linux for a full course.",
     "next_catalogue_vide":
         "This catalog holds no lab. Check how it was installed: dsoxlab doctor",
-    "next_no_context":   "No active context. Run [bold]dsoxlab use <section>[/bold] first.",
 
     # ── console — lab detail ──────────────────────────────────────────────────
     "field_section":    "[bold]Section:[/bold]",
