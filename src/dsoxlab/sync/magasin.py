@@ -117,6 +117,32 @@ class Preuve(TypedDict):
     était juste et inexploitable. Tronqué à ``MAX_CONTROLES_NOMMES``.
     """
 
+    blocking_failed: list[str] | None
+    """Ceux de ces contrôles qu'aucun total ne compense, ou ``None``.
+
+    ``None`` veut dire INCONNU, et c'est le cas de toute tentative enregistrée
+    avant dsoxlab 0.7.0 : la colonne n'existait pas. Une liste vide, elle, dit
+    qu'aucun contrôle bloquant n'a échoué, ce qui n'est pas la même chose.
+
+    Sans ce champ, un apprenant qui passe par son compte ne voyait jamais
+    qu'une épreuve était refusée sur son exigence critique, alors que `submit`
+    et l'export le savaient.
+    """
+
+    exam_passed: bool | None
+    """Le verdict d'épreuve, ou ``None`` pour un lab qui n'en est pas une.
+
+    C'est le PREMIER JUGEMENT que cette preuve transporte : tous ses autres
+    champs sont des faits bruts. Il est donc calculé une seule fois, côté
+    moteur, par ``exam_verdict``, et le portail le lit sans le recalculer.
+    Deux calculs finiraient par diverger, et l'apprenant verrait deux verdicts
+    pour une seule tentative.
+
+    ``None`` couvre deux cas que le portail n'a pas à distinguer : un lab
+    ordinaire, qui ne déclare aucun seuil, et une tentative d'avant 0.7.0,
+    dont on ne sait rien.
+    """
+
     attempted_at: str
     producer_version: str | None
 
@@ -266,6 +292,38 @@ def _controles_rates(valeur: object) -> list[str]:
     return [nom for nom in propres if nom]
 
 
+def _refus_de_la_ligne(
+    ligne: dict[str, Any]
+) -> tuple[list[str] | None, bool | None]:
+    """Ce qu'une ligne d'export dit du refus : les bloquants, et le verdict.
+
+    LE CHAMP ABSENT ET LE CHAMP VIDE NE DISENT PAS LA MÊME CHOSE. Absent,
+    c'est une tentative d'avant 0.7.0, dont la colonne n'existait pas : on ne
+    SAIT pas, et envoyer `[]` affirmerait qu'aucun contrôle bloquant n'a
+    échoué. Le portail lit ce `None` comme « inconnu », et la distinction se
+    tranche chez lui sur le compte des tests : une liste vide avec un
+    sans-faute est exacte, une liste vide avec un compte incomplet ne l'est
+    pas.
+
+    LE VERDICT VIENT DE L'EXPORT, donc d'``exam_verdict``, calculé une seule
+    fois côté moteur. On ne le recalcule pas ici : deux calculs finiraient par
+    diverger, et l'apprenant verrait deux verdicts pour une seule tentative.
+    C'est le premier jugement que cette preuve transporte, tous ses autres
+    champs étant des faits bruts.
+
+    Aucune forme ne fait échouer cette lecture : une ligne écartée vide le
+    magasin de l'apprenant, ce que ce module existe pour éviter.
+
+    Sortie de ``_reduire_une_ligne`` parce que le cliquet du dépôt l'a
+    refusée à quatre-vingt-cinq lignes.
+    """
+    brut = ligne.get("blocking_failed")
+    bloquants = _controles_rates(brut) if isinstance(brut, list) else None
+    examen = ligne.get("exam")
+    verdict = examen.get("passed") if isinstance(examen, dict) else None
+    return bloquants, (verdict if isinstance(verdict, bool) else None)
+
+
 def _reduire_une_ligne(
     ligne: dict[str, Any], entete: _Entete, quand: datetime
 ) -> Preuve | str:
@@ -287,6 +345,7 @@ def _reduire_une_ligne(
     score = _entier(ligne.get("score"), MAX_SCORE)
     indices = _entier(ligne.get("hints_used"), MAX_TESTS)
     noms = _controles_rates(ligne.get("failed_checks"))
+    bloquants, verdict = _refus_de_la_ligne(ligne)
     date = _date_sure(ligne.get("attempted_at"), quand)
     valide = ligne.get("validated")
 
@@ -331,6 +390,8 @@ def _reduire_une_ligne(
         "total_tests": total,
         "hints_used": indices,
         "failed_checks": noms,
+        "blocking_failed": bloquants,
+        "exam_passed": verdict,
         "attempted_at": date,
         "producer_version": entete["version_producteur"],
     }
