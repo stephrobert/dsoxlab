@@ -7,6 +7,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-11-02
+
+### Added
+
+- **The proof pushed to the account now says an exam was refused, and why.**
+  `push` carried `failed_checks` but neither `blocking_failed` nor the
+  verdict: a learner going through their account never saw that an exam was
+  refused on its critical requirement, although `submit` and the export both
+  knew. That was half a link.
+
+  Two fields, and they are not of the same nature. `blocking_failed` is a
+  **measurement**, like `failed_checks`, under the same bounds and the same
+  cleaning. `exam_passed` is a **computed verdict**, and the first judgement
+  this proof carries: every other field is a raw fact. It is therefore
+  computed once, engine side, by `exam_verdict`, and the portal reads it
+  without recomputing. Two computations would eventually diverge, and the
+  learner would see two verdicts for one attempt.
+
+  **"Unknown" is not "nothing".** An attempt recorded before 0.7.0 has
+  neither: the columns did not exist. Its fields go out as `null`, never as
+  `[]`, which would claim no blocking check failed, nor as `false`, which
+  would claim a refusal. The distinction is settled on the test count: an
+  empty list with a clean sweep is exact, an empty list with an incomplete
+  count is unknown.
+
+  The proof's `schema` stays at **1**: the fields are additive, and no shape
+  of them can make a line be discarded, measured on a list, an empty list, an
+  absent field, a string, an integer and a mapping.
+
 ## [0.7.1] - 2026-11-02
 
 ### Fixed

@@ -7,6 +7,36 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.7.2] - 2026-11-02
+
+### Ajouté
+
+- **La preuve poussée au compte dit désormais qu'une épreuve est refusée, et
+  pourquoi.** `push` portait `failed_checks` mais ni `blocking_failed` ni le
+  verdict : un apprenant qui passe par son compte ne voyait jamais qu'une
+  épreuve était refusée sur son exigence critique, alors que `submit` et
+  l'export le savaient. C'était une moitié de chaînon.
+
+  Deux champs, et ils ne sont pas de même nature. `blocking_failed` est une
+  **mesure**, comme `failed_checks`, sous les mêmes bornes et le même
+  nettoyage. `exam_passed` est un **verdict calculé**, et le premier jugement
+  que cette preuve transporte : tous ses autres champs sont des faits bruts.
+  Il est donc calculé une seule fois, côté moteur, par `exam_verdict`, et le
+  portail le lit sans le recalculer. Deux calculs finiraient par diverger, et
+  l'apprenant verrait deux verdicts pour une seule tentative.
+
+  **« Inconnu » n'est pas « rien ».** Une tentative enregistrée avant la
+  0.7.0 n'a ni l'un ni l'autre : les colonnes n'existaient pas. Ses champs
+  partent à `null`, jamais à `[]`, qui affirmerait qu'aucun contrôle bloquant
+  n'a échoué, ni à `false`, qui affirmerait un refus. La distinction se
+  tranche sur le compte des tests : une liste vide avec un sans-faute est
+  exacte, une liste vide avec un compte incomplet est inconnue.
+
+  Le `schema` de la preuve reste à **1** : les champs sont additifs, et
+  aucune de leurs formes ne peut faire écarter une ligne, mesuré sur une
+  liste, une liste vide, un champ absent, une chaîne, un entier et un
+  dictionnaire.
+
 ## [0.7.1] - 2026-11-02
 
 ### Corrigé
