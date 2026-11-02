@@ -7,6 +7,29 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.7.1] - 2026-11-02
+
+### Corrigé
+
+- **Un refus sur contrôle bloquant n'accuse plus le score.** Mesuré sur une VM
+  avec la 0.7.0, sur une épreuve à 80 pour un seuil de 75 dont le seul
+  contrôle bloquant échouait :
+
+  ```
+  ✘ Un contrôle bloquant a échoué, donc l'épreuve est refusée quel que soit
+    le total : …
+  ✘ Examen échoué : 80 % du barème, sous le seuil de 75 %.
+  ```
+
+  80 n'est pas sous 75. La seconde ligne attribuait le refus au score, qui
+  était largement suffisant, et un apprenant qui la lit part chercher des
+  points qu'aucun point ne lui rendra.
+
+  C'est la faute même que cette fonctionnalité corrige, retournée : le moteur
+  disait « reçue » quand il fallait refuser, puis il a refusé en motivant
+  faux. Un refus sur contrôle bloquant le dit désormais, donne le pourcentage
+  obtenu, et n'invoque plus un seuil qui est franchi.
+
 ## [0.7.0] - 2026-11-02
 
 ### Ajouté

@@ -1898,6 +1898,12 @@ hors ligne, elle se tait.
     ),
     "exam_passed":
         "Examen réussi : {pct} % du barème, pour un seuil de {threshold} %.",
+    "exam_failed_blocking":
+        "Épreuve refusée : un contrôle bloquant a échoué. Vous obtenez "
+        "{pct} % du barème, ce qui franchit le seuil de {threshold} %, et "
+        "aucune note ne compense cette exigence. Corrigez-la, puis soumettez "
+        "à nouveau.",
+
     "exam_failed":
         "Examen échoué : {pct} % du barème, sous le seuil de {threshold} %. "
         "Rejoue le lab : dsoxlab reset, puis dsoxlab run.",

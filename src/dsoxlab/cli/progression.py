@@ -158,6 +158,29 @@ def check(
 
 # ── submit ────────────────────────────────────────────────────────────────────
 
+def _dire_le_verdict(recue: bool, bloquee: bool, pct: int, seuil: int) -> None:
+    """Le verdict d'une épreuve, avec le VRAI motif de son refus.
+
+    Mesuré sur la VM avec 0.7.0 : une épreuve à 80 sur un seuil de 75,
+    refusée sur son contrôle bloquant, affichait « 80 % du barème, SOUS le
+    seuil de 75 % ». 80 n'est pas sous 75. Le message attribuait le refus au
+    score, et un apprenant qui le lit cherche à gagner des points alors
+    qu'aucun point ne rachète son exigence.
+
+    C'est la faute que cette version corrige, retournée : le moteur disait
+    « reçue » quand il fallait refuser, puis il a refusé en motivant faux.
+
+    Sortie de `submit` parce que le cliquet du dépôt a refusé la commande à
+    22 de complexité cognitive, et il a raison : choisir un message n'est pas
+    le travail d'une commande.
+    """
+    if recue:
+        success(_("exam_passed", pct=pct, threshold=seuil))
+        return
+    cle = "exam_failed_blocking" if bloquee else "exam_failed"
+    error(_(cle, pct=pct, threshold=seuil))
+
+
 @app.command("submit", help=_("cmd_submit_help"))
 def submit(
     lab_id: Annotated[str | None, typer.Argument(help=_("cmd_submit_arg"), autocompletion=_complete_lab_id)] = None,
@@ -203,13 +226,9 @@ def submit(
         error(_("exam_blocking_failed",
                 checks="\n".join(f"  {nom}" for nom in bloques)))
     if verdict is not None:
-        cle = "exam_passed" if verdict else "exam_failed"
-        rendu = success if verdict else error
-        rendu(_(
-            cle,
-            pct=exam_percentage(score, max_score),
-            threshold=lab.exam_passing_score,
-        ))
+        _dire_le_verdict(verdict, bool(bloques),
+                         exam_percentage(score, max_score),
+                         lab.exam_passing_score)
 
     _proposer_la_remise(root, lab)
 
