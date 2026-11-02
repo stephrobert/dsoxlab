@@ -32,6 +32,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The export and the proof now say what to revise.** A correct verdict that
+  names nothing leaves the learner in front of "3 out of 5", and leaves the
+  portal with nothing to suggest. Every attempt now records the names of the
+  checks it failed, and both the JSON export and the proof pushed to the portal
+  carry them, in two distinct fields: `failed_checks`, everything that failed,
+  and `blocking_failed`, the subset that refuses the exam. Conflating them
+  would cost the reader the hierarchy.
+
+  **This serves every lab, not only the twelve exams.** A lab that declares no
+  blocking check still names what it failed, so the 78 others stop being silent
+  about what to go back to.
+
+  The proof's `schema` stays at **1**, and that is deliberate: raising it would
+  guarantee refusal by a portal that only knows 1, which is exactly the
+  destructive case this module exists to avoid. A single line the portal
+  discards makes it return an empty store, erasing the learner's displayed
+  history with no message. The field is therefore additive, bounded to twenty
+  names, and no shape of it can make a line be discarded: measured on a list, an
+  empty list, an absent field, a string, an integer and a mapping.
+
 - **The verdict is persisted, so `scores` and the JSON export no longer
   contradict `submit`.** `exam_verdict` is called at four places, and two of
   them reread history from SQLite, where the failed tests were not recorded.

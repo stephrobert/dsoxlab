@@ -36,7 +36,12 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             -- lignes écrites avant que cette colonne existe : pour elles, on
             -- ne sait pas, et le verdict retombe sur le seul score. Deviner
             -- aurait été pire.
-            blocking_failed TEXT NOT NULL DEFAULT ''
+            blocking_failed TEXT NOT NULL DEFAULT '',
+            -- TOUS les contrôles qui ont échoué, séparés par une virgule, dont
+            -- les bloquants. C'est ce qui permet de dire À QUOI se remettre :
+            -- un verdict exact qui ne nomme rien laisse l'apprenant devant
+            -- « 3 sur 5 », et le portail n'a rien à lui proposer.
+            failed_checks  TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS hint_requests (
@@ -63,7 +68,10 @@ def _ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> None:
     on ajoute celles qui manquent, avec une valeur par défaut. Aucune donnée
     n'est réécrite, et une base déjà à jour ne subit rien.
     """
-    attendues = {"blocking_failed": "TEXT NOT NULL DEFAULT ''"}
+    attendues = {
+        "blocking_failed": "TEXT NOT NULL DEFAULT ''",
+        "failed_checks": "TEXT NOT NULL DEFAULT ''",
+    }
     presentes = {
         ligne["name"] for ligne in conn.execute("PRAGMA table_info(results)")
     }
@@ -132,15 +140,16 @@ def record_result(
     total_tests: int,
     hints_used: int,
     blocking_failed: tuple[str, ...] = (),
+    failed_checks: tuple[str, ...] = (),
 ) -> None:
     with _get_db(root) as conn:
         conn.execute(
             """INSERT INTO results
                (lab_id, section, validated_at, score, max_score, passed_tests,
-                total_tests, hints_used, blocking_failed)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                total_tests, hints_used, blocking_failed, failed_checks)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (lab_id, section, _now(), score, max_score, passed_tests, total_tests,
-             hints_used, ",".join(blocking_failed)),
+             hints_used, ",".join(blocking_failed), ",".join(failed_checks)),
         )
         conn.commit()
 

@@ -331,13 +331,24 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
     # L'ordre suit celui que le lab déclare, pour que le message soit stable
     # d'une exécution à l'autre.
     blocking_failed = blocages_rates(lab, result)
+    # TOUS les contrôles ratés, et pas seulement les bloquants : ce sont eux
+    # qui disent à l'apprenant sur quoi revenir. Le verdict se passe de cette
+    # liste, l'apprenant non.
+    echecs_nommes = tuple(echec.nom for echec in echecs_de_tests(result.output))
 
-    if not lab.is_exercise:
-        # Un lab `validation` défend un guide publié : ses tests mesurent des
-        # FAITS, pas une personne. Inscrire une note reviendrait à noter le
-        # guide, et à faire entrer dans la progression d'un apprenant une
-        # avancée qui n'est pas la sienne. Les tests tournent — c'est tout
-        # l'objet du lab — et rien n'en sort.
+    # DEUX CAS N'INSCRIVENT RIEN, et ils ne disent pas la même chose.
+    #
+    # Un lab `validation` défend un guide publié : ses tests mesurent des
+    # FAITS, pas une personne. Inscrire une note reviendrait à noter le guide,
+    # et à faire entrer dans la progression d'un apprenant une avancée qui
+    # n'est pas la sienne.
+    #
+    # Une exécution qui n'a RIEN mesuré, elle, est un accident : pytest n'a pas
+    # pu collecter, faute d'un conftest qui lève, d'une machine injoignable ou
+    # d'une dépendance absente. Inscrire ce 0 le rendrait indiscernable d'un
+    # lab tenté et raté, `status` afficherait « validé », et `next` sauterait
+    # un lab que l'apprenant n'a jamais pu jouer.
+    if not lab.is_exercise or not a_mesure(result):
         return ScoreResult(
             check=result,
             score=score,
@@ -345,24 +356,6 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
             hints_used=used,
             hints_cost=hints_cost,
             blocking_failed=blocking_failed,
-            enregistre=False,
-        )
-
-    if not a_mesure(result):
-        # Rien n'a été mesuré : pytest n'a pas pu collecter, faute d'un
-        # conftest qui lève, d'une machine injoignable ou d'une dépendance
-        # absente. Inscrire ce 0 le rendrait indiscernable d'un lab tenté et
-        # raté, et la suite en dépend : `status` afficherait « validé », et
-        # `next` sauterait un lab que l'apprenant n'a jamais pu jouer.
-        #
-        # `compute_score` refusait déjà de deviner un score ; ce refus n'allait
-        # pas jusqu'à la base.
-        return ScoreResult(
-            check=result,
-            score=score,
-            max_score=max_score,
-            hints_used=used,
-            hints_cost=hints_cost,
             enregistre=False,
         )
 
@@ -379,6 +372,7 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
         total_tests=result.total,
         hints_used=used,
         blocking_failed=blocking_failed,
+        failed_checks=echecs_nommes,
     )
     return ScoreResult(
         check=result,

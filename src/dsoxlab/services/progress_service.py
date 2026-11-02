@@ -65,6 +65,17 @@ def exam_percentage(score: int, max_score: int) -> int:
     return score * 100 // max_score
 
 
+def echecs_de_ligne(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """TOUS les contrôles qu'une tentative a ratés, consignés sur sa ligne.
+
+    C'est ce qui dit à quoi se remettre. Une ligne écrite avant que cette
+    colonne existe est vide, et l'absence de noms n'y veut donc pas dire
+    « rien n'a échoué » : le compte des tests, lui, le dit déjà.
+    """
+    brut = row.get("failed_checks") or ""
+    return tuple(nom for nom in str(brut).split(",") if nom)
+
+
 def blocages_de_ligne(row: Mapping[str, Any]) -> tuple[str, ...]:
     """Les contrôles bloquants en échec consignés sur une ligne d'historique.
 

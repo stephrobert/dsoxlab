@@ -33,6 +33,27 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **L'export et la preuve disent désormais ce qu'il faut réviser.** Un verdict
+  exact qui ne nomme rien laisse l'apprenant devant « 3 sur 5 », et le portail
+  sans rien à proposer. Chaque tentative consigne maintenant les noms des
+  contrôles qu'elle a ratés, et l'export JSON comme la preuve poussée au
+  portail les portent, en deux champs distincts : `failed_checks`, tout ce qui
+  a échoué, et `blocking_failed`, le sous-ensemble qui refuse l'épreuve. Les
+  confondre priverait le lecteur de la hiérarchie.
+
+  **Cela sert tous les labs, pas seulement les douze épreuves.** Un lab qui ne
+  déclare aucun contrôle bloquant nomme quand même ce qu'il a raté, et les 78
+  autres cessent donc d'être muets sur ce à quoi revenir.
+
+  Le `schema` de la preuve reste à **1**, et c'est délibéré : le monter
+  garantirait le refus par un portail qui ne connaît que 1, c'est-à-dire
+  exactement le cas destructeur que ce module existe pour éviter. Une seule
+  ligne écartée lui fait rendre un magasin vide, donc effacer l'historique
+  affiché de l'apprenant, sans message. Le champ est donc additif, borné à
+  vingt noms, et aucune de ses formes ne peut faire écarter une ligne : mesuré
+  sur une liste, une liste vide, un champ absent, une chaîne, un entier et un
+  dictionnaire.
+
 - **Le verdict est persisté, donc `scores` et l'export JSON ne contredisent
   plus `submit`.** `exam_verdict` est appelé à quatre endroits, dont deux
   relisent l'historique SQLite, où les tests échoués n'étaient pas consignés.

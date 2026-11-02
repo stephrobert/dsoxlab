@@ -172,6 +172,13 @@ class TestLeContratNeBougePasEnSilence:
     LIGNE: ClassVar[frozenset[str]] = frozenset({
         "catalog", "lab_id", "lab_type", "section", "validated", "score",
         "max_score", "passed_tests", "total_tests", "hints_used",
+        # Ajoutés en 0.7.0, et délibérément : un consommateur lisait « 3 sur
+        # 5 » et ne pouvait proposer AUCUNE révision. `failed_checks` porte
+        # tout ce qui a raté, `blocking_failed` le sous-ensemble qui refuse
+        # l'épreuve. Les deux sont des listes, vides quand rien n'a échoué, et
+        # vides aussi sur une ligne écrite avant cette version : la colonne
+        # n'existait pas, donc on ne sait pas, et deviner serait pire.
+        "failed_checks", "blocking_failed",
         "attempted_at", "exam",
     })
 

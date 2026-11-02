@@ -215,6 +215,7 @@ def export_result_dict(
     """
     from ..services.progress_service import (
         blocages_de_ligne,
+        echecs_de_ligne,
         exam_percentage,
         exam_verdict,
     )
@@ -242,6 +243,13 @@ def export_result_dict(
         "passed_tests": row["passed_tests"],
         "total_tests": row["total_tests"],
         "hints_used": row["hints_used"],
+        # CE QU'IL FAUT RÉVISER, et c'est la seule chose qu'un lecteur de cet
+        # export pouvait vouloir et n'avait pas. Il lisait « 3 sur 5 » et ne
+        # pouvait proposer aucune révision. Deux champs et non un : tout ce qui
+        # a échoué, puis le sous-ensemble qui refuse l'épreuve. Les confondre
+        # priverait le lecteur de la hiérarchie.
+        "failed_checks": list(echecs_de_ligne(row)),
+        "blocking_failed": list(bloques),
         "attempted_at": row["validated_at"],
         "exam": None if verdict is None else {
             "passing_score": passing_score,
@@ -259,6 +267,7 @@ def score_dict(row: dict[str, Any], passing_score: int | None) -> dict[str, Any]
     """
     from ..services.progress_service import (
         blocages_de_ligne,
+        echecs_de_ligne,
         exam_percentage,
         exam_verdict,
     )
@@ -274,6 +283,8 @@ def score_dict(row: dict[str, Any], passing_score: int | None) -> dict[str, Any]
         "passed_tests": row["passed_tests"],
         "total_tests": row["total_tests"],
         "hints_used": row["hints_used"],
+        "failed_checks": list(echecs_de_ligne(row)),
+        "blocking_failed": list(bloques),
         "validated_at": row["validated_at"],
         "exam": None if verdict is None else {
             "passing_score": passing_score,

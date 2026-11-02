@@ -37,7 +37,11 @@ from dsoxlab.models.lab import (
 )
 from dsoxlab.reporting.machine import score_dict
 from dsoxlab.services.lab_service import CheckResult, blocages_rates
-from dsoxlab.services.progress_service import blocages_de_ligne, exam_verdict
+from dsoxlab.services.progress_service import (
+    blocages_de_ligne,
+    echecs_de_ligne,
+    exam_verdict,
+)
 from dsoxlab.sessions.store import get_results, record_result
 from dsoxlab.validators.metadata import validate_metadata
 
@@ -377,3 +381,47 @@ def test_une_valeur_malformee_leve_dans_le_contrat(
     }), encoding="utf-8")
     with pytest.raises((KeyError, ValueError, _yaml.YAMLError)):
         LabDefinition.from_yaml(tmp_path / "lab.yaml")
+
+
+# ── ce qu'il faut réviser ─────────────────────────────────────────────────
+
+class TestCeQuIlFautReviser:
+    """Un verdict exact qui ne nomme rien laisse l'apprenant devant « 3 sur 5 ».
+
+    Le verdict corrigé règle la justesse et pas l'usage : le portail recevait
+    un compte, donc il n'avait aucune révision à proposer. Les noms des
+    contrôles ratés sont donc consignés, exportés, et transmis.
+    """
+
+    def test_les_echecs_sont_consignes_et_relus(self, tmp_path: Path) -> None:
+        record_result(
+            tmp_path, lab_id="epreuve", section="s", score=60, max_score=100,
+            passed_tests=3, total_tests=5, hints_used=0,
+            blocking_failed=("test_critique",),
+            failed_checks=("test_critique", "test_ordinaire"),
+        )
+        [ligne] = get_results(tmp_path, lab_id="epreuve")
+        assert echecs_de_ligne(ligne) == ("test_critique", "test_ordinaire")
+        # LES DEUX LISTES SONT DISTINCTES, et c'est la hiérarchie utile :
+        # tout ce qui a raté, puis ce qui refuse l'épreuve.
+        assert blocages_de_ligne(ligne) == ("test_critique",)
+
+    def test_l_export_nomme_les_deux_listes(self) -> None:
+        rendu = score_dict({
+            "lab_id": "epreuve", "section": "s", "score": 60, "max_score": 100,
+            "passed_tests": 3, "total_tests": 5, "hints_used": 0,
+            "validated_at": "2026-11-02T10:00:00",
+            "failed_checks": "test_critique,test_ordinaire",
+            "blocking_failed": "test_critique",
+        }, 75)
+        assert rendu["failed_checks"] == ["test_critique", "test_ordinaire"]
+        assert rendu["blocking_failed"] == ["test_critique"]
+
+    def test_une_ligne_sans_echec_ne_nomme_rien(self) -> None:
+        rendu = score_dict({
+            "lab_id": "epreuve", "section": "s", "score": 100, "max_score": 100,
+            "passed_tests": 5, "total_tests": 5, "hints_used": 0,
+            "validated_at": "2026-11-02T10:00:00",
+        }, 75)
+        assert rendu["failed_checks"] == []
+        assert rendu["blocking_failed"] == []
