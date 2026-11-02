@@ -181,6 +181,26 @@ vide.
 `lab | challenge | capstone | validation`, et `exam_passing_score` entre 1 et
 100 quand il est déclaré.
 
+**`exam_blocking_checks` : l'exigence qu'aucun total ne compense.** Une épreuve
+annonce souvent un fait critique, perdre la donnée, laisser fuiter le secret,
+couper l'accès, et promet qu'aucune moyenne ne le rachète. Déclarez les noms
+des fonctions de test correspondantes, et le moteur tient la promesse : un
+échec sur l'un d'eux refuse l'épreuve quel que soit le score, et `submit` le
+dit en nommant le contrôle.
+
+```yaml
+lab_type: challenge
+exam_passing_score: 75
+exam_blocking_checks:
+  - test_la_donnee_de_l_application_est_intacte
+```
+
+Sans ce champ, la promesse était écrite et le moteur disait le contraire :
+quatre contrôles sur cinq donnent 80, et 80 passe un seuil de 75. Le champ
+n'est accepté que sur un `lab_type` qui évalue, et chaque nom doit correspondre
+à une fonction de `challenge/tests/test_functional.py` : un test renommé
+désarmerait l'exigence en silence, donc `validate-structure` le refuse.
+
 Un mot sur la dernière valeur, parce qu'elle change ce que fait dsoxlab et non
 l'ampleur du lab : un lab `validation` n'est **pas un exercice**. C'est une
 suite d'assertions qui défend un guide publié, donc il n'inscrit aucune note,

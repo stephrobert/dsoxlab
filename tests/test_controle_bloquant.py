@@ -352,3 +352,28 @@ def test_la_regle_du_croisement_n_est_ecrite_qu_une_fois() -> None:
         "la règle du croisement doit vivre dans un seul fichier, et elle est "
         f"dans : {coupables}"
     )
+
+
+@pytest.mark.parametrize("valeur", [42, "test_critique", {"a": 1}, 3.5])
+def test_une_valeur_malformee_leve_dans_le_contrat(
+    tmp_path: Path, valeur: object
+) -> None:
+    """Un champ malformé doit lever DANS le contrat, jamais ailleurs.
+
+    Le parseur a une promesse : `KeyError`, `ValueError` ou `YAMLError`. Un lab
+    dont le `lab.yaml` lève ainsi est sauté avec un avertissement ; tout autre
+    type d'exception remonte en trace Python et fait planter la CLI entière.
+
+    Mesuré sur la première écriture de ce champ, qui faisait les deux fautes :
+    un `42` levait un `TypeError`, hors contrat, et une chaîne était
+    silencieusement éclatée en caractères, ce qui est pire qu'une erreur
+    puisque l'exigence devenait une liste de lettres ne bloquant rien.
+    """
+    import yaml as _yaml
+
+    (tmp_path / "lab.yaml").write_text(_yaml.safe_dump({
+        "id": "epreuve", "title": "Épreuve", "level": "c1",
+        "exam_blocking_checks": valeur,
+    }), encoding="utf-8")
+    with pytest.raises((KeyError, ValueError, _yaml.YAMLError)):
+        LabDefinition.from_yaml(tmp_path / "lab.yaml")

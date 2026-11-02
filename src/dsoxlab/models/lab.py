@@ -331,8 +331,19 @@ class LabDefinition:
             exam_passing_score=as_int(
                 data.get("exam_passing_score"), 0, "exam_passing_score", lab_yaml
             ),
+            # `as_str_list` et non une compréhension : un `42` ici levait un
+            # TypeError, qui n'est pas dans le contrat du parseur
+            # (KeyError, ValueError, YAMLError), donc il faisait planter la CLI
+            # au lieu de sauter le lab avec un avertissement. Et une chaîne
+            # était silencieusement éclatée en caractères, ce qui est pire
+            # qu'une erreur : l'exigence devenait une liste de lettres qui ne
+            # bloquait rien.
             exam_blocking_checks=tuple(
-                str(nom) for nom in (data.get("exam_blocking_checks") or [])
+                as_str_list(
+                    data.get("exam_blocking_checks"),
+                    "exam_blocking_checks",
+                    lab_yaml,
+                )
             ),
             bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
             bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),
