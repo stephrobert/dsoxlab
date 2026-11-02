@@ -12,7 +12,9 @@ sans capturer une sortie terminal.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from ..models.lab import LabDefinition
 
@@ -63,21 +65,51 @@ def exam_percentage(score: int, max_score: int) -> int:
     return score * 100 // max_score
 
 
-def exam_verdict(score: int, max_score: int, passing_score: int) -> bool | None:
+def blocages_de_ligne(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """Les contrôles bloquants en échec consignés sur une ligne d'historique.
+
+    La colonne est une liste de noms séparés par des virgules, et vide veut
+    dire « aucun ». Une ligne écrite AVANT que cette colonne existe est vide
+    elle aussi : on ne sait pas, et le verdict retombe alors sur le seul score.
+    Deviner le contraire ferait passer pour recalée une tentative qui ne l'a
+    jamais été.
+    """
+    brut = row.get("blocking_failed") or ""
+    return tuple(nom for nom in str(brut).split(",") if nom)
+
+
+def exam_verdict(
+    score: int,
+    max_score: int,
+    passing_score: int,
+    blocking_failed: Sequence[str] = (),
+) -> bool | None:
     """Le lab est-il réussi au sens de son ``exam_passing_score`` ?
 
     Rend ``None`` quand le lab ne déclare pas de seuil : la très grande
     majorité des labs, qui ne sont pas des examens. ``None`` n'est pas un
-    échec, et distinguer les deux est tout l'intérêt de cette fonction — un
+    échec, et distinguer les deux est tout l'intérêt de cette fonction : un
     lab ordinaire ne doit jamais s'afficher « recalé ».
 
     La comparaison est faite en entiers, sans passer par un pourcentage
     arrondi : à 69,5 % d'un barème, l'arrondi rendrait 70 et déclarerait reçu
     un apprenant qui ne l'est pas. Un seuil d'examen ne s'arrondit pas en
     faveur du candidat.
+
+    UN CONTRÔLE BLOQUANT EN ÉCHEC REFUSE L'ÉPREUVE, quel que soit le total, et
+    c'est la raison d'être de ``blocking_failed``. Les épreuves du catalogue
+    annoncent une exigence « qu'aucun total ne compense » ; sans ce paramètre,
+    le moteur disait le contraire. Mesuré avant la correction : quatre
+    contrôles réussis sur cinq donnent 80, et 80 passait un seuil de 75,
+    l'épreuve était donc reçue alors que son exigence critique avait échoué.
+
+    Le refus vient AVANT le seuil, parce qu'il ne se discute pas : un total
+    parfait sur les autres contrôles ne rachète pas un contrôle bloquant.
     """
     if passing_score <= 0:
         return None
+    if blocking_failed:
+        return False
     if max_score <= 0:
         return False
     return score * 100 >= passing_score * max_score

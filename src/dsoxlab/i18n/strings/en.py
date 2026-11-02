@@ -1166,6 +1166,15 @@ silent.
     "metadata_doc_url_scheme": "invalid URL (http/https scheme expected): {url}",
     "metadata_lab_type_invalid":
         "Invalid value '{value}'. Expected one of: {expected}",
+    "metadata_blocking_check_inconnu": (
+        "exam_blocking_checks names `{value}`, and no test of that name "
+        "exists in challenge/tests/test_functional.py. A renamed test "
+        "would disarm the requirement in silence."
+    ),
+    "metadata_blocking_sans_epreuve": (
+        "exam_blocking_checks is declared on a `{value}` lab, which grades "
+        "nobody. Only {expected} evaluate."
+    ),
     "metadata_exam_score_invalid":
         "Invalid value '{value}'. Expected a percentage of the lab scale, "
         "between 1 and 100 (omit the field for a lab that is not an exam).",
@@ -1834,6 +1843,11 @@ silent.
     "col_verdict":   "Verdict",
     "verdict_pass":  "passed",
     "verdict_fail":  "failed",
+    "exam_blocking_failed": (
+        "A blocking check failed, so this test is refused whatever the total:\n"
+        "{checks}\n"
+        "This requirement is made up for by no score. Fix it and submit again."
+    ),
     "exam_passed":
         "Exam passed: {pct}% of the scale, for a pass mark of {threshold}%.",
     "exam_failed":

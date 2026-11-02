@@ -222,6 +222,8 @@ la suite.
 | `metadata_lab_type_invalid` | `lab_type` sort de l'énuméré |
 | `metadata_exam_score_invalid` | `exam_passing_score` est hors bornes |
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` est déclaré sur un `lab_type` qui n'évalue pas : seuls `challenge` et `capstone` le font |
+| `metadata_blocking_check_inconnu` | `exam_blocking_checks` nomme un test absent de `challenge/tests/test_functional.py` : un test renommé désarmerait l'exigence en silence |
+| `metadata_blocking_sans_epreuve` | `exam_blocking_checks` est déclaré sur un `lab_type` qui ne note personne : seuls `challenge` et `capstone` évaluent |
 | `content_broken_links` | un lien relatif ne pointe sur rien |
 | `content_missing_english` | un document n'est traduit que d'un côté |
 | `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |

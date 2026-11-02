@@ -1184,6 +1184,15 @@ hors ligne, elle se tait.
     "metadata_doc_url_scheme": "URL invalide (schéma http/https attendu) : {url}",
     "metadata_lab_type_invalid":
         "Valeur invalide « {value} ». Attendu, l'une de : {expected}",
+    "metadata_blocking_check_inconnu": (
+        "exam_blocking_checks nomme `{value}`, et aucun test de ce nom "
+        "n'existe dans challenge/tests/test_functional.py. Un test renommé "
+        "désarmerait l'exigence en silence."
+    ),
+    "metadata_blocking_sans_epreuve": (
+        "exam_blocking_checks est déclaré sur un lab `{value}`, qui ne note "
+        "personne. Seuls {expected} évaluent."
+    ),
     "metadata_exam_score_invalid":
         "Valeur invalide « {value} ». Attendu : un pourcentage du barème du "
         "lab, entre 1 et 100 (omets le champ pour un lab qui n'est pas un examen).",
@@ -1880,6 +1889,13 @@ hors ligne, elle se tait.
     "col_verdict":   "Verdict",
     "verdict_pass":  "reçu",
     "verdict_fail":  "recalé",
+    "exam_blocking_failed": (
+        "Un contrôle bloquant a échoué, donc l'épreuve est refusée quel que "
+        "soit le total :\n"
+        "{checks}\n"
+        "Cette exigence n'est compensée par aucune note. Corrigez-la, puis "
+        "soumettez à nouveau."
+    ),
     "exam_passed":
         "Examen réussi : {pct} % du barème, pour un seuil de {threshold} %.",
     "exam_failed":

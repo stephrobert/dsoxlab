@@ -7,7 +7,7 @@ import shlex
 import shutil
 import subprocess
 import zlib
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -38,7 +38,11 @@ from ..services.doctor import (
 from ..services.infra_state_service import EtatHote, EtatInfra
 from ..services.lab_service import EchecDeTest
 from ..services.lab_state import LabState
-from ..services.progress_service import build_progress, exam_verdict
+from ..services.progress_service import (
+    blocages_de_ligne,
+    build_progress,
+    exam_verdict,
+)
 from ..services.validation_service import Anomalie, Famille, RapportValidation
 from ..validators.structure import StructureReport
 
@@ -1417,16 +1421,22 @@ def print_scores_table(
             score_text,
         ]
         if avec_verdict:
-            cellules.append(_verdict_cell(score, max_s, seuils.get(r["lab_id"], 0)))
+            cellules.append(_verdict_cell(
+                score, max_s, seuils.get(r["lab_id"], 0), blocages_de_ligne(r)))
         cellules += [tests, str(r["hints_used"]), validated_at]
         table.add_row(*cellules)
 
     console.print(table)
 
 
-def _verdict_cell(score: int, max_score: int, passing_score: int) -> Text:
+def _verdict_cell(
+    score: int,
+    max_score: int,
+    passing_score: int,
+    blocking_failed: Sequence[str] = (),
+) -> Text:
     """« reçu » / « recalé » et le seuil, ou un tiret si le lab n'est pas un examen."""
-    verdict = exam_verdict(score, max_score, passing_score)
+    verdict = exam_verdict(score, max_score, passing_score, blocking_failed)
     if verdict is None:
         return Text("·", style="dim")
     libelle = _("verdict_pass") if verdict else _("verdict_fail")

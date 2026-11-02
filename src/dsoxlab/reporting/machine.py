@@ -213,10 +213,20 @@ def export_result_dict(
     ``lab_type`` vaut ``null`` quand le lab n'existe plus dans le catalogue —
     renommé, déplacé, supprimé. Le résultat reste exporté : il a eu lieu.
     """
-    from ..services.progress_service import exam_percentage, exam_verdict
+    from ..services.progress_service import (
+        blocages_de_ligne,
+        exam_percentage,
+        exam_verdict,
+    )
 
     passing_score = lab.exam_passing_score if lab and lab.exam_passing_score else None
-    verdict = exam_verdict(row["score"], row["max_score"], passing_score or 0)
+    # LES CONTRÔLES BLOQUANTS DE CETTE TENTATIVE, relus de l'historique. Sans
+    # eux, `exam.passed` annonçait reçue une épreuve dont l'exigence critique
+    # avait échoué, et c'est ce champ que lisent les outils qui consomment
+    # l'export.
+    bloques = blocages_de_ligne(row)
+    verdict = exam_verdict(
+        row["score"], row["max_score"], passing_score or 0, bloques)
     return {
         "catalog": catalog_id,
         "lab_id": row["lab_id"],
@@ -247,9 +257,15 @@ def score_dict(row: dict[str, Any], passing_score: int | None) -> dict[str, Any]
     ``exam`` vaut ``null`` sur un lab ordinaire : il n'y a pas de seuil, donc
     pas de verdict à rendre. Un ``false`` s'y lirait comme un échec.
     """
-    from ..services.progress_service import exam_percentage, exam_verdict
+    from ..services.progress_service import (
+        blocages_de_ligne,
+        exam_percentage,
+        exam_verdict,
+    )
 
-    verdict = exam_verdict(row["score"], row["max_score"], passing_score or 0)
+    bloques = blocages_de_ligne(row)
+    verdict = exam_verdict(
+        row["score"], row["max_score"], passing_score or 0, bloques)
     return {
         "lab_id": row["lab_id"],
         "section": row["section"],

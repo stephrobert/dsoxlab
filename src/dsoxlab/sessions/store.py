@@ -30,7 +30,13 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             max_score     INTEGER NOT NULL,
             passed_tests  INTEGER NOT NULL,
             total_tests   INTEGER NOT NULL,
-            hints_used    INTEGER NOT NULL
+            hints_used    INTEGER NOT NULL,
+            -- Les contrôles bloquants qui ont échoué, séparés par une virgule.
+            -- Vide veut dire « aucun », et c'est aussi ce que portent les
+            -- lignes écrites avant que cette colonne existe : pour elles, on
+            -- ne sait pas, et le verdict retombe sur le seul score. Deviner
+            -- aurait été pire.
+            blocking_failed TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS hint_requests (
@@ -41,7 +47,29 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             cost         INTEGER NOT NULL
         );
     """)
+    _ajouter_colonnes_manquantes(conn)
     conn.commit()
+
+
+def _ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> None:
+    """Les colonnes ajoutées après coup, sur une base qui existe déjà.
+
+    `CREATE TABLE IF NOT EXISTS` ne touche pas une table présente : une base
+    créée avant l'ajout d'une colonne ne l'aurait jamais. Toute l'écriture
+    lèverait alors `no such column`, sur la machine de quelqu'un qui joue des
+    labs depuis des mois, et le message ne dirait rien d'utile.
+
+    La migration est ADDITIVE et idempotente : on lit les colonnes présentes,
+    on ajoute celles qui manquent, avec une valeur par défaut. Aucune donnée
+    n'est réécrite, et une base déjà à jour ne subit rien.
+    """
+    attendues = {"blocking_failed": "TEXT NOT NULL DEFAULT ''"}
+    presentes = {
+        ligne["name"] for ligne in conn.execute("PRAGMA table_info(results)")
+    }
+    for nom, declaration in attendues.items():
+        if nom not in presentes:
+            conn.execute(f"ALTER TABLE results ADD COLUMN {nom} {declaration}")
 
 
 # ── Hints ─────────────────────────────────────────────────────────────────────
@@ -103,13 +131,16 @@ def record_result(
     passed_tests: int,
     total_tests: int,
     hints_used: int,
+    blocking_failed: tuple[str, ...] = (),
 ) -> None:
     with _get_db(root) as conn:
         conn.execute(
             """INSERT INTO results
-               (lab_id, section, validated_at, score, max_score, passed_tests, total_tests, hints_used)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (lab_id, section, _now(), score, max_score, passed_tests, total_tests, hints_used),
+               (lab_id, section, validated_at, score, max_score, passed_tests,
+                total_tests, hints_used, blocking_failed)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (lab_id, section, _now(), score, max_score, passed_tests, total_tests,
+             hints_used, ",".join(blocking_failed)),
         )
         conn.commit()
 

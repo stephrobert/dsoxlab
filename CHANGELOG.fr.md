@@ -7,6 +7,51 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.7.0] - 2026-11-02
+
+### Ajouté
+
+- **Un contrôle bloquant en échec refuse l'épreuve, quel que soit le total.**
+  Un lab qui évalue peut déclarer `exam_blocking_checks`, les noms des tests
+  qu'aucune note ne compense, et `submit` refuse l'épreuve dès que l'un d'eux
+  échoue, en le nommant. Mesuré avant le changement, sur le catalogue
+  conteneurs : ses douze épreuves annoncent toutes une exigence « qu'aucun
+  total ne compense », et le moteur ne connaissait pas cette notion. Quatre
+  contrôles sur cinq donnent 80, et 80 passait un seuil de 75 : une épreuve
+  dont le seul contrôle critique échouait était donc **reçue**. La promesse
+  était écrite sur toutes les pages, et le moteur disait le contraire.
+
+  L'exigence se déclare dans le contrat plutôt que par un marqueur pytest, et
+  c'est une mesure qui l'a décidé, pas un goût : le moteur lance pytest par
+  quatre voies différentes (`resolve_pytest_cmd`), et un greffon passé par `-p`
+  ne serait chargé que dans l'une d'elles. Il aurait donc été silencieusement
+  inopérant trois fois sur quatre.
+
+  `validate-structure` refuse un nom qui ne correspond à aucun test, car un
+  test renommé désarmerait l'exigence en silence, et refuse le champ sur un
+  type de lab qui ne note personne, comme il le fait déjà pour un seuil.
+
+### Modifié
+
+- **Le verdict est persisté, donc `scores` et l'export JSON ne contredisent
+  plus `submit`.** `exam_verdict` est appelé à quatre endroits, dont deux
+  relisent l'historique SQLite, où les tests échoués n'étaient pas consignés.
+  Sans colonne, la même tentative se serait lue « recalée » sous `submit` et
+  « reçue » sous `scores`. La table `results` gagne `blocking_failed`, ajoutée
+  par une migration additive : `CREATE TABLE IF NOT EXISTS` ne touche pas une
+  table existante, donc sans elle toute écriture aurait levé `no such column`
+  sur la machine de quelqu'un qui joue des labs depuis des mois. Une ligne
+  écrite avant cette version ne porte aucun blocage, et son verdict retombe sur
+  le seul score : on ne sait pas, et deviner déclarerait recalée une tentative
+  qui ne l'a jamais été.
+
+- **`exam.passed` de l'export JSON dit la vérité.** Il venait du seul score, et
+  annonçait donc reçue une épreuve dont l'exigence critique avait échoué, alors
+  que c'est ce champ que lisent les outils consommant l'export. Le score, lui,
+  ne bouge pas : le refus est un verdict, pas une pénalité. La preuve poussée
+  au portail, elle, était déjà juste, son `validated` valant « tous les tests
+  passés et au moins un joué ».
+
 ## [0.6.1] - 2026-10-30
 
 ### Corrigé

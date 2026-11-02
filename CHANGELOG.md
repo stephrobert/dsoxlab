@@ -7,6 +7,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-11-02
+
+### Added
+
+- **A failing blocking check now refuses an exam, whatever the total.** A lab
+  that assesses can declare `exam_blocking_checks`, the test names no score
+  makes up for, and `submit` refuses the exam when one of them fails, naming
+  it. Measured before the change, on the containers catalogue: its twelve
+  exercises all announce a requirement "no total makes up for", and the engine
+  had no such notion. Four checks out of five give 80, and 80 passed a 75
+  threshold, so an exam whose only critical check failed was **passed**. The
+  promise was written on every page and the engine said the opposite.
+
+  The requirement is declared in the contract rather than carried by a pytest
+  marker, and that is a measurement, not a preference: the engine runs pytest
+  through four different paths (`resolve_pytest_cmd`), and a plugin passed with
+  `-p` would only load in one of them. It would have been silently inoperative
+  three times out of four.
+
+  `validate-structure` refuses a name that matches no test, because a renamed
+  test would otherwise disarm the requirement in silence, and refuses the field
+  on a lab type that grades nobody, as it already does for a pass mark.
+
+### Changed
+
+- **The verdict is persisted, so `scores` and the JSON export no longer
+  contradict `submit`.** `exam_verdict` is called at four places, and two of
+  them reread history from SQLite, where the failed tests were not recorded.
+  Without a column, the same attempt would have read "failed" under `submit`
+  and "passed" under `scores`. The `results` table gains `blocking_failed`,
+  added by an additive migration: `CREATE TABLE IF NOT EXISTS` does not touch
+  an existing table, so without it every write would have raised
+  `no such column` on the machine of someone who has been playing labs for
+  months. A row written before this version carries no blocking failure, and
+  its verdict falls back on the score alone: we do not know, and guessing would
+  declare failed an attempt that never was.
+
+- **`exam.passed` in the JSON export tells the truth.** It came from the score
+  alone, so it announced as passed an exam whose critical requirement had
+  failed, and that is the field consumed by whatever reads the export. The
+  score itself does not move: the refusal is a verdict, not a penalty. The
+  proof pushed to the portal was already right, since its `validated` means
+  "every test passed and at least one played".
+
 ## [0.6.1] - 2026-10-30
 
 ### Fixed
