@@ -522,3 +522,63 @@ class TestProgression:
         )
         assert get_exam_outcomes(tmp_path, {"epreuve": 70}) == {"epreuve": False}
         assert exam_verdict(69, 100, 70) is False
+
+
+# ── le motif du refus ─────────────────────────────────────────────────────
+
+class TestLeMotifDuRefus:
+    """Un refus doit dire POURQUOI, et le vrai pourquoi.
+
+    MESURÉ SUR LA VM avec 0.7.0, `epreuve-reprendre-un-hote-docker` à 80 sur
+    un seuil de 75, son seul contrôle bloquant en échec :
+
+        ✘ Un contrôle bloquant a échoué, donc l'épreuve est refusée quel que
+          soit le total : test_la_place_est_rendue_et_le_volume_utile_est_intact
+        ✘ Examen échoué : 80 % du barème, SOUS LE SEUIL DE 75 %.
+
+    80 n'est pas sous 75. La seconde ligne attribuait le refus au score alors
+    que le score était suffisant, et un apprenant qui la lit cherche à gagner
+    des points qu'aucun point ne lui rendra.
+
+    C'est la faute que cette version corrige, retournée : le moteur disait
+    « reçue » quand il fallait refuser, puis il a refusé en motivant faux.
+    """
+
+    @staticmethod
+    def _cle(verdict: bool | None, bloques: tuple[str, ...]) -> str:
+        """La règle du code, isolée pour être éprouvée sans terminal."""
+        if verdict:
+            return "exam_passed"
+        if bloques:
+            return "exam_failed_blocking"
+        return "exam_failed"
+
+    def test_un_refus_sur_blocage_ne_parle_pas_du_seuil(self) -> None:
+        assert self._cle(False, ("test_critique",)) == "exam_failed_blocking"
+
+    def test_un_refus_sur_le_score_garde_son_message(self) -> None:
+        assert self._cle(False, ()) == "exam_failed"
+
+    def test_une_reussite_reste_une_reussite(self) -> None:
+        assert self._cle(True, ()) == "exam_passed"
+
+    def test_les_deux_langues_ne_mentionnent_pas_le_seuil_franchi(self) -> None:
+        """Le message du blocage ne doit pas invoquer un seuil qui est franchi."""
+        from dsoxlab.i18n.strings import en, fr
+
+        for nom, mod in (("en", en), ("fr", fr)):
+            texte = mod.STRINGS["exam_failed_blocking"]
+            assert "{pct}" in texte and "{threshold}" in texte, nom
+            for mensonge in ("below the", "sous le seuil"):
+                assert mensonge not in texte, f"{nom} dit « {mensonge} »"
+
+    def test_le_message_du_score_parle_bien_du_seuil(self) -> None:
+        """L'AUTRE SENS : la clé du score doit, elle, parler du seuil.
+
+        Sans ce test, vider les deux messages de toute mention du seuil
+        passerait le précédent.
+        """
+        from dsoxlab.i18n.strings import en, fr
+
+        assert "below the" in en.STRINGS["exam_failed"]
+        assert "sous le seuil" in fr.STRINGS["exam_failed"]

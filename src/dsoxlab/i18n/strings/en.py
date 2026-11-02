@@ -1850,6 +1850,11 @@ silent.
     ),
     "exam_passed":
         "Exam passed: {pct}% of the scale, for a pass mark of {threshold}%.",
+    "exam_failed_blocking":
+        "Exam refused: a blocking check failed. You scored {pct}% of the scale, "
+        "which clears the {threshold}% pass mark, and no score makes up for "
+        "that requirement. Fix it, then submit again.",
+
     "exam_failed":
         "Exam failed: {pct}% of the scale, below the {threshold}% pass mark. "
         "Replay the lab: dsoxlab reset, then dsoxlab run.",

@@ -7,6 +7,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-11-02
+
+### Fixed
+
+- **A refusal on a blocking check no longer blames the score.** Measured on a
+  VM with 0.7.0, on an exam scoring 80 against a 75 pass mark whose only
+  blocking check failed:
+
+  ```
+  ✘ A blocking check failed, so this test is refused whatever the total: …
+  ✘ Exam failed: 80% of the scale, below the 75% pass mark.
+  ```
+
+  80 is not below 75. The second line attributed the refusal to the score,
+  which was more than sufficient, and a learner reading it would go hunting
+  for points that no amount of points can give back.
+
+  It is the very fault this feature was written to correct, turned around: the
+  engine used to say "passed" when it should refuse, then it refused and gave
+  a false reason. A refusal on a blocking check now says so, states the
+  percentage obtained, and does not invoke a pass mark that was cleared.
+
 ## [0.7.0] - 2026-11-02
 
 ### Added
