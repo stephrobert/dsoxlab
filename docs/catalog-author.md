@@ -177,6 +177,26 @@ matches one of those targets. A `shell` lab needs a non-empty `runtime.workdir`.
 `lab | challenge | capstone | validation`, and `exam_passing_score` within
 1..100 when declared.
 
+**`exam_blocking_checks`: the requirement no total makes up for.** An exam
+often announces one critical fact, losing the data, leaking the secret, cutting
+access, and promises that no average buys it back. Declare the names of the
+matching test functions and the engine keeps the promise: a failure on any of
+them refuses the exam whatever the score, and `submit` says so, naming the
+check.
+
+```yaml
+lab_type: challenge
+exam_passing_score: 75
+exam_blocking_checks:
+  - test_the_application_data_is_intact
+```
+
+Without this field the promise was written and the engine said the opposite:
+four checks out of five give 80, and 80 passes a 75 threshold. The field is
+accepted only on a `lab_type` that assesses, and every name must match a
+function of `challenge/tests/test_functional.py`: a renamed test would disarm
+the requirement in silence, so `validate-structure` refuses it.
+
 A word on the last value, because it changes what dsoxlab does rather than how
 big the lab is: a `validation` lab is **not an exercise**. It is a set of
 assertions defending a published guide, so it records no score, takes no place
@@ -216,6 +236,8 @@ step with the code: adding a check without documenting it here fails the suite.
 | `metadata_lab_type_invalid` | `lab_type` is outside the enumeration |
 | `metadata_exam_score_invalid` | `exam_passing_score` is out of range |
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` is declared on a `lab_type` that does not assess: only `challenge` and `capstone` do |
+| `metadata_blocking_check_inconnu` | `exam_blocking_checks` names a test that does not exist in `challenge/tests/test_functional.py`: a renamed test would disarm the requirement in silence |
+| `metadata_blocking_sans_epreuve` | `exam_blocking_checks` is declared on a `lab_type` that grades nobody: only `challenge` and `capstone` assess |
 | `content_broken_links` | a relative link points at nothing |
 | `content_missing_english` | a document is translated on one side only |
 | `content_scoring_points_mismatch` | the tasks total a different number of points than announced |

@@ -190,9 +190,18 @@ def submit(
     # verdict. Sans lui, un apprenant qui rendait 40/100 sur un mock RHCSA ne
     # lisait nulle part qu'il avait échoué : la note s'affichait, jamais son
     # sens. Un lab ordinaire n'en déclare pas et n'affiche donc rien.
+    from ..services.lab_service import blocages_rates
     from ..services.progress_service import exam_percentage, exam_verdict
 
-    verdict = exam_verdict(score, max_score, lab.exam_passing_score)
+    bloques = blocages_rates(lab, result)
+    verdict = exam_verdict(score, max_score, lab.exam_passing_score, bloques)
+    # LE REFUS SE DIT AVANT LE VERDICT, et il se dit nommément. Un apprenant
+    # qui lit « 80 sur 100, recalé » sans explication croit à un défaut du
+    # moteur, cherche l'erreur dans sa note, et ne voit pas ce qui compte :
+    # l'exigence que son travail n'a pas tenue.
+    if bloques:
+        error(_("exam_blocking_failed",
+                checks="\n".join(f"  {nom}" for nom in bloques)))
     if verdict is not None:
         cle = "exam_passed" if verdict else "exam_failed"
         rendu = success if verdict else error
@@ -508,7 +517,17 @@ def progress(
             },
         })
         return
-    print_progress_table(labs, scores_data)
+    # LES ÉPREUVES REMPORTÉES, et non simplement tentées. Sans ce relevé,
+    # `progress` déclarait une épreuve validée dès qu'une note existait, même
+    # un zéro, pendant que `submit` la refusait sur son contrôle bloquant.
+    from ..sessions.store import get_exam_outcomes
+
+    seuils = {
+        lab.id: lab.exam_passing_score
+        for lab in labs
+        if lab.exam_passing_score
+    }
+    print_progress_table(labs, scores_data, get_exam_outcomes(root, seuils))
 
 
 # ── next ──────────────────────────────────────────────────────────────────────

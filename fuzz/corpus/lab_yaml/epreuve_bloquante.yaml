@@ -1,0 +1,10 @@
+id: epreuve
+title: Epreuve
+level: c1
+lab_type: challenge
+exam_passing_score: 75
+exam_blocking_checks:
+  - test_critique
+runtime:
+  type: shell
+  workdir: challenge/work

@@ -218,6 +218,21 @@ class LabDefinition:
     mesure une personne perd alors son objet. Voir :attr:`is_exercise`."""
 
     exam_passing_score: int = 0
+
+    exam_blocking_checks: tuple[str, ...] = ()
+    """Les contrôles qu'aucun total ne compense.
+
+    Une épreuve annonce souvent une exigence « critique » : perdre la donnée,
+    laisser fuiter le secret, couper l'accès. Sans ce champ, le moteur n'en
+    savait rien, et une épreuve dont SEUL ce contrôle échouait était reçue,
+    parce que quatre contrôles sur cinq donnent 80 et que le seuil est à 75.
+
+    Les noms sont ceux des fonctions de test, sans le chemin : le moteur les
+    compare aux tests que pytest a déclarés en échec. Un nom qui ne correspond
+    à aucun test est refusé par `validate-structure`, sans quoi un test renommé
+    désarmerait son exigence en silence.
+    """
+
     """Pourcentage du barème à atteindre pour réussir, ou 0 s'il n'y a pas de seuil.
 
     Un ``lab_type: capstone`` est un examen blanc, et un examen sans seuil de
@@ -315,6 +330,20 @@ class LabDefinition:
             lab_type=data.get("lab_type", "lab"),
             exam_passing_score=as_int(
                 data.get("exam_passing_score"), 0, "exam_passing_score", lab_yaml
+            ),
+            # `as_str_list` et non une compréhension : un `42` ici levait un
+            # TypeError, qui n'est pas dans le contrat du parseur
+            # (KeyError, ValueError, YAMLError), donc il faisait planter la CLI
+            # au lieu de sauter le lab avec un avertissement. Et une chaîne
+            # était silencieusement éclatée en caractères, ce qui est pire
+            # qu'une erreur : l'exigence devenait une liste de lettres qui ne
+            # bloquait rien.
+            exam_blocking_checks=tuple(
+                as_str_list(
+                    data.get("exam_blocking_checks"),
+                    "exam_blocking_checks",
+                    lab_yaml,
+                )
             ),
             bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
             bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),

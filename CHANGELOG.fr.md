@@ -7,6 +7,91 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.7.0] - 2026-11-02
+
+### Ajouté
+
+- **Un contrôle bloquant en échec refuse l'épreuve, quel que soit le total.**
+  Un lab qui évalue peut déclarer `exam_blocking_checks`, les noms des tests
+  qu'aucune note ne compense, et `submit` refuse l'épreuve dès que l'un d'eux
+  échoue, en le nommant. Mesuré avant le changement, sur le catalogue
+  conteneurs : ses douze épreuves annoncent toutes une exigence « qu'aucun
+  total ne compense », et le moteur ne connaissait pas cette notion. Quatre
+  contrôles sur cinq donnent 80, et 80 passait un seuil de 75 : une épreuve
+  dont le seul contrôle critique échouait était donc **reçue**. La promesse
+  était écrite sur toutes les pages, et le moteur disait le contraire.
+
+  L'exigence se déclare dans le contrat plutôt que par un marqueur pytest, et
+  c'est une mesure qui l'a décidé, pas un goût : le moteur lance pytest par
+  quatre voies différentes (`resolve_pytest_cmd`), et un greffon passé par `-p`
+  ne serait chargé que dans l'une d'elles. Il aurait donc été silencieusement
+  inopérant trois fois sur quatre.
+
+  `validate-structure` refuse un nom qui ne correspond à aucun test, car un
+  test renommé désarmerait l'exigence en silence, et refuse le champ sur un
+  type de lab qui ne note personne, comme il le fait déjà pour un seuil.
+
+### Modifié
+
+- **`progress` ne déclare plus validé ce que `submit` a refusé.** Mesuré : une
+  tentative, 0 sur 100, contrôle critique en échec, et `challenge_validated`
+  rendait vrai. Le champ valait « une note existe », sans regarder ni la note,
+  ni le seuil, ni le contrôle bloquant : soumettre une fois, fût-ce à zéro,
+  validait l'épreuve.
+
+  Le défaut est antérieur au contrôle bloquant et plus large que lui, mais il
+  le contredit frontalement, et une fonctionnalité dont une autre commande dit
+  le contraire n'est pas livrée. Une épreuve est désormais validée quand UNE
+  tentative a franchi son seuil sans contrôle bloquant en échec. Une
+  tentative, et non la meilleure au sens du score : un 80 avec un blocage ne
+  vaut pas un 76 sans, et un apprenant qui réussit puis rejoue et rate n'a pas
+  désappris.
+
+  `validated` continue de compter les labs ordinaires ayant une note. Ceux-là
+  ne déclarent pas de seuil, donc il n'existe pas de barre à franchir, et en
+  inventer une ici changerait la progression affichée de tous les apprenants
+  sur un jugement que personne n'a pris.
+
+- **L'export et la preuve disent désormais ce qu'il faut réviser.** Un verdict
+  exact qui ne nomme rien laisse l'apprenant devant « 3 sur 5 », et le portail
+  sans rien à proposer. Chaque tentative consigne maintenant les noms des
+  contrôles qu'elle a ratés, et l'export JSON comme la preuve poussée au
+  portail les portent, en deux champs distincts : `failed_checks`, tout ce qui
+  a échoué, et `blocking_failed`, le sous-ensemble qui refuse l'épreuve. Les
+  confondre priverait le lecteur de la hiérarchie.
+
+  **Cela sert tous les labs, pas seulement les douze épreuves.** Un lab qui ne
+  déclare aucun contrôle bloquant nomme quand même ce qu'il a raté, et les 78
+  autres cessent donc d'être muets sur ce à quoi revenir.
+
+  Le `schema` de la preuve reste à **1**, et c'est délibéré : le monter
+  garantirait le refus par un portail qui ne connaît que 1, c'est-à-dire
+  exactement le cas destructeur que ce module existe pour éviter. Une seule
+  ligne écartée lui fait rendre un magasin vide, donc effacer l'historique
+  affiché de l'apprenant, sans message. Le champ est donc additif, borné à
+  vingt noms, et aucune de ses formes ne peut faire écarter une ligne : mesuré
+  sur une liste, une liste vide, un champ absent, une chaîne, un entier et un
+  dictionnaire.
+
+- **Le verdict est persisté, donc `scores` et l'export JSON ne contredisent
+  plus `submit`.** `exam_verdict` est appelé à quatre endroits, dont deux
+  relisent l'historique SQLite, où les tests échoués n'étaient pas consignés.
+  Sans colonne, la même tentative se serait lue « recalée » sous `submit` et
+  « reçue » sous `scores`. La table `results` gagne `blocking_failed`, ajoutée
+  par une migration additive : `CREATE TABLE IF NOT EXISTS` ne touche pas une
+  table existante, donc sans elle toute écriture aurait levé `no such column`
+  sur la machine de quelqu'un qui joue des labs depuis des mois. Une ligne
+  écrite avant cette version ne porte aucun blocage, et son verdict retombe sur
+  le seul score : on ne sait pas, et deviner déclarerait recalée une tentative
+  qui ne l'a jamais été.
+
+- **`exam.passed` de l'export JSON dit la vérité.** Il venait du seul score, et
+  annonçait donc reçue une épreuve dont l'exigence critique avait échoué, alors
+  que c'est ce champ que lisent les outils consommant l'export. Le score, lui,
+  ne bouge pas : le refus est un verdict, pas une pénalité. La preuve poussée
+  au portail, elle, était déjà juste, son `validated` valant « tous les tests
+  passés et au moins un joué ».
+
 ## [0.6.1] - 2026-10-30
 
 ### Corrigé

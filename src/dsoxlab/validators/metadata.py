@@ -8,6 +8,7 @@ français quel que soit ``DSOXLAB_LANG``.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 from dataclasses import dataclass
 from typing import Any
@@ -50,6 +51,104 @@ class MetadataReport:
     @property
     def ok(self) -> bool:
         return len(self.issues) == 0
+
+
+def _controler_les_blocages(
+    lab: LabDefinition, report: MetadataReport
+) -> None:
+    """Les deux contrôles propres à ``exam_blocking_checks``.
+
+    Sortis de ``validate_metadata`` parce que le cliquet de complexité du
+    dépôt a refusé la fonction, et il a eu raison : elle empilait sept
+    contrôles indépendants, et les deux nouveaux la poussaient à 25 de
+    complexité cognitive et au-delà de quatre-vingts lignes.
+
+    Les trois tiennent ensemble : ils disent ce qu'un lab a le droit de
+    déclarer quand il ÉVALUE quelqu'un, et ils ne regardent que ces
+    champs-là.
+    """
+    # LES CONTRÔLES BLOQUANTS DOIVENT EXISTER, et c'est la faiblesse propre de
+    # la forme déclarative : le `lab.yaml` nomme un test, et rien ne garantit
+    # que ce test porte encore ce nom. Un renommage désarmerait l'exigence en
+    # silence, et l'épreuve redeviendrait compensable sans que personne ne
+    # l'ait décidé.
+    #
+    # On lit le FICHIER, pas les tests collectés : `validate-structure` tourne
+    # hors ligne et sans machine, et doit rester jouable dans la CI d'un
+    # catalogue. Chercher les `def <nom>(` suffit à attraper un renommage.
+    fichier_de_tests = lab.path / "challenge/tests/test_functional.py"
+    if lab.exam_blocking_checks and fichier_de_tests.is_file():
+        source = fichier_de_tests.read_text(encoding="utf-8", errors="replace")
+        definis = {
+            noeud.name
+            for noeud in ast.walk(ast.parse(source))
+            if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        for nom in lab.exam_blocking_checks:
+            if nom not in definis:
+                report.issues.append(
+                    MetadataIssue(
+                        "exam_blocking_checks",
+                        "metadata_blocking_check_inconnu",
+                        {"value": nom},
+                    )
+                )
+
+    # Une exigence bloquante sur un lab qui n'évalue personne ne veut rien
+    # dire, pour la même raison qu'un seuil au même endroit.
+    if (
+        lab.exam_blocking_checks
+        and lab.lab_type in _VALID_LAB_TYPES - _TYPES_QUI_EVALUENT
+    ):
+        report.issues.append(
+            MetadataIssue(
+                "lab_type",
+                "metadata_blocking_sans_epreuve",
+                {
+                    "value": lab.lab_type,
+                    "expected": ", ".join(sorted(_TYPES_QUI_EVALUENT)),
+                },
+            )
+        )
+
+
+def _controler_le_seuil_sans_epreuve(
+    lab: LabDefinition, report: MetadataReport
+) -> None:
+    """Un seuil de réussite sur un lab qui ne note personne.
+
+    Séparé de son voisin parce que les deux réunis faisaient une fonction de
+    quatre-vingt-quatre lignes, que le cliquet du dépôt refuse. Ce sont deux
+    règles distinctes, sur deux champs distincts.
+    """
+    # Un seuil de réussite sur un lab qui n'évalue pas est une contradiction,
+    # et elle ne se voit pas : le moteur rend le verdict que `submit` affiche,
+    # pendant que tout ce qui range les labs par forme (un parcours à niveaux,
+    # un sommaire) classe celui-ci parmi les exercices. Les deux lectures du
+    # même fichier divergent sans qu'aucune échoue.
+    #
+    # Un seuil absurde est déjà signalé pour lui-même, juste au-dessus : en
+    # discuter la forme par-dessus ferait deux messages pour une seule ligne,
+    # dont l'un porte sur une valeur qui n'a de toute façon pas de sens. Les
+    # deux contrôles sont donc exclusifs.
+    if (
+        lab.exam_passing_score
+        and 1 <= lab.exam_passing_score <= 100
+        and lab.lab_type in _VALID_LAB_TYPES - _TYPES_QUI_EVALUENT
+    ):
+        report.issues.append(
+            MetadataIssue(
+                "lab_type",
+                "metadata_exam_score_sans_epreuve",
+                {
+                    "value": lab.lab_type,
+                    "score": lab.exam_passing_score,
+                    "expected": ", ".join(sorted(_TYPES_QUI_EVALUENT)),
+                },
+            )
+        )
+
+
 
 
 def validate_metadata(lab: LabDefinition) -> MetadataReport:
@@ -103,31 +202,7 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
                 {"value": lab.exam_passing_score},
             )
         )
-    # Un seuil de réussite sur un lab qui n'évalue pas est une contradiction,
-    # et elle ne se voit pas : le moteur rend le verdict que `submit` affiche,
-    # pendant que tout ce qui range les labs par forme (un parcours à niveaux,
-    # un sommaire) classe celui-ci parmi les exercices. Les deux lectures du
-    # même fichier divergent sans qu'aucune échoue.
-    #
-    # Un seuil absurde est déjà signalé pour lui-même, juste au-dessus : en
-    # discuter la forme par-dessus ferait deux messages pour une seule ligne,
-    # dont l'un porte sur une valeur qui n'a de toute façon pas de sens. Les
-    # deux contrôles sont donc exclusifs.
-    if (
-        lab.exam_passing_score
-        and 1 <= lab.exam_passing_score <= 100
-        and lab.lab_type in _VALID_LAB_TYPES - _TYPES_QUI_EVALUENT
-    ):
-        report.issues.append(
-            MetadataIssue(
-                "lab_type",
-                "metadata_exam_score_sans_epreuve",
-                {
-                    "value": lab.lab_type,
-                    "score": lab.exam_passing_score,
-                    "expected": ", ".join(sorted(_TYPES_QUI_EVALUENT)),
-                },
-            )
-        )
+    _controler_les_blocages(lab, report)
+    _controler_le_seuil_sans_epreuve(lab, report)
 
     return report

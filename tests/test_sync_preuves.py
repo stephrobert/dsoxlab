@@ -159,13 +159,26 @@ class TestLaRevisionDuCatalogue:
 
 
 class TestLaFormeEmise:
-    def test_les_quatorze_champs_du_portail_sont_la(self) -> None:
+    def test_les_quinze_champs_du_portail_sont_la(self) -> None:
+        """Le quinzieme est arrive en 0.7.0, et il est ADDITIF a dessein.
+
+        `failed_checks` dit au portail ce qu'il faut reviser : sans lui, une
+        epreuve refusee pour son exigence critique et une epreuve a 60 %
+        arrivaient sous la meme forme, et la page « Mon apprentissage »
+        n'avait rien a proposer.
+
+        Le numero de schema NE BOUGE PAS. Le monter garantirait le refus par
+        un portail qui ne connait que 1, c'est-a-dire exactement le cas que ce
+        module existe pour eviter : une seule ligne ecartee lui fait rendre un
+        magasin vide, donc effacer l'historique affiche de l'apprenant.
+        """
         issue = m.convertir(_document(_ligne()), maintenant=MAINTENANT)
         preuve = issue["preuves"][0]
         assert set(preuve) == {
             "source", "schema", "catalogue_id", "catalogue_revision", "lab_id",
             "lab_type", "validated", "score", "max_score", "passed_tests",
-            "total_tests", "hints_used", "attempted_at", "producer_version",
+            "total_tests", "hints_used", "failed_checks", "attempted_at",
+            "producer_version",
         }
         # `catalog` de l'export devient `catalogue_id` du portail : deux noms
         # pour la même chose, et c'est le second qui part.

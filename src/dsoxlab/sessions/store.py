@@ -30,7 +30,18 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             max_score     INTEGER NOT NULL,
             passed_tests  INTEGER NOT NULL,
             total_tests   INTEGER NOT NULL,
-            hints_used    INTEGER NOT NULL
+            hints_used    INTEGER NOT NULL,
+            -- Les contrôles bloquants qui ont échoué, séparés par une virgule.
+            -- Vide veut dire « aucun », et c'est aussi ce que portent les
+            -- lignes écrites avant que cette colonne existe : pour elles, on
+            -- ne sait pas, et le verdict retombe sur le seul score. Deviner
+            -- aurait été pire.
+            blocking_failed TEXT NOT NULL DEFAULT '',
+            -- TOUS les contrôles qui ont échoué, séparés par une virgule, dont
+            -- les bloquants. C'est ce qui permet de dire À QUOI se remettre :
+            -- un verdict exact qui ne nomme rien laisse l'apprenant devant
+            -- « 3 sur 5 », et le portail n'a rien à lui proposer.
+            failed_checks  TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS hint_requests (
@@ -41,7 +52,32 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             cost         INTEGER NOT NULL
         );
     """)
+    _ajouter_colonnes_manquantes(conn)
     conn.commit()
+
+
+def _ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> None:
+    """Les colonnes ajoutées après coup, sur une base qui existe déjà.
+
+    `CREATE TABLE IF NOT EXISTS` ne touche pas une table présente : une base
+    créée avant l'ajout d'une colonne ne l'aurait jamais. Toute l'écriture
+    lèverait alors `no such column`, sur la machine de quelqu'un qui joue des
+    labs depuis des mois, et le message ne dirait rien d'utile.
+
+    La migration est ADDITIVE et idempotente : on lit les colonnes présentes,
+    on ajoute celles qui manquent, avec une valeur par défaut. Aucune donnée
+    n'est réécrite, et une base déjà à jour ne subit rien.
+    """
+    attendues = {
+        "blocking_failed": "TEXT NOT NULL DEFAULT ''",
+        "failed_checks": "TEXT NOT NULL DEFAULT ''",
+    }
+    presentes = {
+        ligne["name"] for ligne in conn.execute("PRAGMA table_info(results)")
+    }
+    for nom, declaration in attendues.items():
+        if nom not in presentes:
+            conn.execute(f"ALTER TABLE results ADD COLUMN {nom} {declaration}")
 
 
 # ── Hints ─────────────────────────────────────────────────────────────────────
@@ -103,13 +139,17 @@ def record_result(
     passed_tests: int,
     total_tests: int,
     hints_used: int,
+    blocking_failed: tuple[str, ...] = (),
+    failed_checks: tuple[str, ...] = (),
 ) -> None:
     with _get_db(root) as conn:
         conn.execute(
             """INSERT INTO results
-               (lab_id, section, validated_at, score, max_score, passed_tests, total_tests, hints_used)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (lab_id, section, _now(), score, max_score, passed_tests, total_tests, hints_used),
+               (lab_id, section, validated_at, score, max_score, passed_tests,
+                total_tests, hints_used, blocking_failed, failed_checks)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (lab_id, section, _now(), score, max_score, passed_tests, total_tests,
+             hints_used, ",".join(blocking_failed), ",".join(failed_checks)),
         )
         conn.commit()
 
@@ -179,6 +219,50 @@ def get_best_scores(
                 "FROM results GROUP BY lab_id"
             ).fetchall()
     return {r["lab_id"]: (r["best"], r["max_s"]) for r in rows}
+
+
+def get_exam_outcomes(
+    root: Path, labs: dict[str, int]
+) -> dict[str, bool]:
+    """Pour chaque épreuve, une tentative l'a-t-elle REMPORTÉE ?
+
+    ``labs`` associe un ``lab_id`` à son ``exam_passing_score``. Rend un
+    booléen par lab ayant au moins une tentative.
+
+    POURQUOI CETTE FONCTION PLUTÔT QUE ``get_best_scores``. Le meilleur score
+    ne suffit pas à dire qu'une épreuve est remportée : il ignore le seuil, et
+    surtout il ignore les contrôles bloquants. Mesuré avant cette correction,
+    une épreuve à 0 sur 100 dont le contrôle critique avait échoué était
+    déclarée validée par `dsoxlab progress`, pendant que `submit` la refusait.
+
+    UNE TENTATIVE SUFFIT, et ce n'est pas la meilleure au sens du score : une
+    tentative à 80 avec un blocage ne vaut pas une tentative à 76 sans. On
+    cherche donc s'il EXISTE une tentative qui franchit le seuil sans blocage,
+    ce qui est la définition même de « remportée ». Un apprenant qui réussit,
+    puis rejoue et rate, n'a pas désappris.
+    """
+    if not labs:
+        return {}
+    with _get_db(root) as conn:
+        placeholders = ",".join("?" * len(labs))
+        rows = conn.execute(
+            f"SELECT lab_id, score, max_score, blocking_failed "  # noqa: S608 — placeholders = "?" liés
+            f"FROM results WHERE lab_id IN ({placeholders})",
+            list(labs),
+        ).fetchall()
+    issues: dict[str, bool] = {}
+    for r in rows:
+        lab_id = r["lab_id"]
+        seuil = labs[lab_id]
+        # La même comparaison en entiers que `exam_verdict`, pour que les deux
+        # ne puissent pas diverger d'un arrondi.
+        reussie = (
+            not (r["blocking_failed"] or "")
+            and r["max_score"] > 0
+            and r["score"] * 100 >= seuil * r["max_score"]
+        )
+        issues[lab_id] = issues.get(lab_id, False) or reussie
+    return issues
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

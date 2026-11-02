@@ -65,6 +65,14 @@ LONGUEUR_MAX_IDENTIFIANT = 128
 LONGUEUR_MAX_VERSION = 40
 LONGUEUR_MAX_DATE = 40
 MAX_TESTS = 10_000
+#: Combien de noms de contrôles ratés une preuve transporte au plus.
+#:
+#: Le portail s'en sert pour dire à l'apprenant sur quoi revenir, et une
+#: vingtaine de noms y suffit largement : un lab du catalogue en porte quatre
+#: ou cinq. La borne existe parce que ces noms viennent d'une sortie pytest, et
+#: qu'une suite inattendue pourrait en rendre des centaines : le magasin
+#: grossirait sans fin pour une information que personne ne lirait.
+MAX_CONTROLES_NOMMES = 20
 MAX_SCORE = 1_000_000
 
 #: Espaces de noms que le portail se réserve : un catalogue qui s'y nommerait
@@ -102,6 +110,13 @@ class Preuve(TypedDict):
     passed_tests: int
     total_tests: int
     hints_used: int
+    failed_checks: list[str]
+    """Les contrôles ratés, pour que le portail puisse dire quoi réviser.
+
+    Sans eux, il recevait « 3 sur 5 » et n'avait rien à proposer : le verdict
+    était juste et inexploitable. Tronqué à ``MAX_CONTROLES_NOMMES``.
+    """
+
     attempted_at: str
     producer_version: str | None
 
@@ -227,6 +242,30 @@ def _motif_du_type(type_lab: object) -> str | None:
     return None
 
 
+def _controles_rates(valeur: object) -> list[str]:
+    """Les noms des contrôles ratés d'une ligne d'export, nettoyés et bornés.
+
+    Ils ne font PAS partie des champs obligatoires : une ligne d'un export
+    antérieur n'en porte pas, et la refuser pour cela viderait le magasin de
+    l'apprenant, ce que ce module existe pour éviter. Toute forme inattendue
+    rend donc une liste vide, jamais un motif de rejet.
+
+    La borne existe parce que ces noms viennent d'une sortie pytest : une suite
+    inattendue en rendrait des centaines, et le magasin grossirait sans fin
+    pour une information que personne ne lirait.
+
+    Sortie de ``_reduire_une_ligne`` parce que le cliquet du dépôt l'a refusée
+    à 21 de complexité cognitive.
+    """
+    if not isinstance(valeur, list):
+        return []
+    propres = (
+        _identifiant_lisible(brut, LONGUEUR_MAX_IDENTIFIANT)
+        for brut in valeur[:MAX_CONTROLES_NOMMES]
+    )
+    return [nom for nom in propres if nom]
+
+
 def _reduire_une_ligne(
     ligne: dict[str, Any], entete: _Entete, quand: datetime
 ) -> Preuve | str:
@@ -247,6 +286,7 @@ def _reduire_une_ligne(
     bareme = _entier(ligne.get("max_score"), MAX_SCORE)
     score = _entier(ligne.get("score"), MAX_SCORE)
     indices = _entier(ligne.get("hints_used"), MAX_TESTS)
+    noms = _controles_rates(ligne.get("failed_checks"))
     date = _date_sure(ligne.get("attempted_at"), quand)
     valide = ligne.get("validated")
 
@@ -290,6 +330,7 @@ def _reduire_une_ligne(
         "passed_tests": passes,
         "total_tests": total,
         "hints_used": indices,
+        "failed_checks": noms,
         "attempted_at": date,
         "producer_version": entete["version_producteur"],
     }

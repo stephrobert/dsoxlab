@@ -57,6 +57,15 @@ class ScoreResult:
     hints_used: int
     hints_cost: int
 
+    blocking_failed: tuple[str, ...] = ()
+    """Les contrôles bloquants que cette exécution a ratés.
+
+    Vide dans l'immense majorité des cas : seuls les labs qui déclarent
+    ``exam_blocking_checks`` peuvent en porter. Non vide, l'épreuve est refusée
+    quel que soit le total, et l'appelant doit le DIRE : « 80 sur 100, recalé »
+    sans explication se lit comme un bug du moteur.
+    """
+
     enregistre: bool = True
     """L'exécution a-t-elle été inscrite dans l'historique ?
 
@@ -251,6 +260,23 @@ def _messages_par_test(output: str) -> dict[str, str]:
     return {nom: message for nom, message in trouves.items() if message}
 
 
+def blocages_rates(lab: LabDefinition, result: CheckResult) -> tuple[str, ...]:
+    """Les contrôles bloquants du lab que cette exécution a ratés.
+
+    Écrite une fois, et appelée à deux endroits : `evaluate_lab`, qui inscrit
+    le résultat, et `submit`, qui le dit à l'apprenant. La dupliquer serait
+    s'exposer à ce que les deux divergent en silence, et c'est exactement le
+    défaut que cette fonctionnalité corrige.
+
+    Le croisement se fait sur le NOM du test, que `echecs_de_tests` extrait
+    déjà pour l'affichage : aucune analyse de plus, et surtout pas une seconde
+    exécution de pytest. L'ordre suit celui que le lab déclare, pour que le
+    message soit stable d'une exécution à l'autre.
+    """
+    rates = {echec.nom for echec in echecs_de_tests(result.output)}
+    return tuple(nom for nom in lab.exam_blocking_checks if nom in rates)
+
+
 def compute_score(passed: int, total: int, max_score: int, hints_cost: int) -> int:
     """Note un lab : proportion de tests réussis, appliquée au barème amputé des indices.
 
@@ -298,36 +324,38 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
     used = hints_used_count(root, lab.id)
     score = compute_score(result.passed, result.total, max_score, hints_cost)
 
-    if not lab.is_exercise:
-        # Un lab `validation` défend un guide publié : ses tests mesurent des
-        # FAITS, pas une personne. Inscrire une note reviendrait à noter le
-        # guide, et à faire entrer dans la progression d'un apprenant une
-        # avancée qui n'est pas la sienne. Les tests tournent — c'est tout
-        # l'objet du lab — et rien n'en sort.
-        return ScoreResult(
-            check=result,
-            score=score,
-            max_score=max_score,
-            hints_used=used,
-            hints_cost=hints_cost,
-            enregistre=False,
-        )
+    # LES CONTRÔLES BLOQUANTS QUI ONT ÉCHOUÉ, croisés sur le nom du test.
+    #
+    # `echecs_de_tests` extrait déjà ces noms pour l'affichage : il n'y a rien
+    # de nouveau à analyser, et surtout pas une seconde exécution de pytest.
+    # L'ordre suit celui que le lab déclare, pour que le message soit stable
+    # d'une exécution à l'autre.
+    blocking_failed = blocages_rates(lab, result)
+    # TOUS les contrôles ratés, et pas seulement les bloquants : ce sont eux
+    # qui disent à l'apprenant sur quoi revenir. Le verdict se passe de cette
+    # liste, l'apprenant non.
+    echecs_nommes = tuple(echec.nom for echec in echecs_de_tests(result.output))
 
-    if not a_mesure(result):
-        # Rien n'a été mesuré : pytest n'a pas pu collecter, faute d'un
-        # conftest qui lève, d'une machine injoignable ou d'une dépendance
-        # absente. Inscrire ce 0 le rendrait indiscernable d'un lab tenté et
-        # raté, et la suite en dépend : `status` afficherait « validé », et
-        # `next` sauterait un lab que l'apprenant n'a jamais pu jouer.
-        #
-        # `compute_score` refusait déjà de deviner un score ; ce refus n'allait
-        # pas jusqu'à la base.
+    # DEUX CAS N'INSCRIVENT RIEN, et ils ne disent pas la même chose.
+    #
+    # Un lab `validation` défend un guide publié : ses tests mesurent des
+    # FAITS, pas une personne. Inscrire une note reviendrait à noter le guide,
+    # et à faire entrer dans la progression d'un apprenant une avancée qui
+    # n'est pas la sienne.
+    #
+    # Une exécution qui n'a RIEN mesuré, elle, est un accident : pytest n'a pas
+    # pu collecter, faute d'un conftest qui lève, d'une machine injoignable ou
+    # d'une dépendance absente. Inscrire ce 0 le rendrait indiscernable d'un
+    # lab tenté et raté, `status` afficherait « validé », et `next` sauterait
+    # un lab que l'apprenant n'a jamais pu jouer.
+    if not lab.is_exercise or not a_mesure(result):
         return ScoreResult(
             check=result,
             score=score,
             max_score=max_score,
             hints_used=used,
             hints_cost=hints_cost,
+            blocking_failed=blocking_failed,
             enregistre=False,
         )
 
@@ -343,6 +371,8 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
         passed_tests=result.passed,
         total_tests=result.total,
         hints_used=used,
+        blocking_failed=blocking_failed,
+        failed_checks=echecs_nommes,
     )
     return ScoreResult(
         check=result,
@@ -350,6 +380,7 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
         max_score=max_score,
         hints_used=used,
         hints_cost=hints_cost,
+        blocking_failed=blocking_failed,
     )
 
 
