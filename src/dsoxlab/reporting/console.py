@@ -7,7 +7,7 @@ import shlex
 import shutil
 import subprocess
 import zlib
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,7 @@ from ..services.infra_state_service import EtatHote, EtatInfra
 from ..services.lab_service import EchecDeTest
 from ..services.lab_state import LabState
 from ..services.progress_service import (
+    BlocProgress,
     blocages_de_ligne,
     build_progress,
     exam_verdict,
@@ -1321,9 +1322,53 @@ def print_hint(index: int, total_hints: int, text: str, cost: int, remaining_cos
 
 # ── progress ──────────────────────────────────────────────────────────────────
 
+def _etat_d_epreuve(validated: bool | None) -> str:
+    """« validée », « en attente », ou un point quand le bloc n'en déclare pas.
+
+    `None` n'est pas un échec : un bloc sans challenge ne doit pas s'afficher
+    comme un challenge raté.
+    """
+    if validated is None:
+        return "·"
+    return _("progress_validated") if validated else _("progress_pending")
+
+
+def _cellules_du_bloc(bloc: BlocProgress) -> tuple[str, str, str, str, str]:
+    """Les cinq cellules d'une ligne de progression, mises en couleur.
+
+    Sortie de ``print_progress_table`` parce que le cliquet du dépôt refuse
+    d'aggraver une fonction déjà au-dessus de son seuil, et il a raison : la
+    mise en forme de la ligne n'a rien à faire dans la fonction qui construit
+    le tableau.
+    """
+    done_text = f"{bloc.validated}/{bloc.total}"
+    if bloc.complete:
+        done_text = f"[green]{done_text}[/green]"
+    elif bloc.started:
+        done_text = f"[yellow]{done_text}[/yellow]"
+    else:
+        done_text = f"[dim]{done_text}[/dim]"
+
+    if bloc.average_pct is None:
+        avg_text = _("progress_pending")
+    else:
+        avg = bloc.average_pct
+        avg_color = "green" if avg >= 80 else "yellow" if avg >= 50 else "red"
+        avg_text = f"[{avg_color}]{avg} %[/{avg_color}]"
+
+    return (
+        texte_affichable(bloc.label) if bloc.label else "?",
+        done_text,
+        avg_text,
+        _etat_d_epreuve(bloc.challenge_validated),
+        _etat_d_epreuve(bloc.capstone_validated),
+    )
+
+
 def print_progress_table(
     labs: list[LabDefinition],
     scores: dict[str, tuple[int, int]],
+    epreuves_remportees: Mapping[str, bool] | None = None,
 ) -> None:
     """Print a bloc-by-bloc progression summary.
 
@@ -1344,34 +1389,8 @@ def print_progress_table(
     table.add_column(_("col_challenge"), justify="center")
     table.add_column(_("col_capstone"), justify="center")
 
-    def _status(validated: bool | None) -> str:
-        if validated is None:
-            return "·"
-        return _("progress_validated") if validated else _("progress_pending")
-
-    for bloc in build_progress(labs, scores):
-        done_text = f"{bloc.validated}/{bloc.total}"
-        if bloc.complete:
-            done_text = f"[green]{done_text}[/green]"
-        elif bloc.started:
-            done_text = f"[yellow]{done_text}[/yellow]"
-        else:
-            done_text = f"[dim]{done_text}[/dim]"
-
-        if bloc.average_pct is None:
-            avg_text = _("progress_pending")
-        else:
-            avg = bloc.average_pct
-            avg_color = "green" if avg >= 80 else "yellow" if avg >= 50 else "red"
-            avg_text = f"[{avg_color}]{avg} %[/{avg_color}]"
-
-        table.add_row(
-            texte_affichable(bloc.label) if bloc.label else "?",
-            done_text,
-            avg_text,
-            _status(bloc.challenge_validated),
-            _status(bloc.capstone_validated),
-        )
+    for bloc in build_progress(labs, scores, epreuves_remportees):
+        table.add_row(*_cellules_du_bloc(bloc))
 
     console.print(table)
 

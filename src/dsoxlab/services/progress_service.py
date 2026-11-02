@@ -139,16 +139,31 @@ def pedagogical_sort_key(lab: LabDefinition) -> tuple[int, int, int, str]:
 def build_progress(
     labs: list[LabDefinition],
     scores: dict[str, tuple[int, int]],
+    epreuves_remportees: Mapping[str, bool] | None = None,
 ) -> list[BlocProgress]:
     """Agrège la progression bloc par bloc.
 
     ``scores`` est le retour de ``get_best_scores`` : ``{lab_id: (score,
     max_score)}``. Un lab absent de ce dict n'a jamais été validé.
+
+    ``epreuves_remportees`` vient de ``get_exam_outcomes`` et dit, par épreuve,
+    si une tentative a franchi son seuil SANS contrôle bloquant en échec.
+    Sans lui, une épreuve était déclarée validée dès qu'une note existait,
+    fût-elle de zéro : mesuré, `submit` disait « recalé » et `progress`
+    « validée » sur la même tentative.
+
+    Il est optionnel pour que les appelants qui ne notent pas d'épreuve
+    n'aient rien à fournir ; absent, aucune épreuve n'est déclarée remportée,
+    ce qui est la réponse prudente plutôt que l'ancienne, qui était fausse.
     """
+    remportees = epreuves_remportees or {}
     blocs: dict[int, list[LabDefinition]] = {}
     for lab in labs:
         blocs.setdefault(lab.bloc, []).append(lab)
-    return [_resumer_un_bloc(numero, blocs[numero], scores) for numero in sorted(blocs)]
+    return [
+        _resumer_un_bloc(numero, blocs[numero], scores, remportees)
+        for numero in sorted(blocs)
+    ]
 
 
 def _moyenne_des_valides(
@@ -174,6 +189,7 @@ def _resumer_un_bloc(
     numero: int,
     labs_du_bloc: list[LabDefinition],
     scores: dict[str, tuple[int, int]],
+    remportees: Mapping[str, bool],
 ) -> BlocProgress:
     """Ce qu'un bloc vaut : ses labs notés, son challenge, son capstone."""
     ordonnes = sorted(labs_du_bloc, key=lambda lab: lab.bloc_order)
@@ -196,8 +212,16 @@ def _resumer_un_bloc(
         validated=len(valides),
         total=len(notes),
         average_pct=_moyenne_des_valides(valides, scores),
-        challenge_validated=(challenges[0].id in scores) if challenges else None,
-        capstone_validated=(capstones[0].id in scores) if capstones else None,
+        # UNE ÉPREUVE EST VALIDÉE QUAND ELLE EST REMPORTÉE, et non quand elle
+        # a été tentée. Ces deux lignes lisaient « une note existe » : un
+        # apprenant qui soumettait une fois, même à zéro, voyait son épreuve
+        # déclarée validée pendant que `submit` la refusait.
+        challenge_validated=(
+            remportees.get(challenges[0].id, False) if challenges else None
+        ),
+        capstone_validated=(
+            remportees.get(capstones[0].id, False) if capstones else None
+        ),
     )
 
 

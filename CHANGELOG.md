@@ -32,6 +32,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`progress` no longer declares validated what `submit` refused.** Measured:
+  one attempt, 0 out of 100, with the critical check failed, and
+  `challenge_validated` returned true. The field read "a score exists", looking
+  at neither the score, nor the threshold, nor the blocking check: submitting
+  once, even scoring zero, validated the exam.
+
+  The defect predates the blocking check and is wider than it, but it
+  contradicts it head-on, and a feature another command denies is not
+  delivered. An exam is now validated when ONE attempt reached its threshold
+  with no blocking check failed. One attempt, and not the best by score: an 80
+  with a blocking failure is not worth a 76 without, and a learner who passes
+  then replays and fails has not unlearned.
+
+  `validated` still counts ordinary labs that have a score. Those declare no
+  threshold, so there is no bar to clear, and inventing one here would change
+  every learner's displayed progression on a judgement nobody made.
+
 - **The export and the proof now say what to revise.** A correct verdict that
   names nothing leaves the learner in front of "3 out of 5", and leaves the
   portal with nothing to suggest. Every attempt now records the names of the

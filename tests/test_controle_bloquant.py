@@ -425,3 +425,100 @@ class TestCeQuIlFautReviser:
         }, 75)
         assert rendu["failed_checks"] == []
         assert rendu["blocking_failed"] == []
+
+
+# ── la progression ────────────────────────────────────────────────────────
+
+class TestProgression:
+    """`progress` ne peut pas dire « validée » ce que `submit` a refusé.
+
+    LE DÉFAUT, mesuré le 2026-11-02 : `challenge_validated` valait « une note
+    existe », sans regarder ni la note, ni le seuil, ni le blocage. Un
+    apprenant qui soumettait une fois, même à zéro, voyait son épreuve
+    déclarée validée pendant que `submit` la refusait.
+
+    Il est antérieur au contrôle bloquant et plus large que lui, mais il le
+    contredit frontalement : une fonctionnalité dont une autre commande dit le
+    contraire n'est pas livrée.
+    """
+
+    @staticmethod
+    def _epreuve(racine: Path) -> LabDefinition:
+        return LabDefinition(
+            id="epreuve", title="Épreuve", level="c1", path=racine,
+            skills=["s"], distros=["d"], doc_url="https://exemple.invalid/",
+            runtime=RuntimeConfig(type=RuntimeType.SHELL),
+            validation=ValidationConfig(), lab_type="challenge",
+            exam_passing_score=75, bloc=1,
+            exam_blocking_checks=("test_critique",),
+        )
+
+    @pytest.mark.parametrize("tentatives,attendu", [
+        # LE CAS DU DÉFAUT : une seule tentative, catastrophique.
+        ([(0, ("test_critique",))], False),
+        # Le cas que le contrôle bloquant existe pour refuser.
+        ([(80, ("test_critique",))], False),
+        ([(80, ())], True),
+        ([(74, ())], False),
+        # UNE tentative suffit, et ce n'est pas la meilleure au sens du score :
+        # une tentative à 80 avec un blocage ne vaut pas une tentative à 76
+        # sans. Et un apprenant qui réussit puis rejoue n'a pas désappris.
+        ([(0, ("test_critique",)), (80, ())], True),
+        ([(80, ()), (0, ("test_critique",))], True),
+    ])
+    def test_une_epreuve_n_est_validee_que_si_elle_est_remportee(
+        self, tmp_path: Path,
+        tentatives: list[tuple[int, tuple[str, ...]]], attendu: bool,
+    ) -> None:
+        from dsoxlab.services.progress_service import build_progress
+        from dsoxlab.sessions.store import get_best_scores, get_exam_outcomes
+
+        lab = self._epreuve(tmp_path)
+        for score, bloques in tentatives:
+            record_result(
+                tmp_path, lab_id="epreuve", section="s", score=score,
+                max_score=100, passed_tests=score // 20, total_tests=5,
+                hints_used=0, blocking_failed=bloques, failed_checks=bloques,
+            )
+        issues = get_exam_outcomes(tmp_path, {"epreuve": 75})
+        (bloc,) = build_progress(
+            [lab], get_best_scores(tmp_path, ["epreuve"]), issues)
+        assert bloc.challenge_validated is attendu
+
+    def test_sans_releve_aucune_epreuve_n_est_declaree_remportee(
+        self, tmp_path: Path
+    ) -> None:
+        """L'absence de relevé rend la réponse PRUDENTE, pas l'ancienne.
+
+        Un appelant qui ne fournit rien ne doit pas retomber sur le
+        comportement faux qu'on vient de corriger.
+        """
+        from dsoxlab.services.progress_service import build_progress
+        from dsoxlab.sessions.store import get_best_scores
+
+        lab = self._epreuve(tmp_path)
+        record_result(
+            tmp_path, lab_id="epreuve", section="s", score=100, max_score=100,
+            passed_tests=5, total_tests=5, hints_used=0,
+        )
+        (bloc,) = build_progress([lab], get_best_scores(tmp_path, ["epreuve"]))
+        assert bloc.challenge_validated is False
+
+    def test_le_seuil_se_compare_en_entiers_comme_le_verdict(
+        self, tmp_path: Path
+    ) -> None:
+        """Les deux chemins ne doivent pas diverger d'un arrondi.
+
+        `exam_verdict` compare en entiers pour ne pas déclarer reçu à 69,5 %
+        un candidat qui ne l'est pas. `get_exam_outcomes` fait la même
+        comparaison, et ce test le tient : une divergence d'arrondi ferait
+        dire deux choses à deux commandes sur la même tentative.
+        """
+        from dsoxlab.sessions.store import get_exam_outcomes
+
+        record_result(
+            tmp_path, lab_id="epreuve", section="s", score=69, max_score=100,
+            passed_tests=3, total_tests=5, hints_used=0,
+        )
+        assert get_exam_outcomes(tmp_path, {"epreuve": 70}) == {"epreuve": False}
+        assert exam_verdict(69, 100, 70) is False

@@ -221,6 +221,50 @@ def get_best_scores(
     return {r["lab_id"]: (r["best"], r["max_s"]) for r in rows}
 
 
+def get_exam_outcomes(
+    root: Path, labs: dict[str, int]
+) -> dict[str, bool]:
+    """Pour chaque épreuve, une tentative l'a-t-elle REMPORTÉE ?
+
+    ``labs`` associe un ``lab_id`` à son ``exam_passing_score``. Rend un
+    booléen par lab ayant au moins une tentative.
+
+    POURQUOI CETTE FONCTION PLUTÔT QUE ``get_best_scores``. Le meilleur score
+    ne suffit pas à dire qu'une épreuve est remportée : il ignore le seuil, et
+    surtout il ignore les contrôles bloquants. Mesuré avant cette correction,
+    une épreuve à 0 sur 100 dont le contrôle critique avait échoué était
+    déclarée validée par `dsoxlab progress`, pendant que `submit` la refusait.
+
+    UNE TENTATIVE SUFFIT, et ce n'est pas la meilleure au sens du score : une
+    tentative à 80 avec un blocage ne vaut pas une tentative à 76 sans. On
+    cherche donc s'il EXISTE une tentative qui franchit le seuil sans blocage,
+    ce qui est la définition même de « remportée ». Un apprenant qui réussit,
+    puis rejoue et rate, n'a pas désappris.
+    """
+    if not labs:
+        return {}
+    with _get_db(root) as conn:
+        placeholders = ",".join("?" * len(labs))
+        rows = conn.execute(
+            f"SELECT lab_id, score, max_score, blocking_failed "  # noqa: S608 — placeholders = "?" liés
+            f"FROM results WHERE lab_id IN ({placeholders})",
+            list(labs),
+        ).fetchall()
+    issues: dict[str, bool] = {}
+    for r in rows:
+        lab_id = r["lab_id"]
+        seuil = labs[lab_id]
+        # La même comparaison en entiers que `exam_verdict`, pour que les deux
+        # ne puissent pas diverger d'un arrondi.
+        reussie = (
+            not (r["blocking_failed"] or "")
+            and r["max_score"] > 0
+            and r["score"] * 100 >= seuil * r["max_score"]
+        )
+        issues[lab_id] = issues.get(lab_id, False) or reussie
+    return issues
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _now() -> str:

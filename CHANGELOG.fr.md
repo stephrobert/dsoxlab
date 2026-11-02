@@ -33,6 +33,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **`progress` ne déclare plus validé ce que `submit` a refusé.** Mesuré : une
+  tentative, 0 sur 100, contrôle critique en échec, et `challenge_validated`
+  rendait vrai. Le champ valait « une note existe », sans regarder ni la note,
+  ni le seuil, ni le contrôle bloquant : soumettre une fois, fût-ce à zéro,
+  validait l'épreuve.
+
+  Le défaut est antérieur au contrôle bloquant et plus large que lui, mais il
+  le contredit frontalement, et une fonctionnalité dont une autre commande dit
+  le contraire n'est pas livrée. Une épreuve est désormais validée quand UNE
+  tentative a franchi son seuil sans contrôle bloquant en échec. Une
+  tentative, et non la meilleure au sens du score : un 80 avec un blocage ne
+  vaut pas un 76 sans, et un apprenant qui réussit puis rejoue et rate n'a pas
+  désappris.
+
+  `validated` continue de compter les labs ordinaires ayant une note. Ceux-là
+  ne déclarent pas de seuil, donc il n'existe pas de barre à franchir, et en
+  inventer une ici changerait la progression affichée de tous les apprenants
+  sur un jugement que personne n'a pris.
+
 - **L'export et la preuve disent désormais ce qu'il faut réviser.** Un verdict
   exact qui ne nomme rien laisse l'apprenant devant « 3 sur 5 », et le portail
   sans rien à proposer. Chaque tentative consigne maintenant les noms des

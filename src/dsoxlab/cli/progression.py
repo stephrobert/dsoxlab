@@ -517,7 +517,17 @@ def progress(
             },
         })
         return
-    print_progress_table(labs, scores_data)
+    # LES ÉPREUVES REMPORTÉES, et non simplement tentées. Sans ce relevé,
+    # `progress` déclarait une épreuve validée dès qu'une note existait, même
+    # un zéro, pendant que `submit` la refusait sur son contrôle bloquant.
+    from ..sessions.store import get_exam_outcomes
+
+    seuils = {
+        lab.id: lab.exam_passing_score
+        for lab in labs
+        if lab.exam_passing_score
+    }
+    print_progress_table(labs, scores_data, get_exam_outcomes(root, seuils))
 
 
 # ── next ──────────────────────────────────────────────────────────────────────
