@@ -7,6 +7,62 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.7.3] - 2026-11-03
+
+### Corrigé
+
+- **Un refus d'épreuve se dit désormais une fois, et aucune coche verte ne le
+  referme.** La 0.7.0 avait ajouté une ligne nommant le contrôle bloquant ; la
+  0.7.1 en a ajouté une seconde pour corriger un motif faux, sans retirer la
+  première. Mesuré sur la VM avec la 0.7.2, un refus affichait le refus **deux
+  fois**, en deux formulations, « corrigez-la, puis soumettez à nouveau »
+  **trois** fois avec la ligne de score, et se refermait sur
+  `✔ Tentative sauvegardée. Vous pouvez enchaîner avec dsoxlab run <lab>…`,
+  en vert, ce qu'un débutant lit comme une réussite. Les deux versions ont été
+  mesurées chacune sur sa fonction, et jamais sur ce que l'apprenant voit. Les
+  deux lignes fusionnent en une, qui porte le pourcentage, le seuil, le fait
+  qu'il est franchi et le nom des contrôles bloquants ; la ligne de clôture
+  perd la couleur du succès et nomme ce qu'il reste à faire ; et la ligne de
+  score se tait sur un refus, là où elle disait « soumettez à nouveau **si
+  besoin** », alors que c'est nécessaire.
+- **La relation entre le score et le seuil se calcule, elle ne se suppose pas.**
+  Ce piège a mordu trois fois, toujours de la même façon : un message qui
+  **énonce** une comparaison au lieu de la faire. La 0.7.0 écrivait « 80 % du
+  barème, **sous** le seuil de 75 % » devant un seuil franchi ; la 0.7.1 l'a
+  corrigé en figeant l'autre sens ; et la première écriture de cette version
+  affichait donc, relevé sur la VM, « vous obtenez **20 %** du barème, ce qui
+  **franchit** le seuil de 75 % ». Un refus sur contrôle bloquant arrive
+  au-dessus comme en dessous du seuil : le message choisit désormais sa
+  formulation sur `pct >= seuil`, et le cas inférieur dit que **deux** choses
+  manquent, sans quoi l'apprenant corrige l'exigence et reste recalé sur son
+  total.
+
+- **Le nom lu dans la sortie pytest est celui de la fonction, et non celui de sa
+  classe.** Le nodeid était lu par `::(\w+)`, qui prend le **premier** segment :
+  un test rangé dans une classe rendait le nom de la classe. La conséquence
+  silencieuse est la plus grave : un `exam_blocking_checks` nommant un tel test
+  n'aurait jamais correspondu, et l'exigence critique aurait été **désarmée sans
+  un mot**, ce qui est exactement le défaut que ce champ existe pour fermer.
+  Mesuré sur la sortie réelle de pytest, pour les trois formes de test.
+- **Le message d'assertion n'est plus perdu sur un test paramétré ou rangé dans
+  une classe.** L'en-tête de section `FAILURES` prend trois formes
+  (`Classe.test`, `test`, `test[cas]`), et le motif n'en reconnaissait qu'une :
+  les deux autres ne correspondaient à rien, leur message était donc écarté. Ce
+  n'était pas théorique : trois labs du catalogue emploient `parametrize`, et le
+  message perdu est la phrase bilingue que l'auteur du lab a écrite pour
+  l'apprenant. Un test paramétré rend désormais le message du **premier** cas en
+  échec.
+- **`clean` et `reset` hors terminal disent pourquoi, au lieu d'« Aborted ».**
+  `typer.confirm(abort=True)` répondait deux mots, sans sujet et sans geste, et
+  rien ne nommait `--yes`, qui est la réponse. Une CI ou un
+  `dsoxlab clean < /dev/null` lisait un refus dont la cause n'était nulle part.
+  Le message nomme la raison et l'option, et le code de sortie vaut 2.
+
+### Retiré
+
+- La clé `exam_blocking_failed`, dans les deux langues : son contenu est fondu
+  dans le message de refus unique. Un test empêche son retour.
+
 ## [0.7.2] - 2026-11-02
 
 ### Ajouté

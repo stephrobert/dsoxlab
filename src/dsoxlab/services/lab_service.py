@@ -155,7 +155,22 @@ class EchecDeTest:
 
 
 #: Début d'une section de la zone FAILURES : ``____ test_nom ____``.
-_SECTION_ECHEC = re.compile(r"^_{3,}\s*(?:[\w\[\]./-]+::)?(\w+)\s*_{3,}$")
+# L'en-tête d'une section ``FAILURES``. Mesuré sur pytest le 2026-11-03, elle
+# prend TROIS formes, et l'ancien motif n'en reconnaissait qu'une :
+#
+#     ___ TestUneClasse.test_en_classe ___     la classe est séparée par un POINT
+#     ___ test_simple ___
+#     ___ test_parametre[a-1] ___              le cas est entre CROCHETS
+#
+# `(\w+)` ne contient ni point ni crochet : les deux formes extrêmes ne
+# correspondaient donc pas, et leur message d'assertion était perdu. Ce n'était
+# pas théorique : trois labs du catalogue emploient `parametrize`, et le message
+# perdu est justement la phrase bilingue que l'auteur du lab a écrite pour
+# l'apprenant. Le nom capturé est celui de la FONCTION, classe retirée, pour
+# qu'il s'apparie avec ce que `_nom_du_test` lit de la ligne `FAILED`.
+_SECTION_ECHEC = re.compile(
+    r"^_{3,}\s*(?:[\w\[\]./-]+::)?([\w.]+?)(?:\[[^\]]*\])?\s*_{3,}$"
+)
 
 #: Première ligne du message d'assertion dans cette section.
 _MESSAGE_ECHEC = re.compile(r"^E\s{2,}(?:\w*(?:Error|Exception|Failed)\s*:\s*)?(.+)$")
@@ -203,10 +218,36 @@ def echecs_de_tests(output: str) -> list[EchecDeTest]:
         ):
             # Le nodeid peut être replié par pytest sur un terminal étroit :
             # on cherche le nom du test, pas la ligne entière.
-            trouve = re.search(r"::(\w+)", depouillee)
-            if trouve and trouve.group(1) not in noms:
-                noms.append(trouve.group(1))
+            nom = _nom_du_test(depouillee)
+            if nom and nom not in noms:
+                noms.append(nom)
     return [EchecDeTest(nom=nom, message=messages.get(nom)) for nom in noms]
+
+
+def _nom_du_test(ligne: str) -> str | None:
+    """Le nom de la FONCTION de test, et non celui de sa classe.
+
+    Mesuré sur pytest le 2026-11-03, trois formes de la ligne ``FAILED`` :
+
+        FAILED t.py::TestUneClasse::test_en_classe - AssertionError: ...
+        FAILED t.py::test_simple - AssertionError: ...
+        FAILED t.py::test_parametre[a-1] - AssertionError: ...
+
+    La lecture précédente prenait le PREMIER segment ``::``, donc
+    ``TestUneClasse`` sur la première forme. Deux conséquences, et la seconde
+    était silencieuse : l'apprenant lisait un nom de classe au lieu du test, et
+    surtout un ``exam_blocking_checks`` nommant un test rangé dans une classe
+    n'aurait jamais correspondu. L'exigence critique aurait été **désarmée sans
+    un mot**, ce qui est exactement le défaut que ce champ existe pour fermer.
+
+    La recherche est bornée au nodeid, et c'est nécessaire : le message qui suit
+    peut lui aussi porter des ``::``, et prendre le dernier segment de la ligne
+    entière rendrait alors un fragment de message.
+    """
+    # `FAILED <nodeid> - <message>` : on coupe avant le message.
+    tete = ligne.split(" - ", 1)[0]
+    segments = re.findall(r"::(\w+)", tete)
+    return segments[-1] if segments else None
 
 
 def _sections_dechec(output: str) -> dict[str, list[str]]:
@@ -222,8 +263,14 @@ def _sections_dechec(output: str) -> dict[str, list[str]]:
     for ligne in output.splitlines():
         entete = _SECTION_ECHEC.match(ligne.strip())
         if entete:
-            courant = entete.group(1)
-            sections[courant] = []
+            # La classe est retirée : la section s'appelle `Classe.test`, et
+            # l'appelant cherche `test`.
+            courant = entete.group(1).rsplit(".", 1)[-1]
+            # `setdefault` et non `= []` : un test paramétré ouvre UNE section
+            # par cas, toutes sous le même nom. Réinitialiser ne gardait que le
+            # dernier cas ; en conservant les lignes, `_message_de_section`
+            # rend le message du PREMIER, qui est le premier à avoir cassé.
+            sections.setdefault(courant, [])
         elif courant is not None:
             sections[courant].append(ligne)
     return sections

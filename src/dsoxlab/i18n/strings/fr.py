@@ -1112,10 +1112,20 @@ hors ligne, elle se tait.
         "soumettez à nouveau.",
     "submit_exit_cta":    "[bold green]\u2714 Tentative sauvegardée.[/bold green] Tapez [bold]exit[/bold] pour revenir à votre répertoire d'origine.",
     "submit_done":        "[bold green]\u2714 Tentative sauvegardée.[/bold green] Vous pouvez enchaîner avec [bold]dsoxlab run <lab>[/bold] ou libérer l'infra avec [bold]dsoxlab destroy[/bold].",
+    # Pas de coche verte, et pas d'invitation à enchaîner : l'épreuve est
+    # refusée, et le geste attendu est de corriger l'exigence, pas de passer
+    # au lab suivant.
+    "submit_done_refus":  "Tentative enregistrée. Corrigez l'exigence ci-dessus, puis [bold]dsoxlab submit[/bold] à nouveau.",
 
     # ── reset ─────────────────────────────────────────────────────────────────
     "resetting": "Réinitialisation de [bold]{lab_id}[/bold]…",
     "lab_reset": "Lab réinitialisé.",
+    # Hors terminal, `typer.confirm` répondait « Aborted » : deux mots sans
+    # sujet et sans geste, alors que `--yes` est la réponse.
+    "confirmation_sans_terminal":
+        "Cette commande demande une confirmation, et il n'y a pas de terminal "
+        "pour la donner. Relancez-la avec [bold]--yes[/bold] pour confirmer "
+        "sans question.",
 
     # ── clean ─────────────────────────────────────────────────────────────────
     "confirm_clean": "Supprimer les ressources du lab {lab_id} ?",
@@ -1889,20 +1899,23 @@ hors ligne, elle se tait.
     "col_verdict":   "Verdict",
     "verdict_pass":  "reçu",
     "verdict_fail":  "recalé",
-    "exam_blocking_failed": (
-        "Un contrôle bloquant a échoué, donc l'épreuve est refusée quel que "
-        "soit le total :\n"
-        "{checks}\n"
-        "Cette exigence n'est compensée par aucune note. Corrigez-la, puis "
-        "soumettez à nouveau."
-    ),
     "exam_passed":
         "Examen réussi : {pct} % du barème, pour un seuil de {threshold} %.",
-    "exam_failed_blocking":
-        "Épreuve refusée : un contrôle bloquant a échoué. Vous obtenez "
-        "{pct} % du barème, ce qui franchit le seuil de {threshold} %, et "
-        "aucune note ne compense cette exigence. Corrigez-la, puis soumettez "
-        "à nouveau.",
+    "exam_failed_blocking": (
+        "Épreuve refusée : vous obtenez {pct} % du barème, ce qui franchit le "
+        "seuil de {threshold} %, et l'épreuve est pourtant refusée. Un "
+        "contrôle bloquant a échoué, et aucune note ne le compense :\n"
+        "{checks}"
+    ),
+    # Le même refus, quand le total ne franchit PAS le seuil : deux choses
+    # manquent, et le dire évite de chercher la seule qu'on nomme.
+    "exam_failed_blocking_et_score": (
+        "Épreuve refusée pour deux raisons. Un contrôle bloquant a échoué, et "
+        "aucune note ne le compense :\n"
+        "{checks}\n"
+        "Et votre total, {pct} % du barème, reste sous le seuil de "
+        "{threshold} %."
+    ),
 
     "exam_failed":
         "Examen échoué : {pct} % du barème, sous le seuil de {threshold} %. "

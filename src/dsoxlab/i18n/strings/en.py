@@ -1095,10 +1095,19 @@ silent.
         "is not a score of zero. Read the output above, then submit again.",
     "submit_exit_cta":     "[bold green]\u2714 Attempt saved.[/bold green] Type [bold]exit[/bold] to return to your original directory.",
     "submit_done":         "[bold green]\u2714 Attempt saved.[/bold green] Continue with [bold]dsoxlab run <lab>[/bold] or release the infra with [bold]dsoxlab destroy[/bold].",
+    # No green tick, and no invitation to move on: the test is refused, and the
+    # expected move is to fix the requirement, not to start the next lab.
+    "submit_done_refus":   "Attempt recorded. Fix the requirement above, then [bold]dsoxlab submit[/bold] again.",
 
     # ── reset ─────────────────────────────────────────────────────────────────
     "resetting": "Resetting [bold]{lab_id}[/bold]…",
     "lab_reset": "Lab reset.",
+    # Outside a terminal, `typer.confirm` answered "Aborted": two words with no
+    # subject and no next move, while `--yes` is the answer.
+    "confirmation_sans_terminal":
+        "This command asks for a confirmation, and there is no terminal to give "
+        "it. Run it again with [bold]--yes[/bold] to confirm without being "
+        "asked.",
 
     # ── clean ─────────────────────────────────────────────────────────────────
     "confirm_clean": "Delete resources for lab {lab_id}?",
@@ -1843,17 +1852,23 @@ silent.
     "col_verdict":   "Verdict",
     "verdict_pass":  "passed",
     "verdict_fail":  "failed",
-    "exam_blocking_failed": (
-        "A blocking check failed, so this test is refused whatever the total:\n"
-        "{checks}\n"
-        "This requirement is made up for by no score. Fix it and submit again."
-    ),
     "exam_passed":
         "Exam passed: {pct}% of the scale, for a pass mark of {threshold}%.",
-    "exam_failed_blocking":
-        "Exam refused: a blocking check failed. You scored {pct}% of the scale, "
-        "which clears the {threshold}% pass mark, and no score makes up for "
-        "that requirement. Fix it, then submit again.",
+    "exam_failed_blocking": (
+        "Test refused: you scored {pct}% of the scale, which clears the "
+        "{threshold}% pass mark, and the test is refused all the same. A "
+        "blocking check failed, and no score makes up for it:\n"
+        "{checks}"
+    ),
+    # The same refusal when the total does NOT clear the mark: two things are
+    # missing, and saying so keeps the learner from chasing only the one named.
+    "exam_failed_blocking_et_score": (
+        "Test refused for two reasons. A blocking check failed, and no score "
+        "makes up for it:\n"
+        "{checks}\n"
+        "And your total, {pct}% of the scale, stays below the {threshold}% "
+        "pass mark."
+    ),
 
     "exam_failed":
         "Exam failed: {pct}% of the scale, below the {threshold}% pass mark. "

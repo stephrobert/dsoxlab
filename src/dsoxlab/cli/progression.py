@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -158,8 +159,76 @@ def check(
 
 # ── submit ────────────────────────────────────────────────────────────────────
 
-def _dire_le_verdict(recue: bool, bloquee: bool, pct: int, seuil: int) -> None:
-    """Le verdict d'une épreuve, avec le VRAI motif de son refus.
+def _confirmer(cle: str, lab_id: str) -> None:
+    """Demande confirmation, ou dit POURQUOI elle est impossible.
+
+    Hors terminal, `typer.confirm(abort=True)` répond « Aborted » et sort. Deux
+    mots, sans sujet et sans geste : un appelant automatisé, une CI ou un
+    `dsoxlab clean < /dev/null` lisait donc un refus dont rien ne disait la
+    cause, et rien ne nommait `--yes`, qui est la réponse.
+
+    C'est le même défaut que les codes de sortie du moteur existent pour
+    éviter : un échec qui ne se dit pas est pire qu'un échec. Le message nomme
+    donc la raison et le geste, et la sortie vaut 2, comme les autres refus
+    d'exécution.
+    """
+    if sys.stdin.isatty():
+        typer.confirm(_(cle, lab_id=lab_id), abort=True)
+        return
+    error(_("confirmation_sans_terminal"))
+    raise typer.Exit(2)
+
+
+def _dire_le_score(
+    lab: LabDefinition, result: Any, score: int, max_score: int, refusee: bool
+) -> None:
+    """La ligne de note, et les trois cas où elle ne doit pas être celle-là.
+
+    « Soumission enregistrée » n'est vrai que si quelque chose a été
+    enregistré. Deux cas où rien ne l'est, et où l'annoncer trompait : un lab
+    `validation`, qui défend un guide et ne note personne, et une exécution qui
+    n'a mesuré aucun test, un `conftest.py` qui lève ou une machine
+    injoignable. `check` disait déjà le premier ; `submit` l'affirmait au
+    contraire.
+
+    Le troisième cas est une épreuve REFUSÉE : la ligne se tait, parce qu'elle
+    disait « Corrigez et soumettez à nouveau si besoin » devant un refus, et
+    que « si besoin » est faux. Le verdict qui suit dit tout, et mieux.
+    """
+    if not lab.is_exercise:
+        info(_("check_validation_sans_note"))
+    elif not a_mesure(result):
+        warn(_("submit_sans_mesure"))
+    elif result.ok:
+        success(_("submit_success", score=score, max_score=max_score))
+    elif not refusee:
+        info(_("submit_partial", passed=result.passed, total=result.total,
+               score=score, max_score=max_score))
+
+
+def _cle_de_la_suite(refusee: bool) -> str:
+    """Le dernier mot de `submit`, et il ne félicite pas un refus.
+
+    AUCUNE COCHE VERTE DERRIÈRE UN REFUS. La 0.7.2 refermait une épreuve
+    refusée par « ✔ Tentative sauvegardée. Vous pouvez enchaîner avec
+    dsoxlab run <lab>… », en vert : un débutant y lit une réussite, et
+    l'invitation à enchaîner sur un autre lab est l'inverse du geste attendu.
+    La tentative est bien enregistrée, ce qui se dit, mais sans la couleur du
+    succès et en nommant ce qu'il reste à faire.
+
+    Le « tape exit » ne vaut que dans le sous-shell ouvert par `dsoxlab run`,
+    donc sur un runtime `shell`. Sur un runtime `vm`, l'apprenant est revenu
+    sur son poste : il n'y a aucun sous-shell à fermer, et le message mentirait.
+    """
+    if os.environ.get("DSOXLAB_LAB_SESSION"):
+        return "submit_exit_cta"
+    return "submit_done_refus" if refusee else "submit_done"
+
+
+def _dire_le_verdict(
+    recue: bool, bloquee: bool, pct: int, seuil: int, blocages: str = ""
+) -> None:
+    """Le verdict d'une épreuve, avec le VRAI motif de son refus, DIT UNE FOIS.
 
     Mesuré sur la VM avec 0.7.0 : une épreuve à 80 sur un seuil de 75,
     refusée sur son contrôle bloquant, affichait « 80 % du barème, SOUS le
@@ -170,6 +239,17 @@ def _dire_le_verdict(recue: bool, bloquee: bool, pct: int, seuil: int) -> None:
     C'est la faute que cette version corrige, retournée : le moteur disait
     « reçue » quand il fallait refuser, puis il a refusé en motivant faux.
 
+    UN REFUS SE DIT UNE FOIS, et la 0.7.3 le corrige. La 0.7.0 avait ajouté
+    une ligne nommant le contrôle bloquant ; la 0.7.1 en a ajouté une seconde
+    pour corriger ce motif faux, sans retirer la première. Mesuré sur la VM, un
+    apprenant lisait donc le refus DEUX fois, en deux formulations, et
+    « corrigez-la, puis soumettez à nouveau » TROIS fois avec la ligne de
+    score. Les deux lignes sont fusionnées, et ce message porte désormais le
+    nom des contrôles bloquants.
+
+    Le défaut vient de ce que les deux versions ont été mesurées séparément,
+    chacune sur sa fonction, jamais sur ce que l'apprenant voit à l'écran.
+
     Sortie de `submit` parce que le cliquet du dépôt a refusé la commande à
     22 de complexité cognitive, et il a raison : choisir un message n'est pas
     le travail d'une commande.
@@ -177,8 +257,22 @@ def _dire_le_verdict(recue: bool, bloquee: bool, pct: int, seuil: int) -> None:
     if recue:
         success(_("exam_passed", pct=pct, threshold=seuil))
         return
-    cle = "exam_failed_blocking" if bloquee else "exam_failed"
-    error(_(cle, pct=pct, threshold=seuil))
+    if not bloquee:
+        error(_("exam_failed", pct=pct, threshold=seuil))
+        return
+    # LA RELATION ENTRE LE SCORE ET LE SEUIL SE CALCULE, elle ne se suppose
+    # pas. Un refus sur contrôle bloquant arrive avec un total AU-DESSUS du
+    # seuil, qui est le cas intéressant, mais aussi EN DESSOUS, et alors deux
+    # choses manquent. La première écriture de ce message affirmait « ce qui
+    # franchit le seuil » dans les deux cas : relevé sur la VM, elle a écrit
+    # « vous obtenez 20 % du barème, ce qui franchit le seuil de 75 % ».
+    #
+    # C'est la troisième fois que ce piège mord, toujours de la même façon :
+    # un message qui ÉNONCE une comparaison au lieu de la faire. La 0.7.0
+    # disait « 80 % sous le seuil de 75 % », la 0.7.1 l'a corrigé en figeant
+    # l'autre sens, et seule une lecture de la sortie l'a vu.
+    cle = "exam_failed_blocking" if pct >= seuil else "exam_failed_blocking_et_score"
+    error(_(cle, pct=pct, threshold=seuil, checks=blocages))
 
 
 @app.command("submit", help=_("cmd_submit_help"))
@@ -195,53 +289,35 @@ def submit(
     except Interrupted as exc:
         _interrompu(exc, f"dsoxlab submit {lab.id}")
 
-    # « Submission recorded » n'est vrai que si quelque chose a été enregistré.
-    # Deux cas où rien ne l'est, et où l'annoncer trompait : un lab `validation`,
-    # qui défend un guide et ne note personne, et une exécution qui n'a mesuré
-    # aucun test — un `conftest.py` qui lève, une machine injoignable. `check`
-    # disait déjà le premier ; `submit` l'affirmait au contraire.
-    if not lab.is_exercise:
-        info(_("check_validation_sans_note"))
-    elif not a_mesure(result):
-        warn(_("submit_sans_mesure"))
-    elif result.ok:
-        success(_("submit_success", score=score, max_score=max_score))
-    else:
-        info(_("submit_partial", passed=result.passed, total=result.total, score=score, max_score=max_score))
-
-    # Un lab qui déclare un seuil est un examen blanc, et un examen rend un
-    # verdict. Sans lui, un apprenant qui rendait 40/100 sur un mock RHCSA ne
-    # lisait nulle part qu'il avait échoué : la note s'affichait, jamais son
-    # sens. Un lab ordinaire n'en déclare pas et n'affiche donc rien.
+    # LE VERDICT SE CALCULE AVANT LA LIGNE DE SCORE, et c'est ce qui permet de
+    # la taire sur une épreuve refusée. Mesuré sur la 0.7.2 : un refus était
+    # précédé d'un « Soumission enregistrée : 80/100 pts […] Corrigez et
+    # soumettez à nouveau SI BESOIN ». « Si besoin » est faux devant un refus,
+    # et la ligne, en bleu, amortissait le verdict qui suit.
     from ..services.lab_service import blocages_rates
     from ..services.progress_service import exam_percentage, exam_verdict
 
     bloques = blocages_rates(lab, result)
     verdict = exam_verdict(score, max_score, lab.exam_passing_score, bloques)
-    # LE REFUS SE DIT AVANT LE VERDICT, et il se dit nommément. Un apprenant
-    # qui lit « 80 sur 100, recalé » sans explication croit à un défaut du
-    # moteur, cherche l'erreur dans sa note, et ne voit pas ce qui compte :
-    # l'exigence que son travail n'a pas tenue.
-    if bloques:
-        error(_("exam_blocking_failed",
-                checks="\n".join(f"  {nom}" for nom in bloques)))
+    refusee = verdict is False
+
+    _dire_le_score(lab, result, score, max_score, refusee)
+
+    # Un lab qui déclare un seuil est un examen blanc, et un examen rend un
+    # verdict. Sans lui, un apprenant qui rendait 40/100 sur un mock RHCSA ne
+    # lisait nulle part qu'il avait échoué : la note s'affichait, jamais son
+    # sens. Un lab ordinaire n'en déclare pas et n'affiche donc rien.
     if verdict is not None:
         _dire_le_verdict(verdict, bool(bloques),
                          exam_percentage(score, max_score),
-                         lab.exam_passing_score)
+                         lab.exam_passing_score,
+                         "\n".join(f"  {nom}" for nom in bloques))
 
     _proposer_la_remise(root, lab)
 
     set_active_lab(root, None)
     console.print()
-    # CTA "tape exit" uniquement si on est dans le sous-shell ouvert
-    # par ``dsoxlab run`` (cas runtime shell). Sur runtime vm,
-    # l'apprenant est revenu sur son poste local — pas de sous-shell
-    # à fermer, donc le message serait trompeur.
-    if os.environ.get("DSOXLAB_LAB_SESSION"):
-        console.print(_("submit_exit_cta"))
-    else:
-        console.print(_("submit_done"))
+    console.print(_(_cle_de_la_suite(refusee)))
 
 
 def _proposer_la_remise(root: Path, lab: LabDefinition) -> None:
@@ -637,7 +713,7 @@ def reset(
     # travail en cours de l'apprenant sans un mot, et l'asymétrie allait dans
     # le mauvais sens.
     if not yes:
-        typer.confirm(_("confirm_reset", lab_id=texte_affichable(lab.id)), abort=True)
+        _confirmer("confirm_reset", texte_affichable(lab.id))
 
     # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
     # attend une réponse au clavier bloquerait l'autre terminal sur une
@@ -681,7 +757,7 @@ def clean(
         raise typer.Exit(1) from None
 
     if not yes:
-        typer.confirm(_("confirm_clean", lab_id=texte_affichable(lab.id)), abort=True)
+        _confirmer("confirm_clean", texte_affichable(lab.id))
 
     # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
     # attend une réponse au clavier bloquerait l'autre terminal sur une
