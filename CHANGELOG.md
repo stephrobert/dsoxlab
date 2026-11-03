@@ -7,6 +7,59 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-11-03
+
+### Fixed
+
+- **A refused test is now said once, and no green tick closes it.** 0.7.0 added
+  a line naming the blocking check; 0.7.1 added a second one to fix a wrong
+  reason, without removing the first. Measured on the lab VM with 0.7.2, a
+  refusal printed the refusal **twice**, in two wordings, "fix it, then submit
+  again" **three** times counting the score line, and closed on
+  `✔ Attempt saved. Continue with dsoxlab run <lab>…` in green, which a
+  beginner reads as a pass. Both versions were measured on their own function,
+  and never on what the learner sees. The two lines are merged into one that
+  carries the percentage, the pass mark, the fact that it is cleared, and the
+  names of the blocking checks; the closing line no longer wears the colour of
+  success and names what is left to do; and the score line falls silent on a
+  refusal, where it said "re-submit **if needed**" — needed is exactly what it
+  is.
+- **The relation between the score and the pass mark is computed, not assumed.**
+  This trap has now bitten three times, always the same way: a message that
+  **states** a comparison instead of making it. 0.7.0 wrote "80% of the scale,
+  **below** the 75% pass mark" in front of a mark that was cleared; 0.7.1 fixed
+  it by freezing the other direction; and the first writing of this very version
+  therefore printed, measured on the lab VM, "you scored **20%** of the scale,
+  which **clears** the 75% pass mark". A refusal on a blocking check happens both
+  above and below the mark, so the message now picks its wording from
+  `pct >= threshold`, and the below case says that **two** things are missing —
+  without which a learner fixes the requirement and stays refused on the total.
+
+- **The name read from pytest's output is the test function's, not its class'.**
+  The nodeid was read with `::(\w+)`, which takes the **first** segment: a test
+  inside a class yielded the class name. Silent consequence, and the worse of
+  the two: an `exam_blocking_checks` naming such a test would never have
+  matched, and the critical requirement would have been **disarmed without a
+  word** — exactly the defect that field exists to close. Measured against real
+  pytest output for the three forms of test.
+- **An assertion message is no longer lost on a parametrized or class-based
+  test.** The `FAILURES` section header takes three shapes
+  (`Class.test`, `test`, `test[case]`), and the pattern recognised only the
+  middle one: the other two matched nothing, so their message was dropped. This
+  was not theoretical — three catalogue labs use `parametrize`, and the lost
+  message is the bilingual sentence the lab author wrote for the learner. A
+  parametrized test now yields the message of the **first** failing case.
+- **`clean` and `reset` outside a terminal say why, instead of `Aborted`.**
+  `typer.confirm(abort=True)` answered two words with no subject and no next
+  move, and nothing named `--yes`, which is the answer. A CI run or a
+  `dsoxlab clean < /dev/null` read a refusal whose cause was nowhere. The
+  message now names the reason and the option, and the exit code is 2.
+
+### Removed
+
+- The `exam_blocking_failed` key, in both languages: its content is merged into
+  the single refusal message. A test keeps it from coming back.
+
 ## [0.7.2] - 2026-11-02
 
 ### Added
