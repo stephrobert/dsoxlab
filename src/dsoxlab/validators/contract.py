@@ -272,7 +272,7 @@ KNOWN_LAB_KEYS: frozenset[str] = frozenset({
     "id", "title", "level", "skills", "distros", "doc_url",
     "section", "description", "track", "difficulty", "estimated_time",
     "certification_tags", "prerequisites", "lab_type", "exam_passing_score", "exam_blocking_checks",
-    "criteria", "feedback",
+    "criteria", "feedback", "transfer_of",
     "criteria[].id", "criteria[].tests", "criteria[].label", "criteria[].lessons",
     "bloc", "bloc_order",
     "runtime", "validation",

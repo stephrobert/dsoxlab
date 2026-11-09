@@ -288,6 +288,7 @@ validate-structure` le signale.
 | `lab_type` | non | énuméré | `lab` | `lab`, `challenge`, `capstone` ou `validation`. Les trois premiers supposent un apprenant qui fait ; le quatrième non — voir plus bas. |
 | `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
 | `prerequisites` | non | liste de chaînes | `[]` | Identifiants des labs que celui-ci suppose joués. Écrit pour les capstones. Voir plus bas. |
+| `transfer_of` | non | chaîne | absent | Identifiant du lab du même catalogue dont ce lab est une variante de transfert. Voir plus bas. |
 | `criteria` | non | liste de mappings | `[]` | Nomme les critères du lab : `{id, tests, label}`. Voir plus bas. |
 | `feedback` | non | énuméré | selon `lab_type` | Ce que `check` montre d'un critère raté : `full`, `first-line` ou `verdict`. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
@@ -416,6 +417,40 @@ Chaque identifiant doit nommer un lab du même catalogue, et
 aucun test et n'empêche aucun run — il affiche simplement un ordre qui ne mène
 nulle part, c'est-à-dire le genre d'erreur qu'un auteur ne découvre jamais. Un
 lab qui se nomme lui-même est signalé aussi.
+
+### `transfer_of` : une variante qui éprouve le transfert, avec ses propres résultats
+
+Réussir un lab montre qu'on sait le suivre. Montrer qu'on sait refaire la même
+chose ailleurs demande un autre exercice : même capacité, mais le contexte, une
+contrainte ou le diagnostic changent. `transfer_of` déclare cette relation, de la
+variante vers le lab qu'elle varie :
+
+```yaml
+id: reverse-proxy-variante-tls
+title: Publier le service derrière TLS, avec un autre backend
+lab_type: lab
+transfer_of: reverse-proxy-publier-un-service
+```
+
+La valeur est l'identifiant d'**un autre lab du même catalogue**. Une variante
+est un lab ordinaire (`lab`, `challenge` ou `capstone`) : il n'y a aucun nouveau
+`lab_type`, ni note en texte libre, puisque l'objectif se lit dans le titre et la
+description de la variante.
+
+`validate-structure` refuse une valeur qui n'est pas un identifiant
+(`content_transfer_invalid_id`), une cible qui ne nomme aucun lab du catalogue
+(`content_transfer_unknown`), un lab qui se cible lui-même
+(`content_transfer_self`), une cible qui est elle-même une variante
+(`content_transfer_chain` : une famille est un lab d'origine et ses variantes,
+jamais une chaîne), et un lab `validation` d'un côté ou de l'autre
+(`content_transfer_validation`).
+
+Le moteur ne décide rien d'autre. Une variante garde **son propre identifiant et
+ses propres résultats** : la base, l'export, le push et le score sont inchangés,
+et la relation ne transforme jamais un lab guidé en preuve. La lecture de la
+relation revient au site qui consomme le catalogue : `dsoxlab show <lab> --json`
+et `dsoxlab list-labs --json` l'exposent sous `transfer_of` (`null` si absent), et
+`show` affiche « Variante de transfert de : <id> ».
 
 Un `lab_type: capstone` est un examen blanc, et un examen sans seuil de
 réussite n'en est pas un. Déclare la barre, et dsoxlab rend un verdict :

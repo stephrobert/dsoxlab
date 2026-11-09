@@ -554,6 +554,10 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
     # la barre que l'apprenant vise. Un lab ordinaire n'en déclare pas.
     if lab.exam_passing_score:
         lines.append(f"{_('field_exam_score')} {lab.exam_passing_score} %")
+    if lab.transfer_of:
+        lines.append(
+            f"{_('field_transfer_of')} {texte_affichable(lab.transfer_of)}"
+        )
     if lab.track:
         lines.append(f"{_('field_track')}   {texte_affichable(', '.join(lab.track))}")
     if lab.certification_tags:

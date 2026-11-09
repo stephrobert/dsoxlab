@@ -124,8 +124,26 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   critère une fois un résultat envoyé. `validate-structure` contrôle la forme,
   les doublons, une liste vide et plus de cinq entrées, sans requête réseau. Le
   moteur ne les affiche ni ne les exporte jamais.
+- **`transfer_of`** (facultatif, `lab.yaml` seulement ; issue blog-roadmap #145,
+  côté moteur) : l'identifiant d'un autre lab du même catalogue dont ce lab est
+  une variante de transfert (même capacité, avec le contexte, une contrainte ou
+  le diagnostic changé). Une variante est un lab ordinaire (`lab`, `challenge`,
+  `capstone`) : aucun nouveau `lab_type`, aucune note en texte libre.
+  `validate-structure` refuse un identifiant invalide, une cible absente du
+  catalogue, un lab qui se cible lui-même, une cible qui est elle-même une
+  variante (une famille est un lab d'origine et ses variantes, jamais une
+  chaîne) et un lab `validation` d'un côté ou de l'autre (`content_transfer_*`,
+  messages EN et FR, listés dans le guide auteur). `show --json` et
+  `list-labs --json` exposent `transfer_of` (`null` si absent), et `show`
+  affiche « Variante de transfert de : <id> ». Le schéma JSON, les clés connues
+  et les documents du contrat portent le champ.
 
 ### Inchangé
+
+- Une variante garde son propre identifiant et ses propres résultats : la base,
+  l'export, le push et le score sont inchangés, et la relation ne transforme
+  jamais un lab guidé en preuve. Un catalogue sans `transfer_of` produit les
+  mêmes sorties qu'avant, au champ `transfer_of: null` près dans l'objet lab.
 
 - Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche,
   `scores --json` et tous les codes de sortie. Seuls ce qui est enregistré et

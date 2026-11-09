@@ -116,8 +116,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   criterion once a result is sent. `validate-structure` checks the form,
   duplicates, an empty list and more than five, with no network request. The
   engine never shows nor exports them.
+- **`transfer_of`** (optional, `lab.yaml` only; issue blog-roadmap #145, engine
+  side): the id of another lab of the same catalog of which this lab is a
+  transfer variant (same capability, with the context, a constraint or the
+  diagnosis changed). A variant is an ordinary lab (`lab`, `challenge`,
+  `capstone`): no new `lab_type`, no free-text note. `validate-structure`
+  refuses an invalid identifier, a target absent from the catalog, a lab that
+  targets itself, a target that is itself a variant (a family is one original
+  lab and its variants, never a chain) and a `validation` lab on either side
+  (`content_transfer_*`, EN and FR messages, listed in the author guide).
+  `show --json` and `list-labs --json` expose `transfer_of` (`null` when
+  absent), and `show` prints "Transfer variant of: <id>". The JSON schema, the
+  known keys and the contract documents carry the field.
 
 ### Unchanged
+
+- A variant keeps its own id and its own results: the database, the export, the
+  push and the score are unchanged, and the relation never turns a guided lab
+  into proof. A catalog without `transfer_of` produces the same output as
+  before, apart from the new `transfer_of: null` field in the lab object.
 
 - The score, `failed_checks`, `blocking_failed`, what `check` prints,
   `scores --json` and every exit code. The only thing that reads the new

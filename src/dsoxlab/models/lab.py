@@ -289,6 +289,16 @@ class LabDefinition:
     ``validate-structure`` vérifie qu'ils existent : un prérequis qui nomme un
     lab absent est exactement le genre d'erreur qu'un auteur ne voit jamais."""
 
+    transfer_of: str | None = None
+    """L'identifiant du lab d'origine dont celui-ci est une variante de transfert.
+
+    ``None`` si ``transfer_of:`` est absent. La valeur est conservée telle quelle
+    (mise en chaîne si l'auteur a écrit autre chose) pour que `validate-structure`
+    la signale : une forme invalide, une cible absente, un lab qui se cible
+    lui-même ou une chaîne de variantes. Le moteur ne décide rien d'autre : une
+    variante garde son identifiant, ses résultats et son score, et la relation
+    ne transforme aucun lab guidé en preuve."""
+
     schema_version: int = DEFAULT_SCHEMA_VERSION
     """Version du contrat d'entrée que ce ``lab.yaml`` déclare respecter.
 
@@ -447,6 +457,7 @@ class LabDefinition:
             prerequisites=as_str_list(
                 data.get("prerequisites"), "prerequisites", lab_yaml
             ),
+            transfer_of=None if data.get("transfer_of") is None else str(data["transfer_of"]),
             lab_type=data.get("lab_type", "lab"),
             exam_passing_score=as_int(
                 data.get("exam_passing_score"), 0, "exam_passing_score", lab_yaml

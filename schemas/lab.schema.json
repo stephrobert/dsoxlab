@@ -80,6 +80,11 @@
       "items": { "type": "string" },
       "description": "Ids of labs this one assumes already played. Written for capstones, which cross several lessons and can only name one in doc_url. Says the order, which a list of doc_urls would not. validate-structure checks that each id names a lab of the same catalog."
     },
+    "transfer_of": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "description": "Optional. Id of another lab of the same catalog of which this lab is a transfer variant: same capability, with the context, a constraint or the diagnosis changed. A variant is an ordinary lab (lab, challenge or capstone) with its own id and its own results: nothing changes in the database, the export, the push or the score, and the relation never turns a guided lab into proof. validate-structure checks that the target exists, is not the lab itself and is not itself a variant (a family is one original lab and its variants, never a chain), and that neither side is a validation lab."
+    },
     "lab_type": {
       "type": "string",
       "enum": ["lab", "challenge", "capstone", "validation"],

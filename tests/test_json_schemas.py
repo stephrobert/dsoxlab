@@ -395,3 +395,23 @@ def test_les_champs_requis_existent_dans_le_schema(nom: str) -> None:
 
     parcourir(_charger(nom), nom)
     assert not orphelins, f"required sans propriété correspondante : {orphelins}"
+
+
+def test_transfer_of_a_la_meme_forme_dans_le_schema_et_dans_le_validator(
+    lab_schema: dict[str, Any],
+) -> None:
+    """Le motif du schéma et celui de `validate-structure` ne doivent pas dériver.
+
+    Deux écritures d'une même règle d'identifiant : un éditeur accepterait
+    alors ce que le validator refuse, ou l'inverse.
+    """
+    import re
+
+    from dsoxlab.validators.content import _ID_DE_LAB
+
+    champ = _noeud(lab_schema, ("properties", "transfer_of"))
+    assert champ["type"] == "string"
+    motif = re.compile(champ["pattern"])
+    for valeur in ("a", "lab-1", "gl-04.x_y", "9abc", "a" * 128, "", "-a", "a b",
+                   "a/b", "é", "a" * 129):
+        assert bool(motif.fullmatch(valeur)) == bool(_ID_DE_LAB.fullmatch(valeur)), valeur

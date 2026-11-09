@@ -1299,6 +1299,22 @@ hors ligne, elle se tait.
         "le prérequis « {prerequisite} » ne nomme aucun lab de ce catalogue",
     "content_prerequisite_self":
         "le prérequis « {lab} » est le lab lui-même",
+    "content_transfer_invalid_id":
+        "transfer_of « {value} » n'est pas un identifiant de lab (lettres, "
+        "chiffres, « . », « _ » et « - », en commençant par une lettre ou un "
+        "chiffre)",
+    "content_transfer_unknown":
+        "transfer_of « {target} » ne nomme aucun lab de ce catalogue",
+    "content_transfer_self":
+        "transfer_of « {lab} » est le lab lui-même",
+    "content_transfer_chain":
+        "transfer_of « {target} » est lui-même une variante de transfert de "
+        "« {origin} » : visez le lab d'origine, une famille est un lab d'origine "
+        "et ses variantes",
+    "content_transfer_validation":
+        "transfer_of relie « {lab} », dont le lab_type est validation : un lab "
+        "de validation ne mesure personne, il n'entre pas dans une famille de "
+        "transfert",
     "content_role_host_unknown":
         "le rôle « {role} » vise « {host} », absent de infra.hosts du meta.yml",
     # ── fixtures : le répertoire et la déclaration doivent coïncider ────────
@@ -1674,6 +1690,7 @@ hors ligne, elle se tait.
     "field_distros":    "[bold]Distros :[/bold]",
     "field_skills":     "[bold]Skills :[/bold]",
     "field_doc":        "[bold]Doc :[/bold]",
+    "field_transfer_of": "[bold]Variante de transfert de :[/bold]",
     "field_track":      "[bold]Parcours :[/bold]",
     "field_certifs":    "[bold]Certifs :[/bold]",
     "field_type":       "[bold]Type :[/bold]",

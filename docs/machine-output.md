@@ -86,6 +86,7 @@ same lab object. It is described once here.
 | `skills` | array of strings | never empty; the validator requires it |
 | `distros` | array of strings | never empty; same |
 | `prerequisites` | array of strings | lab ids this one assumes already played — empty for most labs, meaningful on a capstone, which crosses several lessons and can only name one in `doc_url` |
+| `transfer_of` | string or null | the id of the lab this one is a transfer variant of, `null` on every other lab. A variant keeps its own id and its own results; the relation changes nothing in scores or export |
 | `doc_url` | string | the online guide, `http` or `https` |
 | `path` | string | **absolute** path of the lab directory, so an editor can open its files |
 | `runtime.type` | string | `shell` or `vm` |

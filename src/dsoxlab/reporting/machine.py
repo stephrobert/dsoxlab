@@ -86,6 +86,10 @@ def lab_dict(
         # une réserve CPU et d'exposer un service. Déclaré mais non exposé, le
         # champ ne servirait à personne.
         "prerequisites": list(lab.prerequisites),
+        # Le lab d'origine dont celui-ci est une variante de transfert, `null`
+        # sinon. Un consommateur relie ainsi une famille sans déduire quoi que
+        # ce soit d'un titre ou d'un nom de test.
+        "transfer_of": lab.transfer_of,
         "doc_url": lab.doc_url,
         "path": str(lab.path),
         "runtime": {

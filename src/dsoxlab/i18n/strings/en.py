@@ -1277,6 +1277,19 @@ silent.
         "prerequisite '{prerequisite}' names no lab of this catalog",
     "content_prerequisite_self":
         "prerequisite '{lab}' is the lab itself",
+    "content_transfer_invalid_id":
+        "transfer_of '{value}' is not a lab identifier (letters, digits, '.', '_' "
+        "and '-', starting with a letter or a digit)",
+    "content_transfer_unknown":
+        "transfer_of '{target}' names no lab of this catalog",
+    "content_transfer_self":
+        "transfer_of '{lab}' is the lab itself",
+    "content_transfer_chain":
+        "transfer_of '{target}' is itself a transfer variant of '{origin}': "
+        "point to the original lab, a family is one original lab and its variants",
+    "content_transfer_validation":
+        "transfer_of links '{lab}', whose lab_type is validation: a validation "
+        "lab measures nobody, so it takes no part in a transfer family",
     "content_role_host_unknown":
         "role '{role}' aims at '{host}', missing from infra.hosts in meta.yml",
     # ── fixtures: the directory and the declaration must agree ──────────────
@@ -1632,6 +1645,7 @@ silent.
     "field_distros":    "[bold]Distros:[/bold]",
     "field_skills":     "[bold]Skills:[/bold]",
     "field_doc":        "[bold]Doc:[/bold]",
+    "field_transfer_of": "[bold]Transfer variant of:[/bold]",
     "field_track":      "[bold]Track:[/bold]",
     "field_certifs":    "[bold]Certifs:[/bold]",
     "field_type":       "[bold]Type:[/bold]",

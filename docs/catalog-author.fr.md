@@ -263,6 +263,11 @@ la suite.
 | `content_role_host_unknown` | une entrée de `roles` nomme un hôte inconnu |
 | `content_prerequisite_unknown` | une entrée de `prerequisites` ne nomme aucun lab de ce catalogue |
 | `content_prerequisite_self` | un lab se déclare son propre prérequis |
+| `content_transfer_invalid_id` | `transfer_of` n'est pas un identifiant de lab |
+| `content_transfer_unknown` | `transfer_of` ne nomme aucun lab de ce catalogue |
+| `content_transfer_self` | un lab se déclare sa propre origine de transfert |
+| `content_transfer_chain` | `transfer_of` vise un lab qui est lui-même une variante : une famille est un lab d'origine et ses variantes |
+| `content_transfer_validation` | un lab `validation` entre dans une famille de transfert, comme variante ou comme origine |
 | `content_solution_plaintext` | un fichier de `solution/` est lisible en clair |
 | `content_fixture_missing` | une fixture est déclarée mais absente de `fixtures/` |
 | `content_fixture_undeclared` | un fichier est dans `fixtures/` sans être déclaré |

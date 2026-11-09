@@ -89,6 +89,7 @@ le même objet lab. Il est décrit une fois, ici.
 | `skills` | liste de chaînes | jamais vide : le validator l'exige |
 | `distros` | liste de chaînes | jamais vide, de même |
 | `prerequisites` | liste de chaînes | les identifiants des labs que celui-ci suppose joués — vide pour la plupart, parlant sur un capstone, qui croise plusieurs leçons et ne peut en nommer qu'une dans `doc_url` |
+| `transfer_of` | chaîne ou null | l'identifiant du lab dont celui-ci est une variante de transfert, `null` sur tout autre lab. Une variante garde son identifiant et ses résultats ; la relation ne change rien aux scores ni à l'export |
 | `doc_url` | chaîne | le guide en ligne, en `http` ou `https` |
 | `path` | chaîne | chemin **absolu** du répertoire du lab, pour qu'un éditeur puisse ouvrir ses fichiers |
 | `runtime.type` | chaîne | `shell` ou `vm` |

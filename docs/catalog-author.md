@@ -257,6 +257,11 @@ step with the code: adding a check without documenting it here fails the suite.
 | `content_role_host_unknown` | a `roles` entry names an unknown host |
 | `content_prerequisite_unknown` | a `prerequisites` entry names no lab of this catalog |
 | `content_prerequisite_self` | a lab declares itself as its own prerequisite |
+| `content_transfer_invalid_id` | `transfer_of` is not a lab identifier |
+| `content_transfer_unknown` | `transfer_of` names no lab of this catalog |
+| `content_transfer_self` | a lab declares itself as its own transfer origin |
+| `content_transfer_chain` | `transfer_of` targets a lab that is itself a variant: a family is one original lab and its variants |
+| `content_transfer_validation` | a `validation` lab takes part in a transfer family, as variant or as origin |
 | `content_solution_plaintext` | a file under `solution/` is readable in the clear |
 | `content_fixture_missing` | a fixture is declared but absent from `fixtures/` |
 | `content_fixture_undeclared` | a file sits in `fixtures/` without being declared |
