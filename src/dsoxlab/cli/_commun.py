@@ -15,6 +15,7 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
 
@@ -257,6 +258,46 @@ def _require_provider(repo_meta: RepoMetadata) -> str:
                     candidates=", ".join(exc.candidates),
                     first=exc.candidates[0]))
         raise typer.Exit(1) from None
+
+
+def _confirmer(cle: str, **params: object) -> None:
+    """Demande confirmation, ou dit POURQUOI elle est impossible.
+
+    Hors terminal, ``typer.confirm(abort=True)`` répond « Aborted » et sort.
+    Deux mots, sans sujet et sans geste : un appelant automatisé, une CI ou un
+    ``dsoxlab clean < /dev/null`` lisait donc un refus dont rien ne disait la
+    cause, et rien ne nommait ``--yes``, qui est la réponse.
+
+    C'est le même défaut que les codes de sortie du moteur existent pour
+    éviter : un échec qui ne se dit pas est pire qu'un échec. Le message nomme
+    donc la raison et le geste, et la sortie vaut 2, comme les autres refus
+    d'exécution.
+
+    Ce helper vit ici, et non dans ``progression``, parce que ``destroy`` posait
+    la même question par ses propres moyens : lancé sans terminal, il affichait
+    « Aborted. » et sortait en 1, là où ``clean`` et ``reset`` nommaient déjà la
+    cause et ``--yes`` (issue #354). Une question qui s'écrit deux fois finit
+    toujours par se répondre de deux façons.
+    """
+    if sys.stdin.isatty():
+        typer.confirm(_(cle, **params), abort=True)
+        return
+    error(_("confirmation_sans_terminal"))
+    raise typer.Exit(2)
+
+
+def _demander(cle: str, **params: object) -> bool:
+    """Pose une question dont le NON est une suite normale, pas un refus.
+
+    Même diagnostic que :func:`_confirmer`, mais l'appelant a un chemin pour la
+    réponse négative (garder les domaines orphelins, et sortir en 6 en donnant
+    la commande qui les retire). Hors terminal, on ne devine donc pas un oui :
+    on dit pourquoi personne n'a pu répondre, et on rend ``False``.
+    """
+    if sys.stdin.isatty():
+        return bool(typer.confirm(_(cle, **params)))
+    error(_("confirmation_sans_terminal"))
+    return False
 
 
 def _verrou(root: Path, commande: str) -> RepoLock:

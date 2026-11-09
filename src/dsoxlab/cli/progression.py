@@ -24,7 +24,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -70,6 +69,8 @@ from ._commun import (
     LabHomeOption,
     _catalogue,
     _complete_lab_id,
+    _confirmer,
+    _ensure_services,
     _interrompu,
     _lab,
     _lang,
@@ -162,26 +163,6 @@ def check(
 # ── submit ────────────────────────────────────────────────────────────────────
 
 # ── submit ────────────────────────────────────────────────────────────────────
-
-def _confirmer(cle: str, lab_id: str) -> None:
-    """Demande confirmation, ou dit POURQUOI elle est impossible.
-
-    Hors terminal, `typer.confirm(abort=True)` répond « Aborted » et sort. Deux
-    mots, sans sujet et sans geste : un appelant automatisé, une CI ou un
-    `dsoxlab clean < /dev/null` lisait donc un refus dont rien ne disait la
-    cause, et rien ne nommait `--yes`, qui est la réponse.
-
-    C'est le même défaut que les codes de sortie du moteur existent pour
-    éviter : un échec qui ne se dit pas est pire qu'un échec. Le message nomme
-    donc la raison et le geste, et la sortie vaut 2, comme les autres refus
-    d'exécution.
-    """
-    if sys.stdin.isatty():
-        typer.confirm(_(cle, lab_id=lab_id), abort=True)
-        return
-    error(_("confirmation_sans_terminal"))
-    raise typer.Exit(2)
-
 
 def _dire_le_score(
     lab: LabDefinition, result: Any, score: int, max_score: int, refusee: bool
@@ -322,6 +303,20 @@ def submit(
     set_active_lab(root, None)
     console.print()
     console.print(_(_cle_de_la_suite(refusee)))
+
+    # LE CODE DE SORTIE DIT LA MÊME CHOSE QUE L'ÉCRAN, et il ne le disait pas.
+    # Mesuré avec 0.8.0 sur une épreuve refusée : le refus s'affichait, puis
+    # `submit` sortait en 0 quand `check` sortait en 1 sur le même lab. Une CI
+    # qui enchaîne `submit` ne pouvait donc conclure qu'en lisant la sortie,
+    # c'est-à-dire en analysant une prose traduite (issue #349).
+    #
+    # Trois cas valent 1, et c'est exactement le contrat de `check` : une
+    # épreuve refusée, des tests en échec sur un lab ordinaire, et une
+    # exécution qui n'a RIEN mesuré — celle-là n'inscrit même pas de tentative,
+    # et un appelant qui la prendrait pour un succès bâtirait sa décision sur
+    # une mesure qui n'a pas eu lieu.
+    if refusee or not a_mesure(result) or not result.ok:
+        raise typer.Exit(1)
 
 
 def _proposer_la_remise(root: Path, lab: LabDefinition) -> None:
@@ -717,13 +712,28 @@ def reset(
     # travail en cours de l'apprenant sans un mot, et l'asymétrie allait dans
     # le mauvais sens.
     if not yes:
-        _confirmer("confirm_reset", texte_affichable(lab.id))
+        _confirmer("confirm_reset", lab_id=texte_affichable(lab.id))
 
     # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
     # attend une réponse au clavier bloquerait l'autre terminal sur une
     # question que personne ne voit.
     ctx.call_on_close(_verrou(root, "reset").release)
     info(_("resetting", lab_id=texte_affichable(lab.id)))
+
+    # LES SERVICES FONT PARTIE DE L'ÉTAT DU LAB, et `reset` les laissait
+    # tourner. Sa docstring le décrit comme « clean + start » ; `clean` arrête
+    # les conteneurs déclarés, lui ne les touchait pas. Sur un lab à services,
+    # un apprenant qui remet tout à zéro repartait donc d'une base de données
+    # qu'il avait lui-même peuplée au tour précédent, et son lab « neuf » ne
+    # ressemblait pas à un premier `run` (issue #351).
+    #
+    # Arrêt PUIS redémarrage, dans cet ordre et avant la préparation : le
+    # conteneur est recréé, donc neuf, et ses `post_start` rejoués. S'arrêter à
+    # l'arrêt laisserait le `setup.yaml` du lab parler à un service absent,
+    # alors qu'il le trouvait debout jusqu'ici.
+    _stop_services(lab, root)
+    _ensure_services(lab, root)
+
     try:
         if lab.runtime.type.value in ("vm", "kvm", "incus"):
             _run_ansible_with_progress(
@@ -761,7 +771,7 @@ def clean(
         raise typer.Exit(1) from None
 
     if not yes:
-        _confirmer("confirm_clean", texte_affichable(lab.id))
+        _confirmer("confirm_clean", lab_id=texte_affichable(lab.id))
 
     # Après la confirmation, jamais avant : tenir le verrou pendant qu'on
     # attend une réponse au clavier bloquerait l'autre terminal sur une

@@ -38,7 +38,10 @@ from ..services import (
     echecs_de_tests,
     evaluate_lab,
 )
-from ..services.politique_affichage import lignes_a_afficher
+from ..services.politique_affichage import (
+    lignes_a_afficher,
+    separer_les_non_evalues,
+)
 from ._commun import _ensure_services, _verrou
 
 #: Les familles de contrôle de ``validate-structure``, dans l'ordre où elles
@@ -185,7 +188,7 @@ def _run_check(
     # lancer quoi que ce soit, sinon une faute de frappe enregistrerait un
     # 0/100 dans l'historique de l'apprenant.
     if target is not None and lab.runtime.target(target) is None:
-        declared = ", ".join(t.name for t in lab.runtime.targets) or "—"
+        declared = ", ".join(t.name for t in lab.runtime.targets) or "-"
         error(_("unknown_target", target=target, declared=declared))
         raise typer.Exit(1)
 
@@ -297,7 +300,18 @@ def _montrer_l_echec(lab: LabDefinition, result: CheckResult) -> None:
         # raté. Pas d'invite vers `-v`, qui montrerait tout.
         print_criteres_a_revoir(lignes_a_afficher(lab, result, politique))
     elif echecs and not verbosite():
-        print_echecs_de_tests(echecs)
+        # `full` montre tout, mais tout n'est pas de même nature : un critère
+        # que la machine n'a PAS PU évaluer n'est pas un travail raté, et il
+        # partait jusqu'ici dans la liste des échecs sans un mot (issue #350).
+        # Les deux politiques plus serrées faisaient déjà la distinction ; un
+        # lab guidé, qui est le premier que l'apprenant rencontre, était le
+        # seul à la perdre.
+        non_evalues, restants = separer_les_non_evalues(lab, result, echecs)
+        print_echecs_de_tests(restants)
+        if non_evalues:
+            # Après les échecs, et sous le même titre : ce sont deux natures de
+            # ligne dans une seule liste, pas deux listes.
+            print_criteres_a_revoir(non_evalues, entete=False)
         info(_("check_sortie_complete", lab_id=texte_affichable(lab.id)))
     else:
         console.print(result.output)

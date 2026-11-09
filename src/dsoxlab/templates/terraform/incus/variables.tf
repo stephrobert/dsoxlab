@@ -37,3 +37,25 @@ variable "target_hosts" {
   type        = list(string)
   default     = []
 }
+
+variable "provenance_config" {
+  description = <<-EOT
+    Clés `user.dsoxlab.*` de provenance, fusionnées dans la config de chaque
+    instance : d'où vient cette machine, c'est-à-dire quel catalogue l'a
+    provisionnée et depuis quel répertoire (dsoxlab issue #345).
+
+    `user.` est l'espace que le serveur Incus réserve aux applications ; ce
+    template y écrivait déjà `user.lab.ip` et `user.lab.role`.
+
+    Mesuré avec lxc/incus 0.5.1 et un serveur Incus 7.2 le 2026-11-09 : la clé
+    se relit par `incus config get` sans Terraform, le plan reste stable bien
+    que `config` soit à la fois optional et computed, et une modification est
+    appliquée IN-PLACE.
+
+    Une entrée PAR HÔTE, pour la même raison que côté kvm : la date de
+    provisionnement d'une machine ajoutée plus tard n'est pas celle des
+    premières. Un hôte absent de la map ne reçoit aucune clé.
+  EOT
+  type        = map(map(string))
+  default     = {}
+}

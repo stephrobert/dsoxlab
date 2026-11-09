@@ -542,6 +542,19 @@ plutôt que laissées à découvrir :
 
 #### `runtime.services[]`
 
+Quelle commande fait quoi de ces conteneurs, et c'est le moteur qui le décide,
+jamais le lab :
+
+| Commande | Ce qu'elle fait des services |
+| --- | --- |
+| `run`, `check` | les **démarrent** (un conteneur déjà debout est réutilisé), attendent `ready_tcp` **et** `ready_exec`, puis rejouent `post_start` |
+| `reset` | les **arrête puis les recrée**, avant de rejouer la préparation : un lab remis à zéro repart du même état qu'un premier `run`, services compris |
+| `clean` | les **arrête** |
+
+`reset` ne les touchait pas jusqu'à la 0.8.1, alors qu'il se décrit comme
+« clean + start » : sur un lab à services, on repartait donc d'une base de
+données peuplée au tour précédent, et l'état de départ n'était pas reproductible.
+
 | Champ | Obligatoire | Type | Défaut | Remarques |
 | --- | --- | --- | --- | --- |
 | `name` | **oui** | chaîne | | Unique dans le lab. C'est aussi le **nom d'hôte** sous lequel les autres services le joignent. |

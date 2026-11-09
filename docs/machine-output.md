@@ -280,9 +280,21 @@ collection error is *not evaluated*: the check was blocked, which is not a
 failure of the learner. A skipped test (`skip`, `xfail`) is *skipped*: nothing
 was blocked, it simply does not apply. `phase` is `setup`, `call`, `teardown` or `collect`. `mention` is
 `teardown_error` when a test passed but its clean-up failed. `observation` is
-the message **the lab's author wrote** in the assertion (at most 280
-characters), or `null`: the text of a technical exception, a test id with a
-path or a raw pytest output never appears. `criteria` is not truncated, since
+the message **the lab's author wrote** in the assertion, or `null`: the text of
+a technical exception, a test id with a path or a raw pytest output never
+appears.
+
+**`observation` carries only the FIRST line of that message, capped at 280
+characters, and that holds on a `full` lab too.** The screen and the export do
+not say the same thing: a guided lab shows the whole message, this document
+keeps only its first line. That is deliberate, for two reasons. A proof states
+*what was measured*; it is not course material, and a portal displaying a
+hundred of them only needs the gist of each complaint. And an assertion message
+can run twenty lines, command blocks included, which would inflate every row of
+history without proving anything more. Only the `verdict` policy (an exam) sets
+`observation` to `null`.
+
+`criteria` is not truncated, since
 cutting it would silently drop evidence; it is bounded by the number of tests
 of the lab.
 

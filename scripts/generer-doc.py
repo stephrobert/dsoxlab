@@ -147,7 +147,14 @@ from pathlib import Path
 from dsoxlab import config, locking, logging_setup
 from dsoxlab.discovery.repo import read_repo_metadata
 from dsoxlab.infra import inventory, terraform
-from dsoxlab.services import bootstrap, catalog, demo, lab_state, update_check
+from dsoxlab.services import (
+    bootstrap,
+    catalog,
+    demo,
+    lab_state,
+    provenance,
+    update_check,
+)
 from dsoxlab.sessions import store
 from dsoxlab.templates import template_root
 
@@ -189,6 +196,7 @@ with tempfile.TemporaryDirectory() as tmp:
             inventory.inventory_path(meta),
             inventory.ssh_config_path(meta),
             inventory.user_ssh_config_path(meta),
+            provenance.chemin_de_l_index(meta.id),
         ))
 
     avant = {p.name for p in racine.iterdir()}

@@ -2,7 +2,7 @@
 
 STRINGS: dict[str, str] = {
     # ── App ───────────────────────────────────────────────────────────────────
-    "app_help": "dsoxlab — DevSecOps XL Labs. Control your labs from the terminal.",
+    "app_help": "dsoxlab: DevSecOps XL Labs. Control your labs from the terminal.",
     "accueil_baseline": "Verifiable labs, driven from the terminal.",
     "accueil_etat_aucun": "No catalog installed yet.",
     "accueil_etat_actif": "Active catalog:",
@@ -38,7 +38,7 @@ STRINGS: dict[str, str] = {
     "opt_bloc":     "Filter by bloc number (1-8)",
     "opt_top":      "Number of displayed results",
     "opt_doctor_strict":
-        "exit 9 if a required check fails, 10 if it could not be measured — for a script, not a human",
+        "exit 9 if a required check fails, 10 if it could not be measured (for a script, not a human)",
     "opt_fix":      "Attempt automatic remediation of missing components.",
     "opt_no_pager": "Print everything at once instead of paging output longer than the screen.",
     "opt_use_provider":
@@ -85,7 +85,7 @@ STRINGS: dict[str, str] = {
     "opt_lang":          "Language for lab content (e.g.: en, fr). Overrides auto-detection.",
     "opt_target":        "Default execution target name (must match runtime.targets[].name in lab.yaml).",
     "opt_run_target":    "Execution target for this run (overrides --target from 'use'). Must match a runtime.targets[].name.",
-    "opt_check_target":  "Target to validate against (overrides the session target). Must match a runtime.targets[].name — the tests run on that host.",
+    "opt_check_target":  "Target to validate against (overrides the session target). Must match a runtime.targets[].name: the tests run on that host.",
     "unknown_target":    "Unknown target '{target}' for this lab. Declared targets: {declared}.",
     "infra_not_provisioned": "This lab needs a VM, and none is running: the lab infrastructure is not provisioned.\nBring it up first:\n  dsoxlab provision",
     "cmd_list_labs_help":"List all available labs (filtered by active context if set).",
@@ -106,7 +106,7 @@ STRINGS: dict[str, str] = {
     "cmd_start_arg":
         "Lab id. Omitted, the lab `next` suggests in the active section.",
     "start_plan":
-        "[bold]Starting {lab_id}[/bold] — {total} steps, each announced with its "
+        "[bold]Starting {lab_id}[/bold]: {total} steps, each announced with its "
         "own command.",
     "start_step":
         "\n[bold cyan]▶ {number}/{total} · {name}[/bold cyan]  [dim]({command})[/dim]",
@@ -137,7 +137,7 @@ STRINGS: dict[str, str] = {
     "cmd_course_arg":    "Lab identifier (optional if a lab is active in session)",
     "cmd_course_opt_section": "Section to display: number (1, 2 …) or id (navigation, permissions …).",
     "cmd_course_list":   "List all labs and show whether a course (scenario.md) is available.",
-    "course_toc_title":  "Course — {title}",
+    "course_toc_title":  "Course: {title}",
     "course_toc_col_n":  "#",
     "course_toc_col_id": "Section ID",
     "course_toc_col_title": "Title",
@@ -208,7 +208,7 @@ STRINGS: dict[str, str] = {
     "course_nav_progress": "Section {pos}/{total}",
     "course_nav_prev":     "← [bold]dsoxlab course {id} --prev[/bold]",
     "course_nav_next":     "→ [bold]dsoxlab course {id} --next[/bold]",
-    "course_end_title":    "End of course — {id}",
+    "course_end_title":    "End of course: {id}",
     "course_end_body":     "You have read all [bold]{total}[/bold] sections.\n\nTime to test your skills: run [bold cyan]dsoxlab challenge {id}[/bold cyan] to tackle the challenge.",
     "course_section_not_found": "Section '{name}' not found. Use [bold]dsoxlab course {id}[/bold] to list available sections.",
     "course_section_file_missing": "Section file not found: {file}",
@@ -281,7 +281,7 @@ STRINGS: dict[str, str] = {
     "cmd_validate_help":  "Check structure and metadata of all labs.",
     "cmd_doctor_help":    "Diagnose the environment (runtimes, tools, detected labs).",
     "opt_verbose":
-        "Say what the engine is doing, on standard error. Repeatable: -v for information, -vv for full detail.",
+        "Say what the engine is doing, on standard error. Repeatable: -v for information, -vv for full detail. It is a global option: it goes BEFORE the command (dsoxlab -v check <lab>).",
     "opt_debug":      "Same as -vv. The full log is written to ~/.local/state/dsoxlab/dsoxlab.log either way.",
     "opt_version_help":   "Show the dsoxlab version and exit.",
     "cmd_install_help":   "Deprecated: use `dsoxlab completion install`. Installs shell completion.",
@@ -337,7 +337,8 @@ STRINGS: dict[str, str] = {
         "No active lab in this catalog. Pick one: dsoxlab run <lab>",
     "status_voir_infra":
         "For the infrastructure state, it is now: dsoxlab infra status",
-    "status_titre": "Lab state",
+    "status_titre": "Lab state: {lab_id}",
+    "status_hote_muet": "{fqdn}: {cause}",
     "cmd_infra_help": "Infrastructure commands for the catalog.",
 
     # ── new: scaffold a contract-compliant skeleton ─────────────────────────
@@ -530,6 +531,42 @@ STRINGS: dict[str, str] = {
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
     "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy), including machines left outside the state.",
+    # ── infra origin : d'ou vient une machine (issue #345) ────────────────────
+    "cmd_infra_origin_help":
+        "Where a provisioned resource comes from: which catalog, and the directory it was provisioned from. Read-only.",
+    "arg_infra_origin":
+        "Name or UUID of the resource (a libvirt domain, an Incus instance). Omit it with --all.",
+    "opt_infra_origin_provider":
+        "Only look at this provider (kvm, incus). Useful when two providers hold a same-named machine.",
+    "opt_infra_origin_all":
+        "Every resource recorded on this machine, all catalogs together.",
+    "infra_origin_sans_cible":
+        "Name a resource, or ask for all of them with --all.",
+    "infra_origin_rien_de_consigne":
+        "Nothing recorded yet: no provision has run since dsoxlab started keeping provenance, or every resource has been destroyed since.",
+    "infra_origin_inconnue":
+        "No recorded origin for « {resource} ».",
+    "infra_origin_inconnue_suite":
+        "It may have been provisioned before dsoxlab recorded provenance, or by something else. dsoxlab infra origin --all lists what is known.",
+    "infra_origin_homonymes":
+        "{count} resources carry this name: they are not the same machine. --provider narrows it down.",
+    "provenance_titre":           "Origin: {resource}",
+    "provenance_field_resource":  "[bold]Resource:[/bold]     ",
+    "provenance_field_provider":  "[bold]Provider:[/bold]     ",
+    "provenance_field_catalog":   "[bold]Catalog:[/bold]      ",
+    "provenance_field_path":      "[bold]Source dir:[/bold]   ",
+    "provenance_field_path_state": "[bold]Path state:[/bold]  ",
+    "provenance_field_when":      "[bold]Provisioned:[/bold]  ",
+    "provenance_field_project":   "[bold]Project:[/bold]      ",
+    "provenance_field_uuid":      "[bold]UUID:[/bold]         ",
+    "provenance_field_state":     "[bold]Terraform:[/bold]    ",
+    "provenance_field_source":    "[bold]Read from:[/bold]    ",
+    "provenance_path_present":    "present",
+    "provenance_path_absent":     "gone (the path is the one recorded at provisioning time, and is never rewritten)",
+    "provenance_source_index":    "the local index",
+    "provenance_source_ressource": "the resource itself (no local index needed)",
+    "provenance_piste":
+        "A catalog declaring the same id sits at {path}. Nothing proves it is the same clone.",
     "cmd_status_help":    "Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent.",
     "cmd_ssh_help":       "Open an interactive SSH session on a lab host.",
     "cmd_ssh_arg":        "Host name or short alias (e.g.: alma-rhcsa-1, ubuntu-lfcs-1)",
@@ -560,9 +597,9 @@ STRINGS: dict[str, str] = {
     "provision_starting":  "Provisioning infrastructure (provider: {provider})…",
     "provision_no_ssh_key": "Lab SSH key missing: {path}\nWithout it, cloud keypair would be empty and VMs unreachable.\nRun first: dsoxlab instructor bootstrap",
     "provision_done_cible":
-        "Provisioning complete — {count} targeted host(s) out of {total} declared are "
+        "Provisioning complete: {count} targeted host(s) out of {total} declared are "
         "ready. The others were not brought up, so they were not checked.",
-    "provision_done":      "Provisioning complete — {count} host(s) ready.",
+    "provision_done":      "Provisioning complete: {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
     "provision_lease_refused":
         "DHCP lease refused for {host} ({mac}): {error}\n"
@@ -571,7 +608,7 @@ STRINGS: dict[str, str] = {
     "provision_provider_conflict": "Cannot provision on '{current}': provider '{others}' still has active lab infrastructure.\nincus and KVM share the lab's network name and subnet, so they can't run at the same time.\nFinish or tear down the other one first:\n  DSOXLAB_PROVIDER={other} dsoxlab destroy",
     "provision_waiting_ssh": "Waiting for hosts to become reachable (SSH + cloud-init)…",
     "provision_waiting_ssh_host": "Waiting for {host} (SSH + cloud-init), attempt {attempt}…",
-    "provision_ssh_timeout": "Host readiness timed out: {error}\nThe VM may still be booting — retry `dsoxlab run` in a moment.\nOn a modest machine, booting several VMs at once saturates the CPU and overruns this delay. Raise it:\n  DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
+    "provision_ssh_timeout": "Host readiness timed out: {error}\nThe VM may still be booting: retry `dsoxlab run` in a moment.\nOn a modest machine, booting several VMs at once saturates the CPU and overruns this delay. Raise it:\n  DSOXLAB_HOST_READY_TIMEOUT=360 dsoxlab provision",
     "confirm_destroy":
         "Destroy the whole {provider} infrastructure? "
         "All VM data will be lost",
@@ -623,7 +660,7 @@ STRINGS: dict[str, str] = {
         "range ».",
     "bridge_name_fix":
         "With this provider, infra.network must be at most {max_network} "
-        "characters — « {suggestion} » would already fit, though a shorter name "
+        "characters: « {suggestion} » would already fit, though a shorter name "
         "reads better. The bridge name is derived from the network name, which is "
         "why it appears nowhere in your file. A `bridge_name` under "
         "infra.providers.<provider> overrides that derivation.",
@@ -698,7 +735,7 @@ STRINGS: dict[str, str] = {
     "bootstrap_ansible_runner_ok":    "ansible-runner: OK",
 
     # ── fullhelp content ────────────────────────────────────────────────────
-    "fullhelp_title":   "dsoxlab — DevSecOps XL Labs",
+    "fullhelp_title":   "dsoxlab: DevSecOps XL Labs",
     "fullhelp_concept": """\
 [bold]What is dsoxlab?[/bold]
 
@@ -722,15 +759,15 @@ Each lab declares:
     "fullhelp_workflow": """\
 [bold]Typical workflow[/bold]
 
-  1. [bold]dsoxlab list-labs[/bold]                   — browse available labs
-  2. [bold]dsoxlab use linux/l1[/bold]                — focus on a section/level
-  3. [bold]dsoxlab show <id>[/bold]                   — read objectives and details
-  4. [bold]dsoxlab run <id>[/bold]                    — launch the lab environment
+  1. [bold]dsoxlab list-labs[/bold]                   : browse available labs
+  2. [bold]dsoxlab use linux/l1[/bold]                : focus on a section/level
+  3. [bold]dsoxlab show <id>[/bold]                   : read objectives and details
+  4. [bold]dsoxlab run <id>[/bold]                    : launch the lab environment
   5. Work inside the environment…
-  6. [bold]dsoxlab hint <id>[/bold]                   — get a hint (costs points)
-  7. [bold]dsoxlab check <id>[/bold]                  — run automated tests and get your score
-  8. [bold]dsoxlab reset <id>[/bold]                  — reset to initial state and retry
-  9. [bold]dsoxlab clean <id>[/bold]                  — destroy the environment when done""",
+  6. [bold]dsoxlab hint <id>[/bold]                   : get a hint (costs points)
+  7. [bold]dsoxlab check <id>[/bold]                  : run automated tests and get your score
+  8. [bold]dsoxlab reset <id>[/bold]                  : reset to initial state and retry
+  9. [bold]dsoxlab clean <id>[/bold]                  : destroy the environment when done""",
 
     "fullhelp_commands": """\
 [bold]Command reference[/bold]
@@ -744,7 +781,7 @@ Each lab declares:
     [dim]--section / -s[/dim]       Filter by section.
     [dim]--level   / -l[/dim]       Filter by level.
     [dim]--type    / -t[/dim]       Filter by type: [bold]lab[/bold], [bold]challenge[/bold] or [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filter by bloc number (1–8).
+    [dim]--bloc    / -b[/dim]       Filter by bloc number (1-8).
     [dim]--json[/dim]               The catalog as a machine document.
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
@@ -753,7 +790,7 @@ Each lab declares:
   [cyan]start[/cyan] [dim][<id>][/dim]         Play a lab end to end. Announces each step with the
                        single command that replays it alone: context, prerequisites,
                        infrastructure when the lab needs one, then the session.
-                       It shortens the typing, never the understanding — a failure
+                       It shortens the typing, never the understanding: a failure
                        names the step that broke and how to retry just that one.
     [dim]--target / -t[/dim]        Target for this run, as for [bold]run[/bold].
                        [dim]<id>[/dim] is optional: without it, the lab [bold]next[/bold] suggests.
@@ -899,10 +936,20 @@ Each lab declares:
                        [dim]Was named « status » until 0.1.67.[/dim]
     [dim]--json[/dim]               Host reachability, as a document.
 
+  [cyan]infra origin <res>[/cyan]   Where a provisioned resource comes from: which catalog, and
+                       the directory it was provisioned from. Read-only, and it
+                       needs no catalog: it answers from anywhere, which is the
+                       whole point in front of a `virsh list --all`. The path is
+                       the one recorded AT provisioning time and is never
+                       rewritten; its current state is shown next to it.
+    [dim]--all[/dim]                Everything recorded on this machine, all catalogs.
+    [dim]--provider[/dim]           Narrow to kvm or incus, when a name is held by both.
+    [dim]--json[/dim]               The same, as a document.
+
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
 
   [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy),
-                       then remove — after confirmation — the machines a failed
+                       then remove, after confirmation, the machines a failed
                        provisioning left defined outside the Terraform state.
                        Exits non-zero if any of them remains.
     [dim]--yes[/dim]                 Do not ask for confirmation, orphan machines included.
@@ -970,8 +1017,8 @@ Each lab declares:
     "fullhelp_runtimes": """\
 [bold]Runtimes[/bold]
 
-  [bold]shell[/bold]   Simple exercises in the current shell — no VM required.
-  [bold]vm[/bold]      Full machine — required for persistence, services, storage.
+  [bold]shell[/bold]   Simple exercises in the current shell, no VM required.
+  [bold]vm[/bold]      Full machine, required for persistence, services, storage.
           Which backend serves it (KVM/libvirt, Incus, Outscale) is declared by
           the catalog in [bold]meta.yml: infra.provider[/bold], not by the lab.
 
@@ -1005,26 +1052,26 @@ silent.
   [bold]dsoxlab check[/bold] calculates the final score and saves it.
   [bold]dsoxlab scores[/bold] shows your history.
   [bold]dsoxlab export[/bold] writes every result as a JSON document, with no
-  limit and an explicit verdict per lab — for reading it elsewhere.""",
+  limit and an explicit verdict per lab, for reading it elsewhere.""",
 
     # ── install ───────────────────────────────────────────────────────────────────
     "install_wrapper":              "Wrapper installed: {path}  →  {source}",
     "install_wrapper_deja":
         "A launcher already points at this binary ({path}): it most likely comes from `uv tool install` or pipx. Leaving it alone, since overwriting it would only undo what their next upgrade restores.",
     "install_completion":           "Completion script: {path}",
-    "install_rc":                   "Shell config updated: {path} — reload with: exec $SHELL",
+    "install_rc":                   "Shell config updated: {path}. Reload with: exec $SHELL",
     "install_completion_unsupported": "Auto-completion not supported for shell: {shell} (bash and zsh only).",
     "install_reload":               "Reload your shell to activate changes: [bold]exec $SHELL[/bold]",
 
     # ── use ───────────────────────────────────────────────────────────────────
     "context_set":      "Active context: [bold]{label}[/bold]",
     "context_set_info": "Commands list-labs and validate-structure now use this filter by default.",
-    "context_lang_set": "Language set to [bold]{lang}[/bold] — lab titles and descriptions will be shown in this language.",
-    "context_target_set": "Default target set to [bold]{target}[/bold] — 'dsoxlab run' will use it unless --target is given.",
+    "context_lang_set": "Language set to [bold]{lang}[/bold]. Lab titles and descriptions will be shown in this language.",
+    "context_target_set": "Default target set to [bold]{target}[/bold]. 'dsoxlab run' will use it unless --target is given.",
     "context_provider_set": "Active provider: [bold]{provider}[/bold]",
     "meta_read_failed": "Cannot read meta.yml: {error}",
-    "context_cleared":  "Context reset — all labs are now visible.",
-    "context_active":   "Active context: [bold]{label}[/bold] — use [bold]dsoxlab use --reset[/bold] to see all.",
+    "context_cleared":  "Context reset: all labs are now visible.",
+    "context_active":   "Active context: [bold]{label}[/bold]. Use [bold]dsoxlab use --reset[/bold] to see all.",
 
     # ── show ──────────────────────────────────────────────────────────────────
     "runtime_unavailable": "runtime unavailable",
@@ -1038,7 +1085,7 @@ silent.
     "service_failed":     "Service [bold]{name}[/bold] could not start: {detail}",
     "service_stopped":    "Service [bold]{name}[/bold] stopped.",
     "lab_starting":       "Starting lab [bold]{lab_id}[/bold] (runtime: {runtime})…",
-    "lab_ready":          "Lab {lab_id} ready. You are now in [bold]{workdir}/[/bold] — your isolated working directory.",
+    "lab_ready":          "Lab {lab_id} ready. You are now in [bold]{workdir}/[/bold], your isolated working directory.",
     "lab_ready_local":    "Lab {lab_id} ready. You are on [bold]your own machine[/bold], at the repository root.",
     "lab_ready_target":   "Lab {lab_id} ready. You are connected to [bold]{host}[/bold].",
     "lab_subshell_tip":   "Type [bold]dsoxlab check[/bold] to validate your work, or [bold]exit[/bold] to leave the session.",
@@ -1070,7 +1117,7 @@ silent.
     # ── hint ──────────────────────────────────────────────────────────────────
     "check_validation_sans_note":
         "This lab defends a published guide: its tests measure facts, not you. "
-        "Nothing is recorded, and no score is given — a red test means the "
+        "Nothing is recorded, and no score is given: a red test means the "
         "guide needs refreshing.",
     "hint_sans_objet":
         "No hint here: this lab defends a published guide rather than teaching "
@@ -1132,6 +1179,7 @@ silent.
     # (incident de réseau, qui ne fait pas échouer).
     "doc_url_issues_header":
         "\n[bold red]Guides answering with an error:[/bold red]",
+    "doc_url_unreachable_ligne": "{lab}: {url} ({raison})",
     "doc_url_unreachable_header":
         "\n[bold yellow]Guides that could not be reached:[/bold yellow]",
     "doc_url_unreachable_note":
@@ -1420,7 +1468,7 @@ silent.
     "detail_pytest_missing": "not found",
     "detail_pytest_bundled": "bundled with dsoxlab",
     "detail_pytest_via":     "via {cmd}",
-    "detail_provider_unresolved": "declared candidates: {candidates} — none selected",
+    "detail_provider_unresolved": "declared candidates: {candidates}, none selected",
     # ── git and docker: two tools nothing declared ──────────────────────────
     "check_git": "git",
     "check_docker": "Docker",
@@ -1479,12 +1527,12 @@ silent.
         "{device} is absent and this system is itself running inside a virtual "
         "machine ({hypervisor}): nested virtualization is unavailable, so the "
         "vm labs cannot run here. It is enabled on the HOST hypervisor, with "
-        "this machine powered off — nothing to change inside it.",
+        "this machine powered off: nothing to change inside it.",
     "detail_hw_virt_nested":
         "{device} is absent and this system is itself running inside a virtual "
         "machine: nested virtualization is unavailable, so the vm labs cannot "
         "run here. It is enabled on the HOST hypervisor, with this machine "
-        "powered off — nothing to change inside it.",
+        "powered off: nothing to change inside it.",
     "detail_hw_virt_bare_metal":
         "{device} is absent on a physical machine: hardware virtualization is "
         "off, so the vm labs cannot run here. Enable VT-x/AMD-V in the BIOS or "
@@ -1503,7 +1551,7 @@ silent.
         "RAM: /proc/meminfo unreadable, nothing measured",
     "explain_qemu_img_absent":
         "Known cause: `qemu-img` is missing, so libvirt can only create raw "
-        "volumes — every qcow2 volume of the plan fails at once. On Debian and "
+        "volumes: every qcow2 volume of the plan fails at once. On Debian and "
         "Ubuntu it lives in `qemu-utils`, which is only a *recommendation* of "
         "qemu-kvm: an install made with --no-install-recommends leaves it out.",
     "explain_pool_full":
@@ -1524,7 +1572,7 @@ silent.
         "the `{pool}` pool is defined but never started: `provision` will fail "
         "with \"storage pool is not active\"",
     "detail_pool_unknown":
-        "virsh did not answer: not verified — nothing is proven either way",
+        "virsh did not answer: not verified, nothing is proven either way",
     "explain_apparmor_denied":
         "Known cause: AppArmor denies the VM disks. virt-aa-helper cannot "
         "resolve a disk declared by pool reference, so none of them enters the "
@@ -1610,11 +1658,11 @@ silent.
     "col_challenge":         "Challenge",
     "col_capstone":          "Capstone",
     "progress_validated":    "[green]✔ validated[/green]",
-    "progress_pending":      "[dim]—[/dim]",
+    "progress_pending":      "[dim]-[/dim]",
     "progress_no_labs":      "No labs found for this context (use [bold]dsoxlab use <section>[/bold] first).",
 
     # ── console — next ────────────────────────────────────────────────────────
-    "next_suggestion":   "Next recommended: [bold cyan]{lab_id}[/bold cyan] — {title}",
+    "next_suggestion":   "Next recommended: [bold cyan]{lab_id}[/bold cyan] ({title})",
     "next_all_done":     "[green]All labs validated in this context![/green] Run [bold]dsoxlab progress[/bold] for a summary.",
     "remediation_labs_aucun_catalogue":
         "dsoxlab demo, or dsoxlab catalog add linux",
@@ -1649,6 +1697,7 @@ silent.
     "field_track":      "[bold]Track:[/bold]",
     "field_certifs":    "[bold]Certifs:[/bold]",
     "field_type":       "[bold]Type:[/bold]",
+    "field_type_bloc":  "bloc {bloc}",
     "field_bloc":       "[bold]Bloc:[/bold]",
     "field_status":     "[bold]Status:[/bold]",
     "field_validation": "[bold]Validation:[/bold]",
@@ -1936,10 +1985,10 @@ silent.
         "\n[bold red]Labs the engine cannot see:[/bold red]",
     "lab_yaml_illisible":
         "this lab.yaml exists but the engine cannot load it ({raison}), so it "
-        "is absent from every other check — and from `list-labs`",
+        "is absent from every other check, and from `list-labs`",
     "lab_yaml_illisible_position":
         "this lab.yaml exists but the engine cannot load it, so it is absent "
-        "from every other check — and from `list-labs`. {raison} "
+        "from every other check, and from `list-labs`. {raison} "
         "(line {ligne}, column {colonne})",
     "lab_declare_absent":
         "section `{section}` declares `{chemin}`, but there is no lab.yaml "

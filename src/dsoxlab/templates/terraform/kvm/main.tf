@@ -356,6 +356,17 @@ resource "libvirt_domain" "host" {
     }
   }
 
+  # D'OÙ VIENT CETTE MACHINE, écrit SUR la machine. Le répertoire d'état donne
+  # le `repo.id`, jamais le chemin du clone, et `catalogue-actif` est un
+  # pointeur mutable : ni l'un ni l'autre n'est une preuve d'origine. Le XML
+  # voyage avec le domaine et se relit sans Terraform (dsoxlab issue #345).
+  #
+  # `null` quand la variable est vide : le bloc n'est alors pas posé du tout,
+  # plutôt que posé vide, ce qui ferait échouer libvirt sur un XML non conforme.
+  metadata = lookup(var.provenance_xml, each.value.name, "") == "" ? null : {
+    xml = var.provenance_xml[each.value.name]
+  }
+
   features = {
     acpi = true
   }

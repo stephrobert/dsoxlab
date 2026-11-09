@@ -541,7 +541,7 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
         f"{_('field_section')}    [{couleur_section}]{texte_affichable(lab.section or '')}[/{couleur_section}]",
         f"{_('field_title')}      {texte_affichable(lab.title)}",
         f"{_('field_type')}       {_type_badge(lab.lab_type)}"
-        + (f"  —  bloc {lab.bloc}" if lab.bloc else ""),
+        + (f"  ({_('field_type_bloc', bloc=lab.bloc)})" if lab.bloc else ""),
         f"{_('field_level')}     [{couleur_niveau}]{texte_affichable(lab.level)}[/{couleur_niveau}]",
         f"{_('field_runtime')}    {lab.runtime.type.value} / {lab.runtime.topology}",
         f"{_('field_duration')}      {texte_affichable(lab.estimated_time)}",
@@ -689,7 +689,8 @@ def print_infra_status(etat: EtatInfra) -> None:
         warn(_("status_hypervisor_unavailable", error=etat.hyperviseur_erreur))
     for hote in etat.hotes:
         if not hote.joignable:
-            console.print(f"[cyan]ℹ[/cyan]   {hote.fqdn} — {_cause_de(hote)}")
+            console.print("[cyan]ℹ[/cyan]   " + _(
+                "status_hote_muet", fqdn=hote.fqdn, cause=_cause_de(hote)))
 
 
 def _cause_de(hote: EtatHote) -> str:
@@ -764,8 +765,12 @@ def print_validation(
         for anomalie in rapport.urls_injoignables:
             url = anomalie.params.get("url", "")
             console.print(
-                f"  [yellow]―[/yellow] {texte_affichable(anomalie.lab or '')} — "
-                f"{texte_affichable(str(url))} — {_(anomalie.cle, **anomalie.params)}"
+                "  [yellow]-[/yellow] " + _(
+                    "doc_url_unreachable_ligne",
+                    lab=texte_affichable(anomalie.lab or ""),
+                    url=texte_affichable(str(url)),
+                    raison=_(anomalie.cle, **anomalie.params),
+                )
             )
         info(_("doc_url_unreachable_note"))
 
@@ -792,7 +797,7 @@ def _etiquette(anomalie: Anomalie, root: Path) -> str:
         situation.append(str(_relatif(anomalie.chemin, root)))
     if anomalie.champ:
         situation.append(texte_affichable(anomalie.champ))
-    prefixe = " — ".join(situation)
+    prefixe = " · ".join(situation)
     phrase = _(anomalie.cle, **anomalie.params)
     return f"{prefixe}: {phrase}" if prefixe else phrase
 
@@ -927,7 +932,8 @@ def print_lab_state(etat: LabState) -> None:
     teinte = couleurs.get(etat.state, "white")
     corps = f"[bold {teinte}]{etat.label}[/bold {teinte}]\n{texte_affichable(etat.detail)}"
     console.print(Panel(corps,
-                        title=f"{_('status_titre')} — {texte_affichable(etat.lab_id)}",
+                        title=_("status_titre",
+                                lab_id=texte_affichable(etat.lab_id)),
                         border_style=teinte, expand=False))
 
 
@@ -1212,7 +1218,7 @@ def error(msg: str) -> None:
 
 # ── check result ──────────────────────────────────────────────────────────────
 
-def print_echecs_de_tests(echecs: list[EchecDeTest]) -> None:
+def print_echecs_de_tests(echecs: list[EchecDeTest], *, entete: bool = True) -> None:
     """Les tests qui ont échoué, avec ce que leur auteur a écrit, sans trace.
 
     Deux niveaux, et l'ordre compte : le nom du test dit **quoi**, le message
@@ -1227,7 +1233,8 @@ def print_echecs_de_tests(echecs: list[EchecDeTest]) -> None:
     catalogue, donc d'une source que ce dépôt ne contrôle pas, et un crochet y
     serait interprété comme du balisage Rich.
     """
-    console.print(f"[yellow]{_('check_echecs_de_tests')}[/yellow]")
+    if entete:
+        console.print(f"[yellow]{_('check_echecs_de_tests')}[/yellow]")
     # Les échecs qui partagent un message sont groupés, et c'est une correction
     # d'usage : sur un lab dont la fixture manque, les cinq tests rendent le
     # même « premiers-pas.txt introuvable, lance d'abord dsoxlab run », et
@@ -1244,7 +1251,9 @@ def print_echecs_de_tests(echecs: list[EchecDeTest]) -> None:
             console.print(Padding(Text(message, style="dim"), (0, 0, 0, 6)))
 
 
-def print_criteres_a_revoir(lignes: list[LigneDeCritere]) -> None:
+def print_criteres_a_revoir(
+    lignes: list[LigneDeCritere], *, entete: bool = True
+) -> None:
     """Les critères à revoir, selon la politique d'affichage du lab.
 
     Pour ``first-line`` et ``verdict`` (``full`` garde
@@ -1253,7 +1262,11 @@ def print_criteres_a_revoir(lignes: list[LigneDeCritere]) -> None:
     la vérification n'a pas pu avoir lieu, ce n'est pas un échec de l'apprenant.
     Les messages passent par ``Text`` pour la même raison que plus haut.
     """
-    console.print(f"[yellow]{_('check_echecs_de_tests')}[/yellow]")
+    if entete:
+        # `entete` : sur un lab guidé, les deux listes se suivent sous un SEUL
+        # titre, les critères bloqués après les tests ratés. Sans ce paramètre,
+        # « Ce qu'il reste à faire » s'écrivait deux fois de suite.
+        console.print(f"[yellow]{_('check_echecs_de_tests')}[/yellow]")
     for ligne in lignes:
         libelle = neutraliser(ligne.libelle)
         if ligne.etat == "not_evaluated":
@@ -1552,7 +1565,7 @@ def print_course_section(
     from rich.rule import Rule
 
     console.print(Rule(
-        f"[bold cyan]{texte_affichable(section.id)} — "
+        f"[bold cyan]{texte_affichable(section.id)} · "
         f"{texte_affichable(section.title)}[/bold cyan]"
     ))
     section_file = lab.path / section.file
@@ -1744,7 +1757,7 @@ def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
         if lang != "en" and localised.exists()
         else lab.path / "challenge" / "README.md"
     )
-    console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)} — challenge[/bold cyan]"))
+    console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)} · challenge[/bold cyan]"))
     if challenge_file.exists():
         console.print(Markdown(challenge_file.read_text()))
     else:
@@ -1798,3 +1811,60 @@ def print_fullhelp() -> None:
         console.print()
         console.print(Rule(style="dim"))
         console.print()
+
+
+def print_provenance(origine: Any, *, autres: list[Path] | None = None) -> None:
+    """D'où vient une machine, en une fiche, sans jamais corriger le chemin.
+
+    Le chemin d'origine s'affiche tel qu'il a été consigné, suivi de son ÉTAT :
+    présent, ou disparu. C'est la distinction qui fait de cette sortie une
+    preuve plutôt qu'un raccourci — un chemin réécrit en silence ne prouverait
+    plus rien, et c'est justement ce que `catalogue-actif` ne sait pas faire.
+
+    Quand le répertoire a disparu mais qu'un catalogue de même ``repo.id``
+    existe ailleurs, on le NOMME comme une piste, au conditionnel : rien ne dit
+    que c'est le même clone, seulement qu'il déclare le même catalogue.
+    """
+    present = origine.etat_du_chemin() == "present"
+    lignes = [
+        f"{_('provenance_field_resource')} {texte_affichable(origine.resource)}",
+        f"{_('provenance_field_provider')} {texte_affichable(origine.provider)}",
+        f"{_('provenance_field_catalog')} {texte_affichable(origine.catalog_id)}",
+        f"{_('provenance_field_path')} {texte_affichable(origine.catalog_path)}",
+        f"{_('provenance_field_path_state')} " + (
+            f"[green]{_('provenance_path_present')}[/green]" if present
+            else f"[yellow]{_('provenance_path_absent')}[/yellow]"
+        ),
+    ]
+    if origine.provisioned_at:
+        lignes.append(
+            f"{_('provenance_field_when')} {texte_affichable(origine.provisioned_at)}"
+        )
+    if origine.project:
+        lignes.append(
+            f"{_('provenance_field_project')} {texte_affichable(origine.project)}"
+        )
+    if origine.resource_uuid:
+        lignes.append(
+            f"{_('provenance_field_uuid')} {texte_affichable(origine.resource_uuid)}"
+        )
+    if origine.terraform_state:
+        lignes.append(
+            f"{_('provenance_field_state')} "
+            f"{texte_affichable(origine.terraform_state)}"
+        )
+    lignes.append(
+        f"{_('provenance_field_source')} " + _(
+            "provenance_source_ressource" if origine.source == "ressource"
+            else "provenance_source_index"
+        )
+    )
+    console.print(Panel(
+        "\n".join(lignes),
+        title=_("provenance_titre", resource=texte_affichable(origine.resource)),
+        border_style="cyan" if present else "yellow",
+        expand=False,
+    ))
+    if not present:
+        for candidat in autres or []:
+            info(_("provenance_piste", path=texte_affichable(str(candidat))))

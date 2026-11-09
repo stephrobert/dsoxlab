@@ -48,6 +48,8 @@ from ._barres import (
 )
 from ._commun import (
     LabHomeOption,
+    _confirmer,
+    _demander,
     _interrompu,
     _read_repo,
     _require_provider,
@@ -107,9 +109,9 @@ def destroy(
 
     # destroy est irréversible et ne prévenait pas : un « dsoxlab destroy »
     # tapé dans le mauvais dépôt effaçait le parc sans un mot. --yes garde
-    # l'usage scripté (CI, procédure de récupération documentée).
+    # l'usage scripté. La question passe par le `_confirmer` de `clean` (#354).
     if not yes:
-        typer.confirm(_("confirm_destroy", provider=provider), abort=True)
+        _confirmer("confirm_destroy", provider=provider)
 
     # Après la confirmation : tenir le verrou pendant l'attente d'une réponse
     # au clavier bloquerait l'autre terminal sans rien protéger.
@@ -167,7 +169,31 @@ def destroy(
     if oublier(repo_meta):
         info(_("bootstrap_oublie"))
 
+    _oublier_la_provenance(repo_meta, provider, host)
+
     success(_("destroy_done"))
+
+
+def _oublier_la_provenance(
+    repo_meta: RepoMetadata, provider: str, host: list[str] | None
+) -> None:
+    """Retire de l'index les machines que ce `destroy` a réellement détruites.
+
+    Ce code n'est atteint qu'après le contrôle des orphelins, qui sort en 6 s'il
+    en reste : une machine encore debout garde donc sa trace, et c'est exactement
+    celle dont on cherchera l'origine. C'est la différence entre « nettoyer un
+    index » et « effacer la preuve de ce qui existe encore ».
+
+    Avec `--host`, seuls les hôtes visés sont oubliés : les autres n'ont pas été
+    touchés.
+    """
+    from ..services import provenance as prov
+
+    noms = list(host) if host else [h.name for h in repo_meta.infra.hosts]
+    try:
+        prov.oublier(noms, repo_meta.id, provider=provider)
+    except OSError as exc:
+        logger.warning("could not update provenance index: %s", exc)
 
 
 def _purge_snapshots_before_destroy(repo_meta: RepoMetadata) -> None:
@@ -226,7 +252,7 @@ def _handle_orphans_after_destroy(
 
     noms = sorted(scan.orphans)
     warn(_("destroy_orphan_domains", hosts=", ".join(noms)))
-    if not assume_yes and not typer.confirm(_("confirm_destroy_orphans")):
+    if not assume_yes and not _demander("confirm_destroy_orphans"):
         info(_("destroy_orphan_kept", cmd=_undefine_command(scan.orphans)))
         return False
 

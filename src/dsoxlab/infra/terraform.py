@@ -271,6 +271,16 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
     if repo_meta.infra.provider == "kvm":
         payload["efi_loader"] = libvirt.efi_loader() or ""
 
+    # D'OÙ VIENT CHAQUE MACHINE, écrit sur la machine (issue #345). Rien n'est
+    # ajouté pour un provider qui ne déclare pas ces variables, pour la raison
+    # d'`efi_loader` ci-dessus ; `services.provenance` dit le reste.
+    from ..services.provenance import tfvars_de_provenance
+
+    payload.update(tfvars_de_provenance(
+        repo_meta, provider=repo_meta.infra.provider,
+        ressources=[h.name for h in repo_meta.infra.hosts],
+    ))
+
     tfvars_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return tfvars_path
 

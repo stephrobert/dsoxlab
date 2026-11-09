@@ -176,6 +176,55 @@ Les tests lisent l'**état du système**, pas les commandes que vous avez tapée
 Aucun crédit pour avoir tapé la bonne commande, aucune pénalité pour être arrivé
 au même état autrement.
 
+### Ce que `check` vous montre, et pourquoi cela dépend du lab
+
+Un lab enseigne, une épreuve évalue. Les deux ne peuvent donc pas vous en dire
+autant, et ce n'est pas un réglage de verbosité : c'est le **type du lab** qui
+décide, et l'auteur peut le forcer par `feedback:` dans le `lab.yaml`.
+
+| Ce que vous jouez | Ce que `check` affiche d'un critère raté |
+| --- | --- |
+| un lab (`feedback: full`) | le libellé, **et le message entier** que l'auteur a écrit, avec son geste de réparation |
+| un défi (`first-line`) | le libellé et la **première ligne** du message, pas plus : un défi n'a pas à rendre la solution avec l'énoncé de l'échec |
+| une épreuve (`verdict`) | le libellé et le verdict, **aucun message** |
+
+Sur une épreuve, **`-v` et `--json` ne donnent rien de plus**, et ils le disent
+plutôt que de se taire. Le détail n'existe pas pour une épreuve, il n'est pas
+caché derrière une option. Toute épreuve est concernée : un lab `capstone`, et
+tout lab qui déclare un `exam_passing_score`.
+
+### « Non évalué » n'est pas « raté »
+
+Un critère peut sortir **non évalué** : la machine n'a pas pu le vérifier, parce
+qu'une fixture a échoué ou que les tests n'ont pas pu être collectés. Il
+s'affiche alors avec un `?` et sa mention, jamais avec la croix rouge d'un
+échec :
+
+```text
+Ce qu'il reste à faire, d'après les tests :
+  ✘ le fichier de réponses existe
+      reponses/cours.txt manquant. Le mot se lit dans : dsoxlab course …
+  ? la persistance après redémarrage (non évalué : vérification impossible)
+```
+
+Les deux lignes appellent des gestes opposés : la première, corriger votre
+travail ; la seconde, relancer `dsoxlab check`, et regarder votre poste si elle
+revient. Cette distinction vaut pour les trois politiques d'affichage.
+
+Le cas extrême existe aussi : quand **rien** n'a pu être mesuré, aucune note
+n'est calculée et **rien n'est enregistré**. Une absence de mesure n'est pas un
+zéro, et `check` comme `submit` sortent alors en code `1` : il n'y a rien à
+conclure d'une mesure qui n'a pas eu lieu.
+
+### `-v` se place avant la commande
+
+C'est une option **globale**, lue avant que la sous-commande existe :
+
+```bash
+dsoxlab -v check mon-lab      # fonctionne
+dsoxlab check mon-lab -v      # « No such option: -v », code 2
+```
+
 ---
 
 ---

@@ -24,12 +24,12 @@
     "src/dsoxlab/cli/destruction.py::destroy": {
       "cognitive": 23,
       "profondeur": 4,
-      "lignes": 106
+      "lignes": 108
     },
     "src/dsoxlab/cli/infrastructure.py::provisionner": {
       "cognitive": 15,
       "profondeur": 3,
-      "lignes": 117
+      "lignes": 121
     },
     "src/dsoxlab/infra/ansible.py::run_playbook": {
       "cognitive": 49,
@@ -72,9 +72,9 @@
       "lignes": 102
     },
     "src/dsoxlab/infra/terraform.py::write_tfvars": {
-      "cognitive": 9,
+      "cognitive": 10,
       "profondeur": 2,
-      "lignes": 90
+      "lignes": 100
     },
     "src/dsoxlab/models/repo.py::RepoMetadata.from_yaml": {
       "cognitive": 14,

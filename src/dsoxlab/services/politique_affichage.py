@@ -24,7 +24,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ..models.lab import LabDefinition
-from .lab_service import CheckResult, echecs_de_tests
+from .lab_service import CheckResult, EchecDeTest, echecs_de_tests
+from .rapport_de_criteres import ResultatDeCritere, nom_de_controle
 
 #: Longueur maximale d'une observation exportée.
 OBSERVATION_MAX = 280
@@ -101,3 +102,54 @@ def lignes_a_afficher(
         )
         for echec in echecs_de_tests(result.output)
     ]
+
+
+def separer_les_non_evalues(
+    lab: LabDefinition, result: CheckResult, echecs: list[EchecDeTest]
+) -> tuple[list[LigneDeCritere], list[EchecDeTest]]:
+    """Sépare ce qui n'a PAS PU être vérifié de ce que l'apprenant a raté.
+
+    Pourquoi cette fonction existe
+    ------------------------------
+
+    La politique ``full`` montre les échecs par le texte de pytest
+    (:func:`echecs_de_tests`), qui range un ``ERROR`` de collecte ou de fixture
+    avec les ``FAILED``. Un critère que la machine n'a pas pu évaluer
+    s'affichait donc comme un travail faux, sans la mention que ``first-line``
+    et ``verdict`` portent déjà (issue #350). Les deux réactions attendues sont
+    opposées : corriger son travail d'un côté, relancer ``check`` ou regarder
+    son poste de l'autre.
+
+    Rend ``([], echecs)`` tel quel quand aucun rapport structuré n'existe : sans
+    lui, rien ne permet de distinguer les deux, et inventer la distinction
+    serait pire que l'absence.
+
+    Un critère DÉCLARÉ regroupe plusieurs tests et ne garde que le ``nodeid`` du
+    premier : ses membres se lisent donc dans ``criteria:``, faute de quoi les
+    autres resteraient dans la liste des échecs, et la même vérification
+    bloquée se dirait deux fois de deux façons.
+    """
+    if not result.criteres:
+        return [], echecs
+    lignes: list[LigneDeCritere] = []
+    noms_bloques: set[str] = set()
+    for critere in result.criteres:
+        if critere.etat != "not_evaluated":
+            continue
+        lignes.append(LigneDeCritere(
+            lab.libelle_de_critere(critere.identifiant)
+            or libelle_du_test(critere.identifiant),
+            "not_evaluated",
+        ))
+        noms_bloques.update(_tests_du_critere(lab, critere))
+    if not noms_bloques:
+        return lignes, echecs
+    return lignes, [e for e in echecs if e.nom not in noms_bloques]
+
+
+def _tests_du_critere(lab: LabDefinition, critere: ResultatDeCritere) -> set[str]:
+    """Les noms de fonctions de test que ce critère couvre."""
+    for declare in lab.criteria:
+        if declare.id == critere.identifiant:
+            return {nom_de_controle(nom) for nom in declare.tests}
+    return {nom_de_controle(critere.nodeid)}

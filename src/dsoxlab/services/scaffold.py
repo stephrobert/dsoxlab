@@ -66,7 +66,7 @@ repo:
     À remplir : ce que ce catalogue apprend, et à qui.
 
 # Où remettre une preuve d'apprentissage, si ce catalogue a un portail. En
-# `https` : le lien porte les résultats d'un apprenant. dsoxlab n'envoie rien —
+# `https` : le lien porte les résultats d'un apprenant. dsoxlab n'envoie rien :
 # il affiche une adresse, et l'apprenant décide.
 #
 # learning:
@@ -223,7 +223,7 @@ c'est le travail de l'apprenant de la trouver.
 #: première chose, et c'est celle qui compte pour qui vient d'écrire un
 #: squelette.
 _TEST = '''\
-"""Tests fonctionnels du lab {id} — SQUELETTE, à écrire.
+"""Tests fonctionnels du lab {id} : SQUELETTE, à écrire.
 
 Ce fichier échoue volontairement. Il ne s'agit pas d'une erreur : tant que les
 tests ne sont pas écrits, `dsoxlab check` doit rendre un échec plutôt qu'un

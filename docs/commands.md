@@ -35,6 +35,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
 | `dsoxlab guide` | Show the URL of the lab's online guide. |
 | `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
+| `dsoxlab infra origin` | Where a provisioned resource comes from: which catalog, and the directory it was provisioned from. Read-only. |
 | `dsoxlab infra status` | Check SSH connectivity to all hosts declared in meta.yml, and name the cause when one stays silent. |
 | `dsoxlab install` | Deprecated: use `dsoxlab completion install`. Installs shell completion. |
 | `dsoxlab instructor audit` | What a learner will not work out alone in this catalog. |

@@ -32,6 +32,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dsoxlab.cli import app
+from dsoxlab.i18n.strings import en as EN
 from dsoxlab.models.lab import LabDefinition
 from dsoxlab.reporting.machine import export_result_dict
 from dsoxlab.services.lab_service import check_lab, evaluate_lab
@@ -122,28 +123,58 @@ def _lab(racine: Path, lang: str = "en") -> LabDefinition:
     )
 
 
-# ── 1. rien ne change pour un lab ─────────────────────────────────────────
+# ── 1. l'écran d'un lab guidé, capturé en entier ──────────────────────────
+#
+# Ces captures ont figé la sortie de la 0.7.3, pour prouver que la politique
+# d'affichage ne changeait rien au lab le plus courant. Elles ont changé UNE
+# fois depuis, en 0.8.1 : un critère non évalué y passait pour un échec de
+# l'apprenant (issue #350). C'est la seule ligne qui diffère, et le reste de
+# l'écran reste la référence qu'il était.
 
 
-def test_la_sortie_d_un_lab_est_identique_a_celle_de_0_7_3_en_echec(tmp_path: Path) -> None:
+def test_l_ecran_d_un_lab_guide_en_echec_ne_bouge_pas(tmp_path: Path) -> None:
     code, ecran = _ecran(_catalogue(tmp_path / "d"))
 
     assert code == 1
-    assert ecran == (REFERENCES / "check_073_echec.txt").read_text(encoding="utf-8")
+    assert ecran == (REFERENCES / "check_lab_full_echec.txt").read_text(encoding="utf-8")
 
 
-def test_la_sortie_d_un_lab_est_identique_a_celle_de_0_7_3_en_reussite(
+def test_l_ecran_d_un_lab_guide_en_reussite_ne_bouge_pas(
     tmp_path: Path,
 ) -> None:
     code, ecran = _ecran(_catalogue(tmp_path / "d", tests=TESTS_REUSSITE))
 
     assert code == 0
-    assert ecran == (REFERENCES / "check_073_reussite.txt").read_text(encoding="utf-8")
+    assert ecran == (REFERENCES / "check_lab_full_reussite.txt").read_text(encoding="utf-8")
 
 
 def test_feedback_full_explicite_ne_change_pas_l_ecran_d_un_lab(tmp_path: Path) -> None:
     _, ecran = _ecran(_catalogue(tmp_path / "d", extra="feedback: full\n"))
-    assert ecran == (REFERENCES / "check_073_echec.txt").read_text(encoding="utf-8")
+    assert ecran == (REFERENCES / "check_lab_full_echec.txt").read_text(encoding="utf-8")
+
+
+def test_un_critere_non_evalue_porte_sa_mention_sur_un_lab_guide(tmp_path: Path) -> None:
+    """Issue #350 : la distinction vaut pour TOUTES les politiques, pas deux sur trois.
+
+    Le catalogue de ce module porte un `test_bloque` dont la fixture lève : la
+    machine n'a donc rien pu conclure. Sur `first-line` et `verdict`, il
+    s'affichait avec un `?` et sa mention ; sur `full`, il était rangé parmi les
+    tests ratés avec une croix rouge, et l'apprenant cherchait dans son travail
+    une faute qui n'y était pas.
+
+    Le `?` n'est pas la mise en forme, c'est le VERDICT : ce test lit donc les
+    deux, le signe et la mention traduite.
+    """
+    _, ecran = _ecran(_catalogue(tmp_path / "d"))
+
+    mention = EN.STRINGS["check_critere_non_evalue"]
+    assert f"? bloque ({mention})" in ecran
+    assert "✘ bloque" not in ecran, (
+        "un critère que rien n'a pu évaluer reste affiché comme un échec"
+    )
+    assert ecran.count(EN.STRINGS["check_echecs_de_tests"]) == 1, (
+        "le titre « ce qu'il reste à faire » est écrit deux fois"
+    )
 
 
 def test_un_challenge_en_full_garde_le_geste_de_reparation(tmp_path: Path) -> None:

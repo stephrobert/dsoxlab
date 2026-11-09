@@ -284,7 +284,7 @@ def write_ssh_config(
     )
 
     lines: list[str] = [
-        "# Auto-généré par dsoxlab — ne pas éditer.",
+        "# Auto-généré par dsoxlab : ne pas éditer.",
         "# Source : inventory dynamique (Terraform outputs + meta.yml).",
         "",
     ]

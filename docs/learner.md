@@ -171,6 +171,54 @@ Tests read the **state of the system**, not the commands you typed. There is no
 credit for having run the right command, and no penalty for reaching the same
 state another way.
 
+### What `check` shows you, and why it depends on the lab
+
+A lab teaches, an exam grades. They cannot tell you as much as each other, and
+this is not a verbosity setting: the **type of the lab** decides, and an author
+may force it with `feedback:` in the `lab.yaml`.
+
+| What you are playing | What `check` shows of an unmet criterion |
+| --- | --- |
+| a lab (`feedback: full`) | the label, **and the whole message** its author wrote, with the fix it names |
+| a challenge (`first-line`) | the label and the **first line** of that message, no more: a challenge must not hand back the solution along with the failure |
+| an exam (`verdict`) | the label and the verdict, **no message at all** |
+
+On an exam, **`-v` and `--json` give nothing more**, and they say so rather than
+stay silent. The detail does not exist for an exam; it is not hidden behind an
+option. Every exam is concerned: a `capstone` lab, and any lab declaring an
+`exam_passing_score`.
+
+### "Not evaluated" is not "failed"
+
+A criterion can come back **not evaluated**: the machine could not check it,
+because a fixture failed or the tests could not be collected. It is then shown
+with a `?` and that mention, never with the red cross of a failure:
+
+```text
+What is left to do, according to the tests:
+  ✘ the answer file exists
+      reponses/cours.txt is missing. The word is in: dsoxlab course …
+  ? persistence across a reboot (not evaluated: check impossible)
+```
+
+The two lines call for opposite moves: fix your work for the first; run
+`dsoxlab check` again for the second, and look at your own machine if it comes
+back. This distinction holds for all three display policies.
+
+The extreme case exists too: when **nothing** could be measured, no score is
+computed and **nothing is recorded**. An absence of measurement is not a zero,
+and both `check` and `submit` then exit with code `1`: there is nothing to
+conclude from a measurement that did not happen.
+
+### `-v` goes before the command
+
+It is a **global** option, read before the subcommand exists:
+
+```bash
+dsoxlab -v check my-lab      # works
+dsoxlab check my-lab -v      # "No such option: -v", exit code 2
+```
+
 ---
 
 ---

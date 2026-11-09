@@ -109,7 +109,10 @@ def test_submit_sans_mesure_ne_dit_pas_enregistre(
 
     resultat = runner.invoke(app, ["submit", "premier"], env={"COLUMNS": "200"})
 
-    assert resultat.exit_code == 0, resultat.output
+    # 1 depuis 0.8.1 (issue #349) : rien n'a été mesuré, donc rien n'est
+    # enregistré, et un appelant qui lirait 0 conclurait d'une mesure qui n'a
+    # pas eu lieu. C'est déjà le contrat de `check`.
+    assert resultat.exit_code == 1, resultat.output
     assert "Submission recorded" not in resultat.output
     assert "nothing was recorded" in resultat.output
 
