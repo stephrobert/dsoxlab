@@ -504,12 +504,14 @@ class TestVerdictAffiche:
         _lab(tmp_path, "mock-exam", extra="exam_passing_score: 70\n")
 
         monkeypatch.setattr(
-            # `_validation` et non `cli` : `progression.submit` importe
-            # `_run_check` par son nom, donc poser l'attribut sur le paquet
-            # ne l'atteint pas. Le patch était inerte avant 0.1.69, et ces
-            # tests passaient sur le vrai résultat (0/100), jamais sur les
-            # 40/100 qu'ils annoncent.
-            cli._validation,
+            # `cli.progression` et non `cli` ni `cli._validation` :
+            # `progression.submit` importe `_run_check` par son nom au
+            # chargement du module, donc c'est ce binding-là qu'il appelle. Posé
+            # ailleurs, le simulacre est inerte et le vrai pytest tourne : ces
+            # tests passaient alors sur « rien n'a été collecté », jamais sur
+            # les 40/100 qu'ils annoncent. Relevé en 0.8.1, le commentaire
+            # précédent nommait déjà le piège et désignait la mauvaise cible.
+            cli.progression,
             "_run_check",
             lambda *a, **k: (CheckResult(False, "", 2, 5), 40, 100),
         )
@@ -517,7 +519,10 @@ class TestVerdictAffiche:
             cli.app, ["submit", "mock-exam", "--lab-home", str(tmp_path)]
         )
 
-        assert resultat.exit_code == 0, resultat.output
+        # 1 depuis 0.8.1 : une épreuve refusée sort comme `check` sort sur des
+        # tests rouges (issue #349). Le verdict à l'écran et le code de sortie
+        # ne peuvent pas dire deux choses différentes.
+        assert resultat.exit_code == 1, resultat.output
         sortie = " ".join(resultat.output.split())
         assert "Exam failed" in sortie, sortie
         assert "70%" in sortie, sortie
@@ -535,7 +540,7 @@ class TestVerdictAffiche:
         _lab(tmp_path, "lab-a")
 
         monkeypatch.setattr(
-            cli._validation,
+            cli.progression,
             "_run_check",
             lambda *a, **k: (CheckResult(False, "", 2, 5), 40, 100),
         )
@@ -543,5 +548,7 @@ class TestVerdictAffiche:
             cli.app, ["submit", "lab-a", "--lab-home", str(tmp_path)]
         )
 
-        assert resultat.exit_code == 0, resultat.output
+        # 1 : des tests rouges sur un lab ordinaire aussi (issue #349). Ce que
+        # ce test défend reste le SILENCE sur le verdict d'examen, pas le code.
+        assert resultat.exit_code == 1, resultat.output
         assert "Exam" not in resultat.output, resultat.output

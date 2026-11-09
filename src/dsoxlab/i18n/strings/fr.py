@@ -285,7 +285,7 @@ STRINGS: dict[str, str] = {
     "cmd_validate_help":  "Vérifie la structure et les métadonnées de tous les labs.",
     "cmd_doctor_help":    "Diagnostique l'environnement (runtimes, outils, labs détectés).",
     "opt_verbose":
-        "Détaille ce que fait le moteur, sur la sortie d'erreur. Répétable : -v pour les informations, -vv pour le détail complet.",
+        "Détaille ce que fait le moteur, sur la sortie d'erreur. Répétable : -v pour les informations, -vv pour le détail complet. C'est une option globale : elle se place AVANT la commande (dsoxlab -v check <lab>).",
     "opt_debug":      "Équivaut à -vv. Le journal complet est de toute façon écrit dans ~/.local/state/dsoxlab/dsoxlab.log.",
     "opt_version_help":   "Affiche la version de dsoxlab et quitte.",
     "cmd_install_help":   "Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion.",
@@ -342,7 +342,8 @@ STRINGS: dict[str, str] = {
         "Aucun lab actif dans ce catalogue. Choisis-en un : dsoxlab run <lab>",
     "status_voir_infra":
         "Pour l'état de l'infrastructure, c'est désormais : dsoxlab infra status",
-    "status_titre": "État du lab",
+    "status_titre": "État du lab : {lab_id}",
+    "status_hote_muet": "{fqdn} : {cause}",
     "cmd_infra_help": "Commandes d'infrastructure du catalogue.",
 
     # ── new : créer un squelette conforme au contrat ────────────────────────
@@ -539,6 +540,42 @@ STRINGS: dict[str, str] = {
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
     "cmd_provision_help": "Provisionne l'infrastructure du lab (terraform apply sur le provider courant).",
     "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises.",
+    # ── infra origin : d'ou vient une machine (issue #345) ────────────────────
+    "cmd_infra_origin_help":
+        "D'où vient une ressource provisionnée : quel catalogue, et depuis quel répertoire. Lecture seule.",
+    "arg_infra_origin":
+        "Nom ou UUID de la ressource (un domaine libvirt, une instance Incus). À omettre avec --all.",
+    "opt_infra_origin_provider":
+        "Ne regarder que ce provider (kvm, incus). Utile quand deux providers portent une machine de même nom.",
+    "opt_infra_origin_all":
+        "Toutes les ressources consignées sur cette machine, tous catalogues confondus.",
+    "infra_origin_sans_cible":
+        "Nommez une ressource, ou demandez-les toutes avec --all.",
+    "infra_origin_rien_de_consigne":
+        "Rien n'est consigné pour l'instant : aucun provision n'a tourné depuis que dsoxlab retient la provenance, ou tout a été détruit depuis.",
+    "infra_origin_inconnue":
+        "Aucune origine consignée pour « {resource} ».",
+    "infra_origin_inconnue_suite":
+        "Elle a pu être provisionnée avant que dsoxlab ne consigne la provenance, ou par autre chose. dsoxlab infra origin --all liste ce qui est connu.",
+    "infra_origin_homonymes":
+        "{count} ressources portent ce nom : ce ne sont pas les mêmes machines. --provider permet de trancher.",
+    "provenance_titre":           "Origine : {resource}",
+    "provenance_field_resource":  "[bold]Ressource :[/bold]      ",
+    "provenance_field_provider":  "[bold]Provider :[/bold]       ",
+    "provenance_field_catalog":   "[bold]Catalogue :[/bold]      ",
+    "provenance_field_path":      "[bold]Dossier source :[/bold] ",
+    "provenance_field_path_state": "[bold]État du chemin :[/bold]",
+    "provenance_field_when":      "[bold]Provisionné le :[/bold] ",
+    "provenance_field_project":   "[bold]Projet :[/bold]         ",
+    "provenance_field_uuid":      "[bold]UUID :[/bold]           ",
+    "provenance_field_state":     "[bold]Terraform :[/bold]      ",
+    "provenance_field_source":    "[bold]Lu depuis :[/bold]      ",
+    "provenance_path_present":    "présent",
+    "provenance_path_absent":     "disparu (le chemin est celui du provisionnement, et il n'est jamais réécrit)",
+    "provenance_source_index":    "l'index local",
+    "provenance_source_ressource": "la ressource elle-même (aucun index local nécessaire)",
+    "provenance_piste":
+        "Un catalogue déclarant le même id se trouve en {path}. Rien ne prouve que ce soit le même clone.",
     "cmd_status_help":    "Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet.",
     "cmd_ssh_help":       "Ouvre une session SSH interactive sur un hôte du lab.",
     "cmd_ssh_arg":        "Nom de l'hôte ou alias court (ex. : alma-rhcsa-1, ubuntu-lfcs-1)",
@@ -757,7 +794,7 @@ Chaque lab déclare :
     [dim]--section / -s[/dim]       Filtre par section.
     [dim]--level   / -l[/dim]       Filtre par niveau.
     [dim]--type    / -t[/dim]       Filtre par type : [bold]lab[/bold], [bold]challenge[/bold] ou [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc (1–8).
+    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc (1-8).
     [dim]--long[/dim]               Toutes les colonnes, même sur un terminal étroit.
     [dim]--json[/dim]               Le catalogue, en document machine.
 
@@ -913,6 +950,16 @@ Chaque lab déclare :
                        boote appellent trois gestes différents.
                        [dim]Portait le nom « status » jusqu'en 0.1.67.[/dim]
     [dim]--json[/dim]               La joignabilité des hôtes, en document.
+
+  [cyan]infra origin <res>[/cyan]   D'où vient une ressource provisionnée : quel catalogue, et
+                       depuis quel répertoire. Lecture seule, et sans catalogue :
+                       elle répond de n'importe où, ce qui est tout l'objet
+                       devant un `virsh list --all`. Le chemin est celui DU
+                       provisionnement et n'est jamais réécrit ; son état
+                       courant s'affiche à côté.
+    [dim]--all[/dim]                Tout ce qui est consigné sur cette machine, tous catalogues.
+    [dim]--provider[/dim]           Restreint à kvm ou incus, quand un nom existe des deux côtés.
+    [dim]--json[/dim]               La même chose, en document.
 
   [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
 
@@ -1150,6 +1197,7 @@ hors ligne, elle se tait.
     # (incident de réseau, qui ne fait pas échouer).
     "doc_url_issues_header":
         "\n[bold red]Guides qui répondent en erreur :[/bold red]",
+    "doc_url_unreachable_ligne": "{lab} : {url} ({raison})",
     "doc_url_unreachable_header":
         "\n[bold yellow]Guides qu'on n'a pas pu joindre :[/bold yellow]",
     "doc_url_unreachable_note":
@@ -1448,7 +1496,7 @@ hors ligne, elle se tait.
     "detail_pytest_missing": "introuvable",
     "detail_pytest_bundled": "embarqué avec dsoxlab",
     "detail_pytest_via":     "via {cmd}",
-    "detail_provider_unresolved": "candidats déclarés : {candidates} , aucun choisi",
+    "detail_provider_unresolved": "candidats déclarés : {candidates}, aucun choisi",
     # ── git et docker : deux outils que rien ne déclarait ───────────────────
     "check_git": "git",
     "check_docker": "Docker",
@@ -1660,7 +1708,7 @@ hors ligne, elle se tait.
     "progress_no_labs":      "Aucun lab trouvé pour ce contexte (utilisez [bold]dsoxlab use <section>[/bold] d’abord).",
 
     # ── console — next ─────────────────────────────────────────────────────
-    "next_suggestion":   "Prochain recommandé : [bold cyan]{lab_id}[/bold cyan] , {title}",
+    "next_suggestion":   "Prochain recommandé : [bold cyan]{lab_id}[/bold cyan] ({title})",
     "next_all_done":     "[green]Tous les labs validés dans ce contexte ![/green] Lancez [bold]dsoxlab progress[/bold] pour un résumé.",
     "remediation_labs_aucun_catalogue":
         "dsoxlab demo, ou dsoxlab catalog add linux",
@@ -1694,6 +1742,7 @@ hors ligne, elle se tait.
     "field_track":      "[bold]Parcours :[/bold]",
     "field_certifs":    "[bold]Certifs :[/bold]",
     "field_type":       "[bold]Type :[/bold]",
+    "field_type_bloc":  "bloc {bloc}",
     "field_bloc":       "[bold]Bloc :[/bold]",
     "field_status":     "[bold]Statut :[/bold]",
     "field_validation": "[bold]Validation :[/bold]",
@@ -1986,10 +2035,10 @@ hors ligne, elle se tait.
         "\n[bold red]Labs que le moteur ne voit pas :[/bold red]",
     "lab_yaml_illisible":
         "ce lab.yaml existe mais le moteur ne sait pas le charger ({raison}), "
-        "il est donc absent de tous les autres contrôles , et de « list-labs »",
+        "il est donc absent de tous les autres contrôles, et de « list-labs »",
     "lab_yaml_illisible_position":
         "ce lab.yaml existe mais le moteur ne sait pas le charger, il est donc "
-        "absent de tous les autres contrôles , et de « list-labs ». {raison} "
+        "absent de tous les autres contrôles, et de « list-labs ». {raison} "
         "(ligne {ligne}, colonne {colonne})",
     "lab_declare_absent":
         "la section « {section} » déclare « {chemin} », or il n'y a aucun "

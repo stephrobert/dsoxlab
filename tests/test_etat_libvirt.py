@@ -30,7 +30,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dsoxlab import i18n
-from dsoxlab.cli import app
+from dsoxlab.cli import app, destruction
 from dsoxlab.infra import inventory, libvirt, terraform
 from dsoxlab.models.repo import HostDefinition, InfraDefinition, RepoMetadata
 from dsoxlab.services import host_diagnosis as diag
@@ -660,9 +660,18 @@ def test_destroy_retire_les_machines_que_terraform_ignore(
 def test_destroy_refuse_de_sortir_en_succes_si_les_machines_restent(
     depot: Path, monkeypatch: pytest.MonkeyPatch, terraform_muet: None
 ) -> None:
-    """Sans confirmation, on ne retire rien — mais on ne ment pas non plus."""
+    """Le retrait des orphelins refusé : on ne retire rien, on ne ment pas non plus.
+
+    Depuis 0.8.1, les deux questions de `destroy` passent par les helpers de
+    `_commun` (issue #354), et c'est sur eux que porte le simulacre : la
+    destruction est confirmée, le retrait des machines restées est refusé.
+    Patcher `typer.confirm` ne distinguait pas les deux questions, et depuis que
+    la première dit pourquoi elle ne peut pas être posée hors terminal, elle
+    sortait en 2 avant d'atteindre le cas que ce test défend.
+    """
     monkeypatch.setattr(libvirt, "run_command", VirshSimule())
-    monkeypatch.setattr("typer.confirm", lambda *a, **k: False)
+    monkeypatch.setattr(destruction, "_confirmer", lambda *a, **k: None)
+    monkeypatch.setattr(destruction, "_demander", lambda *a, **k: False)
 
     resultat = runner.invoke(app, ["destroy", "--lab-home", str(depot)])
 

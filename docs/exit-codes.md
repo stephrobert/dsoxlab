@@ -54,6 +54,12 @@ ignorance.
 the tool worked, the answer is negative. `run` on a lab whose declared fixture is
 missing exits `2` — nothing was measured, because the lab could not even start.
 
+**`submit` returns the same code as `check`**, since 0.8.1: `1` when the
+submission is not accepted, that is a refused exam, failing tests on an ordinary
+lab, or a run that could measure nothing. Until then it exited `0` while
+displaying its refusal, and a caller could only conclude by parsing translated
+prose.
+
 ## Where the codes are not
 
 `doctor` without `--strict` exits **0 whatever it finds**, deliberately: for a

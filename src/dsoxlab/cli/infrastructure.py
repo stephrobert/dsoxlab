@@ -180,6 +180,10 @@ def provisionner(
     for message in result.warnings:
         warn(message)
 
+    # ICI, et pas plus bas : ce qui suit attend les hôtes en SSH et peut sortir
+    # en 8, alors que les machines existent déjà (issue #345).
+    _consigner_la_provenance(repo_meta, provider, result)
+
     ready_hosts = _hotes_a_attendre(result, host)
     avertissements_cloud_init, attente_depassee = _attendre_les_hotes(
         repo_meta, ready_hosts
@@ -218,6 +222,51 @@ def provisionner(
         success(_("provision_done", count=len(result.hosts)))
     for fqdn, ip in sorted(result.hosts.items()):
         info(f"  {fqdn} → {ip}")
+
+
+def _consigner_la_provenance(
+    repo_meta: RepoMetadata, provider: str, result: object
+) -> None:
+    """Écrit dans l'index local d'où viennent les machines que l'apply a produites.
+
+    Les machines retenues sont celles que les **sorties Terraform** portent :
+    c'est la mesure la plus fiable sans interroger chaque provider, et une
+    machine qui n'a pas été créée n'y figure pas. Consigner un hôte seulement
+    parce qu'il est déclaré dans le `meta.yml` écrirait une trace fausse, du
+    genre qui fait chercher une machine qui n'a jamais existé.
+
+    LA RESSOURCE EST LA SOURCE, l'index n'en est que la copie consultable. On
+    relit donc ce que le template vient de poser SUR la machine, plutôt que de
+    recalculer une provenance de son côté : mesuré sur un provision réel, les
+    deux calculs donnaient deux horodatages distants de vingt-neuf secondes et
+    deux identifiants de provisionnement différents, si bien que la machine et
+    l'index se contredisaient sur le moment où elle avait été créée. Un
+    identifiant censé relier les machines d'un même apply ne reliait rien.
+
+    Le gabarit ne sert donc que de repli, quand le provider ne rend rien — un
+    hyperviseur muet, ou un provider sans métadonnées natives.
+
+    Best-effort assumé : un index qui ne s'écrit pas ne doit pas faire échouer un
+    provisionnement réussi. Il se reconstruit au prochain `provision`, et les
+    métadonnées posées sur les ressources elles-mêmes, elles, sont déjà là.
+    """
+    from ..services import provenance as prov
+
+    hotes = sorted(getattr(result, "hosts", {}) or {})
+    if not hotes:
+        return
+    try:
+        gabarit = prov.gabarits(repo_meta, provider=provider, ressources=hotes)
+        origines = [
+            prov.lire_sur_la_ressource(origine.resource, provider) or origine
+            for origine in gabarit.values()
+        ]
+        from ..infra import terraform as tf
+
+        origines = prov.avec_le_state(origines, tf.provider_dir(repo_meta))
+        prov.enregistrer(prov.completer_les_uuid(origines), repo_meta.id)
+    except (OSError, RuntimeError) as exc:
+        logger.warning("could not record provenance: %s", exc)
 
 
 def _ecrire_le_fragment_ssh(repo_meta: RepoMetadata) -> None:

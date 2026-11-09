@@ -125,7 +125,10 @@ resource "incus_instance" "host" {
   image   = lookup(var.provider_config, "image_${each.value.distro}", local.default_images[each.value.distro])
   running = true
 
-  config = {
+  # `merge` avec la provenance EN DERNIER argument : d'où vient cette machine
+  # s'écrit SUR la machine, et aucune clé du lab ne peut l'effacer par
+  # inadvertance (dsoxlab issue #345). Vide, `merge` ne change rien.
+  config = merge({
     "limits.cpu"     = tostring(each.value.vcpu)
     "limits.memory"  = "${each.value.ram_mb}MiB"
     "boot.autostart" = "true"
@@ -142,7 +145,7 @@ resource "incus_instance" "host" {
     # même IP au sein du bridge.
     "user.lab.ip"   = each.value.ip
     "user.lab.role" = each.value.role
-  }
+  }, lookup(var.provenance_config, each.value.name, {}))
 
   # NIC reliée au bridge lab + IP statique. Le ``hwaddr`` fixe la MAC,
   # ce qui permet à Incus de réserver l'IP via dnsmasq.

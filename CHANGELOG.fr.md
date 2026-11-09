@@ -7,6 +7,156 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.8.1] - 2026-11-09
+
+Sept issues relevées sur la 0.8.0 : six défauts, et une fonctionnalité.
+
+Cinq des six défauts sont la même faute : deux chemins du moteur disaient deux
+choses différentes du même fait, et chacun, mesuré seul, donnait le résultat
+qu'on attendait de lui. La fonctionnalité répond, elle, à une question qu'aucune
+commande ne savait traiter : d'où vient cette machine ?
+
+### Ajouté
+
+- **`dsoxlab infra origin` dit d'où vient une machine provisionnée** : quel
+  catalogue, et depuis quel répertoire (issue #345). La question se posait
+  devant un `virsh list --all` sans qu'aucune commande n'y réponde : le
+  répertoire d'état donne le `repo.id` mais jamais le chemin du clone, et
+  `catalogue-actif` est un pointeur mutable, donc une preuve d'origine qui n'en
+  est pas une. Lecture seule, et sans catalogue : la commande répond depuis
+  n'importe où, y compris `/`, ce qui est tout son objet. `--all` liste ce qui
+  est consigné sur la machine, `--provider` tranche entre deux homonymes, et
+  `--json` rend le même document pour un appelant automatisé.
+- **La provenance est écrite à deux endroits, et c'est voulu.** Un index local
+  par catalogue (`~/.local/state/dsoxlab/<catalog-id>/provenance.json`, schéma
+  `dsoxlab-provenance-v1`, écriture atomique — un fichier par dépôt parce que le
+  verrou d'écriture de dsoxlab l'est aussi), **et** les métadonnées de la
+  ressource elle-même : un bloc `<metadata>` sous un namespace dsoxlab côté
+  libvirt, des clés de configuration dans l'espace `user` côté Incus. Le second
+  est celui qui répond encore quand l'état local a disparu, et c'est le seul des
+  deux qui voyage avec la machine. Mesuré : index effacé, `dsoxlab infra origin`
+  répond toujours, en disant qu'il a lu la ressource.
+- **Le chemin consigné est celui DU provisionnement, et il n'est jamais
+  réécrit.** C'est ce qui en fait une preuve plutôt qu'un pointeur. Un clone
+  déplacé ou supprimé ne corrige donc pas l'origine : la commande affiche le
+  chemin tel qu'il a été consigné, suivi de son état (présent, ou disparu), et
+  nomme au conditionnel un catalogue de même `repo.id` trouvé ailleurs. Une
+  machine ajoutée à un `meta.yml` déjà monté reçoit sa propre date, et non celle
+  des premières.
+- `destroy` retire de l'index ce qu'il a **réellement** détruit. Le code n'est
+  atteint qu'après le contrôle des orphelins, qui sort en 6 s'il en reste : une
+  machine encore debout garde donc sa trace, et c'est précisément celle dont on
+  cherchera l'origine.
+
+#### Ce que les providers permettent, mesuré avant d'écrire une ligne de template
+
+Terraform 1.16.1, le 2026-11-09, parce que l'issue le demandait et parce que le
+provider libvirt a déjà échoué sur une relecture de XML (issue #234) :
+
+- `dmacvicar/libvirt` **0.9.7** accepte du XML brut dans `libvirt_domain.metadata`
+  et le pose dans `<metadata>`. Relu **sans Terraform** par
+  `virsh metadata <domaine> <namespace>`, et un second plan ne rend aucun
+  changement.
+- `lxc/incus` **0.5.1** sur un serveur Incus **7.2** accepte les clés `user.*`,
+  relues par `incus config get` ou `incus query`, qui rend aussi le projet. Le
+  plan reste stable bien que `config` soit à la fois `optional` et `computed`.
+- **Le piège, trouvé par un provision réel et non par le banc** : le provider
+  libvirt échoue sur **toute** mise à jour in-place d'un domaine en marche, son
+  `.id` passant de 21 à 22 entre l'envoi et la relecture (« Provider produced
+  inconsistent result after apply »). Un banc sur domaine arrêté ne le voit pas.
+  Conséquence de conception : la provenance doit être **stable** entre deux
+  applies, donc la ressource est relue avant d'être réécrite. Sans cela, il
+  suffisait d'effacer l'index pour rendre le dépôt improvisionnable.
+
+### Corrigé
+
+- **`submit` sort désormais en 1 quand la soumission n'est pas reçue** (issue
+  #349). Sur une épreuve refusée, il affichait le refus puis sortait en **0**,
+  là où `check` sortait en 1 sur le même lab : une CI qui enchaîne `submit` ne
+  pouvait détecter le refus qu'en analysant une prose traduite. Trois cas valent
+  1, et c'est exactement le contrat de `check` : une épreuve refusée, des tests
+  en échec sur un lab ordinaire, et une exécution qui n'a rien pu mesurer, qui
+  n'inscrit même pas de tentative. Documenté dans `docs/exit-codes.fr.md`.
+- **Un critère non évalué porte sa mention sur un lab guidé aussi** (issue
+  #350). Sur la politique `full`, un critère que la machine n'a pas pu vérifier
+  (fixture en erreur, erreur de collecte) était rangé avec les tests ratés, sous
+  une croix rouge et sans un mot : l'apprenant ne pouvait pas distinguer « votre
+  travail est faux » de « la vérification n'a pas pu se faire », alors que les
+  deux réactions attendues sont opposées. Il s'affiche désormais avec son `?` et
+  sa mention, après les échecs et sous le même titre, comme le faisaient déjà
+  `first-line` et `verdict`. Les tests d'un critère déclaré sont retirés de la
+  liste des échecs, pour qu'une même vérification bloquée ne se dise pas deux
+  fois de deux façons.
+- **`reset` arrête puis recrée les services du lab** (issue #351). Il se décrit
+  comme « clean + start », mais ne touchait pas aux conteneurs déclarés par
+  `runtime.services`, que `clean` arrête : sur un lab à services, un apprenant
+  qui remettait tout à zéro repartait d'une base qu'il avait peuplée au tour
+  précédent, et son lab « neuf » ne ressemblait pas à un premier `run`. L'arrêt
+  et la recréation précèdent la préparation, pour qu'un `setup.yaml` ne parle
+  jamais à un service absent. Le cycle de vie complet est décrit dans
+  `docs/contract-v1.fr.md`.
+- **Un lab `vm` sans `setup.yaml` ou `cleanup.yaml` dit sa phrase, et rien
+  autour** (issue #352). `runtimes/vm.py` levait une `FileNotFoundError` dont le
+  message était déjà complet ; faute de `filename`, le filet générique de
+  `_socle` ne pouvait que le replier dans « Fichier introuvable : « … » », et
+  l'apprenant lisait un message emballé dans un autre. C'est une `RuntimeError`
+  désormais, que `run`, `clean` et `reset` attrapent tous les trois : la phrase
+  du contrat, préfixée de `✘`, et le code 2.
+- **Les tirets cadratins des libellés construits par le code ont disparu**
+  (issue #353, suite de #333). #333 avait nettoyé les chaînes de `fr.py` ; il en
+  restait dans les libellés composés **hors** des tables de traduction, qui
+  s'affichent dans les deux langues : le titre du panneau de `status`, la règle
+  de `challenge`, la fiche de `show`, l'en-tête d'une section de cours, les
+  lignes de diagnostic d'hôte et d'URL, et le récapitulatif d'une tâche ansible
+  en échec. `en.py` n'avait jamais été traité, et `fr.py` gardait quatre
+  « espace virgule » laissés par le remplacement précédent. La ponctuation des
+  deux titres qui mêlent un libellé traduit et un identifiant appartient
+  désormais à la traduction, et non au code : elle ne peut plus produire un
+  `Lab state : lab` anglais.
+- **`destroy` réclame `--yes` au lieu de répondre « Aborted. »** (issue #354).
+  Lancé sans terminal et sans `--yes`, il affichait sa question puis deux mots
+  sans sujet ni geste, et sortait en 1. Ses deux questions passent désormais par
+  les helpers que `clean` et `reset` utilisent déjà : la confirmation de la
+  destruction nomme la cause et `--yes` puis sort en 2, et le retrait des
+  machines restées sur l'hyperviseur, dont le « non » est une suite normale, dit
+  pourquoi personne n'a pu répondre et sort en 6 avec la commande qui les
+  retire. Un « oui » deviné y dé-définirait des domaines homonymes que rien ne
+  garantit être ceux de ce dépôt.
+
+### Modifié
+
+- L'aide de `-v` dit qu'il s'agit d'une option **globale**, qui se place avant
+  la commande : `dsoxlab check <lab> -v` répond « No such option: -v » en code 2
+  (issue #355).
+
+### Documentation
+
+- `docs/learner.fr.md` et sa version anglaise décrivent ce que `check` montre
+  selon le type de lab (`full`, `first-line`, `verdict`), le fait qu'une épreuve
+  ne rende rien de plus même avec `-v` ou `--json`, l'état « non évalué » d'un
+  critère, le cas « rien n'a été mesuré, rien n'est enregistré », et la place de
+  `-v` (issue #355).
+- `docs/machine-output.fr.md` et sa version anglaise disent qu'`observation` ne
+  porte que la **première ligne** du message de l'auteur, bornée à
+  280 caractères, **même sur un lab `full`** : l'écran et l'export ne disent pas
+  la même chose, et c'est voulu.
+
+### Tests
+
+- `tests/test_lot_0_8_1.py` défend les quatre incohérences de comportement, avec
+  un contre-exemple par famille. Chacun de ces tests échoue sur le code de la
+  0.8.0, ce qui a été vérifié avant de les retenir.
+- `tests/test_ponctuation_des_libelles.py` refuse tout tiret long dans un
+  littéral de chaîne **utilisé comme valeur** de `src/dsoxlab/`, par l'arbre
+  syntaxique et non par `grep` : une docstring n'atteint aucun écran, et un
+  contrôle qui les relèverait serait rouge en permanence. Un témoin vérifie que
+  la mesure sait refuser.
+- Deux simulacres de tests voisins désignaient `cli._validation._run_check`,
+  que `submit` n'appelle pas : le patch était inerte et ces tests passaient sur
+  « rien n'a été collecté », jamais sur les 40/100 qu'ils annonçaient. Le
+  commentaire qui les accompagnait nommait déjà le piège, et pointait la
+  mauvaise cible.
+
 ## [0.8.0] - 2026-11-09
 
 ### Ajouté

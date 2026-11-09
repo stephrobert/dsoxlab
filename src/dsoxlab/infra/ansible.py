@@ -66,7 +66,7 @@ class TacheEnEchec:
         """
         quoi = "injoignable" if self.injoignable else "échec"
         message = " ".join(self.message.split())[:largeur] or _("ansible_sans_message")
-        return f"{self.tache} — {self.hote} ({quoi}) : {message}"
+        return f"{self.tache} ({self.hote}, {quoi}) : {message}"
 
 
 @dataclass

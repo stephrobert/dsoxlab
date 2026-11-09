@@ -285,9 +285,21 @@ bloquée, ce qui n'est pas un échec de l'apprenant. Un test sauté (`skip`,
 `xfail`) est *skipped* : rien n'a été bloqué, il ne s'applique simplement pas. `phase` vaut `setup`, `call`, `teardown`
 ou `collect`. `mention` vaut `teardown_error` quand un test a réussi mais que
 son nettoyage a échoué. `observation` est le message **que l'auteur du lab a
-écrit** dans l'assertion (280 caractères au plus), ou `null` : le texte d'une
+écrit** dans l'assertion, ou `null` : le texte d'une
 exception technique, un identifiant de test avec chemin ou une sortie brute de
-pytest n'apparaissent jamais. `criteria` n'est pas tronquée, car la couper
+pytest n'apparaissent jamais.
+
+**`observation` ne porte que la PREMIÈRE ligne de ce message, bornée à
+280 caractères, et cela vaut aussi sur un lab `full`.** L'écran et l'export ne
+disent donc pas la même chose : un lab guidé affiche le message entier, ce
+document n'en garde que sa première ligne. C'est voulu, et pour deux raisons.
+Une preuve atteste *ce qui a été mesuré*, elle n'est pas un support de cours :
+un portail qui en affiche cent n'a besoin que de l'intitulé du reproche. Et un
+message d'assertion peut tenir vingt lignes, avec des blocs de commandes, qui
+gonfleraient chaque ligne d'historique sans rien prouver de plus. Seule la
+politique `verdict` (une épreuve) met `observation` à `null`.
+
+`criteria` n'est pas tronquée, car la couper
 ferait disparaître des preuves sans le dire ; elle est bornée par le nombre de
 tests du lab.
 

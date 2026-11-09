@@ -183,3 +183,67 @@ def infra_status(
     print_infra_status(etat)
     if not etat.tout_repond:
         raise typer.Exit(ExitCode.ECHEC)
+
+
+@infra_app.command("origin", help=_("cmd_infra_origin_help"))
+def infra_origin(
+    ressource: Annotated[str | None, typer.Argument(
+        help=_("arg_infra_origin"))] = None,
+    provider: Annotated[str | None, typer.Option(
+        "--provider", help=_("opt_infra_origin_provider"))] = None,
+    toutes: Annotated[bool, typer.Option(
+        "--all", help=_("opt_infra_origin_all"))] = False,
+    as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+) -> None:
+    """D'où vient une machine : le catalogue, et son répertoire d'origine.
+
+    EN LECTURE SEULE, sans exception : cette commande ne crée, ne modifie et ne
+    retire aucune ressource. Elle répond à une question qu'un `virsh list --all`
+    pose sans y répondre — « ce `pve.lab`, il vient d'où ? » (issue #345).
+
+    Elle ne prend volontairement **aucun** `--lab-home` : son objet est
+    justement de répondre sans se placer dans un dépôt, et l'index est balayé
+    pour tous les catalogues de la machine.
+    """
+    from ..services import provenance as prov
+
+    if not toutes and ressource is None:
+        error(_("infra_origin_sans_cible"))
+        raise typer.Exit(ExitCode.ECHEC)
+
+    if toutes:
+        origines = [
+            origine for origine in prov.toutes_les_origines()
+            if provider is None or origine.provider == provider
+        ]
+    else:
+        assert ressource is not None  # garanti par le contrôle ci-dessus
+        origines = prov.chercher(ressource, provider=provider)
+
+    if as_json:
+        machine.emit(machine.document_de_provenance(origines))
+        if not origines:
+            raise typer.Exit(ExitCode.ECHEC)
+        return
+
+    if not origines:
+        # Deux absences, deux phrases. « Aucune origine pour « » » devant un
+        # `--all` est un message qui parle d'une ressource que personne n'a
+        # nommée : c'est le genre de phrase qui fait douter de l'outil plutôt
+        # que de renseigner.
+        if toutes:
+            info(_("infra_origin_rien_de_consigne"))
+            return
+        error(_("infra_origin_inconnue", resource=ressource or ""))
+        info(_("infra_origin_inconnue_suite"))
+        raise typer.Exit(ExitCode.ECHEC)
+
+    from ..reporting.console import print_provenance
+
+    # L'homonymie se DIT, elle ne se tranche pas : deux dépôts peuvent avoir
+    # nommé deux machines pareil, et choisir pour l'utilisateur serait décider
+    # à sa place de quelle machine il parle.
+    if len(origines) > 1 and not toutes:
+        warn(_("infra_origin_homonymes", count=len(origines)))
+    for origine in origines:
+        print_provenance(origine, autres=prov.catalogues_de_meme_id(origine))

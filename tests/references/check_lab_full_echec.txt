@@ -13,7 +13,7 @@ What is left to do, according to the tests:
       reponses/cours.txt                                                        
   ✘ la mission
       reponses/mission.txt manquant.                                            
-  ✘ bloque
+  ? bloque (not evaluated: check impossible)
 ℹ The full test output: dsoxlab -v check premier
 ╭───────── Result: premier ─────────╮
 │  20 / 100 pts                     │

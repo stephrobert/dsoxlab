@@ -64,3 +64,27 @@ variable "efi_loader" {
   # une chaîne vide, en nommant le paquet OVMF à installer.
   default     = ""
 }
+
+variable "provenance_xml" {
+  description = <<-EOT
+    Bloc `<metadata>` de provenance, construit par dsoxlab et posé tel quel sur
+    chaque domaine : d'où vient cette machine, c'est-à-dire quel catalogue l'a
+    provisionnée et depuis quel répertoire (dsoxlab issue #345).
+
+    Le XML est fabriqué en Python, et non ici : HCL n'a aucune fonction
+    d'échappement XML, et un chemin de clone peut porter un `&`. Le document
+    serait alors invalide et libvirt refuserait le domaine entier.
+
+    Mesuré avec dmacvicar/libvirt 0.9.7 le 2026-11-09 : le XML se relit par
+    `virsh metadata <domaine> <namespace>` sans Terraform, un second plan ne
+    rend aucun changement, et le modifier donne un update IN-PLACE — l'UUID du
+    domaine ne bouge pas, donc une reprovision ne détruit pas la machine.
+
+    Une entrée PAR HÔTE, et non un bloc unique : une machine ajoutée à un
+    catalogue déjà provisionné n'a pas été provisionnée en même temps que les
+    autres, et lui attribuer la date des premières serait écrire un fait faux.
+    Un hôte absent de la map ne reçoit aucun bloc.
+  EOT
+  type        = map(string)
+  default     = {}
+}

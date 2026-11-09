@@ -528,6 +528,19 @@ discovered:
 
 #### `runtime.services[]`
 
+Which command does what with these containers — decided by the engine, never by
+the lab:
+
+| Command | What it does with the services |
+| --- | --- |
+| `run`, `check` | **start** them (a container already up is reused), wait for `ready_tcp` **and** `ready_exec`, then replay `post_start` |
+| `reset` | **stops then recreates** them, before replaying the setup: a lab reset starts from the same state as a first `run`, services included |
+| `clean` | **stops** them |
+
+`reset` left them alone until 0.8.1, although it describes itself as "clean +
+start": on a lab with services, you restarted from a database you had populated
+on the previous round, and the starting state was not reproducible.
+
 | Field | Required | Type | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `name` | **yes** | string | — | Unique in the lab. Also the **hostname** other services reach it by. |

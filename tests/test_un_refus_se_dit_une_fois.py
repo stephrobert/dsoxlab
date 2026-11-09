@@ -199,31 +199,31 @@ class TestLaConfirmationHorsTerminal:
         """
         import typer
 
-        from dsoxlab.cli import progression
+        from dsoxlab.cli import _commun
 
         appels: list[str] = []
-        monkeypatch.setattr(progression.sys.stdin, "isatty", lambda: False)
-        monkeypatch.setattr(progression, "error", appels.append)
+        monkeypatch.setattr(_commun.sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(_commun, "error", appels.append)
         monkeypatch.setattr(
-            progression.typer, "confirm",
+            _commun.typer, "confirm",
             lambda *a, **k: pytest.fail("une confirmation a été demandée sans terminal"),
         )
         with pytest.raises(typer.Exit) as sortie:
-            progression._confirmer("confirm_clean", "un-lab")
+            _commun._confirmer("confirm_clean", lab_id="un-lab")
         assert sortie.value.exit_code == 2
         assert appels, "le refus est sorti sans un mot"
 
     def test_dans_un_terminal_la_confirmation_est_bien_demandee(self, monkeypatch):
         """L'autre sens : le garde-fou ne doit pas supprimer la question."""
-        from dsoxlab.cli import progression
+        from dsoxlab.cli import _commun
 
         demandes: list[tuple] = []
-        monkeypatch.setattr(progression.sys.stdin, "isatty", lambda: True)
+        monkeypatch.setattr(_commun.sys.stdin, "isatty", lambda: True)
         monkeypatch.setattr(
-            progression.typer, "confirm",
+            _commun.typer, "confirm",
             lambda message, **k: demandes.append((message, k)),
         )
-        progression._confirmer("confirm_clean", "un-lab")
+        _commun._confirmer("confirm_clean", lab_id="un-lab")
         assert len(demandes) == 1
         assert demandes[0][1].get("abort") is True, (
             "sans `abort=True`, un « non » laisserait la commande continuer"

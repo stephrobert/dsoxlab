@@ -139,7 +139,7 @@ def url_sure(
         # agir le poste à partir d'une chaîne du catalogue.
         raise URLRefusee(
             champ, valeur, "securite_url_schema",
-            scheme=parties.scheme or "—",
+            scheme=parties.scheme or "-",
             allowed=", ".join(politique.value),
         )
 

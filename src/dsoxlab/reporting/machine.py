@@ -388,3 +388,28 @@ def score_dict(row: dict[str, Any], passing_score: int | None) -> dict[str, Any]
             "passed": verdict,
         },
     }
+
+
+def document_de_provenance(origines: list[Any]) -> dict[str, Any]:
+    """D'où viennent ces ressources, en document stable pour un appelant.
+
+    ``path_state`` est calculé à la lecture et porté explicitement : un appelant
+    qui ne ferait qu'afficher ``catalog_path`` enverrait vers un répertoire
+    disparu sans le savoir. Le chemin reste celui du provisionnement — on ne le
+    corrige pas, on dit son état.
+
+    ``source`` dit d'où vient la réponse, ``index`` ou ``resource`` : la seconde
+    tient encore quand l'état local a été effacé, et un appelant qui vérifie une
+    chaîne de provenance a le droit de savoir laquelle il lit.
+    """
+    return {
+        "schema": SCHEMA,
+        "resources": [
+            {
+                **origine.en_json(),
+                "path_state": origine.etat_du_chemin(),
+                "source": "resource" if origine.source == "ressource" else "index",
+            }
+            for origine in origines
+        ],
+    }

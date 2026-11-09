@@ -87,7 +87,14 @@ class VmRuntime(BaseRuntime):
         repo_meta = self._repo_meta(lab)
         setup = lab.path / "setup.yaml"
         if not setup.is_file():
-            raise FileNotFoundError(
+            # `RuntimeError`, et non `FileNotFoundError` : le message EST déjà
+            # la phrase complète, et le filet de `_socle.py` repliait la
+            # seconde dans « Fichier introuvable : « … » », parce qu'une
+            # `FileNotFoundError` sans `filename` n'a que son texte à montrer.
+            # L'apprenant lisait donc un message emballé dans un autre
+            # (issue #352). `run`, `clean` et `reset` attrapent tous les trois
+            # `RuntimeError` et en sortent en 2 avec la phrase seule.
+            raise RuntimeError(
                 _("err_vm_setup_missing", lab_id=lab.id, path=setup)
             )
 
@@ -162,7 +169,8 @@ class VmRuntime(BaseRuntime):
         repo_meta = self._repo_meta(lab)
         cleanup = lab.path / "cleanup.yaml"
         if not cleanup.is_file():
-            raise FileNotFoundError(
+            # Même raison qu'au `setup.yaml` plus haut (issue #352).
+            raise RuntimeError(
                 _("err_vm_cleanup_missing", lab_id=lab.id, path=cleanup)
             )
 

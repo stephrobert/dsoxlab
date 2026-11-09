@@ -54,6 +54,12 @@ certitude est plus forte qu'une ignorance.
 un lab dont une fixture déclarée manque sort en `2` : rien n'a été mesuré, parce
 que le lab n'a même pas pu démarrer.
 
+**`submit` rend le même code que `check`**, depuis la 0.8.1 : `1` quand la
+soumission n'est pas reçue, c'est-à-dire une épreuve refusée, des tests rouges
+sur un lab ordinaire, ou une exécution qui n'a rien pu mesurer. Jusque-là il
+sortait en `0` en affichant son refus, et un appelant ne pouvait conclure qu'en
+analysant une prose traduite.
+
 ## Là où les codes ne sont pas
 
 `doctor` sans `--strict` sort en **0 quoi qu'il trouve**, délibérément : pour un
