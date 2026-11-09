@@ -63,6 +63,7 @@ NOEUDS_LAB: dict[str, tuple[str, ...]] = {
     "t": ("properties", "runtime", "properties", "targets", "items"),
     "s": ("properties", "runtime", "properties", "services", "items"),
     "validation_data": ("properties", "validation"),
+    "c": ("properties", "criteria", "items"),
 }
 
 NOEUDS_META: dict[str, tuple[str, ...]] = {

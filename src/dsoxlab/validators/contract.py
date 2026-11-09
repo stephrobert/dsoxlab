@@ -272,6 +272,8 @@ KNOWN_LAB_KEYS: frozenset[str] = frozenset({
     "id", "title", "level", "skills", "distros", "doc_url",
     "section", "description", "track", "difficulty", "estimated_time",
     "certification_tags", "prerequisites", "lab_type", "exam_passing_score", "exam_blocking_checks",
+    "criteria", "feedback",
+    "criteria[].id", "criteria[].tests", "criteria[].label",
     "bloc", "bloc_order",
     "runtime", "validation",
     "runtime.type", "runtime.targets", "runtime.default",
@@ -313,7 +315,12 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
 #: pour qui relit le fichier, et les 284 traductions des catalogues réels le
 #: portent déjà. Tout autre champ y serait ignoré, ce qui est exactement le
 #: défaut qu'on répare ailleurs.
-KNOWN_LAB_LANG_KEYS: frozenset[str] = frozenset({"id", "title", "description"})
+KNOWN_LAB_LANG_KEYS: frozenset[str] = frozenset({
+    "id", "title", "description",
+    # 0.8.0 : les libellés des critères, appariés par `id` (comme les sections
+    # d'un `meta.<lang>.yml`). Rien d'autre d'un critère ne se traduit.
+    "criteria", "criteria[].id", "criteria[].label",
+})
 
 #: Ce qu'un ``meta.<lang>.yml`` peut porter. ``sections[].id`` n'est pas une
 #: traduction : c'est la clé d'appariement, sans laquelle la surcharge ne

@@ -29,7 +29,7 @@ PLUGIN = "dsoxlab_rapport"
 #: Variable d'environnement qui donne au plugin le chemin du rapport.
 VARIABLE_RAPPORT = "DSOXLAB_RAPPORT"
 
-EtatDeCritere = Literal["satisfied", "unsatisfied", "not_evaluated"]
+EtatDeCritere = Literal["satisfied", "unsatisfied", "not_evaluated", "skipped"]
 OrigineDeMessage = Literal["author", "technical"]
 
 IDENTIFIANT_MAX = 128
@@ -42,9 +42,11 @@ class ResultatDeCritere:
     """Ce qu'un test a dit d'un critère, sous une forme qui se montre.
 
     ``etat`` : ``satisfied`` (le test a réussi), ``unsatisfied`` (l'assertion a
-    échoué dans la phase ``call``) ou ``not_evaluated`` (le critère n'a pas pu
-    être évalué : fixture en erreur, erreur de collecte, test sauté). Ce dernier
-    n'est pas un échec de l'apprenant et ne doit jamais se lire comme tel.
+    échoué dans la phase ``call``), ``not_evaluated`` (le critère n'a pas pu
+    être évalué : fixture en erreur ou erreur de collecte, donc une vérification
+    BLOQUÉE) ou ``skipped`` (le test a été sauté, par ``skip`` ou ``xfail`` :
+    rien n'a été bloqué, le test ne s'applique simplement pas). Aucun des deux
+    derniers n'est un échec de l'apprenant, et ils ne se confondent pas.
 
     ``message_auteur`` n'est renseigné que si ``origine_message`` vaut
     ``author`` : c'est la phrase que l'auteur du lab a écrite. Le texte d'une
@@ -83,7 +85,7 @@ def arguments_du_plugin() -> list[str]:
 _INTERDIT = re.compile(r"[^\w.:\[\]-]", re.UNICODE)
 
 
-def _assainir(texte: str) -> str:
+def assainir(texte: str) -> str:
     normalise = unicodedata.normalize("NFC", texte)
     # `\w` accepte aussi `_` et les lettres/chiffres Unicode : c'est le jeu
     # `[\p{L}\p{N}_.:\[\]-]` attendu côté site.
@@ -105,7 +107,7 @@ def identifiants_de_criteres(nodeids: list[str]) -> dict[str, str]:
     d'exécution. Si l'assainissement ou la coupe à 128 caractères fait encore
     collisionner, un suffixe ``~<n>`` (rang dans l'ordre des nodeids) départage.
     """
-    sans_chemin = {n: _assainir(_sans_chemin(n)) for n in nodeids}
+    sans_chemin = {n: assainir(_sans_chemin(n)) for n in nodeids}
     groupes: dict[str, list[str]] = {}
     for nodeid, court in sans_chemin.items():
         groupes.setdefault(court[:IDENTIFIANT_MAX], []).append(nodeid)
@@ -115,7 +117,7 @@ def identifiants_de_criteres(nodeids: list[str]) -> dict[str, str]:
             resultat[membres[0]] = court
             continue
         for nodeid in membres:
-            resultat[nodeid] = _assainir(nodeid)[:IDENTIFIANT_MAX]
+            resultat[nodeid] = assainir(nodeid)[:IDENTIFIANT_MAX]
     vus: dict[str, int] = {}
     for nodeid in sorted(resultat):
         ident = resultat[nodeid]
@@ -196,8 +198,11 @@ def _un_critere(
     if "collect" in phases:
         return ResultatDeCritere(identifiant, nodeid, "collect", "not_evaluated")
     setup = phases.get("setup")
+    if setup is not None and setup["issue"] == "skipped":
+        # `mark.skip` / `skipif` jouent en phase setup : le test ne s'applique pas.
+        return ResultatDeCritere(identifiant, nodeid, "setup", "skipped")
     if setup is not None and setup["issue"] != "passed":
-        # Une fixture en erreur ou un test sauté : le critère n'a pas été évalué.
+        # Une fixture en erreur : la vérification n'a pas pu avoir lieu.
         return ResultatDeCritere(identifiant, nodeid, "setup", "not_evaluated")
     appel = phases.get("call")
     teardown = phases.get("teardown")
@@ -214,7 +219,7 @@ def _un_critere(
         )
     if appel["issue"] == "skipped":
         return ResultatDeCritere(
-            identifiant, nodeid, "call", "not_evaluated", mention=mention
+            identifiant, nodeid, "call", "skipped", mention=mention
         )
     return ResultatDeCritere(identifiant, nodeid, "call", "satisfied", mention=mention)
 
@@ -228,3 +233,101 @@ def _origine_et_message(
             return "author", message.strip()[:MESSAGE_MAX]
         return "author", None
     return "technical", None
+
+
+def nom_de_controle(identifiant: str) -> str:
+    """Le nom d'un critère au format de ``failed_checks`` : la fonction, sans cas.
+
+    ``TestC::test_x[p-1]`` donne ``test_x``. Un critère de collecte, qui n'a pas
+    de ``::``, garde son identifiant entier. Sert aussi sur un nodeid complet :
+    ``labs/x/test_a.py::TestC::test_x[p-1]`` donne ``test_x``.
+    """
+    dernier = identifiant.rsplit("::", 1)[-1]
+    return dernier.split("[", 1)[0] or identifiant
+
+
+def _etat_du_groupe(etats: list[str]) -> EtatDeCritere:
+    """L'état d'un critère déclaré qui regroupe plusieurs tests.
+
+    Satisfait seulement si TOUS le sont ; non satisfait dès qu'un seul ne l'est
+    pas ; non évalué si l'un est bloqué et qu'aucun n'est non satisfait ; sauté
+    si tous sont sautés. Un mélange de satisfaits et de sautés n'est pas
+    « satisfait » (une partie de la preuve n'a pas eu lieu) : il vaut ``skipped``.
+    """
+    if "unsatisfied" in etats:
+        return "unsatisfied"
+    if "not_evaluated" in etats:
+        return "not_evaluated"
+    if all(etat == "satisfied" for etat in etats):
+        return "satisfied"
+    return "skipped"
+
+
+def _critere_declare(
+    identifiant: str, membres: list[ResultatDeCritere]
+) -> ResultatDeCritere:
+    etat = _etat_du_groupe([m.etat for m in membres])
+    determinant = next((m for m in membres if m.etat == etat), membres[0])
+    mention = next((m.mention for m in membres if m.mention), None)
+    origine: OrigineDeMessage | None = None
+    message: str | None = None
+    if etat == "unsatisfied":
+        origine, message = determinant.origine_message, determinant.message_auteur
+    return ResultatDeCritere(
+        identifiant, determinant.nodeid, determinant.phase, etat, origine, message, mention
+    )
+
+
+def regrouper_par_declaration(
+    criteres: tuple[ResultatDeCritere, ...] | None,
+    declarations: list[tuple[str, tuple[str, ...]]],
+) -> tuple[ResultatDeCritere, ...] | None:
+    """Regroupe les tests d'un critère DÉCLARÉ sous son ``id`` ; le reste, intact.
+
+    ``declarations`` : ``(id, noms de fonction de test)``. Un test qui appartient
+    à un critère déclaré perd son identifiant par défaut au profit de l'``id``
+    déclaré, à la place du premier de ses membres. Un critère déclaré dont aucun
+    test n'a tourné (rien de collecté) n'apparaît pas : on ne conclut rien sur ce
+    qu'on n'a pas vu. ``None`` (rapport inconnu) reste ``None``.
+
+    Si un identifiant déclaré rejoint celui d'un test non déclaré, ce dernier
+    prend un suffixe ``~n`` : deux critères ne partagent jamais un identifiant.
+    """
+    if criteres is None or not declarations:
+        return criteres
+    appartenance = {nom: ident for ident, noms in declarations for nom in noms}
+    groupes: dict[str, list[ResultatDeCritere]] = {}
+    ordre: list[str | ResultatDeCritere] = []
+    for critere in criteres:
+        declare = appartenance.get(nom_de_controle(critere.nodeid))
+        if declare is None or critere.phase == "collect":
+            ordre.append(critere)
+        else:
+            if declare not in groupes:
+                groupes[declare] = []
+                ordre.append(declare)
+            groupes[declare].append(critere)
+    resultat: list[ResultatDeCritere] = []
+    pris = set(groupes)
+    for element in ordre:
+        if isinstance(element, str):
+            resultat.append(_critere_declare(element, groupes[element]))
+            continue
+        ident = element.identifiant
+        rang = 0
+        while ident in pris:
+            rang += 1
+            suffixe = f"~{rang}"
+            ident = element.identifiant[: IDENTIFIANT_MAX - len(suffixe)] + suffixe
+        pris.add(ident)
+        resultat.append(
+            element if ident == element.identifiant else _renomme(element, ident)
+        )
+    return tuple(resultat)
+
+
+def _renomme(critere: ResultatDeCritere, identifiant: str) -> ResultatDeCritere:
+    return ResultatDeCritere(
+        identifiant, critere.nodeid, critere.phase, critere.etat,
+        critere.origine_message, critere.message_auteur, critere.mention,
+    )

@@ -38,12 +38,59 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   illisible : inconnu n'est pas « zéro critère », et `check` garde alors le
   chemin texte qu'il a toujours eu. Si un lanceur masque le plugin à pytest,
   l'exécution est rejouée sans lui, au lieu de transformer une mesure en panne.
+- **Chaque tentative enregistrée garde désormais de quoi être relue plus
+  tard** (lot B de l'issue #336) : `attempt_id` (uuid4), `lab_digest` (16
+  caractères hexadécimaux d'un SHA-256 de `lab.yaml`, de `challenge/tests/**` et
+  de `challenge/hints.yaml`, indépendant de git, caches exclus),
+  `catalog_revision` (la révision au moment du check, et non plus seulement à
+  l'export), `criteria` (un résultat par critère, avec le message de l'auteur et
+  jamais un texte technique) et `hints_seen` (les indices pris, avec leur `id`
+  lu dans `hints.yaml`, copiés sur la ligne parce que `reset` efface les
+  demandes). Cinq colonnes nullables ajoutées par la migration additive
+  existante ; une base 0.7.3 se relit comme avant et ses lignes donnent `NULL`,
+  c'est-à-dire inconnu.
+- **L'export les porte, par extension compatible de `dsoxlab-evidence-v1`**
+  (lot C) : `attempt_id`, `lab_digest`, `catalog_revision`, `not_evaluated`,
+  `hints_seen` et `criteria` sur chaque ligne, tous à `null` sur une ligne écrite
+  avant la 0.8.0. Le nom du schéma ne change pas, aucun champ existant ne change
+  de sens et `catalog.version` garde le sien. Chaque valeur est revalidée à la
+  lecture (identifiants réduits aux lettres, chiffres et `_ . : [ ] -`, 128
+  caractères au plus ; observations de 280 caractères au plus ; aucun
+  identifiant de test avec chemin, aucun texte technique). `push` et
+  `scores --json` sont inchangés.
+- **`lab.yaml` accepte `criteria:` et `feedback:`** (lot D de l'issue #336).
+  `criteria` est une liste facultative de `{id, tests, label}` : les tests
+  regroupés sous un `id` déclaré forment un seul critère, satisfait seulement
+  si tous le sont (libellés dans `lab.yaml` pour l'anglais et dans
+  `lab.<lang>.yaml`, appariés par `id`). Sans elle, un critère par test, comme
+  avant. `feedback` vaut `full`, `first-line` ou `verdict` et règle ce que
+  `check` montre d'un critère raté : `full` par défaut pour un `lab` (sortie
+  **strictement inchangée**), `first-line` pour un `challenge`, `verdict` pour
+  un `capstone` ou tout lab avec `exam_passing_score`. Avec `first-line`,
+  `check` montre le libellé du critère, son verdict et la seule première ligne
+  du message de l'auteur, pour que le geste de réparation écrit sur les lignes
+  suivantes ne soit pas donné ; avec `verdict`, aucun message. Un critère qui
+  n'a pas pu être évalué s'affiche *non évalué : vérification impossible*,
+  jamais comme non satisfait. L'`observation` exportée suit la même politique
+  (première ligne de 280 caractères au plus, `null` pour `verdict`).
+  `validate-structure` refuse un id invalide ou en double, un critère sans
+  test, un nom de test qui ne correspond à aucune fonction, un test revendiqué
+  par deux critères et un `feedback` inconnu. Contrat, schéma JSON et docs mis à
+  jour. **Changement de comportement** : un `challenge` sans `feedback:` ne
+  montre plus que la première ligne ; écrire `feedback: full` garde l'ancien
+  affichage.
+- **Un test sauté n'est plus « non évalué ».** Dans `criteria`, `skip` et
+  `xfail` donnent l'état `skipped` ; `not_evaluated` se limite aux vérifications
+  bloquées (erreur de fixture, erreur de collecte), pour que le site puisse le
+  présenter comme « vérification bloquée par l'environnement ». Dans l'export,
+  `not_evaluated` est alors un sous-ensemble de `failed_checks` (une erreur de
+  collecte, qui n'a pas de nom de test, garde son identifiant).
 
 ### Inchangé
 
-- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche,
-  l'export JSON, `push` et la base, et tous les codes de sortie. Rien ne lit
-  encore le nouveau rapport.
+- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche, `push`,
+  `scores --json` et tous les codes de sortie. Seuls ce qui est enregistré et
+  exporté lit le nouveau rapport, comme décrit plus haut.
 
 ## [0.7.3] - 2026-11-03
 

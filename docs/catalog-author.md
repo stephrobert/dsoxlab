@@ -238,6 +238,12 @@ step with the code: adding a check without documenting it here fails the suite.
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` is declared on a `lab_type` that does not assess: only `challenge` and `capstone` do |
 | `metadata_blocking_check_inconnu` | `exam_blocking_checks` names a test that does not exist in `challenge/tests/test_functional.py`: a renamed test would disarm the requirement in silence |
 | `metadata_blocking_sans_epreuve` | `exam_blocking_checks` is declared on a `lab_type` that grades nobody: only `challenge` and `capstone` assess |
+| `metadata_feedback_inconnu` | `feedback` is outside `full`, `first-line`, `verdict`: the engine applies the default of the lab type instead |
+| `metadata_critere_id_invalide` | a `criteria[].id` does not match `[\w.:\[\]-]{1,128}` |
+| `metadata_critere_id_double` | two criteria declare the same `id` |
+| `metadata_critere_sans_test` | a criterion lists no test: it would never be evaluated |
+| `metadata_critere_test_inconnu` | a criterion names a test function that exists nowhere in `challenge/tests/`: a renamed test would empty the criterion in silence |
+| `metadata_critere_test_partage` | a test belongs to several criteria |
 | `content_broken_links` | a relative link points at nothing |
 | `content_missing_english` | a document is translated on one side only |
 | `content_scoring_points_mismatch` | the tasks total a different number of points than announced |

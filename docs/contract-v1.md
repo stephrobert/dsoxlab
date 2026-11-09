@@ -282,6 +282,8 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `lab_type` | no | enum | `lab` | `lab`, `challenge`, `capstone` or `validation`. The first three assume a learner doing the work; the fourth does not — see below. |
 | `exam_passing_score` | no | integer | `0` | Pass mark of a mock exam, as a **percentage** of the lab scale. See below. |
 | `prerequisites` | no | list of strings | `[]` | Ids of labs this one assumes already played. Written for capstones. See below. |
+| `criteria` | no | list of mappings | `[]` | Names the criteria of the lab: `{id, tests, label}`. See below. |
+| `feedback` | no | enum | by `lab_type` | What `check` shows of a failed criterion: `full`, `first-line` or `verdict`. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
 | `runtime` | no | mapping | shell defaults | See below. |
@@ -291,6 +293,47 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 is not a lab at all. `skills`, `distros` and `doc_url` are required by
 `dsoxlab validate-structure`: the file parses without them, but the lab is not
 publishable.
+
+### `criteria` and `feedback`
+
+Without `criteria`, every test function is its own criterion, identified by
+its pytest id without the file path (`test_pair[2]`). Declare criteria to give
+them a stable name and a label, and to group several tests under one id:
+
+```yaml
+criteria:
+  - id: ssh-hardened
+    label: SSH is hardened            # English; lab.fr.yaml overrides it
+    tests: [test_root_login_off, test_password_auth_off]
+feedback: first-line
+```
+
+`id` matches `[\w.:\[\]-]{1,128}` and is what the evidence export carries.
+`tests` lists **test function names** (no path, no parametrized case) of
+`challenge/tests/`; a test belongs to at most one criterion. A criterion
+grouping several tests is *satisfied* only if all of them are, *unsatisfied* as
+soon as one is, *not evaluated* if one was blocked and none failed, and
+*skipped* otherwise (all skipped, or satisfied and skipped mixed). A declared
+criterion none of whose tests ran does not appear. Labels are matched by `id`
+in `lab.<lang>.yaml` (`criteria: [{id, label}]`), on the model of `title` and
+`description`.
+
+`feedback` sets what `check` shows of a failed criterion, and what the export
+carries as `criteria[].observation`:
+
+| Value | `check` shows | `observation` |
+| --- | --- | --- |
+| `full` | the author's full message, exactly as before | first line, 280 characters at most |
+| `first-line` | criterion label, verdict, and **only the first line** of the author's message | first line, 280 characters at most |
+| `verdict` | criterion label and verdict, no message | `null` |
+
+Default when `feedback` is absent: `lab` = `full`; `challenge` = `first-line`;
+`capstone`, and any lab with an `exam_passing_score` = `verdict`. A criterion
+that could not be evaluated (fixture error, collection error) is shown as such,
+*not evaluated: check impossible*, never as unsatisfied. When the lab is no
+longer in the catalog, the export applies `verdict`. `dsoxlab -v check` and the
+`output` of `check --json` still carry the raw pytest output: they are explicit
+requests for the detail.
 
 ### `exam_passing_score`
 

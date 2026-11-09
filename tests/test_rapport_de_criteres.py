@@ -392,7 +392,7 @@ def test_le_texte_et_les_comptes_restent_ceux_de_pytest(tmp_path: Path) -> None:
     assert (resultat.passed, resultat.total, resultat.skipped, resultat.ok) == (1, 3, 1, False)
     assert [e.nom for e in echecs_de_tests(resultat.output)] == ["test_deux"]
     criteres = _par_id(resultat)
-    assert criteres["test_trois"].etat == "not_evaluated"
+    assert criteres["test_trois"].etat == "skipped"
     # Le plugin n'ajoute rien à ce que l'apprenant lit.
     assert "dsoxlab_rapport" not in resultat.output
 

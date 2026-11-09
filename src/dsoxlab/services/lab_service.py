@@ -22,7 +22,12 @@ from ..models.hint import HintFile
 from ..models.lab import LabDefinition
 from ..runtimes.base import EventCallback, SessionSpec
 from ..runtimes.manager import RuntimeManager
-from ..sessions.store import hints_cost_total, hints_used_count, record_result
+from ..sessions.store import (
+    hint_requests_for,
+    hints_cost_total,
+    hints_used_count,
+    record_result,
+)
 from ..utils.shell import CommandError, run_command
 from ..validators.metadata import MetadataReport, validate_metadata
 from ..validators.structure import StructureReport, validate_structure
@@ -32,6 +37,14 @@ from .rapport_de_criteres import (
     arguments_du_plugin,
     environnement_du_plugin,
     lire_rapport,
+    regrouper_par_declaration,
+)
+from .revision_catalogue import revision_du_catalogue
+from .tentative import (
+    criteres_en_json,
+    empreinte_du_lab,
+    indices_vus_en_json,
+    nouvel_identifiant,
 )
 
 _manager = RuntimeManager()
@@ -439,6 +452,14 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
         hints_used=used,
         blocking_failed=blocking_failed,
         failed_checks=echecs_nommes,
+        # Ce que la tentative consigne pour être relue plus tard (#336, lot B).
+        # Calculé ICI, juste avant l'inscription : `reset` efface les demandes
+        # d'indices, et la révision du catalogue peut changer entre deux checks.
+        attempt_id=nouvel_identifiant(),
+        lab_digest=empreinte_du_lab(lab),
+        catalog_revision=revision_du_catalogue(root),
+        criteria=criteres_en_json(result.criteres),
+        hints_seen=indices_vus_en_json(hint_requests_for(root, lab.id), hint_file),
     )
     return ScoreResult(
         check=result,
@@ -696,17 +717,38 @@ def check_lab(
     if resolved is not None and resolved.host:
         env["DSOXLAB_TARGET_HOST"] = resolved.host
 
+    return _check_avec_rapport(lab, pytest_cmd, tests_dir, repo_root, env, on_event)
+
+
+def _check_avec_rapport(
+    lab: LabDefinition,
+    pytest_cmd: list[str],
+    tests_dir: Path,
+    repo_root: Path,
+    env: dict[str, str],
+    on_event: Callable[[dict[str, Any]], None] | None,
+) -> CheckResult:
+    """Joue pytest avec le plugin du rapport, puis regroupe les critères déclarés.
+
+    Le rapport vit dans un répertoire temporaire que cette fonction retire. Les
+    critères que l'auteur déclare regroupent ses tests sous leur ``id``.
+    """
     with tempfile.TemporaryDirectory(prefix="dsoxlab-rapport-") as repertoire:
         rapport = Path(repertoire) / "rapport.jsonl"
         env_rapport = dict(env)
         environnement_du_plugin(env_rapport, rapport)
         if on_event is None:
-            return _check_en_bloc(
+            resultat = _check_en_bloc(
                 pytest_cmd, tests_dir, repo_root, env, env_rapport, rapport
             )
-        return _check_en_flux(
-            pytest_cmd, tests_dir, repo_root, env, env_rapport, rapport, on_event
+        else:
+            resultat = _check_en_flux(
+                pytest_cmd, tests_dir, repo_root, env, env_rapport, rapport, on_event
+            )
+        resultat.criteres = regrouper_par_declaration(
+            resultat.criteres, [(c.id, c.tests) for c in lab.criteria]
         )
+        return resultat
 
 
 def _plugin_refuse(output: str, returncode: int) -> bool:

@@ -37,12 +37,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unreadable: unknown is not "zero criteria", and `check` then keeps the text
   path it always had. If a launcher hides the plugin from pytest, the run is
   replayed without it rather than turning a measurement into a failure.
+- **Each recorded attempt now keeps what is needed to read it again later**
+  (lot B of issue #336): `attempt_id` (uuid4), `lab_digest` (16 hexadecimal
+  characters of a SHA-256 over `lab.yaml`, `challenge/tests/**` and
+  `challenge/hints.yaml`, independent of git, caches excluded),
+  `catalog_revision` (the revision at the time of the check, no longer only at
+  export time), `criteria` (one result per criterion, with the author's message
+  and never a technical text) and `hints_seen` (the hints taken, with their `id`
+  read in `hints.yaml`, copied onto the row because `reset` erases the requests).
+  Five nullable columns added by the existing additive migration; a 0.7.3
+  database is read as before and its rows give `NULL`, meaning unknown.
+- **The export carries them, by compatible extension of `dsoxlab-evidence-v1`**
+  (lot C): `attempt_id`, `lab_digest`, `catalog_revision`, `not_evaluated`,
+  `hints_seen` and `criteria` on each line, all `null` on a line written before
+  0.8.0. The schema name does not change, no existing field changes meaning and
+  `catalog.version` keeps its meaning. Every value is revalidated when read
+  (identifiers restricted to letters, digits and `_ . : [ ] -`, 128 characters
+  at most; observations 280 characters at most; no test id, path or technical
+  text). `push` and `scores --json` are unchanged.
+- **`lab.yaml` accepts `criteria:` and `feedback:`** (lot D of issue #336).
+  `criteria` is an optional list of `{id, tests, label}`: tests grouped under a
+  declared `id` become one criterion, satisfied only if all of them are (labels
+  in `lab.yaml` for English and in `lab.<lang>.yaml`, matched by `id`).
+  Without it, one criterion per test, as before. `feedback` is `full`,
+  `first-line` or `verdict` and sets what `check` shows of a failed criterion:
+  default `full` for a `lab` (output **strictly unchanged**), `first-line` for a
+  `challenge`, `verdict` for a `capstone` or any lab with `exam_passing_score`.
+  With `first-line`, `check` shows the criterion label, its verdict and only the
+  first line of the author's message, so that the repair gesture written on the
+  next lines is not handed out; with `verdict`, no message. A criterion that
+  could not be evaluated is shown as *not evaluated: check impossible*, never
+  as unsatisfied. The exported `observation` follows the same policy (first line
+  at most 280 characters, `null` for `verdict`). `validate-structure` refuses an
+  invalid or duplicated id, a criterion without a test, a test name that matches
+  no function, a test claimed by two criteria and an unknown `feedback`.
+  Contract, JSON schema and docs updated. **Behaviour change**: a `challenge`
+  without `feedback:` now shows the first line only; set `feedback: full` to
+  keep the old display.
+- **A skipped test is no longer "not evaluated".** In `criteria`, `skip` and
+  `xfail` give the state `skipped`; `not_evaluated` is restricted to blocked
+  checks (fixture error, collection error), so that the site can present it as
+  "check blocked by the environment". `not_evaluated` in the export is then a
+  subset of `failed_checks` (a collection error, which has no test name, keeps
+  its identifier).
 
 ### Unchanged
 
-- The score, `failed_checks`, `blocking_failed`, what `check` prints, the JSON
-  export, `push` and the database, and every exit code. Nothing reads the new
-  report yet.
+- The score, `failed_checks`, `blocking_failed`, what `check` prints, `push`,
+  `scores --json` and every exit code. The only thing that reads the new
+  report is what is recorded and exported, as described above.
 
 ## [0.7.3] - 2026-11-03
 

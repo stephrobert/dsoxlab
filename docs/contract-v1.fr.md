@@ -288,6 +288,8 @@ validate-structure` le signale.
 | `lab_type` | non | énuméré | `lab` | `lab`, `challenge`, `capstone` ou `validation`. Les trois premiers supposent un apprenant qui fait ; le quatrième non — voir plus bas. |
 | `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
 | `prerequisites` | non | liste de chaînes | `[]` | Identifiants des labs que celui-ci suppose joués. Écrit pour les capstones. Voir plus bas. |
+| `criteria` | non | liste de mappings | `[]` | Nomme les critères du lab : `{id, tests, label}`. Voir plus bas. |
+| `feedback` | non | énuméré | selon `lab_type` | Ce que `check` montre d'un critère raté : `full`, `first-line` ou `verdict`. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
 | `runtime` | non | mapping | défauts shell | Voir ci-dessous. |
@@ -297,6 +299,48 @@ validate-structure` le signale.
 n'est pas un lab. `skills`, `distros` et `doc_url` sont exigés par
 `dsoxlab validate-structure` : le fichier se lit sans eux, mais le lab n'est pas
 publiable.
+
+### `criteria` et `feedback`
+
+Sans `criteria`, chaque fonction de test est son propre critère, identifié par
+son identifiant pytest sans le chemin du fichier (`test_pair[2]`). Déclarez des
+critères pour leur donner un nom stable et un libellé, et pour regrouper
+plusieurs tests sous un même id :
+
+```yaml
+criteria:
+  - id: ssh-durci
+    label: SSH is hardened            # anglais ; lab.fr.yaml le surcharge
+    tests: [test_root_login_off, test_password_auth_off]
+feedback: first-line
+```
+
+`id` respecte `[\w.:\[\]-]{1,128}` et c'est lui que l'export de preuves porte.
+`tests` liste des **noms de fonction de test** (sans chemin, sans cas
+paramétré) de `challenge/tests/` ; un test appartient à un critère au plus. Un
+critère qui regroupe plusieurs tests est *satisfait* seulement si tous le sont,
+*non satisfait* dès qu'un seul ne l'est pas, *non évalué* si l'un a été bloqué
+et qu'aucun n'a échoué, et *sauté* sinon (tous sautés, ou satisfaits et sautés
+mêlés). Un critère déclaré dont aucun test n'a tourné n'apparaît pas. Les
+libellés se surchargent par `id` dans `lab.<lang>.yaml`
+(`criteria: [{id, label}]`), sur le modèle de `title` et `description`.
+
+`feedback` règle ce que `check` montre d'un critère raté, et ce que l'export
+porte dans `criteria[].observation` :
+
+| Valeur | `check` montre | `observation` |
+| --- | --- | --- |
+| `full` | le message complet de l'auteur, exactement comme avant | première ligne, 280 caractères au plus |
+| `first-line` | libellé du critère, verdict, et **seulement la première ligne** du message de l'auteur | première ligne, 280 caractères au plus |
+| `verdict` | libellé du critère et verdict, aucun message | `null` |
+
+Défaut quand `feedback` est absent : `lab` = `full` ; `challenge` =
+`first-line` ; `capstone`, et tout lab qui porte un `exam_passing_score` =
+`verdict`. Un critère qui n'a pas pu être évalué (erreur de fixture, erreur de
+collecte) s'affiche comme tel, *non évalué : vérification impossible*, jamais
+comme non satisfait. Quand le lab n'est plus au catalogue, l'export applique
+`verdict`. `dsoxlab -v check` et le champ `output` de `check --json` portent
+toujours la sortie brute de pytest : ce sont des demandes explicites du détail.
 
 ### `exam_passing_score`
 

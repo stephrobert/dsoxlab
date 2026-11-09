@@ -98,6 +98,36 @@
       "items": { "type": "string" },
       "description": "Names of the test functions no total makes up for. A failing check named here refuses the exam whatever the score, because four checks out of five give 80 and that passed a 75 threshold. Only challenge and capstone may declare it, and validate-structure refuses a name that matches no test: a renamed test would otherwise disarm the requirement in silence."
     },
+    "criteria": {
+      "type": "array",
+      "description": "Optional. The criteria this lab names, each grouping the test functions that prove it. Without it every test is its own criterion. A criterion grouping several tests is satisfied only if all of them are; not evaluated if one is blocked and none failed; skipped if all are skipped. Labels live here (English) and in lab.<lang>.yaml, matched by id.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.:\\[\\]-]{1,128}$",
+            "description": "Stable identifier of the criterion, the one the evidence export carries."
+          },
+          "tests": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of the test functions of challenge/tests/ that make up the criterion. A test belongs to at most one criterion, and validate-structure refuses a name that matches no test."
+          },
+          "label": {
+            "type": "string",
+            "description": "The criterion label, shown by check in place of the test name. English here; lab.<lang>.yaml overrides it, matched by id."
+          }
+        }
+      }
+    },
+    "feedback": {
+      "type": "string",
+      "enum": ["full", "first-line", "verdict"],
+      "description": "What check shows of a failed criterion: the author's full message (full), only its first line (first-line), or the verdict alone (verdict). Default by lab_type: lab = full, challenge = first-line, capstone or any lab with exam_passing_score = verdict."
+    },
     "bloc": {
       "type": "integer",
       "description": "Position of the teaching bloc. Normally NOT written here: it is derived from meta.yml sections[].labs[]. Declaring it forces an exception and duplicates information that already lives elsewhere."

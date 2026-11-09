@@ -20,6 +20,25 @@ from ._contract import (
 from .runtime import RuntimeConfig, RuntimeType, Service, Target
 from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
 
+#: Les trois politiques d'affichage d'un `check`, de la plus bavarde à la plus
+#: sobre : le message complet de l'auteur, sa première ligne, ou le seul verdict.
+FEEDBACK_POLICIES: tuple[str, ...] = ("full", "first-line", "verdict")
+
+
+@dataclass(frozen=True)
+class CriterionDecl:
+    """Un critère que l'auteur du lab nomme, et les tests qui le composent.
+
+    ``id`` est l'identifiant stable exporté (``[\\w.:\\[\\]-]{1,128}``),
+    ``tests`` les NOMS DE FONCTION de test (sans chemin ni cas paramétré) qu'il
+    regroupe, ``label`` son libellé dans la langue demandée (anglais par défaut,
+    surchargé par ``lab.<lang>.yaml``), vide si l'auteur n'en a pas écrit.
+    """
+
+    id: str
+    tests: tuple[str, ...] = ()
+    label: str = ""
+
 
 @dataclass
 class ValidationConfig:
@@ -45,6 +64,65 @@ def _charger_document(lab_yaml: Path) -> dict[str, Any]:
             f"(reçu : {type(data).__name__})."
         )
     return data
+
+
+def _libelles_traduits(lab_yaml: Path, lang: str) -> dict[str, str]:
+    """Les libellés de critères de `lab.<lang>.yaml`, appariés par ``id``.
+
+    Même patron que les champs traduits : un fichier absent ou illisible est
+    avalé, le libellé anglais reste. Seuls ``id`` (clé d'appariement) et
+    ``label`` sont lus ; tout autre champ d'une data est ignoré.
+    """
+    if not lang or lang == "en":
+        return {}
+    fichier = lab_yaml.parent / f"lab.{lang[:2].lower()}.yaml"
+    try:
+        with fichier.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except (OSError, yaml.YAMLError):
+        return {}
+    if not isinstance(data, dict) or not isinstance(data.get("criteria"), list):
+        return {}
+    libelles: dict[str, str] = {}
+    for c in data["criteria"]:
+        if isinstance(c, dict) and "id" in c and c.get("label"):
+            libelles[str(c["id"])] = str(c["label"])
+    return libelles
+
+
+def _lire_validation(data: dict[str, Any], lab_yaml: Path) -> ValidationConfig:
+    """Le bloc `validation:`, purement déclaratif."""
+    validation_data = as_mapping(data.get("validation"), "validation", lab_yaml)
+    return ValidationConfig(
+        functional=validation_data.get("functional", True),
+        security=validation_data.get("security", False),
+        persistence_after_reboot=validation_data.get("persistence_after_reboot", False),
+    )
+
+
+def _lire_section(data: dict[str, Any]) -> str | None:
+    """La section déclarée, ou ``None``, sentinelle de « non déclarée »."""
+    section_raw = data.get("section")
+    return str(section_raw) if section_raw is not None else None
+
+
+def _lire_criteres(
+    data: dict[str, Any], lab_yaml: Path, lang: str
+) -> tuple[CriterionDecl, ...]:
+    """Le bloc `criteria:`. Les anomalies de FOND (id invalide, test inconnu) se
+    disent à l'auteur par `validate-structure`, jamais en écartant le lab."""
+    libelles = _libelles_traduits(lab_yaml, lang)
+    criteres: list[CriterionDecl] = []
+    for idx, c in enumerate(as_mapping_list(data.get("criteria"), "criteria", lab_yaml)):
+        if "id" not in c:
+            raise LabYamlError(f"{lab_yaml}: criteria[{idx}] doit contenir 'id'.")
+        identifiant = str(c["id"])
+        criteres.append(CriterionDecl(
+            id=identifiant,
+            tests=tuple(as_str_list(c.get("tests"), f"criteria[{idx}].tests", lab_yaml)),
+            label=libelles.get(identifiant, str(c.get("label") or "")),
+        ))
+    return tuple(criteres)
 
 
 def _fusionner_la_traduction(
@@ -244,6 +322,20 @@ class LabDefinition:
     de son ``challenge/hints.yaml`` (100 par défaut, mais libre), et un seuil
     en points absolus voudrait dire autre chose d'un lab à l'autre."""
 
+    criteria: tuple[CriterionDecl, ...] = ()
+    """Les critères que l'auteur déclare (``criteria:``), vides par défaut.
+
+    Sans déclaration, chaque test est son propre critère. Avec : les tests d'un
+    critère déclaré se regroupent sous son ``id``, et c'est cet identifiant que
+    l'export porte."""
+
+    feedback: str | None = None
+    """Ce que ``feedback:`` déclare, tel quel (``None`` si absent).
+
+    Une valeur hors de :data:`FEEDBACK_POLICIES` est conservée pour que
+    ``validate-structure`` la signale ; l'exécution, elle, applique le défaut.
+    Voir :attr:`feedback_policy`."""
+
     bloc: int = 0               # bloc number 1-8; 0 = unassigned
     bloc_order: int = 0         # position within the bloc; 0 = unassigned
     bloc_name: str = ""         # nom lisible du bloc (section meta.yml), ex. "Fondamentaux (l1)"
@@ -266,6 +358,31 @@ class LabDefinition:
         ailleurs.
         """
         return self.lab_type != "validation"
+
+    @property
+    def feedback_policy(self) -> str:
+        """Ce que ``check`` montre d'un critère raté : la politique EFFECTIVE.
+
+        Déclarée par ``feedback:`` quand sa valeur est connue. Sinon selon ce
+        que le lab EST : une épreuve (``capstone``, ou tout lab qui porte un
+        ``exam_passing_score``) ne dit que le verdict ; un ``challenge`` montre
+        la première ligne du message de l'auteur, de quoi chercher sans donner
+        le geste ; un ``lab`` montre tout, puisqu'il enseigne.
+        """
+        if self.feedback in FEEDBACK_POLICIES:
+            return self.feedback
+        if self.lab_type == "capstone" or self.exam_passing_score > 0:
+            return "verdict"
+        if self.lab_type == "challenge":
+            return "first-line"
+        return "full"
+
+    def libelle_de_critere(self, identifiant: str) -> str | None:
+        """Le libellé écrit par l'auteur pour ce critère, ou ``None``."""
+        for declare in self.criteria:
+            if declare.id == identifiant:
+                return declare.label or None
+        return None
 
     @classmethod
     def from_yaml(cls, lab_yaml: Path, lang: str = "en") -> LabDefinition:
@@ -295,15 +412,9 @@ class LabDefinition:
         # `None`, pas une chaîne, quand la clé est absente : c'est ce qui
         # distingue « non déclaré » de « déclaré », y compris quand la valeur
         # déclarée est le nom d'un domaine.
-        section_raw = data.get("section")
-        section = str(section_raw) if section_raw is not None else None
+        section = _lire_section(data)
 
-        validation_data = as_mapping(data.get("validation"), "validation", lab_yaml)
-        validation = ValidationConfig(
-            functional=validation_data.get("functional", True),
-            security=validation_data.get("security", False),
-            persistence_after_reboot=validation_data.get("persistence_after_reboot", False),
-        )
+        validation = _lire_validation(data, lab_yaml)
 
         return cls(
             schema_version=schema_version,
@@ -345,6 +456,8 @@ class LabDefinition:
                     lab_yaml,
                 )
             ),
+            criteria=_lire_criteres(data, lab_yaml, lang),
+            feedback=None if data.get("feedback") is None else str(data["feedback"]),
             bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
             bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),
         )

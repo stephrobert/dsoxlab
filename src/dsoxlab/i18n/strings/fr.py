@@ -360,6 +360,8 @@ STRINGS: dict[str, str] = {
         "Affiche toutes les colonnes, même si le terminal est trop étroit.",
     "check_echecs_de_tests":
         "Ce qui reste à faire, d'après les tests :",
+    "check_critere_non_satisfait": "non satisfait",
+    "check_critere_non_evalue": "non évalué : vérification impossible",
     "check_sortie_complete":
         "La sortie complète des tests : dsoxlab -v check {lab_id}",
     "check_rien_mesure":
@@ -1194,6 +1196,30 @@ hors ligne, elle se tait.
     "metadata_doc_url_scheme": "URL invalide (schéma http/https attendu) : {url}",
     "metadata_lab_type_invalid":
         "Valeur invalide « {value} ». Attendu, l'une de : {expected}",
+    "metadata_feedback_inconnu": (
+        "feedback vaut `{value}` ; valeurs attendues : {expected}. Le moteur "
+        "applique à la place le défaut du type de lab."
+    ),
+    "metadata_critere_id_invalide": (
+        "criteria déclare l'id `{value}`, qui ne respecte pas "
+        "[\\w.:\\[\\]-]{{1,128}} : lettres, chiffres et _ . : [ ] -, 128 "
+        "caractères au plus."
+    ),
+    "metadata_critere_id_double": (
+        "criteria déclare deux fois l'id `{value}` : un identifiant nomme un seul critère."
+    ),
+    "metadata_critere_sans_test": (
+        "Le critère `{value}` ne liste aucun test : il ne serait jamais évalué."
+    ),
+    "metadata_critere_test_inconnu": (
+        "Le critère `{criterion}` nomme `{value}`, et aucune fonction de test "
+        "de ce nom n'existe dans challenge/tests/. Un test renommé viderait "
+        "le critère en silence."
+    ),
+    "metadata_critere_test_partage": (
+        "Le test `{value}` appartient à plusieurs critères ({criteria}) : un "
+        "test ne prouve qu'un critère au plus."
+    ),
     "metadata_blocking_check_inconnu": (
         "exam_blocking_checks nomme `{value}`, et aucun test de ce nom "
         "n'existe dans challenge/tests/test_functional.py. Un test renommé "

@@ -355,6 +355,8 @@ STRINGS: dict[str, str] = {
         "Show every column, even when the terminal is too narrow.",
     "check_echecs_de_tests":
         "What is left to do, according to the tests:",
+    "check_critere_non_satisfait": "not met",
+    "check_critere_non_evalue": "not evaluated: check impossible",
     "check_sortie_complete":
         "The full test output: dsoxlab -v check {lab_id}",
     "check_rien_mesure":
@@ -1175,6 +1177,30 @@ silent.
     "metadata_doc_url_scheme": "invalid URL (http/https scheme expected): {url}",
     "metadata_lab_type_invalid":
         "Invalid value '{value}'. Expected one of: {expected}",
+    "metadata_feedback_inconnu": (
+        "feedback is `{value}`; expected one of: {expected}. The engine "
+        "applies the default of the lab type instead."
+    ),
+    "metadata_critere_id_invalide": (
+        "criteria declares the id `{value}`, which does not match "
+        "[\\w.:\\[\\]-]{{1,128}}: letters, digits and _ . : [ ] -, 128 "
+        "characters at most."
+    ),
+    "metadata_critere_id_double": (
+        "criteria declares the id `{value}` twice: an identifier names one criterion."
+    ),
+    "metadata_critere_sans_test": (
+        "The criterion `{value}` lists no test: it would never be evaluated."
+    ),
+    "metadata_critere_test_inconnu": (
+        "The criterion `{criterion}` names `{value}`, and no test function of "
+        "that name exists in challenge/tests/. A renamed test would silently "
+        "empty the criterion."
+    ),
+    "metadata_critere_test_partage": (
+        "The test `{value}` belongs to several criteria ({criteria}): a test "
+        "proves at most one criterion."
+    ),
     "metadata_blocking_check_inconnu": (
         "exam_blocking_checks names `{value}`, and no test of that name "
         "exists in challenge/tests/test_functional.py. A renamed test "

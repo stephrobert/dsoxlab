@@ -28,6 +28,7 @@ from ..reporting import (
     error,
     info,
     print_check_result,
+    print_criteres_a_revoir,
     print_echecs_de_tests,
 )
 from ..security.terminal import texte_affichable
@@ -37,6 +38,7 @@ from ..services import (
     echecs_de_tests,
     evaluate_lab,
 )
+from ..services.politique_affichage import lignes_a_afficher
 from ._commun import _ensure_services, _verrou
 
 #: Les familles de contrôle de ``validate-structure``, dans l'ordre où elles
@@ -233,7 +235,12 @@ def _valider(
         # `-v` pour un humain qui veut creuser, `--json` pour un programme.
         # La retirer serait perdre un diagnostic ; l'imposer, le noyer.
         echecs = echecs_de_tests(result.output)
-        if echecs and not verbosite():
+        politique = lab.feedback_policy
+        if echecs and not verbosite() and politique != "full":
+            # `first-line` et `verdict` : ce que le lab accepte de montrer d'un
+            # critère raté. Pas d'invite vers `-v`, qui montrerait tout.
+            print_criteres_a_revoir(lignes_a_afficher(lab, result, politique))
+        elif echecs and not verbosite():
             print_echecs_de_tests(echecs)
             info(_("check_sortie_complete", lab_id=texte_affichable(lab.id)))
         else:

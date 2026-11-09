@@ -180,6 +180,12 @@ class TestLeContratNeBougePasEnSilence:
         # n'existait pas, donc on ne sait pas, et deviner serait pire.
         "failed_checks", "blocking_failed",
         "attempted_at", "exam",
+        # Ajoutés en 0.8.0 (#336, lots B et C), DÉLIBÉRÉMENT, par extension
+        # compatible : le nom du schéma reste `dsoxlab-evidence-v1` et aucun
+        # champ ci-dessus ne change de sens. Tous `null` sur une ligne écrite
+        # avant 0.8.0 (inconnu, jamais « aucun »).
+        "attempt_id", "lab_digest", "catalog_revision", "not_evaluated",
+        "hints_seen", "criteria",
     })
 
     def test_les_cles_de_l_enveloppe_restent_figees(self, catalogue: Path) -> None:

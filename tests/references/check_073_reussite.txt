@@ -1,0 +1,12 @@
+ℹ Validating premier…
+  ✔ test_functional.py::test_un
+  ✔ test_functional.py::test_deux
+  Tests premier finished ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2/2 H:MM:SS
+╭───────── Result: premier ─────────╮
+│  100 / 100 pts                    │
+│  ████████████████████  2/2 tests  │
+╰───────────────────────────────────╯
+ℹ Result saved to history (100/100 pts).
+✔ All tests passed.
+ℹ Score saved. Run dsoxlab submit to record your final attempt and end the 
+session.

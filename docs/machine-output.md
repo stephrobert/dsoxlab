@@ -256,7 +256,34 @@ chronological order, with nothing left for the reader to work out.
 | `results[].validated` | bool | **the verdict, stated** — see below |
 | `results[].attempted_at` | string | when the learner attempted the lab, ISO 8601, UTC |
 | `results[].exam` | object or null | as in `scores` |
+| `results[].failed_checks` / `blocking_failed` | array of strings | the checks that failed, and the subset that refuses an exam; empty on a line written before 0.7.0 |
+| `results[].attempt_id` | string or null | a uuid4 generated for each recorded attempt, so that the same result received twice (by file, then by push) is recognised |
+| `results[].lab_digest` | string or null | 16 hexadecimal characters: a SHA-256 of `lab.yaml`, `challenge/tests/**` (sorted, caches excluded) and `challenge/hints.yaml` when present. It does not depend on git |
+| `results[].catalog_revision` | string or null | the catalog revision **at the time of the check**. `catalog.version` keeps its meaning: the revision when the document was produced |
+| `results[].not_evaluated` | array of strings or null | the names of the **blocked** checks (a fixture error, phase `setup`, or a collection error), in the same format as `failed_checks`, of which it is a subset (a collection error, which has no test name, keeps its identifier): the score counts them as failures. A skipped test is not listed. At most 20 names |
+| `results[].hints_seen` | array or null | the hints taken for this lab at that moment, as `{"index", "id", "criterion"}`: `index` is the 0-based position, `id` is the `id` read in `hints.yaml` (`null` if absent), `criterion` is `null` until a hint is tied to a criterion. `[]` means none were taken. At most 20 entries |
+| `results[].criteria` | array or null | one entry per criterion: `{"id", "state", "phase", "mention", "observation"}` |
 | `count` | int | the number of lines, which always equals `results.length` |
+
+**Added in 0.8.0, by compatible extension.** `attempt_id`, `lab_digest`,
+`catalog_revision`, `not_evaluated`, `hints_seen` and `criteria` were added to
+each line. The schema name stays `dsoxlab-evidence-v1`, and no existing field
+changes meaning. On a line written before 0.8.0, all six are `null`: **`null`
+means unknown, never none**, while `[]` says that there really was nothing.
+
+In `criteria`, `id` is the pytest test id **without its file path**, restricted
+to letters, digits and `_ . : [ ] -` (at most 128 characters), so two failing
+cases of the same parametrized test are two distinct criteria. `state` is
+`satisfied`, `unsatisfied`, `not_evaluated` or `skipped`. A fixture error or a
+collection error is *not evaluated*: the check was blocked, which is not a
+failure of the learner. A skipped test (`skip`, `xfail`) is *skipped*: nothing
+was blocked, it simply does not apply. `phase` is `setup`, `call`, `teardown` or `collect`. `mention` is
+`teardown_error` when a test passed but its clean-up failed. `observation` is
+the message **the lab's author wrote** in the assertion (at most 280
+characters), or `null`: the text of a technical exception, a test id with a
+path or a raw pytest output never appears. `criteria` is not truncated, since
+cutting it would silently drop evidence; it is bounded by the number of tests
+of the lab.
 
 Four things this document says that `scores --json` left the reader to guess:
 

@@ -244,6 +244,12 @@ la suite.
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` est déclaré sur un `lab_type` qui n'évalue pas : seuls `challenge` et `capstone` le font |
 | `metadata_blocking_check_inconnu` | `exam_blocking_checks` nomme un test absent de `challenge/tests/test_functional.py` : un test renommé désarmerait l'exigence en silence |
 | `metadata_blocking_sans_epreuve` | `exam_blocking_checks` est déclaré sur un `lab_type` qui ne note personne : seuls `challenge` et `capstone` évaluent |
+| `metadata_feedback_inconnu` | `feedback` sort de `full`, `first-line`, `verdict` : le moteur applique à la place le défaut du type de lab |
+| `metadata_critere_id_invalide` | un `criteria[].id` ne respecte pas `[\w.:\[\]-]{1,128}` |
+| `metadata_critere_id_double` | deux critères déclarent le même `id` |
+| `metadata_critere_sans_test` | un critère ne liste aucun test : il ne serait jamais évalué |
+| `metadata_critere_test_inconnu` | un critère nomme une fonction de test qui n'existe nulle part dans `challenge/tests/` : un test renommé viderait le critère en silence |
+| `metadata_critere_test_partage` | un test appartient à plusieurs critères |
 | `content_broken_links` | un lien relatif ne pointe sur rien |
 | `content_missing_english` | un document n'est traduit que d'un côté |
 | `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |
