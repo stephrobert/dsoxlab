@@ -159,7 +159,7 @@ class TestLaRevisionDuCatalogue:
 
 
 class TestLaFormeEmise:
-    def test_les_dix_sept_champs_du_portail_sont_la(self) -> None:
+    def test_les_vingt_deux_champs_du_portail_sont_la(self) -> None:
         """Le quinzieme est arrive en 0.7.0, et il est ADDITIF a dessein.
 
         `failed_checks` dit au portail ce qu'il faut reviser : sans lui, une
@@ -171,6 +171,11 @@ class TestLaFormeEmise:
         et `exam_passed`. Sans eux, un apprenant qui passe par son compte ne
         voyait jamais qu une epreuve est refusee sur son exigence critique,
         alors que `submit` et l export le savaient.
+
+        Les dix-huitieme a vingt-deuxieme sont arrives en 0.8.0 (lot E de
+        #336) : `attempt_id`, `lab_digest`, `not_evaluated`, `hints_seen` et
+        `criteria` (reduit a `{id, state}`). Toujours ADDITIFS : un champ
+        inconnu ou mal forme devient `None`, jamais un motif d'ecart.
 
         Le numero de schema NE BOUGE PAS. Le monter garantirait le refus par
         un portail qui ne connait que 1, c'est-a-dire exactement le cas que ce
@@ -184,6 +189,7 @@ class TestLaFormeEmise:
             "lab_type", "validated", "score", "max_score", "passed_tests",
             "total_tests", "hints_used", "failed_checks", "blocking_failed",
             "exam_passed", "attempted_at", "producer_version",
+            "attempt_id", "lab_digest", "not_evaluated", "hints_seen", "criteria",
         }
         # `catalog` de l'export devient `catalogue_id` du portail : deux noms
         # pour la même chose, et c'est le second qui part.

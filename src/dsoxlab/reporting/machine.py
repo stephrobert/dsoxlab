@@ -182,6 +182,38 @@ def issue_dict(
     }
 
 
+def detail_de_check(result: Any, lab: LabDefinition) -> dict[str, Any]:
+    """Ce que `check --json` dit du détail d'une exécution, selon la politique du lab.
+
+    ``output`` est la sortie brute de pytest, sauf pour un lab en ``verdict`` :
+    une épreuve ne donne rien, donc ``output`` y est vide et ``output_withheld``
+    le dit (un champ vide seul se lirait comme « pytest n'a rien écrit »).
+    ``failed_checks`` et ``criteria`` restent : les noms, les états, et une
+    ``observation`` qui suit la même politique que l'export (jamais de message
+    en ``verdict``).
+    """
+    from ..services.lab_service import echecs_de_tests
+    from ..services.politique_affichage import observation_exportee
+
+    politique = lab.feedback_policy
+    criteres = result.criteres
+    return {
+        "output": "" if politique == "verdict" else result.output,
+        "output_withheld": politique == "verdict",
+        "failed_checks": [echec.nom for echec in echecs_de_tests(result.output)],
+        "criteria": None if criteres is None else [
+            {
+                "id": c.identifiant,
+                "state": c.etat,
+                "phase": c.phase,
+                "mention": c.mention,
+                "observation": observation_exportee(c.message_auteur, politique),
+            }
+            for c in criteres
+        ],
+    }
+
+
 def export_result_dict(
     row: dict[str, Any],
     lab: LabDefinition | None,

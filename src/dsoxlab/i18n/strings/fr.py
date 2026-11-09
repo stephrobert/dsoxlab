@@ -360,6 +360,8 @@ STRINGS: dict[str, str] = {
         "Affiche toutes les colonnes, même si le terminal est trop étroit.",
     "check_echecs_de_tests":
         "Ce qui reste à faire, d'après les tests :",
+    'check_detail_epreuve_indisponible':
+        "C'est une épreuve : le détail des tests n'est pas disponible, seul le verdict par critère l'est.",
     "check_critere_non_satisfait": "non satisfait",
     "check_critere_non_evalue": "non évalué : vérification impossible",
     "check_sortie_complete":
@@ -1196,6 +1198,20 @@ hors ligne, elle se tait.
     "metadata_doc_url_scheme": "URL invalide (schéma http/https attendu) : {url}",
     "metadata_lab_type_invalid":
         "Valeur invalide « {value} ». Attendu, l'une de : {expected}",
+    "metadata_lecons_vide": (
+        "Le critère `{criterion}` déclare une liste de leçons vide : retirez la "
+        "clé, ou donnez-lui une à cinq URL."
+    ),
+    "metadata_lecons_trop": (
+        "Le critère `{criterion}` liste {count} leçons ; {max} au plus sont acceptées."
+    ),
+    "metadata_lecon_url_invalide": (
+        "Le critère `{criterion}` liste la leçon `{value}`, qui n'est pas une "
+        "URL http(s)."
+    ),
+    "metadata_lecon_doublon": (
+        "Le critère `{criterion}` liste deux fois la leçon `{value}`."
+    ),
     "metadata_feedback_inconnu": (
         "feedback vaut `{value}` ; valeurs attendues : {expected}. Le moteur "
         "applique à la place le défaut du type de lab."
@@ -2085,6 +2101,8 @@ hors ligne, elle se tait.
         '{ajoutees} tentative(s) ajoutée(s). Le compte en porte désormais {total}, en révision {revision}.',
     'push_doublons':
         '{doublons} tentative(s) étaient déjà sur le compte, et y ont été laissées telles quelles.',
+    'push_allege':
+        "{degradees} tentative(s) ancienne(s) sont parties sans leur détail par critère, pour que vos preuves tiennent dans la limite du compte. Le détail reste dans votre historique local.",
     'push_injoignable':
         "Le portail n'a pas répondu. Rien n'a été écrit, donc rejouer dsoxlab push est sans risque.",
     'push_conflit_persistant':

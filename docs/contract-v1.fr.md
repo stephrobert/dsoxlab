@@ -339,8 +339,25 @@ Défaut quand `feedback` est absent : `lab` = `full` ; `challenge` =
 `verdict`. Un critère qui n'a pas pu être évalué (erreur de fixture, erreur de
 collecte) s'affiche comme tel, *non évalué : vérification impossible*, jamais
 comme non satisfait. Quand le lab n'est plus au catalogue, l'export applique
-`verdict`. `dsoxlab -v check` et le champ `output` de `check --json` portent
-toujours la sortie brute de pytest : ce sont des demandes explicites du détail.
+`verdict`.
+
+**Une épreuve ne donne rien.** Sur un lab en `verdict`, `dsoxlab -v check`
+n'affiche pas non plus la sortie brute de pytest : seulement le verdict par
+critère, et une ligne qui dit que le détail n'est pas disponible pour une
+épreuve. Dans `check --json`, `output` est la chaîne vide et `output_withheld`
+vaut `true` ; les compteurs, `failed_checks` et `criteria` (avec une
+`observation` à `null`) restent. Sur un lab en `full` ou `first-line`, `-v` et
+`output` portent toujours la sortie brute. Le seul moyen d'ouvrir une épreuve
+est que son auteur déclare explicitement `feedback: full` ou `first-line`.
+
+**`criteria[].lessons`.** Chaque critère déclaré peut porter `lessons`, une à
+cinq URL de leçons du site où le réviser, au format de `doc_url` (`http` ou
+`https`, une ancre `#...` est permise). Seul `lab.yaml` les porte, puisque le
+site traduit lui-même ses URL. `validate-structure` contrôle la forme, refuse
+les doublons, une liste vide et plus de cinq entrées, et ne fait aucune requête
+réseau. Le moteur ne les **affiche jamais** dans `check` (une épreuve ne donne
+rien) et ne les **exporte jamais** : c'est le site qui les lit dans le catalogue
+pour dire, après l'envoi d'un résultat, quelles leçons réviser.
 
 ### `exam_passing_score`
 

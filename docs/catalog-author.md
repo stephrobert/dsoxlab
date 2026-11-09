@@ -244,6 +244,10 @@ step with the code: adding a check without documenting it here fails the suite.
 | `metadata_critere_sans_test` | a criterion lists no test: it would never be evaluated |
 | `metadata_critere_test_inconnu` | a criterion names a test function that exists nowhere in `challenge/tests/`: a renamed test would empty the criterion in silence |
 | `metadata_critere_test_partage` | a test belongs to several criteria |
+| `metadata_lecons_vide` | a criterion declares an empty `lessons` list |
+| `metadata_lecons_trop` | a criterion lists more than five lessons |
+| `metadata_lecon_url_invalide` | a lesson is not an `http(s)` URL |
+| `metadata_lecon_doublon` | a criterion lists the same lesson twice |
 | `content_broken_links` | a relative link points at nothing |
 | `content_missing_english` | a document is translated on one side only |
 | `content_scoring_points_mismatch` | the tasks total a different number of points than announced |

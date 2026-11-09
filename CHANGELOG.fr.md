@@ -56,8 +56,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   de sens et `catalog.version` garde le sien. Chaque valeur est revalidée à la
   lecture (identifiants réduits aux lettres, chiffres et `_ . : [ ] -`, 128
   caractères au plus ; observations de 280 caractères au plus ; aucun
-  identifiant de test avec chemin, aucun texte technique). `push` et
-  `scores --json` sont inchangés.
+  identifiant de test avec chemin, aucun texte technique). `scores --json`
+  est inchangé (`push` est traité plus bas).
 - **`lab.yaml` accepte `criteria:` et `feedback:`** (lot D de l'issue #336).
   `criteria` est une liste facultative de `{id, tests, label}` : les tests
   regroupés sous un `id` déclaré forment un seul critère, satisfait seulement
@@ -85,10 +85,49 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   présenter comme « vérification bloquée par l'environnement ». Dans l'export,
   `not_evaluated` est alors un sous-ensemble de `failed_checks` (une erreur de
   collecte, qui n'a pas de nom de test, garde son identifiant).
+- **`push` porte aussi la tentative** (lot E) : `attempt_id`, `lab_digest`,
+  `not_evaluated` (20 noms au plus), `hints_seen` (20 au plus) et `criteria`
+  réduit à `{id, state}` (40 au plus ; au-delà `null`, jamais une liste
+  tronquée). La lecture est tolérante et n'ajoute aucun motif d'écart : un champ
+  mal formé devient `null`. La fusion garde le triplet catalogue, lab, date pour
+  clé ; une ligne qui porte un `attempt_id` remplace la même tentative détenue
+  sans identifiant, jamais l'inverse, et deux lignes de même `attempt_id` mais
+  de dates différentes restent deux. Le portail lit ce magasin comme une valeur
+  opaque et ne refuse pas une section pour des clés nouvelles dans les lignes ;
+  le navigateur, qui relit le magasin par liste blanche, le réécrit sans les
+  nouveaux champs tant que le site n'est pas à jour, et le `push` suivant les
+  rétablit : une perte temporaire de détail côté navigateur, jamais un magasin
+  vidé. Limites de taille : voir plus bas.
+- **`push` allège ce qu'il envoie avant de refuser pour la taille.** Le portail
+  limite les preuves à 1 500 000 octets bruts et 350 000 compressés (mesurés sur
+  la charge, où le magasin est une chaîne échappée). Avec le détail de la 0.8.0,
+  une ligne typique pèse environ 1 560 octets au lieu de 630, donc environ 960
+  tentatives tiennent au lieu de 2 380. Les plus anciennes d'abord,
+  `criteria` puis `hints_seen` puis `not_evaluated` passent à `null`, seulement
+  autant qu'il le faut : jamais une liste tronquée, jamais une ligne retirée,
+  jamais un champ v1, jamais la base locale. `push` dit combien de tentatives
+  anciennes sont parties sans leur détail. À la fusion, la ligne la plus riche
+  gagne pour un même `attempt_id` (une ligne allégée n'écrase jamais un détail
+  que le compte porte), donc un second `push` n'écrit rien. Au-delà d'environ
+  2 380 tentatives, même allégé au maximum, `push` refuse encore et nomme la
+  limite.
+- **Une épreuve ne donne rien, pas même avec `-v`.** Sur un lab en `verdict`
+  (un `capstone`, ou tout lab avec un `exam_passing_score`), `dsoxlab -v check`
+  n'affiche plus la sortie brute de pytest : seulement le verdict par critère et
+  une ligne qui dit que le détail n'est pas disponible. Dans `check --json`,
+  `output` est vide et le nouveau `output_withheld` vaut `true` ; `check --json`
+  porte désormais aussi `failed_checks` et `criteria` (sans observation en
+  `verdict`). Seul un `feedback: full` ou `first-line` explicite ouvre une
+  épreuve. `-v` et `output` sont inchangés sur les labs `full` et `first-line`.
+- **`criteria[].lessons`** (facultatif, une à cinq URL de leçons au format de
+  `doc_url`, `lab.yaml` seulement) : où le site envoie l'apprenant réviser un
+  critère une fois un résultat envoyé. `validate-structure` contrôle la forme,
+  les doublons, une liste vide et plus de cinq entrées, sans requête réseau. Le
+  moteur ne les affiche ni ne les exporte jamais.
 
 ### Inchangé
 
-- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche, `push`,
+- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche,
   `scores --json` et tous les codes de sortie. Seuls ce qui est enregistré et
   exporté lit le nouveau rapport, comme décrit plus haut.
 

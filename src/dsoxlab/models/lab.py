@@ -38,6 +38,11 @@ class CriterionDecl:
     id: str
     tests: tuple[str, ...] = ()
     label: str = ""
+    lessons: tuple[str, ...] | None = None
+    """Les leçons du site où réviser ce critère, ou ``None`` si l'auteur n'en
+    déclare pas. Une liste vide déclarée (``lessons: []``) reste ``()`` pour que
+    `validate-structure` la refuse. Le moteur ne les affiche ni ne les exporte
+    jamais : c'est le site qui les lit dans le catalogue."""
 
 
 @dataclass
@@ -121,6 +126,10 @@ def _lire_criteres(
             id=identifiant,
             tests=tuple(as_str_list(c.get("tests"), f"criteria[{idx}].tests", lab_yaml)),
             label=libelles.get(identifiant, str(c.get("label") or "")),
+            lessons=(
+                tuple(as_str_list(c["lessons"], f"criteria[{idx}].lessons", lab_yaml))
+                if "lessons" in c else None
+            ),
         ))
     return tuple(criteres)
 

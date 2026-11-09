@@ -137,6 +137,41 @@ def _fonctions_de_test(lab: LabDefinition) -> set[str]:
     return noms
 
 
+#: Combien de leçons un critère peut désigner.
+LECONS_MAX = 5
+
+
+def _controler_les_lecons(declare: Any, report: MetadataReport) -> None:
+    """``criteria[].lessons`` : forme d'URL, doublons, taille. Aucun réseau.
+
+    Une liste déclarée vide est refusée (autant ne pas la déclarer), comme plus de
+    cinq leçons : au-delà, le site n'a plus de leçon à proposer, seulement un
+    sommaire.
+    """
+    if declare.lessons is None:
+        return
+    if not declare.lessons:
+        report.issues.append(MetadataIssue(
+            "criteria", "metadata_lecons_vide", {"criterion": declare.id}))
+        return
+    if len(declare.lessons) > LECONS_MAX:
+        report.issues.append(MetadataIssue(
+            "criteria", "metadata_lecons_trop",
+            {"criterion": declare.id, "count": len(declare.lessons), "max": LECONS_MAX}))
+    vues: set[str] = set()
+    for url in declare.lessons:
+        analyse = urlparse(url)
+        if analyse.scheme not in ("http", "https") or not analyse.netloc or " " in url:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_lecon_url_invalide",
+                {"criterion": declare.id, "value": url}))
+        if url in vues:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_lecon_doublon",
+                {"criterion": declare.id, "value": url}))
+        vues.add(url)
+
+
 def _controler_les_criteres(lab: LabDefinition, report: MetadataReport) -> None:
     """``criteria:`` et ``feedback:`` : ce que l'auteur peut déclarer, et ce qui
     vide un critère en silence.
@@ -157,6 +192,7 @@ def _controler_les_criteres(lab: LabDefinition, report: MetadataReport) -> None:
     vus: set[str] = set()
     appartenance: dict[str, list[str]] = {}
     for declare in lab.criteria:
+        _controler_les_lecons(declare, report)
         if not _ID_DE_CRITERE.fullmatch(declare.id):
             report.issues.append(MetadataIssue(
                 "criteria", "metadata_critere_id_invalide", {"value": declare.id}))

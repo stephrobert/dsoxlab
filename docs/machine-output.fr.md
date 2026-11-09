@@ -479,6 +479,51 @@ viennent **de ce catalogue non fiable**. Ce sont des données pédagogiques, et
 ce sont malgré tout des chaînes contrôlées par un tiers. Échappez-les avant de
 les afficher, comme toute entrée externe.
 
+### Ce que `push` envoie d'une tentative
+
+`dsoxlab push` n'envoie pas le document d'export : il réduit chaque ligne au
+modèle que le portail garde, et n'émet jamais une ligne que le portail
+écarterait (une seule ligne écartée vide tout le magasin à la relecture). Depuis
+la 0.8.0, une preuve poussée porte aussi, tout cela additif et à `null` quand
+c'est inconnu :
+
+| Champ | Sens |
+| --- | --- |
+| `attempt_id` | l'uuid4 de la tentative |
+| `lab_digest` | l'empreinte de 16 hexadécimaux du lab tel qu'il était |
+| `not_evaluated` | les vérifications bloquées, 20 noms au plus |
+| `hints_seen` | `{index, id, criterion}` par indice pris ; `null` au-delà de 20 |
+| `criteria` | **seulement `{id, state}`** par critère (ni observation, ni phase, ni mention) ; `null` au-delà de 40 critères |
+
+Un champ mal formé devient `null` et ne fait jamais refuser une ligne. Une liste
+trop longue vaut `null` plutôt qu'une liste tronquée, qui se donnerait pour
+complète. À la fusion avec le compte, la clé reste le triplet catalogue, lab,
+date de tentative : une ligne locale qui porte un `attempt_id` **remplace** la
+même tentative détenue sans identifiant (elle est enrichie, pas ajoutée), jamais
+l'inverse, et deux lignes de même `attempt_id` mais de dates différentes restent
+deux lignes.
+
+Le portail garde au plus 1 500 000 octets bruts et 350 000 octets compressés de
+preuves, mesurés sur la charge où le magasin est une chaîne échappée. Mesuré
+ainsi : une ligne typique pesait environ 630 octets avant la 0.8.0 (environ
+2 380 tentatives tiennent) et environ 1 560 octets avec douze critères (environ
+960 tentatives) ; une ligne dont toutes les listes sont au maximum pèse environ
+7 700 octets (environ 190 tentatives).
+
+**Avant de refuser, `push` allège ce qu'il envoie**, des tentatives les plus
+anciennes aux plus récentes et seulement autant qu'il le faut : le `criteria` de
+la ligne la plus ancienne passe à `null`, puis si cela ne suffit pas son
+`hints_seen`, puis son `not_evaluated`, puis la ligne suivante, jusqu'à ce que
+les deux limites tiennent. Il ne tronque jamais une liste, ne retire jamais une
+ligne, ne touche jamais un champ v1 (compteurs, `validated`, `failed_checks`,
+`blocking_failed`) et ne modifie jamais la base locale. `push` dit combien de
+tentatives anciennes sont parties sans leur détail. À la fusion, la ligne la plus
+riche gagne pour un même `attempt_id` : une ligne allégée n'écrase jamais un
+détail que le compte porte déjà, et une ligne locale qui en a davantage le
+rétablit. Pousser de nouveau n'écrit donc rien. Le plancher est le format v1
+lui-même : environ 2 380 tentatives à 630 octets. Au-delà, même allégé au
+maximum, `push` refuse avant d'envoyer et dit quelle limite.
+
 ## `check`
 
 ```json
@@ -502,7 +547,10 @@ les afficher, comme toute entrée externe.
 | `check.passed` / `total` | entier | tests réussis, tests joués |
 | `check.score` / `max_score` | entier | la note enregistrée dans la base du catalogue |
 | `check.recorded` | booléen | si une note a réellement été mesurée et inscrite : `false` quand aucun test n'a pu tourner (`total` vaut 0), ce qui est une absence de mesure et non un zéro |
-| `check.output` | chaîne | la sortie brute de pytest, où vit le détail d'un échec |
+| `check.output` | chaîne | la sortie brute de pytest, où vit le détail d'un échec. **Vide pour un lab en `verdict`** (une épreuve) : voir `output_withheld` |
+| `check.output_withheld` | booléen | `true` quand `output` est retenu parce que la politique `feedback` du lab est `verdict` ; un `output` vide seul se lirait « pytest n'a rien écrit » |
+| `check.failed_checks` | tableau de chaînes | les noms des contrôles en échec, comme dans `export` |
+| `check.criteria` | tableau ou null | une entrée par critère, `{id, state, phase, mention, observation}`, comme dans `export` ; `observation` suit la politique `feedback` du lab (`null` en `verdict`) ; `null` si inconnu |
 
 La commande sort en 1 quand `ok` vaut faux, et rend le document quand même.
 

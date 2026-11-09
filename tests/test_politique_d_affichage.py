@@ -476,3 +476,206 @@ def test_le_squelette_d_un_lab_reste_conforme(tmp_path: Path) -> None:
     from dsoxlab.services.scaffold import _LAB_COMMUN
 
     assert "feedback" in textwrap.dedent(_LAB_COMMUN)
+
+
+# ── une épreuve ne donne rien, pas même avec -v ni avec --json ────────────
+
+MOTS_INTERDITS = ("mkdir", "manquant", "Cree le fichier", "AssertionError", "assert ")
+
+
+def _invoquer(racine: Path, *args: str) -> tuple[int, str, str]:
+    resultat = CliRunner().invoke(
+        app, [*[a for a in args if a == "-v"], "check", "premier",
+              *[a for a in args if a != "-v"], "--lab-home", str(racine)]
+    )
+    return resultat.exit_code, resultat.stdout, re.sub(r"\d+:\d\d:\d\d", "H:MM:SS", resultat.output)
+
+
+def _journal(tmp_path: Path) -> str:
+    chemin = tmp_path / "state" / "dsoxlab" / "dsoxlab.log"
+    return chemin.read_text(encoding="utf-8") if chemin.is_file() else ""
+
+
+def test_v_check_d_une_epreuve_n_affiche_aucun_message_d_assertion(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: capstone\n")
+
+    code, _, ecran = _invoquer(racine, "-v")
+    with capsys.disabled():
+        print("\n----- dsoxlab -v check, epreuve (verdict) -----")
+        print(ecran)
+
+    assert code == 1
+    for interdit in MOTS_INTERDITS:
+        assert interdit not in ecran, interdit
+    assert "le mot du cours (not met)" in ecran
+    assert "bloque (not evaluated: check impossible)" in ecran
+    assert "the test detail is not available" in ecran
+    assert "SECRET" not in ecran
+
+
+def test_v_check_d_un_lab_avec_seuil_est_ferme_comme_une_epreuve(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: challenge\nexam_passing_score: 70\n")
+    _, _, ecran = _invoquer(racine, "-v")
+    assert "mkdir" not in ecran and "the test detail is not available" in ecran
+
+
+def test_json_d_une_epreuve_ne_porte_aucun_message_d_assertion(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: capstone\n")
+
+    code, sortie, _ = _invoquer(racine, "--json")
+    document = json.loads(sortie)
+    check = document["check"]
+
+    assert code == 1
+    assert check["output"] == "" and check["output_withheld"] is True
+    for interdit in (*MOTS_INTERDITS, "SECRET"):
+        assert interdit not in sortie, interdit
+    # Ce qui reste : les compteurs, les noms, les critères sans observation.
+    assert (check["passed"], check["total"], check["ok"]) == (1, 5, False)
+    assert check["failed_checks"] == ["test_le_mot_du_cours", "test_la_mission", "test_bloque"]
+    etats = {c["id"]: (c["state"], c["observation"]) for c in check["criteria"]}
+    assert etats["test_le_mot_du_cours"] == ("unsatisfied", None)
+    assert etats["test_bloque"] == ("not_evaluated", None)
+    assert etats["test_ok"] == ("satisfied", None)
+
+
+def test_un_lab_full_garde_v_et_output_complets(tmp_path: Path) -> None:
+    """Non-régression : la fermeture ne vaut que pour `verdict`."""
+    racine = _catalogue(tmp_path / "d")
+
+    _, _, ecran = _invoquer(racine, "-v")
+    _, sortie, _ = _invoquer(racine, "--json")
+    check = json.loads(sortie)["check"]
+
+    assert "mkdir -p reponses" in ecran and "AssertionError" in ecran
+    assert "mkdir -p reponses" in check["output"] and check["output_withheld"] is False
+    # `criteria` porte la première ligne seulement, comme l'export.
+    obs = {c["id"]: c["observation"] for c in check["criteria"]}
+    assert obs["test_le_mot_du_cours"] == MESSAGE_LONG.splitlines()[0]
+
+
+def test_un_challenge_en_first_line_garde_v_et_output(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: challenge\n")
+    _, _, ecran = _invoquer(racine, "-v")
+    _, sortie, _ = _invoquer(racine, "--json")
+    assert "mkdir -p reponses" in ecran
+    assert "mkdir -p reponses" in json.loads(sortie)["check"]["output"]
+
+
+def test_seul_un_feedback_explicite_ouvre_une_epreuve(tmp_path: Path) -> None:
+    for extra in ("lab_type: capstone\nfeedback: full\n", "lab_type: capstone\nfeedback: first-line\n"):
+        racine = _catalogue(tmp_path / extra.split("feedback: ")[1].strip(), extra=extra)
+        _, _, ecran_v = _invoquer(racine, "-v")
+        _, sortie, _ = _invoquer(racine, "--json")
+        assert "mkdir -p reponses" in ecran_v
+        check = json.loads(sortie)["check"]
+        assert check["output_withheld"] is False and "mkdir -p reponses" in check["output"]
+
+
+def test_le_journal_ne_recrache_pas_les_messages_d_une_epreuve(tmp_path: Path) -> None:
+    """Le journal garde les commandes lancées et leur code de retour, pas la sortie de pytest."""
+    racine = _catalogue(tmp_path / "d", extra="lab_type: capstone\n")
+
+    _invoquer(racine, "-v")
+    _invoquer(racine, "--json")
+    journal = _journal(tmp_path)
+
+    assert "pytest" in journal, "le journal existe et porte bien la commande lancée"
+    for interdit in (*MOTS_INTERDITS, "SECRET"):
+        assert interdit not in journal, interdit
+
+
+def test_scores_et_status_ne_nomment_que_des_controles(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: capstone\n")
+    _invoquer(racine)
+    for commande in (["scores"], ["scores", "--json"], ["status", "premier"], ["progress"]):
+        sortie = CliRunner().invoke(app, [*commande, "--lab-home", str(racine)]).output
+        for interdit in ("mkdir", "manquant", "Cree le fichier", "SECRET"):
+            assert interdit not in sortie, (commande, interdit)
+
+
+# ── criteria[].lessons : déclarées, jamais montrées, jamais exportées ─────
+
+LECONS = (
+    "criteria:\n  - id: acces\n    tests: [test_le_mot_du_cours, test_la_mission]\n"
+    "    lessons:\n      - https://www.stephane-robert.info/docs/x/y/#ancre\n"
+    "      - http://exemple.test/lecon\n"
+)
+
+
+def test_un_check_d_epreuve_n_affiche_aucune_url_de_lecon(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra="lab_type: capstone\n" + LECONS)
+
+    for options in ((), ("-v",)):
+        _, _, ecran = _invoquer(racine, *options)
+        assert "http" not in ecran and "stephane-robert" not in ecran
+    _, sortie, _ = _invoquer(racine, "--json")
+    assert "stephane-robert" not in sortie and "lessons" not in sortie
+
+
+def test_les_lecons_ne_sortent_jamais_dans_l_export(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", extra=LECONS)
+    lab = _lab(racine)
+    evaluate_lab(racine, lab, check_lab(lab))
+    (row,) = get_all_results(racine)
+
+    ligne = json.dumps(export_result_dict(row, lab, "politique-test"))
+
+    assert "stephane-robert" not in ligne and "lessons" not in ligne
+    assert lab.criteria[0].lessons == (
+        "https://www.stephane-robert.info/docs/x/y/#ancre", "http://exemple.test/lecon",
+    )
+
+
+def _issues_lecons(racine: Path) -> list[str]:
+    return [i.key for i in validate_metadata(_lab(racine)).issues if "lecon" in i.key]
+
+
+@pytest.mark.parametrize(
+    "lecons",
+    [
+        "[https://www.stephane-robert.info/docs/a/]",
+        "[https://www.stephane-robert.info/docs/a/#section-2]",
+        "[http://exemple.test/a, https://exemple.test/b]",
+        "[https://a.test/1, https://a.test/2, https://a.test/3, https://a.test/4, https://a.test/5]",
+    ],
+)
+def test_des_lecons_bien_formees_passent(tmp_path: Path, lecons: str) -> None:
+    extra = f"criteria:\n  - id: un\n    tests: [test_ok]\n    lessons: {lecons}\n"
+    racine = _catalogue(tmp_path / "d", tests="def test_ok():\n    assert True\n", extra=extra)
+    assert _issues_lecons(racine) == []
+
+
+@pytest.mark.parametrize(
+    ("lecons", "cle"),
+    [
+        ("[]", "metadata_lecons_vide"),
+        ("[/docs/relatif/]", "metadata_lecon_url_invalide"),
+        ("[ftp://exemple.test/a]", "metadata_lecon_url_invalide"),
+        ("[www.stephane-robert.info/docs/a/]", "metadata_lecon_url_invalide"),
+        ("['https://']", "metadata_lecon_url_invalide"),
+        ("['https://a.test/une lecon']", "metadata_lecon_url_invalide"),
+        ("[https://a.test/1, https://a.test/1]", "metadata_lecon_doublon"),
+        (
+            ("[https://a.test/1, https://a.test/2, https://a.test/3, https://a.test/4, "
+             "https://a.test/5, https://a.test/6]"),
+            "metadata_lecons_trop",
+        ),
+    ],
+)
+def test_des_lecons_mal_formees_sont_refusees(tmp_path: Path, lecons: str, cle: str) -> None:
+    extra = f"criteria:\n  - id: un\n    tests: [test_ok]\n    lessons: {lecons}\n"
+    racine = _catalogue(tmp_path / "d", tests="def test_ok():\n    assert True\n", extra=extra)
+    assert cle in _issues_lecons(racine)
+
+
+def test_les_lecons_ne_se_traduisent_pas(tmp_path: Path) -> None:
+    racine = _catalogue(
+        tmp_path / "d", tests="def test_ok():\n    assert True\n",
+        extra="criteria:\n  - {id: un, tests: [test_ok], lessons: [https://a.test/1]}\n",
+        lab_fr="criteria:\n  - {id: un, lessons: [https://a.test/1]}\n",
+    )
+    chemins = " ".join(str(i.params) for i in validate_unknown_keys(racine).issues)
+    assert "criteria[].lessons" in chemins

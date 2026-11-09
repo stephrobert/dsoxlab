@@ -219,32 +219,7 @@ def _valider(
         info(_("validating", lab_id=texte_affichable(lab.id)))
     result = _run_check_with_progress(lab, target, quiet=quiet)
     if not result.ok and not quiet:
-        # « and not quiet » : sans lui, la sortie pytest précédait le document
-        # JSON sur stdout dès qu'un test échouait, et le flux n'était plus
-        # analysable. Le cas le plus fréquent en usage réel, et le plus facile
-        # à manquer : un lab qui passe n'emprunte jamais cette branche.
-        # L'appelant en mode machine retrouve ce texte dans check.output.
-        #
-        # Par défaut, les NOMS des tests en échec, pas leurs tracebacks. Mesuré
-        # sur le lab de démonstration : la sortie brute valait 26 lignes
-        # d'`assert False` et de `+ where exists = PosixPath(...)`, affichées à
-        # quelqu'un qui apprend l'administration système. Les labs de ce contrat
-        # nomment leurs tests en phrases, c'est donc là qu'est l'information.
-        #
-        # La sortie brute reste accessible, et à deux endroits plutôt qu'un :
-        # `-v` pour un humain qui veut creuser, `--json` pour un programme.
-        # La retirer serait perdre un diagnostic ; l'imposer, le noyer.
-        echecs = echecs_de_tests(result.output)
-        politique = lab.feedback_policy
-        if echecs and not verbosite() and politique != "full":
-            # `first-line` et `verdict` : ce que le lab accepte de montrer d'un
-            # critère raté. Pas d'invite vers `-v`, qui montrerait tout.
-            print_criteres_a_revoir(lignes_a_afficher(lab, result, politique))
-        elif echecs and not verbosite():
-            print_echecs_de_tests(echecs)
-            info(_("check_sortie_complete", lab_id=texte_affichable(lab.id)))
-        else:
-            console.print(result.output)
+        _montrer_l_echec(lab, result)
 
     evaluation = evaluate_lab(root, lab, result)
     if not lab.is_exercise:
@@ -285,6 +260,60 @@ def _valider(
     )
     info(_("check_result_saved", score=evaluation.score, max_score=evaluation.max_score))
     return result, evaluation.score, evaluation.max_score
+
+
+def _montrer_l_echec(lab: LabDefinition, result: CheckResult) -> None:
+    """Ce que `check` montre quand des tests échouent, selon la politique du lab.
+
+    Sortie de ``_valider`` : la politique d'affichage (`full`, `first-line`,
+    `verdict`) a fait passer la fonction au-delà de ce que le cliquet de
+    complexité du dépôt accepte.
+    """
+    # « and not quiet » : sans lui, la sortie pytest précédait le document
+    # JSON sur stdout dès qu'un test échouait, et le flux n'était plus
+    # analysable. Le cas le plus fréquent en usage réel, et le plus facile
+    # à manquer : un lab qui passe n'emprunte jamais cette branche.
+    # L'appelant en mode machine retrouve ce texte dans check.output.
+    #
+    # Par défaut, les NOMS des tests en échec, pas leurs tracebacks. Mesuré
+    # sur le lab de démonstration : la sortie brute valait 26 lignes
+    # d'`assert False` et de `+ where exists = PosixPath(...)`, affichées à
+    # quelqu'un qui apprend l'administration système. Les labs de ce contrat
+    # nomment leurs tests en phrases, c'est donc là qu'est l'information.
+    #
+    # La sortie brute reste accessible, et à deux endroits plutôt qu'un :
+    # `-v` pour un humain qui veut creuser, `--json` pour un programme.
+    # La retirer serait perdre un diagnostic ; l'imposer, le noyer.
+    echecs = echecs_de_tests(result.output)
+    politique = lab.feedback_policy
+    if politique == "verdict":
+        # UNE ÉPREUVE NE DONNE RIEN, pas même avec `-v` : le verdict par
+        # critère, jamais la sortie brute de pytest, qui porte les messages
+        # que l'auteur a écrits pour guider. Seul un `feedback:` déclaré
+        # explicitement par l'auteur ouvre une épreuve.
+        _montrer_le_verdict_seul(lab, result)
+    elif echecs and not verbosite() and politique != "full":
+        # `first-line` : ce que le lab accepte de montrer d'un critère
+        # raté. Pas d'invite vers `-v`, qui montrerait tout.
+        print_criteres_a_revoir(lignes_a_afficher(lab, result, politique))
+    elif echecs and not verbosite():
+        print_echecs_de_tests(echecs)
+        info(_("check_sortie_complete", lab_id=texte_affichable(lab.id)))
+    else:
+        console.print(result.output)
+
+
+def _montrer_le_verdict_seul(lab: LabDefinition, result: CheckResult) -> None:
+    """Une épreuve échouée : le libellé et le verdict de chaque critère, rien d'autre.
+
+    Avec `-v`, l'apprenant demande le détail : on lui dit qu'il n'existe pas
+    pour une épreuve, plutôt que de le lui donner ou de se taire.
+    """
+    lignes = lignes_a_afficher(lab, result, "verdict")
+    if lignes:
+        print_criteres_a_revoir(lignes)
+    if verbosite():
+        info(_("check_detail_epreuve_indisponible"))
 
 
 def _undefine_command(orphans: dict[str, str]) -> str:

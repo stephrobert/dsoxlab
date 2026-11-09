@@ -119,6 +119,13 @@
           "label": {
             "type": "string",
             "description": "The criterion label, shown by check in place of the test name. English here; lab.<lang>.yaml overrides it, matched by id."
+          },
+          "lessons": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": { "type": "string", "pattern": "^https?://" },
+            "description": "Optional. One to five URLs of site lessons where to review this criterion, in the format of doc_url (http or https, an #anchor is allowed). Only lab.yaml carries them. The engine never shows them in check (an exam gives nothing) and never exports them: the site reads them in the catalog to say, once a result is sent, which lessons to review. No network check."
           }
         }
       }

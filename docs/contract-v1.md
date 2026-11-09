@@ -331,9 +331,25 @@ Default when `feedback` is absent: `lab` = `full`; `challenge` = `first-line`;
 `capstone`, and any lab with an `exam_passing_score` = `verdict`. A criterion
 that could not be evaluated (fixture error, collection error) is shown as such,
 *not evaluated: check impossible*, never as unsatisfied. When the lab is no
-longer in the catalog, the export applies `verdict`. `dsoxlab -v check` and the
-`output` of `check --json` still carry the raw pytest output: they are explicit
-requests for the detail.
+longer in the catalog, the export applies `verdict`.
+
+**An exam gives nothing.** On a lab in `verdict`, `dsoxlab -v check` does not
+show the raw pytest output either: only the verdict per criterion, and a line
+saying the detail is not available for an exam. In `check --json`, `output` is
+the empty string and `output_withheld` is `true`; the counters, `failed_checks`
+and `criteria` (with an `observation` of `null`) remain. On a lab in `full` or
+`first-line`, `-v` and `output` keep carrying the raw output. The only way to
+open an exam is for its author to declare `feedback: full` or `first-line`
+explicitly.
+
+**`criteria[].lessons`.** Each declared criterion may carry `lessons`, one to
+five URLs of lessons of the site where to review it, in the format of `doc_url`
+(`http` or `https`, an `#anchor` is allowed). Only `lab.yaml` carries them, since
+the site translates its own URLs. `validate-structure` checks the form, refuses
+duplicates, an empty list and more than five, and makes no network request. The
+engine **never shows** them in `check` (an exam gives nothing) and **never
+exports** them: the site reads them in the catalog to say, once a result is
+sent, which lessons to review.
 
 ### `exam_passing_score`
 

@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `catalog.version` keeps its meaning. Every value is revalidated when read
   (identifiers restricted to letters, digits and `_ . : [ ] -`, 128 characters
   at most; observations 280 characters at most; no test id, path or technical
-  text). `push` and `scores --json` are unchanged.
+  text). `scores --json` is unchanged (`push` is covered below).
 - **`lab.yaml` accepts `criteria:` and `feedback:`** (lot D of issue #336).
   `criteria` is an optional list of `{id, tests, label}`: tests grouped under a
   declared `id` become one criterion, satisfied only if all of them are (labels
@@ -80,10 +80,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "check blocked by the environment". `not_evaluated` in the export is then a
   subset of `failed_checks` (a collection error, which has no test name, keeps
   its identifier).
+- **`push` carries the attempt too** (lot E): `attempt_id`, `lab_digest`,
+  `not_evaluated` (20 names at most), `hints_seen` (20 at most) and `criteria`
+  reduced to `{id, state}` (40 at most; beyond that `null`, never a truncated
+  list). Reading is tolerant and adds no new reason for discarding a line: a
+  malformed field becomes `null`. `merge` keeps the triplet catalog, lab, date as
+  its key; a line carrying an `attempt_id` replaces the same attempt held
+  without one, never the reverse, and two lines with the same `attempt_id` but
+  different dates stay two. The portal reads this store as an opaque value
+  and does not refuse a section for new keys in the lines; the browser, which
+  re-reads the store through a whitelist, rewrites it without the new fields until
+  the site is updated, and the next `push` restores them: a temporary loss of
+  detail on the browser side, never an emptied store. Size limits: see below.
+- **`push` lightens what it sends before refusing for size.** The portal limits
+  the proofs to 1,500,000 raw and 350,000 compressed bytes (measured on the
+  payload, where the store is an escaped string). With the 0.8.0 detail a typical
+  line weighs about 1,560 bytes instead of 630, so about 960 attempts fit instead
+  of 2,380. Oldest attempts first, `criteria` then `hints_seen` then
+  `not_evaluated` becomes `null`, only as much as needed: never a truncated list,
+  never a removed line, never a v1 field, never the local database. `push` says
+  how many old attempts were sent without their detail. When merging, the
+  richest line wins for the same `attempt_id` (a lightened line never overwrites a
+  detail the account holds), so a second `push` writes nothing. Beyond about
+  2,380 attempts, even fully lightened, `push` still refuses and names the limit.
+- **An exam gives nothing, not even with `-v`.** On a lab in `verdict` (a
+  `capstone`, or any lab with an `exam_passing_score`), `dsoxlab -v check` no
+  longer shows the raw pytest output: only the verdict per criterion and a line
+  saying the detail is not available. In `check --json`, `output` is empty and
+  the new `output_withheld` is `true`; `check --json` now also carries
+  `failed_checks` and `criteria` (no observation in `verdict`). Only an explicit
+  `feedback: full` or `first-line` opens an exam. `-v` and `output` are unchanged
+  on `full` and `first-line` labs.
+- **`criteria[].lessons`** (optional, one to five lesson URLs in the format of
+  `doc_url`, `lab.yaml` only): where the site sends the learner to review a
+  criterion once a result is sent. `validate-structure` checks the form,
+  duplicates, an empty list and more than five, with no network request. The
+  engine never shows nor exports them.
 
 ### Unchanged
 
-- The score, `failed_checks`, `blocking_failed`, what `check` prints, `push`,
+- The score, `failed_checks`, `blocking_failed`, what `check` prints,
   `scores --json` and every exit code. The only thing that reads the new
   report is what is recorded and exported, as described above.
 

@@ -250,6 +250,10 @@ la suite.
 | `metadata_critere_sans_test` | un critère ne liste aucun test : il ne serait jamais évalué |
 | `metadata_critere_test_inconnu` | un critère nomme une fonction de test qui n'existe nulle part dans `challenge/tests/` : un test renommé viderait le critère en silence |
 | `metadata_critere_test_partage` | un test appartient à plusieurs critères |
+| `metadata_lecons_vide` | un critère déclare une liste `lessons` vide |
+| `metadata_lecons_trop` | un critère liste plus de cinq leçons |
+| `metadata_lecon_url_invalide` | une leçon n'est pas une URL `http(s)` |
+| `metadata_lecon_doublon` | un critère liste deux fois la même leçon |
 | `content_broken_links` | un lien relatif ne pointe sur rien |
 | `content_missing_english` | un document n'est traduit que d'un côté |
 | `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |
