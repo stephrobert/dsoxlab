@@ -231,6 +231,7 @@ def _anomalies_de_contenu(root: Path, labs: list[LabDefinition]) -> list[Anomali
         validate_scoring,
         validate_solutions_encrypted,
         validate_targets,
+        validate_transfer,
     )
 
     # Les cibles vm se valident contre `infra.hosts` : un FQDN inconnu ne se
@@ -248,6 +249,7 @@ def _anomalies_de_contenu(root: Path, labs: list[LabDefinition]) -> list[Anomali
     # Les prérequis se valident contre le catalogue entier : c'est le seul
     # endroit où la liste complète des identifiants existe.
     identifiants = {lab.id for lab in labs}
+    par_identifiant = {lab.id: lab for lab in labs}
 
     anomalies: list[Anomalie] = []
     for lab in labs:
@@ -258,6 +260,7 @@ def _anomalies_de_contenu(root: Path, labs: list[LabDefinition]) -> list[Anomali
             validate_language_parity(lab),
             validate_targets(lab, hotes),
             validate_prerequisites(lab, identifiants),
+            validate_transfer(lab, par_identifiant),
         ]
         # Deux dispositions coexistent : « solution/<chemin du lab> » à la
         # racine, et « labs/<lab>/solution/ » dans le lab. Le contrôle ne

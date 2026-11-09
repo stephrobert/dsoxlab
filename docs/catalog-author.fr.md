@@ -244,6 +244,16 @@ la suite.
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` est déclaré sur un `lab_type` qui n'évalue pas : seuls `challenge` et `capstone` le font |
 | `metadata_blocking_check_inconnu` | `exam_blocking_checks` nomme un test absent de `challenge/tests/test_functional.py` : un test renommé désarmerait l'exigence en silence |
 | `metadata_blocking_sans_epreuve` | `exam_blocking_checks` est déclaré sur un `lab_type` qui ne note personne : seuls `challenge` et `capstone` évaluent |
+| `metadata_feedback_inconnu` | `feedback` sort de `full`, `first-line`, `verdict` : le moteur applique à la place le défaut du type de lab |
+| `metadata_critere_id_invalide` | un `criteria[].id` ne respecte pas `[\w.:\[\]-]{1,128}` |
+| `metadata_critere_id_double` | deux critères déclarent le même `id` |
+| `metadata_critere_sans_test` | un critère ne liste aucun test : il ne serait jamais évalué |
+| `metadata_critere_test_inconnu` | un critère nomme une fonction de test qui n'existe nulle part dans `challenge/tests/` : un test renommé viderait le critère en silence |
+| `metadata_critere_test_partage` | un test appartient à plusieurs critères |
+| `metadata_lecons_vide` | un critère déclare une liste `lessons` vide |
+| `metadata_lecons_trop` | un critère liste plus de cinq leçons |
+| `metadata_lecon_url_invalide` | une leçon n'est pas une URL `http(s)` |
+| `metadata_lecon_doublon` | un critère liste deux fois la même leçon |
 | `content_broken_links` | un lien relatif ne pointe sur rien |
 | `content_missing_english` | un document n'est traduit que d'un côté |
 | `content_scoring_points_mismatch` | les tâches totalisent un autre nombre de points que celui annoncé |
@@ -253,6 +263,11 @@ la suite.
 | `content_role_host_unknown` | une entrée de `roles` nomme un hôte inconnu |
 | `content_prerequisite_unknown` | une entrée de `prerequisites` ne nomme aucun lab de ce catalogue |
 | `content_prerequisite_self` | un lab se déclare son propre prérequis |
+| `content_transfer_invalid_id` | `transfer_of` n'est pas un identifiant de lab |
+| `content_transfer_unknown` | `transfer_of` ne nomme aucun lab de ce catalogue |
+| `content_transfer_self` | un lab se déclare sa propre origine de transfert |
+| `content_transfer_chain` | `transfer_of` vise un lab qui est lui-même une variante : une famille est un lab d'origine et ses variantes |
+| `content_transfer_validation` | un lab `validation` entre dans une famille de transfert, comme variante ou comme origine |
 | `content_solution_plaintext` | un fichier de `solution/` est lisible en clair |
 | `content_fixture_missing` | une fixture est déclarée mais absente de `fixtures/` |
 | `content_fixture_undeclared` | un fichier est dans `fixtures/` sans être déclaré |

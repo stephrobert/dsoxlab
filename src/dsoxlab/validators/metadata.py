@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from ..models.lab import LabDefinition
+from ..models.lab import FEEDBACK_POLICIES, LabDefinition
 
 #: Les trois premières formes supposent un apprenant qui fait ; ``validation``
 #: non — c'est une suite d'assertions qui défend un guide publié. Étendre
@@ -112,6 +113,109 @@ def _controler_les_blocages(
         )
 
 
+_ID_DE_CRITERE = re.compile(r"[\w.:\[\]-]{1,128}")
+
+
+def _fonctions_de_test(lab: LabDefinition) -> set[str]:
+    """Les noms de fonction définis sous ``challenge/tests/``, lus dans les fichiers.
+
+    Comme pour ``exam_blocking_checks`` : on lit la source, pas les tests
+    collectés, pour que `validate-structure` reste jouable hors ligne et sans
+    machine. Tous les ``*.py`` du répertoire comptent, méthodes de classe comprises.
+    """
+    noms: set[str] = set()
+    for fichier in sorted((lab.path / "challenge" / "tests").rglob("*.py")):
+        try:
+            arbre = ast.parse(fichier.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        noms |= {
+            noeud.name
+            for noeud in ast.walk(arbre)
+            if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+    return noms
+
+
+#: Combien de leçons un critère peut désigner.
+LECONS_MAX = 5
+
+
+def _controler_les_lecons(declare: Any, report: MetadataReport) -> None:
+    """``criteria[].lessons`` : forme d'URL, doublons, taille. Aucun réseau.
+
+    Une liste déclarée vide est refusée (autant ne pas la déclarer), comme plus de
+    cinq leçons : au-delà, le site n'a plus de leçon à proposer, seulement un
+    sommaire.
+    """
+    if declare.lessons is None:
+        return
+    if not declare.lessons:
+        report.issues.append(MetadataIssue(
+            "criteria", "metadata_lecons_vide", {"criterion": declare.id}))
+        return
+    if len(declare.lessons) > LECONS_MAX:
+        report.issues.append(MetadataIssue(
+            "criteria", "metadata_lecons_trop",
+            {"criterion": declare.id, "count": len(declare.lessons), "max": LECONS_MAX}))
+    vues: set[str] = set()
+    for url in declare.lessons:
+        analyse = urlparse(url)
+        if analyse.scheme not in ("http", "https") or not analyse.netloc or " " in url:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_lecon_url_invalide",
+                {"criterion": declare.id, "value": url}))
+        if url in vues:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_lecon_doublon",
+                {"criterion": declare.id, "value": url}))
+        vues.add(url)
+
+
+def _controler_les_criteres(lab: LabDefinition, report: MetadataReport) -> None:
+    """``criteria:`` et ``feedback:`` : ce que l'auteur peut déclarer, et ce qui
+    vide un critère en silence.
+
+    Un identifiant invalide ou double, un critère sans test, un nom de test qui
+    n'existe plus (un renommage vide le critère sans qu'aucun contrôle ne
+    rougisse), un test revendiqué par deux critères, et un ``feedback`` hors de
+    l'énuméré.
+    """
+    if lab.feedback is not None and lab.feedback not in FEEDBACK_POLICIES:
+        report.issues.append(MetadataIssue(
+            "feedback", "metadata_feedback_inconnu",
+            {"value": lab.feedback, "expected": ", ".join(FEEDBACK_POLICIES)},
+        ))
+    if not lab.criteria:
+        return
+    existants = _fonctions_de_test(lab)
+    vus: set[str] = set()
+    appartenance: dict[str, list[str]] = {}
+    for declare in lab.criteria:
+        _controler_les_lecons(declare, report)
+        if not _ID_DE_CRITERE.fullmatch(declare.id):
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_critere_id_invalide", {"value": declare.id}))
+        if declare.id in vus:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_critere_id_double", {"value": declare.id}))
+        vus.add(declare.id)
+        if not declare.tests:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_critere_sans_test", {"value": declare.id}))
+        for nom in declare.tests:
+            appartenance.setdefault(nom, []).append(declare.id)
+            if nom not in existants:
+                report.issues.append(MetadataIssue(
+                    "criteria", "metadata_critere_test_inconnu",
+                    {"criterion": declare.id, "value": nom}))
+    for nom, identifiants in appartenance.items():
+        if len(set(identifiants)) > 1:
+            report.issues.append(MetadataIssue(
+                "criteria", "metadata_critere_test_partage",
+                {"value": nom, "criteria": ", ".join(sorted(set(identifiants)))}))
+
+
 def _controler_le_seuil_sans_epreuve(
     lab: LabDefinition, report: MetadataReport
 ) -> None:
@@ -204,5 +308,6 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
         )
     _controler_les_blocages(lab, report)
     _controler_le_seuil_sans_epreuve(lab, report)
+    _controler_les_criteres(lab, report)
 
     return report

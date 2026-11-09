@@ -38,6 +38,7 @@ from ..security.urls import URLRefusee, url_de_portail
 from ..sync import ErreurPortail, SansSession, SyncIndisponible, oidc
 from ..sync import jetons as magasin_jetons
 from ..sync import magasin as construction
+from ..sync.allegement import alleger
 from ..sync.oidc import Configuration
 from ..sync.protocole import ClientPortail
 
@@ -64,6 +65,13 @@ class Envoi:
     revision: int
     rejoue: bool
     total: int
+
+    degradees: int = 0
+    """Combien de tentatives anciennes sont parties sans leur détail.
+
+    Pour tenir sous les limites d'octets du portail, `push` allège d'abord les
+    lignes les plus anciennes (voir :mod:`dsoxlab.sync.allegement`). Le détail
+    reste dans la base locale, que cela ne touche pas."""
 
     ecrit: bool = True
     """Faux quand le compte portait déjà exactement ces preuves.
@@ -246,6 +254,9 @@ def pousser(portail: Portail, document: dict[str, Any]) -> Envoi:
         fusion, ajoutees, doublons = construction.fusionner(
             distant, conversion["preuves"]
         )
+        # Ce qui ne tiendrait pas sous les limites du portail est allégé, des
+        # lignes les plus anciennes aux plus récentes, avant de refuser.
+        fusion, degradees = alleger(fusion)
         charge = construction.serialiser(fusion)
         if ajoutees == 0 and brut is not None and charge == brut:
             # RIEN À ÉCRIRE, et ne pas écrire est le bon geste. Le portail
@@ -281,6 +292,7 @@ def pousser(portail: Portail, document: dict[str, Any]) -> Envoi:
             revision=ecriture["revision"],
             rejoue=ecriture["rejoue"],
             total=len(fusion["preuves"]),
+            degradees=degradees,
         )
 
     # Trois tours n'ont pas suffi : on rend le dernier refus tel quel plutôt

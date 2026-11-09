@@ -1,0 +1,8 @@
+id: variante
+title: Variante
+level: c1
+lab_type: lab
+transfer_of: lab-origine
+runtime:
+  type: shell
+  workdir: challenge/work

@@ -355,6 +355,10 @@ STRINGS: dict[str, str] = {
         "Show every column, even when the terminal is too narrow.",
     "check_echecs_de_tests":
         "What is left to do, according to the tests:",
+    'check_detail_epreuve_indisponible':
+        'This is an exam: the test detail is not available, only the verdict per criterion.',
+    "check_critere_non_satisfait": "not met",
+    "check_critere_non_evalue": "not evaluated: check impossible",
     "check_sortie_complete":
         "The full test output: dsoxlab -v check {lab_id}",
     "check_rien_mesure":
@@ -1175,6 +1179,44 @@ silent.
     "metadata_doc_url_scheme": "invalid URL (http/https scheme expected): {url}",
     "metadata_lab_type_invalid":
         "Invalid value '{value}'. Expected one of: {expected}",
+    "metadata_lecons_vide": (
+        "The criterion `{criterion}` declares an empty lessons list: leave the "
+        "key out, or give it one to five URLs."
+    ),
+    "metadata_lecons_trop": (
+        "The criterion `{criterion}` lists {count} lessons; at most {max} are accepted."
+    ),
+    "metadata_lecon_url_invalide": (
+        "The criterion `{criterion}` lists the lesson `{value}`, which is not an "
+        "http(s) URL."
+    ),
+    "metadata_lecon_doublon": (
+        "The criterion `{criterion}` lists the lesson `{value}` twice."
+    ),
+    "metadata_feedback_inconnu": (
+        "feedback is `{value}`; expected one of: {expected}. The engine "
+        "applies the default of the lab type instead."
+    ),
+    "metadata_critere_id_invalide": (
+        "criteria declares the id `{value}`, which does not match "
+        "[\\w.:\\[\\]-]{{1,128}}: letters, digits and _ . : [ ] -, 128 "
+        "characters at most."
+    ),
+    "metadata_critere_id_double": (
+        "criteria declares the id `{value}` twice: an identifier names one criterion."
+    ),
+    "metadata_critere_sans_test": (
+        "The criterion `{value}` lists no test: it would never be evaluated."
+    ),
+    "metadata_critere_test_inconnu": (
+        "The criterion `{criterion}` names `{value}`, and no test function of "
+        "that name exists in challenge/tests/. A renamed test would silently "
+        "empty the criterion."
+    ),
+    "metadata_critere_test_partage": (
+        "The test `{value}` belongs to several criteria ({criteria}): a test "
+        "proves at most one criterion."
+    ),
     "metadata_blocking_check_inconnu": (
         "exam_blocking_checks names `{value}`, and no test of that name "
         "exists in challenge/tests/test_functional.py. A renamed test "
@@ -1235,6 +1277,19 @@ silent.
         "prerequisite '{prerequisite}' names no lab of this catalog",
     "content_prerequisite_self":
         "prerequisite '{lab}' is the lab itself",
+    "content_transfer_invalid_id":
+        "transfer_of '{value}' is not a lab identifier (letters, digits, '.', '_' "
+        "and '-', starting with a letter or a digit)",
+    "content_transfer_unknown":
+        "transfer_of '{target}' names no lab of this catalog",
+    "content_transfer_self":
+        "transfer_of '{lab}' is the lab itself",
+    "content_transfer_chain":
+        "transfer_of '{target}' is itself a transfer variant of '{origin}': "
+        "point to the original lab, a family is one original lab and its variants",
+    "content_transfer_validation":
+        "transfer_of links '{lab}', whose lab_type is validation: a validation "
+        "lab measures nobody, so it takes no part in a transfer family",
     "content_role_host_unknown":
         "role '{role}' aims at '{host}', missing from infra.hosts in meta.yml",
     # ── fixtures: the directory and the declaration must agree ──────────────
@@ -1590,6 +1645,7 @@ silent.
     "field_distros":    "[bold]Distros:[/bold]",
     "field_skills":     "[bold]Skills:[/bold]",
     "field_doc":        "[bold]Doc:[/bold]",
+    "field_transfer_of": "[bold]Transfer variant of:[/bold]",
     "field_track":      "[bold]Track:[/bold]",
     "field_certifs":    "[bold]Certifs:[/bold]",
     "field_type":       "[bold]Type:[/bold]",
@@ -2008,6 +2064,8 @@ silent.
         '{ajoutees} attempt(s) added. The account now holds {total}, at revision {revision}.',
     'push_doublons':
         '{doublons} attempt(s) were already on the account, and were left as they are.',
+    'push_allege':
+        '{degradees} older attempt(s) were sent without their per-criterion detail, so that your proofs fit the account limit. The detail is still in your local history.',
     'push_injoignable':
         'The portal did not answer. Nothing was written, so running dsoxlab push again is safe.',
     'push_conflit_persistant':

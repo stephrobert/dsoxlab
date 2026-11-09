@@ -1,0 +1,8 @@
+id: lab-feedback
+title: Lab feedback
+level: c1
+lab_type: lab
+feedback: first-line
+runtime:
+  type: shell
+  workdir: challenge/work

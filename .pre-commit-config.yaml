@@ -22,8 +22,10 @@ repos:
         # `templates/licences/` porte des textes de licence qui doivent rester
         # tels qu'ils sont publiés : GitHub ne reconnaît une licence qu'à son
         # texte officiel nu, et un catalogue qui reçoit une copie reformatée
-        # serait rapporté en NOASSERTION.
-        exclude: '(^LICENSE$|\.md$|^src/dsoxlab/templates/licences/)'
+        # serait rapporté en NOASSERTION. `tests/references/` porte des sorties
+        # de `check` capturées telles quelles (rich y laisse des espaces de fin
+        # de ligne) : les comparer octet pour octet est leur raison d'être.
+        exclude: '(^LICENSE$|\.md$|^src/dsoxlab/templates/licences/|^tests/references/)'
       # `fuzz/corpus/` est hors du périmètre de l'hygiène, et pas par
       # commodité : ce sont des graines DÉLIBÉRÉMENT malformées, qui existent
       # pour être données à un fuzzer. Un JSON tronqué au milieu d'une chaîne

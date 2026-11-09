@@ -491,6 +491,61 @@ def validate_prerequisites(
     return report
 
 
+_ID_DE_LAB = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+
+def validate_transfer(
+    lab: LabDefinition, labs_du_catalogue: dict[str, LabDefinition]
+) -> ContentReport:
+    """``transfer_of`` doit viser le lab d'origine d'une famille, et lui seul.
+
+    Une variante de transfert est un lab ordinaire qui éprouve la même capacité
+    dans un autre contexte. La relation est une flèche d'une variante vers son
+    origine : la cible existe, n'est pas la variante elle-même et n'est pas
+    elle-même une variante (une famille est un lab d'origine et ses variantes,
+    jamais une chaîne). Un lab ``validation`` ne mesure personne et n'entre dans
+    aucune famille, ni comme variante ni comme origine.
+
+    Un lien faux ne casse aucun test et ne fait échouer aucun run : le site qui
+    lit le catalogue proposerait simplement une variante qui ne mène nulle part.
+    """
+    report = ContentReport(lab_id=lab.id)
+    cible = lab.transfer_of
+    if cible is None:
+        return report
+    chemin = lab.path / "lab.yaml"
+    # Les clés restent des littéraux au point d'appel : le test qui relie les
+    # validators à la page auteur les lit dans l'arbre syntaxique.
+    if not _ID_DE_LAB.fullmatch(cible):
+        report.issues.append(ContentIssue(
+            path=chemin, key="content_transfer_invalid_id", params={"value": cible}))
+    elif cible == lab.id:
+        report.issues.append(ContentIssue(
+            path=chemin, key="content_transfer_self", params={"lab": cible}))
+    else:
+        _controler_l_origine(lab, labs_du_catalogue.get(cible), report)
+    return report
+
+
+def _controler_l_origine(
+    lab: LabDefinition, origine: LabDefinition | None, report: ContentReport
+) -> None:
+    """La cible de ``transfer_of``, une fois sa forme et l'auto-référence écartées."""
+    chemin = lab.path / "lab.yaml"
+    cible = lab.transfer_of or ""
+    if origine is None:
+        report.issues.append(ContentIssue(
+            path=chemin, key="content_transfer_unknown", params={"target": cible}))
+    elif origine.transfer_of is not None:
+        report.issues.append(ContentIssue(
+            path=chemin, key="content_transfer_chain",
+            params={"target": cible, "origin": origine.transfer_of}))
+    elif "validation" in (lab.lab_type, origine.lab_type):
+        concerne = lab.id if lab.lab_type == "validation" else cible
+        report.issues.append(ContentIssue(
+            path=chemin, key="content_transfer_validation", params={"lab": concerne}))
+
+
 def validate_targets(lab: LabDefinition, host_names: set[str]) -> ContentReport:
     """Les cibles d'un lab vm doivent exister dans `infra.hosts` du meta.yml.
 

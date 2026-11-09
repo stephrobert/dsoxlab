@@ -102,8 +102,9 @@ def check(
     except Interrupted as exc:
         _interrompu(exc, f"dsoxlab check {lab.id}")
     if as_json:
-        # La sortie brute de pytest est conservée : c'est là que l'appelant
-        # trouve le détail des échecs, qu'aucun compteur ne résume.
+        # La sortie brute de pytest est conservée sauf pour une épreuve : c'est
+        # là que l'appelant trouve le détail des échecs, qu'aucun compteur ne
+        # résume.
         machine.emit({
             "lab": machine.lab_dict(lab),
             "check": {
@@ -129,7 +130,10 @@ def check(
                     else "passed" if result.ok
                     else "failed"
                 ),
-                "output": result.output,
+                # `output`, `output_withheld`, `failed_checks` et `criteria` : la
+                # sortie brute n'est conservée que si le lab accepte de la
+                # montrer. Une épreuve (`verdict`) n'en donne aucune.
+                **machine.detail_de_check(result, lab),
             },
         })
         # Le code de sortie dit la même chose que `status`, et la même chose

@@ -1,0 +1,23 @@
+ℹ Validating premier…
+  ✘ test_functional.py::test_le_mot_du_cours  (FAILED)
+  ✘ test_functional.py::test_la_mission  (FAILED)
+  ✔ test_functional.py::test_ok
+  ✘ test_functional.py::test_bloque  (ERROR)
+  ⊘ test_functional.py::test_saute  (skipped)
+  Tests premier finished ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5/5 H:MM:SS
+What is left to do, according to the tests:
+  ✘ le mot du cours
+      reponses/cours.txt manquant. Le mot se lit dans : dsoxlab course          
+      premiers-pas                                                              
+      Cree le fichier, par exemple : mkdir -p reponses && echo mot >            
+      reponses/cours.txt                                                        
+  ✘ la mission
+      reponses/mission.txt manquant.                                            
+  ✘ bloque
+ℹ The full test output: dsoxlab -v check premier
+╭───────── Result: premier ─────────╮
+│  20 / 100 pts                     │
+│  ████░░░░░░░░░░░░░░░░  1/5 tests  │
+╰───────────────────────────────────╯
+ℹ Result saved to history (20/100 pts).
+✘ Some tests failed.

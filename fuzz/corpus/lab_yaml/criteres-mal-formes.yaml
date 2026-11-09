@@ -1,0 +1,15 @@
+id: criteres-mal-formes
+title: Criteres mal formes
+level: c1
+lab_type: challenge
+feedback: [verdict]
+transfer_of: {lab: x}
+criteria:
+  - persistance
+  - id: 12
+    tests: test_seul
+    lessons: "pas une liste"
+  - tests: [a]
+runtime:
+  type: shell
+  workdir: challenge/work

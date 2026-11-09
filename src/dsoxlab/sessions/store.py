@@ -71,6 +71,21 @@ def _ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> None:
     attendues = {
         "blocking_failed": "TEXT NOT NULL DEFAULT ''",
         "failed_checks": "TEXT NOT NULL DEFAULT ''",
+        # 0.8.0 (#336, lot B). Toutes NULL par défaut, et NULL veut dire
+        # INCONNU : une ligne écrite avant cette version n'a rien de tout cela,
+        # et on ne reconstitue pas ce qu'on n'a pas mesuré.
+        #
+        # attempt_id       uuid4 de la tentative.
+        # lab_digest       empreinte du lab (lab.yaml, tests, hints.yaml).
+        # catalog_revision révision du catalogue AU MOMENT du check.
+        # criteria         JSON compact : un résultat par critère.
+        # hints_seen       JSON : les indices vus, copiés ici parce que
+        #                  `reset_hints` efface `hint_requests`.
+        "attempt_id": "TEXT DEFAULT NULL",
+        "lab_digest": "TEXT DEFAULT NULL",
+        "catalog_revision": "TEXT DEFAULT NULL",
+        "criteria": "TEXT DEFAULT NULL",
+        "hints_seen": "TEXT DEFAULT NULL",
     }
     presentes = {
         ligne["name"] for ligne in conn.execute("PRAGMA table_info(results)")
@@ -111,6 +126,19 @@ def hints_cost_total(root: Path, lab_id: str) -> int:
         return int(row["total"]) if row else 0
 
 
+def hint_requests_for(root: Path, lab_id: str) -> list[dict[str, Any]]:
+    """Les indices demandés pour ce lab, dans l'ordre où ils l'ont été."""
+    with _get_db(root) as conn:
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT hint_index, requested_at, cost FROM hint_requests "
+                "WHERE lab_id = ? ORDER BY id ASC",
+                (lab_id,),
+            ).fetchall()
+        ]
+
+
 def record_hint(root: Path, lab_id: str, hint_index: int, cost: int) -> None:
     with _get_db(root) as conn:
         conn.execute(
@@ -141,15 +169,24 @@ def record_result(
     hints_used: int,
     blocking_failed: tuple[str, ...] = (),
     failed_checks: tuple[str, ...] = (),
+    attempt_id: str | None = None,
+    lab_digest: str | None = None,
+    catalog_revision: str | None = None,
+    criteria: str | None = None,
+    hints_seen: str | None = None,
 ) -> None:
+    """Inscrit une tentative. Les cinq derniers champs (0.8.0) valent ``None``
+    = inconnu, et c'est ce que portent aussi les lignes plus anciennes."""
     with _get_db(root) as conn:
         conn.execute(
             """INSERT INTO results
                (lab_id, section, validated_at, score, max_score, passed_tests,
-                total_tests, hints_used, blocking_failed, failed_checks)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                total_tests, hints_used, blocking_failed, failed_checks,
+                attempt_id, lab_digest, catalog_revision, criteria, hints_seen)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (lab_id, section, _now(), score, max_score, passed_tests, total_tests,
-             hints_used, ",".join(blocking_failed), ",".join(failed_checks)),
+             hints_used, ",".join(blocking_failed), ",".join(failed_checks),
+             attempt_id, lab_digest, catalog_revision, criteria, hints_seen),
         )
         conn.commit()
 

@@ -52,6 +52,8 @@ class Hint:
     text_en: str = ""
     text_fr: str = ""
     cost: int = 10
+    #: Le champ `id` de hints.yaml, lu tel quel (texte), absent = None.
+    id: str | None = None
 
     def text(self, lang: str = "en") -> str:
         """Retourne le texte dans la langue demandée, fallback EN."""
@@ -94,6 +96,7 @@ class HintFile:
                     text_en=text_en,
                     text_fr=text_fr,
                     cost=int(h.get("cost", 10)),
+                    id=None if h.get("id") is None else str(h["id"]),
                 )
             )
         return cls(points=int(data.get("points", 100)), hints=hints)

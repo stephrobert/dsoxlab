@@ -1,0 +1,17 @@
+id: epreuve-criteres
+title: Epreuve a criteres
+level: c1
+lab_type: challenge
+exam_passing_score: 75
+criteria:
+  - id: persistance
+    tests: [test_donnees, test_volume]
+    label: Data survives recreation
+    lessons:
+      - https://www.stephane-robert.info/docs/conteneurs/volumes/
+  - id: reseau
+    tests: [test_nom]
+    label: The app reaches its database
+runtime:
+  type: shell
+  workdir: challenge/work

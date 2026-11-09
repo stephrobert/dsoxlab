@@ -30,7 +30,7 @@ from ..reporting import machine
 from ..security import identifiant_sur
 from ..security.urls import url_de_portail
 from ..sessions.store import get_all_results
-from ..utils.shell import run_command
+from .revision_catalogue import revision_du_catalogue
 
 #: Le nom du format, tel qu'il voyage. Une **chaîne**, et c'est le seul endroit
 #: du projet où c'est le cas : ce document quitte dsoxlab, atterrit dans un
@@ -61,19 +61,6 @@ def _version_outil() -> str:
     from .. import __version__
 
     return __version__
-
-
-def _revision(root: Path) -> str | None:
-    """La révision du catalogue, quand il en a une.
-
-    Un score obtenu sur une version antérieure d'un lab se reconnaît alors, au
-    lieu d'être comparé à un énoncé qui a changé depuis. Absente d'un répertoire
-    qui n'est pas un dépôt git, et ce n'est pas une anomalie.
-    """
-    resultat = run_command(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], check=False, timeout=5,
-    )
-    return resultat.stdout.strip() if resultat.ok else None
 
 
 def identifiant_de_catalogue(root: Path, repo_id: str | None) -> str:
@@ -149,7 +136,7 @@ def construire_document(
         # nom de famille, et l'arborescence d'une machine — à un destinataire qui
         # n'en a aucun usage, puisque `id` et `version` identifient déjà le
         # catalogue.
-        "catalog": {"id": catalog_id, "version": _revision(root)},
+        "catalog": {"id": catalog_id, "version": revision_du_catalogue(root)},
         "results": lignes,
         "count": len(lignes),
     }

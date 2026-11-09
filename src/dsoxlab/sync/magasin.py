@@ -73,6 +73,16 @@ MAX_TESTS = 10_000
 #: qu'une suite inattendue pourrait en rendre des centaines : le magasin
 #: grossirait sans fin pour une information que personne ne lirait.
 MAX_CONTROLES_NOMMES = 20
+#: Combien de critères une preuve transporte au plus (0.8.0). Au-delà, le champ
+#: vaut ``None`` (inconnu) : une liste tronquée dirait « voici les critères »
+#: alors qu'il en manque, ce qui est pire que de ne rien dire.
+MAX_CRITERES_POUSSES = 40
+#: Les états de critère que le portail peut lire.
+ETATS_DE_CRITERE = frozenset({"satisfied", "unsatisfied", "not_evaluated", "skipped"})
+#: Forme d'un identifiant de critère ou d'indice : celle du contrat auteur.
+_JETON = re.compile(r"[\w.:\[\]-]+")
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+_EMPREINTE = re.compile(r"[0-9a-f]{16}")
 MAX_SCORE = 1_000_000
 
 #: Espaces de noms que le portail se réserve : un catalogue qui s'y nommerait
@@ -145,6 +155,31 @@ class Preuve(TypedDict):
 
     attempted_at: str
     producer_version: str | None
+
+    attempt_id: str | None
+    """L'identifiant de la tentative (0.8.0), ou ``None`` : inconnu.
+
+    Il sert à ``fusionner`` pour ENRICHIR une ligne déjà connue sans
+    identifiant (même triplet catalogue, lab, date), jamais pour dédoublonner :
+    la clé reste le triplet. ``None`` sur une tentative d'avant 0.8.0."""
+
+    lab_digest: str | None
+    """L'empreinte du lab telle qu'il était à la tentative (16 hexadécimaux)."""
+
+    not_evaluated: list[str] | None
+    """Les vérifications BLOQUÉES (fixture, collecte), ``MAX_CONTROLES_NOMMES`` au plus.
+
+    ``None`` veut dire INCONNU, ``[]`` aucune."""
+
+    hints_seen: list[dict[str, Any]] | None
+    """Les indices vus : ``{index, id, criterion}``, vingt au plus, sinon ``None``."""
+
+    criteria: list[dict[str, str]] | None
+    """Les critères réduits à ``{id, state}``, ``MAX_CRITERES_POUSSES`` au plus.
+
+    Ni observation, ni phase, ni mention : le portail n'a besoin que du verdict
+    par critère, et chaque octet de plus se paie sur 5 000 lignes. Au-delà du
+    plafond, ``None`` plutôt qu'une liste tronquée."""
 
 
 class Magasin(TypedDict):
@@ -292,6 +327,72 @@ def _controles_rates(valeur: object) -> list[str]:
     return [nom for nom in propres if nom]
 
 
+def _indices_vus(valeur: object) -> list[dict[str, Any]] | None:
+    """Les indices vus, ou ``None`` si le champ est absent, mal formé ou trop long."""
+    if not isinstance(valeur, list) or len(valeur) > MAX_CONTROLES_NOMMES:
+        return None
+    propres: list[dict[str, Any]] = []
+    for brut in valeur:
+        if not isinstance(brut, dict) or _entier(brut.get("index"), MAX_TESTS) is None:
+            return None
+        identifiant = brut.get("id")
+        critere = brut.get("criterion")
+        propres.append({
+            "index": brut["index"],
+            "id": identifiant if _jeton(identifiant) else None,
+            "criterion": critere if _jeton(critere) else None,
+        })
+    return propres
+
+
+def _jeton(valeur: object) -> bool:
+    return (
+        isinstance(valeur, str)
+        and len(valeur) <= LONGUEUR_MAX_IDENTIFIANT
+        and _JETON.fullmatch(valeur) is not None
+    )
+
+
+def _criteres_pousses(valeur: object) -> list[dict[str, str]] | None:
+    """``{id, state}`` par critère, ou ``None`` : mal formé, ou plus de quarante."""
+    if not isinstance(valeur, list) or len(valeur) > MAX_CRITERES_POUSSES:
+        return None
+    propres: list[dict[str, str]] = []
+    for brut in valeur:
+        if not isinstance(brut, dict):
+            return None
+        identifiant, etat = brut.get("id"), brut.get("state")
+        if not _jeton(identifiant) or etat not in ETATS_DE_CRITERE:
+            return None
+        propres.append({"id": cast("str", identifiant), "state": cast("str", etat)})
+    return propres
+
+
+def _champs_de_tentative(ligne: dict[str, Any]) -> dict[str, Any]:
+    """Les champs ajoutés en 0.8.0, lus avec TOLÉRANCE.
+
+    Aucun motif d'écart n'est ajouté : une ligne n'est jamais refusée pour l'un
+    d'eux, puisqu'une ligne écartée vide le magasin de l'apprenant. Un champ
+    absent ou mal formé devient ``None`` (inconnu) ; une liste mal formée ou
+    trop longue aussi, jamais une liste tronquée ou à moitié lue.
+    """
+    brut_id, brut_digest = ligne.get("attempt_id"), ligne.get("lab_digest")
+    non_evalues = ligne.get("not_evaluated")
+    return {
+        "attempt_id": brut_id if isinstance(brut_id, str) and _UUID.fullmatch(brut_id) else None,
+        "lab_digest": (
+            brut_digest
+            if isinstance(brut_digest, str) and _EMPREINTE.fullmatch(brut_digest)
+            else None
+        ),
+        "not_evaluated": (
+            _controles_rates(non_evalues) if isinstance(non_evalues, list) else None
+        ),
+        "hints_seen": _indices_vus(ligne.get("hints_seen")),
+        "criteria": _criteres_pousses(ligne.get("criteria")),
+    }
+
+
 def _refus_de_la_ligne(
     ligne: dict[str, Any]
 ) -> tuple[list[str] | None, bool | None]:
@@ -368,7 +469,7 @@ def _reduire_une_ligne(
         # ET au moins un joué » — mais un document retouché, oui.
         return "verdict_contradictoire"
 
-    return {
+    return cast("Preuve", {
         "source": "dsoxlab",
         "schema": 1,
         "catalogue_id": catalogue,
@@ -394,7 +495,8 @@ def _reduire_une_ligne(
         "exam_passed": verdict,
         "attempted_at": date,
         "producer_version": entete["version_producteur"],
-    }
+        **_champs_de_tentative(ligne),
+    })
 
 
 def convertir(
@@ -467,6 +569,30 @@ def lire(brut: str | None) -> Magasin:
             "dernierImport": dernier if isinstance(dernier, str) else None}
 
 
+def _richesse(preuve: Preuve) -> tuple[bool, int]:
+    """Ce qu'une ligne sait de sa tentative : un identifiant, puis du détail."""
+    detail = sum(
+        1 for champ in ("criteria", "hints_seen", "not_evaluated")
+        if preuve.get(champ) is not None
+    )
+    return (bool(preuve.get("attempt_id")), detail)
+
+
+def _plus_riche(nouvelle: Preuve, connue: Preuve) -> bool:
+    """La nouvelle ligne est-elle la MÊME tentative que la connue, en plus riche ?
+
+    Même triplet (déjà garanti par l'appelant) et, si les deux portent un
+    identifiant, le même : deux identifiants pour un même triplet sont deux
+    tentatives que le portail ne distingue pas, on garde la sienne. Plus riche
+    veut dire strictement : un identifiant que l'autre n'a pas, ou plus de
+    champs de détail connus. À richesse égale, la ligne du portail reste.
+    """
+    id_nouvelle, id_connue = nouvelle.get("attempt_id"), connue.get("attempt_id")
+    if id_nouvelle and id_connue and id_nouvelle != id_connue:
+        return False
+    return _richesse(nouvelle) > _richesse(connue)
+
+
 def fusionner(distant: Magasin, nouvelles: list[Preuve]) -> tuple[Magasin, int, int]:
     """L'union dédoublonnée du magasin distant et des preuves locales.
 
@@ -476,6 +602,15 @@ def fusionner(distant: Magasin, nouvelles: list[Preuve]) -> tuple[Magasin, int, 
     machine ou importées à la main. Les perdre parce qu'on tient la dernière
     révision serait un défaut silencieux et irréversible.
 
+    **La clé reste le triplet catalogue, lab, date.** ``attempt_id`` ne
+    dédoublonne rien à lui seul : deux lignes de même identifiant et de dates
+    différentes sont deux lignes (un document retouché ou rejoué ne doit pas
+    faire disparaître une tentative sur la foi d'un champ que le portail ne
+    garantit pas encore). Il sert à une seule chose : une ligne locale PLUS
+    RICHE (un identifiant que l'autre n'a pas, ou plus de détail connu) REMPLACE
+    la ligne du portail de même triplet et de même identifiant. La plus riche
+    gagne, jamais la plus récente : une ligne allégée n'écrase pas un détail.
+
     Le tri par date de tentative reprend celui du portail : à magasin égal,
     même ordre, donc même empreinte des deux côtés.
 
@@ -483,22 +618,34 @@ def fusionner(distant: Magasin, nouvelles: list[Preuve]) -> tuple[Magasin, int, 
         Le magasin fusionné, le nombre de preuves ajoutées, le nombre de
         doublons rencontrés.
     """
-    connues = {
-        _cle(preuve)
-        for preuve in distant["preuves"]
-        if isinstance(preuve, dict) and "lab_id" in preuve
-    }
-    ajout: list[Preuve] = []
+    total: list[Preuve] = list(distant["preuves"])
+    position: dict[tuple[str, str, str], int] = {}
+    for rang, preuve in enumerate(total):
+        if isinstance(preuve, dict) and "lab_id" in preuve:
+            position.setdefault(_cle(preuve), rang)
+    ajoutees = 0
     doublons = 0
     for preuve in nouvelles:
         cle = _cle(preuve)
-        if cle in connues:
+        connu = position.get(cle)
+        if connu is None:
+            position[cle] = len(total)
+            total.append(preuve)
+            ajoutees += 1
+        elif _plus_riche(preuve, total[connu]):
+            # LA MÊME TENTATIVE, PLUS RICHE. La ligne du portail date d'avant
+            # 0.8.0, ou a été allégée pour tenir sous la limite d'octets : la
+            # nôtre dit la même chose et davantage, elle la remplace. Jamais
+            # l'inverse : une ligne locale plus pauvre n'écrase pas un détail
+            # que le portail porte déjà.
+            # Comptée parmi les doublons : la tentative était connue, et
+            # `dernierImport` ne bouge pas. La charge, elle, diffère, donc elle
+            # est bien écrite.
+            total[connu] = preuve
             doublons += 1
-            continue
-        connues.add(cle)
-        ajout.append(preuve)
+        else:
+            doublons += 1
 
-    total = [*distant["preuves"], *ajout]
     total.sort(key=lambda preuve: str(preuve.get("attempted_at", "")))
     fusion: Magasin = {
         "v": 1,
@@ -506,10 +653,10 @@ def fusionner(distant: Magasin, nouvelles: list[Preuve]) -> tuple[Magasin, int, 
         # `dernierImport` dit quand des preuves sont ENTRÉES, pas quand on a
         # parlé au portail : sans ajout, il ne bouge pas.
         "dernierImport": (
-            datetime.now(UTC).isoformat() if ajout else distant["dernierImport"]
+            datetime.now(UTC).isoformat() if ajoutees else distant["dernierImport"]
         ),
     }
-    return fusion, len(ajout), doublons
+    return fusion, ajoutees, doublons
 
 
 def serialiser(magasin: Magasin) -> str:

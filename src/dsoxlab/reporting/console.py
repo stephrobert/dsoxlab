@@ -38,6 +38,7 @@ from ..services.doctor import (
 from ..services.infra_state_service import EtatHote, EtatInfra
 from ..services.lab_service import EchecDeTest
 from ..services.lab_state import LabState
+from ..services.politique_affichage import LigneDeCritere
 from ..services.progress_service import (
     BlocProgress,
     blocages_de_ligne,
@@ -553,6 +554,10 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
     # la barre que l'apprenant vise. Un lab ordinaire n'en déclare pas.
     if lab.exam_passing_score:
         lines.append(f"{_('field_exam_score')} {lab.exam_passing_score} %")
+    if lab.transfer_of:
+        lines.append(
+            f"{_('field_transfer_of')} {texte_affichable(lab.transfer_of)}"
+        )
     if lab.track:
         lines.append(f"{_('field_track')}   {texte_affichable(', '.join(lab.track))}")
     if lab.certification_tags:
@@ -1237,6 +1242,31 @@ def print_echecs_de_tests(echecs: list[EchecDeTest]) -> None:
             # coupait en deux lignes désalignées, et la commande à taper
             # devenait illisible sur un terminal de 80 colonnes.
             console.print(Padding(Text(message, style="dim"), (0, 0, 0, 6)))
+
+
+def print_criteres_a_revoir(lignes: list[LigneDeCritere]) -> None:
+    """Les critères à revoir, selon la politique d'affichage du lab.
+
+    Pour ``first-line`` et ``verdict`` (``full`` garde
+    :func:`print_echecs_de_tests`, inchangé) : le libellé, le verdict, et le
+    message déjà coupé par l'appelant. Un critère non évalué se dit comme tel :
+    la vérification n'a pas pu avoir lieu, ce n'est pas un échec de l'apprenant.
+    Les messages passent par ``Text`` pour la même raison que plus haut.
+    """
+    console.print(f"[yellow]{_('check_echecs_de_tests')}[/yellow]")
+    for ligne in lignes:
+        libelle = neutraliser(ligne.libelle)
+        if ligne.etat == "not_evaluated":
+            console.print(
+                f"  [yellow]?[/yellow] {libelle} "
+                f"[dim]({_('check_critere_non_evalue')})[/dim]"
+            )
+            continue
+        console.print(
+            f"  [red]✘[/red] {libelle} [dim]({_('check_critere_non_satisfait')})[/dim]"
+        )
+        if ligne.message:
+            console.print(Padding(Text(ligne.message, style="dim"), (0, 0, 0, 6)))
 
 
 def _grouper_par_message(echecs: list[EchecDeTest]) -> list[tuple[str | None, list[str]]]:

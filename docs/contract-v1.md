@@ -282,6 +282,9 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `lab_type` | no | enum | `lab` | `lab`, `challenge`, `capstone` or `validation`. The first three assume a learner doing the work; the fourth does not — see below. |
 | `exam_passing_score` | no | integer | `0` | Pass mark of a mock exam, as a **percentage** of the lab scale. See below. |
 | `prerequisites` | no | list of strings | `[]` | Ids of labs this one assumes already played. Written for capstones. See below. |
+| `transfer_of` | no | string | absent | Id of the lab of the same catalog this lab is a transfer variant of. See below. |
+| `criteria` | no | list of mappings | `[]` | Names the criteria of the lab: `{id, tests, label}`. See below. |
+| `feedback` | no | enum | by `lab_type` | What `check` shows of a failed criterion: `full`, `first-line` or `verdict`. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
 | `runtime` | no | mapping | shell defaults | See below. |
@@ -291,6 +294,63 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 is not a lab at all. `skills`, `distros` and `doc_url` are required by
 `dsoxlab validate-structure`: the file parses without them, but the lab is not
 publishable.
+
+### `criteria` and `feedback`
+
+Without `criteria`, every test function is its own criterion, identified by
+its pytest id without the file path (`test_pair[2]`). Declare criteria to give
+them a stable name and a label, and to group several tests under one id:
+
+```yaml
+criteria:
+  - id: ssh-hardened
+    label: SSH is hardened            # English; lab.fr.yaml overrides it
+    tests: [test_root_login_off, test_password_auth_off]
+feedback: first-line
+```
+
+`id` matches `[\w.:\[\]-]{1,128}` and is what the evidence export carries.
+`tests` lists **test function names** (no path, no parametrized case) of
+`challenge/tests/`; a test belongs to at most one criterion. A criterion
+grouping several tests is *satisfied* only if all of them are, *unsatisfied* as
+soon as one is, *not evaluated* if one was blocked and none failed, and
+*skipped* otherwise (all skipped, or satisfied and skipped mixed). A declared
+criterion none of whose tests ran does not appear. Labels are matched by `id`
+in `lab.<lang>.yaml` (`criteria: [{id, label}]`), on the model of `title` and
+`description`.
+
+`feedback` sets what `check` shows of a failed criterion, and what the export
+carries as `criteria[].observation`:
+
+| Value | `check` shows | `observation` |
+| --- | --- | --- |
+| `full` | the author's full message, exactly as before | first line, 280 characters at most |
+| `first-line` | criterion label, verdict, and **only the first line** of the author's message | first line, 280 characters at most |
+| `verdict` | criterion label and verdict, no message | `null` |
+
+Default when `feedback` is absent: `lab` = `full`; `challenge` = `first-line`;
+`capstone`, and any lab with an `exam_passing_score` = `verdict`. A criterion
+that could not be evaluated (fixture error, collection error) is shown as such,
+*not evaluated: check impossible*, never as unsatisfied. When the lab is no
+longer in the catalog, the export applies `verdict`.
+
+**An exam gives nothing.** On a lab in `verdict`, `dsoxlab -v check` does not
+show the raw pytest output either: only the verdict per criterion, and a line
+saying the detail is not available for an exam. In `check --json`, `output` is
+the empty string and `output_withheld` is `true`; the counters, `failed_checks`
+and `criteria` (with an `observation` of `null`) remain. On a lab in `full` or
+`first-line`, `-v` and `output` keep carrying the raw output. The only way to
+open an exam is for its author to declare `feedback: full` or `first-line`
+explicitly.
+
+**`criteria[].lessons`.** Each declared criterion may carry `lessons`, one to
+five URLs of lessons of the site where to review it, in the format of `doc_url`
+(`http` or `https`, an `#anchor` is allowed). Only `lab.yaml` carries them, since
+the site translates its own URLs. `validate-structure` checks the form, refuses
+duplicates, an empty list and more than five, and makes no network request. The
+engine **never shows** them in `check` (an exam gives nothing) and **never
+exports** them: the site reads them in the catalog to say, once a result is
+sent, which lessons to review.
 
 ### `exam_passing_score`
 
@@ -346,6 +406,39 @@ Each id must name a lab of the same catalog, and `validate-structure` checks
 it: a prerequisite pointing at nothing breaks no test and fails no run — it
 simply shows an order that leads nowhere, which is the kind of mistake an
 author never finds. A lab naming itself is reported too.
+
+### `transfer_of`: a variant that tests transfer, with its own results
+
+A learner who succeeds at a lab has shown they can follow it. Showing they can
+do the same thing elsewhere takes another exercise: same capability, but the
+context, a constraint or the diagnosis changed. `transfer_of` declares that
+relation, from the variant to the lab it varies:
+
+```yaml
+id: reverse-proxy-variante-tls
+title: Publish the service behind TLS, with another backend
+lab_type: lab
+transfer_of: reverse-proxy-publier-un-service
+```
+
+The value is the id of **another lab of the same catalog**. A variant is an
+ordinary lab (`lab`, `challenge` or `capstone`): there is no new `lab_type`, and
+no free-text note, since the goal reads in the title and the description of the
+variant.
+
+`validate-structure` refuses a value that is not an identifier
+(`content_transfer_invalid_id`), a target that names no lab of the catalog
+(`content_transfer_unknown`), a lab that targets itself
+(`content_transfer_self`), a target that is itself a variant
+(`content_transfer_chain`: a family is one original lab and its variants, never a
+chain), and a `validation` lab on either side (`content_transfer_validation`).
+
+The engine decides nothing else. A variant keeps **its own id and its own
+results**: the database, the export, the push and the score are unchanged, and
+the relation never turns a guided lab into proof. Reading the relation is for the
+site that consumes the catalog: `dsoxlab show <lab> --json` and
+`dsoxlab list-labs --json` expose it as `transfer_of` (`null` when absent), and
+`show` prints "Transfer variant of: <id>".
 
 A `lab_type: capstone` is a mock exam, and an exam without a pass mark is not
 one. Declare the bar, and dsoxlab renders a verdict:

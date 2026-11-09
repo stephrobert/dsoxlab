@@ -7,6 +7,148 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.8.0] - 2026-11-09
+
+### Ajouté
+
+- **Le moteur produit désormais un rapport structuré interne de chaque
+  exécution de `check`, sans aucun changement visible** (lot A de l'issue
+  #336). Un plugin pytest embarqué dans la roue
+  (`dsoxlab/rapport_pytest/dsoxlab_rapport.py`, bibliothèque standard et pytest
+  seulement, aucun import de `dsoxlab`) est chargé par `-p dsoxlab_rapport`
+  depuis un répertoire placé en tête du `PYTHONPATH` du sous-processus, ce qui
+  couvre les quatre façons dont `resolve_pytest_cmd` peut lancer pytest. Il
+  écrit une ligne JSONL par phase de test dans un répertoire temporaire que
+  `check` retire ensuite. Les deux chemins d'exécution de `check_lab` (capture
+  en bloc et flux) le passent et relisent le rapport dans un nouveau
+  `CheckResult.criteres`.
+- **Un résultat par critère**, `ResultatDeCritere` : un identifiant (le nodeid
+  pytest privé de son chemin de fichier, assaini en lettres, chiffres et
+  `_ . : [ ] -`, 128 caractères au plus ; deux cas paramétrés en échec donnent
+  deux critères ; deux tests homonymes dans deux fichiers retrouvent leur chemin
+  assaini pour rester distincts), le nodeid complet, la phase, un état
+  (`satisfied`, `unsatisfied`, `not_evaluated`), l'origine du message et le
+  message de l'auteur quand il existe. Une erreur de fixture ou de collecte
+  vaut `not_evaluated`, jamais `unsatisfied` ; un échec au teardown d'un test
+  réussi reste `satisfied` avec la mention `teardown_error`. Le message de
+  l'auteur est celui écrit dans l'`assert` ou dans `pytest.fail`, coupé avant
+  l'explication de pytest ; le texte d'une exception technique n'est jamais
+  conservé, et ne peut donc pas atteindre un apprenant par accident.
+- `CheckResult.criteres` vaut `None` quand le rapport est absent, tronqué ou
+  illisible : inconnu n'est pas « zéro critère », et `check` garde alors le
+  chemin texte qu'il a toujours eu. Si un lanceur masque le plugin à pytest,
+  l'exécution est rejouée sans lui, au lieu de transformer une mesure en panne.
+- **Chaque tentative enregistrée garde désormais de quoi être relue plus
+  tard** (lot B de l'issue #336) : `attempt_id` (uuid4), `lab_digest` (16
+  caractères hexadécimaux d'un SHA-256 de `lab.yaml`, de `challenge/tests/**` et
+  de `challenge/hints.yaml`, indépendant de git, caches exclus),
+  `catalog_revision` (la révision au moment du check, et non plus seulement à
+  l'export), `criteria` (un résultat par critère, avec le message de l'auteur et
+  jamais un texte technique) et `hints_seen` (les indices pris, avec leur `id`
+  lu dans `hints.yaml`, copiés sur la ligne parce que `reset` efface les
+  demandes). Cinq colonnes nullables ajoutées par la migration additive
+  existante ; une base 0.7.3 se relit comme avant et ses lignes donnent `NULL`,
+  c'est-à-dire inconnu.
+- **L'export les porte, par extension compatible de `dsoxlab-evidence-v1`**
+  (lot C) : `attempt_id`, `lab_digest`, `catalog_revision`, `not_evaluated`,
+  `hints_seen` et `criteria` sur chaque ligne, tous à `null` sur une ligne écrite
+  avant la 0.8.0. Le nom du schéma ne change pas, aucun champ existant ne change
+  de sens et `catalog.version` garde le sien. Chaque valeur est revalidée à la
+  lecture (identifiants réduits aux lettres, chiffres et `_ . : [ ] -`, 128
+  caractères au plus ; observations de 280 caractères au plus ; aucun
+  identifiant de test avec chemin, aucun texte technique). `scores --json`
+  est inchangé (`push` est traité plus bas).
+- **`lab.yaml` accepte `criteria:` et `feedback:`** (lot D de l'issue #336).
+  `criteria` est une liste facultative de `{id, tests, label}` : les tests
+  regroupés sous un `id` déclaré forment un seul critère, satisfait seulement
+  si tous le sont (libellés dans `lab.yaml` pour l'anglais et dans
+  `lab.<lang>.yaml`, appariés par `id`). Sans elle, un critère par test, comme
+  avant. `feedback` vaut `full`, `first-line` ou `verdict` et règle ce que
+  `check` montre d'un critère raté : `full` par défaut pour un `lab` (sortie
+  **strictement inchangée**), `first-line` pour un `challenge`, `verdict` pour
+  un `capstone` ou tout lab avec `exam_passing_score`. Avec `first-line`,
+  `check` montre le libellé du critère, son verdict et la seule première ligne
+  du message de l'auteur, pour que le geste de réparation écrit sur les lignes
+  suivantes ne soit pas donné ; avec `verdict`, aucun message. Un critère qui
+  n'a pas pu être évalué s'affiche *non évalué : vérification impossible*,
+  jamais comme non satisfait. L'`observation` exportée suit la même politique
+  (première ligne de 280 caractères au plus, `null` pour `verdict`).
+  `validate-structure` refuse un id invalide ou en double, un critère sans
+  test, un nom de test qui ne correspond à aucune fonction, un test revendiqué
+  par deux critères et un `feedback` inconnu. Contrat, schéma JSON et docs mis à
+  jour. **Changement de comportement** : un `challenge` sans `feedback:` ne
+  montre plus que la première ligne ; écrire `feedback: full` garde l'ancien
+  affichage.
+- **Un test sauté n'est plus « non évalué ».** Dans `criteria`, `skip` et
+  `xfail` donnent l'état `skipped` ; `not_evaluated` se limite aux vérifications
+  bloquées (erreur de fixture, erreur de collecte), pour que le site puisse le
+  présenter comme « vérification bloquée par l'environnement ». Dans l'export,
+  `not_evaluated` est alors un sous-ensemble de `failed_checks` (une erreur de
+  collecte, qui n'a pas de nom de test, garde son identifiant).
+- **`push` porte aussi la tentative** (lot E) : `attempt_id`, `lab_digest`,
+  `not_evaluated` (20 noms au plus), `hints_seen` (20 au plus) et `criteria`
+  réduit à `{id, state}` (40 au plus ; au-delà `null`, jamais une liste
+  tronquée). La lecture est tolérante et n'ajoute aucun motif d'écart : un champ
+  mal formé devient `null`. La fusion garde le triplet catalogue, lab, date pour
+  clé ; une ligne qui porte un `attempt_id` remplace la même tentative détenue
+  sans identifiant, jamais l'inverse, et deux lignes de même `attempt_id` mais
+  de dates différentes restent deux. Le portail lit ce magasin comme une valeur
+  opaque et ne refuse pas une section pour des clés nouvelles dans les lignes ;
+  le navigateur, qui relit le magasin par liste blanche, le réécrit sans les
+  nouveaux champs tant que le site n'est pas à jour, et le `push` suivant les
+  rétablit : une perte temporaire de détail côté navigateur, jamais un magasin
+  vidé. Limites de taille : voir plus bas.
+- **`push` allège ce qu'il envoie avant de refuser pour la taille.** Le portail
+  limite les preuves à 1 500 000 octets bruts et 350 000 compressés (mesurés sur
+  la charge, où le magasin est une chaîne échappée). Avec le détail de la 0.8.0,
+  une ligne typique pèse environ 1 560 octets au lieu de 630, donc environ 960
+  tentatives tiennent au lieu de 2 380. Les plus anciennes d'abord,
+  `criteria` puis `hints_seen` puis `not_evaluated` passent à `null`, seulement
+  autant qu'il le faut : jamais une liste tronquée, jamais une ligne retirée,
+  jamais un champ v1, jamais la base locale. `push` dit combien de tentatives
+  anciennes sont parties sans leur détail. À la fusion, la ligne la plus riche
+  gagne pour un même `attempt_id` (une ligne allégée n'écrase jamais un détail
+  que le compte porte), donc un second `push` n'écrit rien. Au-delà d'environ
+  2 380 tentatives, même allégé au maximum, `push` refuse encore et nomme la
+  limite.
+- **Une épreuve ne donne rien, pas même avec `-v`.** Sur un lab en `verdict`
+  (un `capstone`, ou tout lab avec un `exam_passing_score`), `dsoxlab -v check`
+  n'affiche plus la sortie brute de pytest : seulement le verdict par critère et
+  une ligne qui dit que le détail n'est pas disponible. Dans `check --json`,
+  `output` est vide et le nouveau `output_withheld` vaut `true` ; `check --json`
+  porte désormais aussi `failed_checks` et `criteria` (sans observation en
+  `verdict`). Seul un `feedback: full` ou `first-line` explicite ouvre une
+  épreuve. `-v` et `output` sont inchangés sur les labs `full` et `first-line`.
+- **`criteria[].lessons`** (facultatif, une à cinq URL de leçons au format de
+  `doc_url`, `lab.yaml` seulement) : où le site envoie l'apprenant réviser un
+  critère une fois un résultat envoyé. `validate-structure` contrôle la forme,
+  les doublons, une liste vide et plus de cinq entrées, sans requête réseau. Le
+  moteur ne les affiche ni ne les exporte jamais.
+- **`transfer_of`** (facultatif, `lab.yaml` seulement ; issue blog-roadmap #145,
+  côté moteur) : l'identifiant d'un autre lab du même catalogue dont ce lab est
+  une variante de transfert (même capacité, avec le contexte, une contrainte ou
+  le diagnostic changé). Une variante est un lab ordinaire (`lab`, `challenge`,
+  `capstone`) : aucun nouveau `lab_type`, aucune note en texte libre.
+  `validate-structure` refuse un identifiant invalide, une cible absente du
+  catalogue, un lab qui se cible lui-même, une cible qui est elle-même une
+  variante (une famille est un lab d'origine et ses variantes, jamais une
+  chaîne) et un lab `validation` d'un côté ou de l'autre (`content_transfer_*`,
+  messages EN et FR, listés dans le guide auteur). `show --json` et
+  `list-labs --json` exposent `transfer_of` (`null` si absent), et `show`
+  affiche « Variante de transfert de : <id> ». Le schéma JSON, les clés connues
+  et les documents du contrat portent le champ.
+
+### Inchangé
+
+- Une variante garde son propre identifiant et ses propres résultats : la base,
+  l'export, le push et le score sont inchangés, et la relation ne transforme
+  jamais un lab guidé en preuve. Un catalogue sans `transfer_of` produit les
+  mêmes sorties qu'avant, au champ `transfer_of: null` près dans l'objet lab.
+
+- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche,
+  `scores --json` et tous les codes de sortie. Seuls ce qui est enregistré et
+  exporté lit le nouveau rapport, comme décrit plus haut.
+
 ## [0.7.3] - 2026-11-03
 
 ### Corrigé
