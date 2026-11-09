@@ -288,6 +288,9 @@ validate-structure` le signale.
 | `lab_type` | non | énuméré | `lab` | `lab`, `challenge`, `capstone` ou `validation`. Les trois premiers supposent un apprenant qui fait ; le quatrième non — voir plus bas. |
 | `exam_passing_score` | non | entier | `0` | Seuil de réussite d'un examen blanc, en **pourcentage** du barème. Voir plus bas. |
 | `prerequisites` | non | liste de chaînes | `[]` | Identifiants des labs que celui-ci suppose joués. Écrit pour les capstones. Voir plus bas. |
+| `transfer_of` | non | chaîne | absent | Identifiant du lab du même catalogue dont ce lab est une variante de transfert. Voir plus bas. |
+| `criteria` | non | liste de mappings | `[]` | Nomme les critères du lab : `{id, tests, label}`. Voir plus bas. |
+| `feedback` | non | énuméré | selon `lab_type` | Ce que `check` montre d'un critère raté : `full`, `first-line` ou `verdict`. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
 | `runtime` | non | mapping | défauts shell | Voir ci-dessous. |
@@ -297,6 +300,65 @@ validate-structure` le signale.
 n'est pas un lab. `skills`, `distros` et `doc_url` sont exigés par
 `dsoxlab validate-structure` : le fichier se lit sans eux, mais le lab n'est pas
 publiable.
+
+### `criteria` et `feedback`
+
+Sans `criteria`, chaque fonction de test est son propre critère, identifié par
+son identifiant pytest sans le chemin du fichier (`test_pair[2]`). Déclarez des
+critères pour leur donner un nom stable et un libellé, et pour regrouper
+plusieurs tests sous un même id :
+
+```yaml
+criteria:
+  - id: ssh-durci
+    label: SSH is hardened            # anglais ; lab.fr.yaml le surcharge
+    tests: [test_root_login_off, test_password_auth_off]
+feedback: first-line
+```
+
+`id` respecte `[\w.:\[\]-]{1,128}` et c'est lui que l'export de preuves porte.
+`tests` liste des **noms de fonction de test** (sans chemin, sans cas
+paramétré) de `challenge/tests/` ; un test appartient à un critère au plus. Un
+critère qui regroupe plusieurs tests est *satisfait* seulement si tous le sont,
+*non satisfait* dès qu'un seul ne l'est pas, *non évalué* si l'un a été bloqué
+et qu'aucun n'a échoué, et *sauté* sinon (tous sautés, ou satisfaits et sautés
+mêlés). Un critère déclaré dont aucun test n'a tourné n'apparaît pas. Les
+libellés se surchargent par `id` dans `lab.<lang>.yaml`
+(`criteria: [{id, label}]`), sur le modèle de `title` et `description`.
+
+`feedback` règle ce que `check` montre d'un critère raté, et ce que l'export
+porte dans `criteria[].observation` :
+
+| Valeur | `check` montre | `observation` |
+| --- | --- | --- |
+| `full` | le message complet de l'auteur, exactement comme avant | première ligne, 280 caractères au plus |
+| `first-line` | libellé du critère, verdict, et **seulement la première ligne** du message de l'auteur | première ligne, 280 caractères au plus |
+| `verdict` | libellé du critère et verdict, aucun message | `null` |
+
+Défaut quand `feedback` est absent : `lab` = `full` ; `challenge` =
+`first-line` ; `capstone`, et tout lab qui porte un `exam_passing_score` =
+`verdict`. Un critère qui n'a pas pu être évalué (erreur de fixture, erreur de
+collecte) s'affiche comme tel, *non évalué : vérification impossible*, jamais
+comme non satisfait. Quand le lab n'est plus au catalogue, l'export applique
+`verdict`.
+
+**Une épreuve ne donne rien.** Sur un lab en `verdict`, `dsoxlab -v check`
+n'affiche pas non plus la sortie brute de pytest : seulement le verdict par
+critère, et une ligne qui dit que le détail n'est pas disponible pour une
+épreuve. Dans `check --json`, `output` est la chaîne vide et `output_withheld`
+vaut `true` ; les compteurs, `failed_checks` et `criteria` (avec une
+`observation` à `null`) restent. Sur un lab en `full` ou `first-line`, `-v` et
+`output` portent toujours la sortie brute. Le seul moyen d'ouvrir une épreuve
+est que son auteur déclare explicitement `feedback: full` ou `first-line`.
+
+**`criteria[].lessons`.** Chaque critère déclaré peut porter `lessons`, une à
+cinq URL de leçons du site où le réviser, au format de `doc_url` (`http` ou
+`https`, une ancre `#...` est permise). Seul `lab.yaml` les porte, puisque le
+site traduit lui-même ses URL. `validate-structure` contrôle la forme, refuse
+les doublons, une liste vide et plus de cinq entrées, et ne fait aucune requête
+réseau. Le moteur ne les **affiche jamais** dans `check` (une épreuve ne donne
+rien) et ne les **exporte jamais** : c'est le site qui les lit dans le catalogue
+pour dire, après l'envoi d'un résultat, quelles leçons réviser.
 
 ### `exam_passing_score`
 
@@ -355,6 +417,40 @@ Chaque identifiant doit nommer un lab du même catalogue, et
 aucun test et n'empêche aucun run — il affiche simplement un ordre qui ne mène
 nulle part, c'est-à-dire le genre d'erreur qu'un auteur ne découvre jamais. Un
 lab qui se nomme lui-même est signalé aussi.
+
+### `transfer_of` : une variante qui éprouve le transfert, avec ses propres résultats
+
+Réussir un lab montre qu'on sait le suivre. Montrer qu'on sait refaire la même
+chose ailleurs demande un autre exercice : même capacité, mais le contexte, une
+contrainte ou le diagnostic changent. `transfer_of` déclare cette relation, de la
+variante vers le lab qu'elle varie :
+
+```yaml
+id: reverse-proxy-variante-tls
+title: Publier le service derrière TLS, avec un autre backend
+lab_type: lab
+transfer_of: reverse-proxy-publier-un-service
+```
+
+La valeur est l'identifiant d'**un autre lab du même catalogue**. Une variante
+est un lab ordinaire (`lab`, `challenge` ou `capstone`) : il n'y a aucun nouveau
+`lab_type`, ni note en texte libre, puisque l'objectif se lit dans le titre et la
+description de la variante.
+
+`validate-structure` refuse une valeur qui n'est pas un identifiant
+(`content_transfer_invalid_id`), une cible qui ne nomme aucun lab du catalogue
+(`content_transfer_unknown`), un lab qui se cible lui-même
+(`content_transfer_self`), une cible qui est elle-même une variante
+(`content_transfer_chain` : une famille est un lab d'origine et ses variantes,
+jamais une chaîne), et un lab `validation` d'un côté ou de l'autre
+(`content_transfer_validation`).
+
+Le moteur ne décide rien d'autre. Une variante garde **son propre identifiant et
+ses propres résultats** : la base, l'export, le push et le score sont inchangés,
+et la relation ne transforme jamais un lab guidé en preuve. La lecture de la
+relation revient au site qui consomme le catalogue : `dsoxlab show <lab> --json`
+et `dsoxlab list-labs --json` l'exposent sous `transfer_of` (`null` si absent), et
+`show` affiche « Variante de transfert de : <id> ».
 
 Un `lab_type: capstone` est un examen blanc, et un examen sans seuil de
 réussite n'en est pas un. Déclare la barre, et dsoxlab rend un verdict :

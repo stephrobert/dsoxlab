@@ -41,7 +41,7 @@ from ._commun import (
 from ._socle import app
 
 if TYPE_CHECKING:
-    from ..services.sync_service import Portail
+    from ..services.sync_service import Envoi, Portail
 
 
 def _portail(root: Path) -> Portail:
@@ -226,6 +226,11 @@ def push(
         note(_(_CONSIGNES.get(erreur.code, "push_refuse_suite")))
         raise typer.Exit(1) from None
 
+    _dire_l_envoi(envoi)
+
+
+def _dire_l_envoi(envoi: Envoi) -> None:
+    """Ce qu'un `push` réussi annonce : écriture, doublons, allègement, écarts."""
     if envoi.rejoue:
         # Pas un échec : notre propre écriture, rejouée après une coupure. C'est
         # exactement ce que l'identifiant d'opération achète, et le dire évite
@@ -242,6 +247,8 @@ def push(
                   revision=envoi.revision))
     if envoi.doublons:
         info(_("push_doublons", doublons=envoi.doublons))
+    if envoi.degradees:
+        info(_("push_allege", degradees=envoi.degradees))
     _dire_les_ecarts(envoi.ecartees)
 
 

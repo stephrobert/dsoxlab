@@ -229,19 +229,30 @@ class ClientPortail:
         pas devinable. Mieux vaut quelques millisecondes de gzip ici qu'un 413
         après l'envoi d'un mégaoctet et demi.
         """
-        charge = json.dumps(
-            {"v": VERSION_CHARGE, "donnees": {CLE_MAGASIN: magasin}},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        if len(charge) > BRUT_PAR_SECTION:
+        brut, compresse = mesurer_charge(magasin)
+        if brut > BRUT_PAR_SECTION:
             raise ChargeRefusee(
-                "sync_charge_trop_grosse", taille=len(charge), max=BRUT_PAR_SECTION
+                "sync_charge_trop_grosse", taille=brut, max=BRUT_PAR_SECTION
             )
-        compresse = len(gzip.compress(charge))
         if compresse > COMPRESSE_PAR_SECTION:
             raise ChargeRefusee(
                 "sync_charge_compressee_trop_grosse",
                 taille=compresse,
                 max=COMPRESSE_PAR_SECTION,
             )
+
+
+def mesurer_charge(magasin: str) -> tuple[int, int]:
+    """(octets bruts, octets compressés) de la charge d'une écriture.
+
+    La mesure exacte que fait le portail : le magasin sérialisé est une CHAÎNE
+    dans la charge, donc échappée une seconde fois (chaque guillemet devient
+    deux caractères), puis compressée. Les deux nombres sont comparés à
+    ``BRUT_PAR_SECTION`` et ``COMPRESSE_PAR_SECTION``.
+    """
+    charge = json.dumps(
+        {"v": VERSION_CHARGE, "donnees": {CLE_MAGASIN: magasin}},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return len(charge), len(gzip.compress(charge))

@@ -7,6 +7,139 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-09
+
+### Added
+
+- **The engine now produces an internal structured report of each `check`
+  run, with no visible change** (lot A of issue #336). A pytest plugin shipped
+  inside the wheel (`dsoxlab/rapport_pytest/dsoxlab_rapport.py`, standard
+  library and pytest only, no import of `dsoxlab`) is loaded with
+  `-p dsoxlab_rapport` from a directory placed first on the subprocess
+  `PYTHONPATH`, which covers all four ways `resolve_pytest_cmd` can launch
+  pytest. It writes one JSONL line per test phase into a temporary directory
+  that `check` removes afterwards. Both execution paths of `check_lab`
+  (captured and streamed) pass it and read the report back into a new
+  `CheckResult.criteres`.
+- **One result per criterion**, `ResultatDeCritere`: an identifier (the pytest
+  nodeid without its file path, sanitised to letters, digits and `_ . : [ ] -`,
+  at most 128 characters; two failing parametrized cases give two criteria; two
+  same-named tests in two files get their sanitised path back so they stay
+  distinct), the full nodeid, the phase, a state (`satisfied`, `unsatisfied`,
+  `not_evaluated`), where the message comes from, and the author's message when
+  there is one. A fixture error or a collection error is `not_evaluated`, never
+  `unsatisfied`; a teardown failure after a passing test stays `satisfied` with
+  a `teardown_error` mention. The author's message is the one written in the
+  `assert` or in `pytest.fail`, cut before pytest's own explanation; the text of
+  a technical exception is never kept, so it can never reach a learner by
+  accident.
+- `CheckResult.criteres` is `None` when the report is absent, truncated or
+  unreadable: unknown is not "zero criteria", and `check` then keeps the text
+  path it always had. If a launcher hides the plugin from pytest, the run is
+  replayed without it rather than turning a measurement into a failure.
+- **Each recorded attempt now keeps what is needed to read it again later**
+  (lot B of issue #336): `attempt_id` (uuid4), `lab_digest` (16 hexadecimal
+  characters of a SHA-256 over `lab.yaml`, `challenge/tests/**` and
+  `challenge/hints.yaml`, independent of git, caches excluded),
+  `catalog_revision` (the revision at the time of the check, no longer only at
+  export time), `criteria` (one result per criterion, with the author's message
+  and never a technical text) and `hints_seen` (the hints taken, with their `id`
+  read in `hints.yaml`, copied onto the row because `reset` erases the requests).
+  Five nullable columns added by the existing additive migration; a 0.7.3
+  database is read as before and its rows give `NULL`, meaning unknown.
+- **The export carries them, by compatible extension of `dsoxlab-evidence-v1`**
+  (lot C): `attempt_id`, `lab_digest`, `catalog_revision`, `not_evaluated`,
+  `hints_seen` and `criteria` on each line, all `null` on a line written before
+  0.8.0. The schema name does not change, no existing field changes meaning and
+  `catalog.version` keeps its meaning. Every value is revalidated when read
+  (identifiers restricted to letters, digits and `_ . : [ ] -`, 128 characters
+  at most; observations 280 characters at most; no test id, path or technical
+  text). `scores --json` is unchanged (`push` is covered below).
+- **`lab.yaml` accepts `criteria:` and `feedback:`** (lot D of issue #336).
+  `criteria` is an optional list of `{id, tests, label}`: tests grouped under a
+  declared `id` become one criterion, satisfied only if all of them are (labels
+  in `lab.yaml` for English and in `lab.<lang>.yaml`, matched by `id`).
+  Without it, one criterion per test, as before. `feedback` is `full`,
+  `first-line` or `verdict` and sets what `check` shows of a failed criterion:
+  default `full` for a `lab` (output **strictly unchanged**), `first-line` for a
+  `challenge`, `verdict` for a `capstone` or any lab with `exam_passing_score`.
+  With `first-line`, `check` shows the criterion label, its verdict and only the
+  first line of the author's message, so that the repair gesture written on the
+  next lines is not handed out; with `verdict`, no message. A criterion that
+  could not be evaluated is shown as *not evaluated: check impossible*, never
+  as unsatisfied. The exported `observation` follows the same policy (first line
+  at most 280 characters, `null` for `verdict`). `validate-structure` refuses an
+  invalid or duplicated id, a criterion without a test, a test name that matches
+  no function, a test claimed by two criteria and an unknown `feedback`.
+  Contract, JSON schema and docs updated. **Behaviour change**: a `challenge`
+  without `feedback:` now shows the first line only; set `feedback: full` to
+  keep the old display.
+- **A skipped test is no longer "not evaluated".** In `criteria`, `skip` and
+  `xfail` give the state `skipped`; `not_evaluated` is restricted to blocked
+  checks (fixture error, collection error), so that the site can present it as
+  "check blocked by the environment". `not_evaluated` in the export is then a
+  subset of `failed_checks` (a collection error, which has no test name, keeps
+  its identifier).
+- **`push` carries the attempt too** (lot E): `attempt_id`, `lab_digest`,
+  `not_evaluated` (20 names at most), `hints_seen` (20 at most) and `criteria`
+  reduced to `{id, state}` (40 at most; beyond that `null`, never a truncated
+  list). Reading is tolerant and adds no new reason for discarding a line: a
+  malformed field becomes `null`. `merge` keeps the triplet catalog, lab, date as
+  its key; a line carrying an `attempt_id` replaces the same attempt held
+  without one, never the reverse, and two lines with the same `attempt_id` but
+  different dates stay two. The portal reads this store as an opaque value
+  and does not refuse a section for new keys in the lines; the browser, which
+  re-reads the store through a whitelist, rewrites it without the new fields until
+  the site is updated, and the next `push` restores them: a temporary loss of
+  detail on the browser side, never an emptied store. Size limits: see below.
+- **`push` lightens what it sends before refusing for size.** The portal limits
+  the proofs to 1,500,000 raw and 350,000 compressed bytes (measured on the
+  payload, where the store is an escaped string). With the 0.8.0 detail a typical
+  line weighs about 1,560 bytes instead of 630, so about 960 attempts fit instead
+  of 2,380. Oldest attempts first, `criteria` then `hints_seen` then
+  `not_evaluated` becomes `null`, only as much as needed: never a truncated list,
+  never a removed line, never a v1 field, never the local database. `push` says
+  how many old attempts were sent without their detail. When merging, the
+  richest line wins for the same `attempt_id` (a lightened line never overwrites a
+  detail the account holds), so a second `push` writes nothing. Beyond about
+  2,380 attempts, even fully lightened, `push` still refuses and names the limit.
+- **An exam gives nothing, not even with `-v`.** On a lab in `verdict` (a
+  `capstone`, or any lab with an `exam_passing_score`), `dsoxlab -v check` no
+  longer shows the raw pytest output: only the verdict per criterion and a line
+  saying the detail is not available. In `check --json`, `output` is empty and
+  the new `output_withheld` is `true`; `check --json` now also carries
+  `failed_checks` and `criteria` (no observation in `verdict`). Only an explicit
+  `feedback: full` or `first-line` opens an exam. `-v` and `output` are unchanged
+  on `full` and `first-line` labs.
+- **`criteria[].lessons`** (optional, one to five lesson URLs in the format of
+  `doc_url`, `lab.yaml` only): where the site sends the learner to review a
+  criterion once a result is sent. `validate-structure` checks the form,
+  duplicates, an empty list and more than five, with no network request. The
+  engine never shows nor exports them.
+- **`transfer_of`** (optional, `lab.yaml` only; issue blog-roadmap #145, engine
+  side): the id of another lab of the same catalog of which this lab is a
+  transfer variant (same capability, with the context, a constraint or the
+  diagnosis changed). A variant is an ordinary lab (`lab`, `challenge`,
+  `capstone`): no new `lab_type`, no free-text note. `validate-structure`
+  refuses an invalid identifier, a target absent from the catalog, a lab that
+  targets itself, a target that is itself a variant (a family is one original
+  lab and its variants, never a chain) and a `validation` lab on either side
+  (`content_transfer_*`, EN and FR messages, listed in the author guide).
+  `show --json` and `list-labs --json` expose `transfer_of` (`null` when
+  absent), and `show` prints "Transfer variant of: <id>". The JSON schema, the
+  known keys and the contract documents carry the field.
+
+### Unchanged
+
+- A variant keeps its own id and its own results: the database, the export, the
+  push and the score are unchanged, and the relation never turns a guided lab
+  into proof. A catalog without `transfer_of` produces the same output as
+  before, apart from the new `transfer_of: null` field in the lab object.
+
+- The score, `failed_checks`, `blocking_failed`, what `check` prints,
+  `scores --json` and every exit code. The only thing that reads the new
+  report is what is recorded and exported, as described above.
+
 ## [0.7.3] - 2026-11-03
 
 ### Fixed

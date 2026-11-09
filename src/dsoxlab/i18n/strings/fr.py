@@ -360,6 +360,10 @@ STRINGS: dict[str, str] = {
         "Affiche toutes les colonnes, même si le terminal est trop étroit.",
     "check_echecs_de_tests":
         "Ce qui reste à faire, d'après les tests :",
+    'check_detail_epreuve_indisponible':
+        "C'est une épreuve : le détail des tests n'est pas disponible, seul le verdict par critère l'est.",
+    "check_critere_non_satisfait": "non satisfait",
+    "check_critere_non_evalue": "non évalué : vérification impossible",
     "check_sortie_complete":
         "La sortie complète des tests : dsoxlab -v check {lab_id}",
     "check_rien_mesure":
@@ -1194,6 +1198,44 @@ hors ligne, elle se tait.
     "metadata_doc_url_scheme": "URL invalide (schéma http/https attendu) : {url}",
     "metadata_lab_type_invalid":
         "Valeur invalide « {value} ». Attendu, l'une de : {expected}",
+    "metadata_lecons_vide": (
+        "Le critère `{criterion}` déclare une liste de leçons vide : retirez la "
+        "clé, ou donnez-lui une à cinq URL."
+    ),
+    "metadata_lecons_trop": (
+        "Le critère `{criterion}` liste {count} leçons ; {max} au plus sont acceptées."
+    ),
+    "metadata_lecon_url_invalide": (
+        "Le critère `{criterion}` liste la leçon `{value}`, qui n'est pas une "
+        "URL http(s)."
+    ),
+    "metadata_lecon_doublon": (
+        "Le critère `{criterion}` liste deux fois la leçon `{value}`."
+    ),
+    "metadata_feedback_inconnu": (
+        "feedback vaut `{value}` ; valeurs attendues : {expected}. Le moteur "
+        "applique à la place le défaut du type de lab."
+    ),
+    "metadata_critere_id_invalide": (
+        "criteria déclare l'id `{value}`, qui ne respecte pas "
+        "[\\w.:\\[\\]-]{{1,128}} : lettres, chiffres et _ . : [ ] -, 128 "
+        "caractères au plus."
+    ),
+    "metadata_critere_id_double": (
+        "criteria déclare deux fois l'id `{value}` : un identifiant nomme un seul critère."
+    ),
+    "metadata_critere_sans_test": (
+        "Le critère `{value}` ne liste aucun test : il ne serait jamais évalué."
+    ),
+    "metadata_critere_test_inconnu": (
+        "Le critère `{criterion}` nomme `{value}`, et aucune fonction de test "
+        "de ce nom n'existe dans challenge/tests/. Un test renommé viderait "
+        "le critère en silence."
+    ),
+    "metadata_critere_test_partage": (
+        "Le test `{value}` appartient à plusieurs critères ({criteria}) : un "
+        "test ne prouve qu'un critère au plus."
+    ),
     "metadata_blocking_check_inconnu": (
         "exam_blocking_checks nomme `{value}`, et aucun test de ce nom "
         "n'existe dans challenge/tests/test_functional.py. Un test renommé "
@@ -1257,6 +1299,22 @@ hors ligne, elle se tait.
         "le prérequis « {prerequisite} » ne nomme aucun lab de ce catalogue",
     "content_prerequisite_self":
         "le prérequis « {lab} » est le lab lui-même",
+    "content_transfer_invalid_id":
+        "transfer_of « {value} » n'est pas un identifiant de lab (lettres, "
+        "chiffres, « . », « _ » et « - », en commençant par une lettre ou un "
+        "chiffre)",
+    "content_transfer_unknown":
+        "transfer_of « {target} » ne nomme aucun lab de ce catalogue",
+    "content_transfer_self":
+        "transfer_of « {lab} » est le lab lui-même",
+    "content_transfer_chain":
+        "transfer_of « {target} » est lui-même une variante de transfert de "
+        "« {origin} » : visez le lab d'origine, une famille est un lab d'origine "
+        "et ses variantes",
+    "content_transfer_validation":
+        "transfer_of relie « {lab} », dont le lab_type est validation : un lab "
+        "de validation ne mesure personne, il n'entre pas dans une famille de "
+        "transfert",
     "content_role_host_unknown":
         "le rôle « {role} » vise « {host} », absent de infra.hosts du meta.yml",
     # ── fixtures : le répertoire et la déclaration doivent coïncider ────────
@@ -1632,6 +1690,7 @@ hors ligne, elle se tait.
     "field_distros":    "[bold]Distros :[/bold]",
     "field_skills":     "[bold]Skills :[/bold]",
     "field_doc":        "[bold]Doc :[/bold]",
+    "field_transfer_of": "[bold]Variante de transfert de :[/bold]",
     "field_track":      "[bold]Parcours :[/bold]",
     "field_certifs":    "[bold]Certifs :[/bold]",
     "field_type":       "[bold]Type :[/bold]",
@@ -2059,6 +2118,8 @@ hors ligne, elle se tait.
         '{ajoutees} tentative(s) ajoutée(s). Le compte en porte désormais {total}, en révision {revision}.',
     'push_doublons':
         '{doublons} tentative(s) étaient déjà sur le compte, et y ont été laissées telles quelles.',
+    'push_allege':
+        "{degradees} tentative(s) ancienne(s) sont parties sans leur détail par critère, pour que vos preuves tiennent dans la limite du compte. Le détail reste dans votre historique local.",
     'push_injoignable':
         "Le portail n'a pas répondu. Rien n'a été écrit, donc rejouer dsoxlab push est sans risque.",
     'push_conflit_persistant':

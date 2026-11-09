@@ -86,6 +86,10 @@ def lab_dict(
         # une réserve CPU et d'exposer un service. Déclaré mais non exposé, le
         # champ ne servirait à personne.
         "prerequisites": list(lab.prerequisites),
+        # Le lab d'origine dont celui-ci est une variante de transfert, `null`
+        # sinon. Un consommateur relie ainsi une famille sans déduire quoi que
+        # ce soit d'un titre ou d'un nom de test.
+        "transfer_of": lab.transfer_of,
         "doc_url": lab.doc_url,
         "path": str(lab.path),
         "runtime": {
@@ -182,6 +186,38 @@ def issue_dict(
     }
 
 
+def detail_de_check(result: Any, lab: LabDefinition) -> dict[str, Any]:
+    """Ce que `check --json` dit du détail d'une exécution, selon la politique du lab.
+
+    ``output`` est la sortie brute de pytest, sauf pour un lab en ``verdict`` :
+    une épreuve ne donne rien, donc ``output`` y est vide et ``output_withheld``
+    le dit (un champ vide seul se lirait comme « pytest n'a rien écrit »).
+    ``failed_checks`` et ``criteria`` restent : les noms, les états, et une
+    ``observation`` qui suit la même politique que l'export (jamais de message
+    en ``verdict``).
+    """
+    from ..services.lab_service import echecs_de_tests
+    from ..services.politique_affichage import observation_exportee
+
+    politique = lab.feedback_policy
+    criteres = result.criteres
+    return {
+        "output": "" if politique == "verdict" else result.output,
+        "output_withheld": politique == "verdict",
+        "failed_checks": [echec.nom for echec in echecs_de_tests(result.output)],
+        "criteria": None if criteres is None else [
+            {
+                "id": c.identifiant,
+                "state": c.etat,
+                "phase": c.phase,
+                "mention": c.mention,
+                "observation": observation_exportee(c.message_auteur, politique),
+            }
+            for c in criteres
+        ],
+    }
+
+
 def export_result_dict(
     row: dict[str, Any],
     lab: LabDefinition | None,
@@ -256,6 +292,66 @@ def export_result_dict(
             "percentage": exam_percentage(row["score"], row["max_score"]),
             "passed": verdict,
         },
+        # Sans lab dans le catalogue, on ne sait plus ce qu'il accepte de montrer :
+        # la politique la plus sobre s'applique, jamais la plus bavarde.
+        **_champs_de_tentative(row, lab.feedback_policy if lab else "verdict"),
+    }
+
+
+#: Au plus ce nombre de noms par liste ajoutée en 0.8.0 (`not_evaluated`,
+#: `hints_seen`) : c'est la borne que le site applique à ses listes.
+MAX_NOMS_PAR_LISTE = 20
+
+
+def _champs_de_tentative(row: dict[str, Any], politique: str) -> dict[str, Any]:
+    """Les champs ajoutés à Evidence v1 en 0.8.0, tous ``null`` sur une ancienne ligne.
+
+    Extension COMPATIBLE : aucun champ existant ne change de sens, et le nom du
+    schéma reste ``dsoxlab-evidence-v1``. ``null`` veut dire « inconnu », jamais
+    « aucun » : une liste vide, elle, dit qu'il n'y en avait pas.
+
+    Chaque valeur est revalidée à la lecture (la base est un fichier qu'un
+    humain peut retoucher, et ce document quitte la machine). Rien de technique
+    ne sort : ni nodeid, ni chemin, ni texte d'exception, seulement l'identifiant
+    du critère, son état, sa phase et, selon la politique ``feedback`` du lab, la
+    première ligne du message écrit par l'auteur du lab.
+    """
+    from ..services.politique_affichage import observation_exportee
+    from ..services.tentative import (
+        criteres_de_ligne,
+        empreinte_de_ligne,
+        identifiant_de_ligne,
+        indices_de_ligne,
+        nom_de_controle,
+        revision_de_ligne,
+    )
+
+    criteres = criteres_de_ligne(row)
+    indices = indices_de_ligne(row)
+    non_evalues: list[str] | None = None
+    if criteres is not None:
+        noms = dict.fromkeys(
+            nom_de_controle(c["id"]) for c in criteres if c["state"] == "not_evaluated"
+        )
+        non_evalues = list(noms)[:MAX_NOMS_PAR_LISTE]
+    return {
+        "attempt_id": identifiant_de_ligne(row),
+        "lab_digest": empreinte_de_ligne(row),
+        "catalog_revision": revision_de_ligne(row),
+        "not_evaluated": non_evalues,
+        "hints_seen": None if indices is None else indices[:MAX_NOMS_PAR_LISTE],
+        "criteria": None if criteres is None else [
+            {
+                "id": c["id"],
+                "state": c["state"],
+                "phase": c["phase"],
+                "mention": c["mention"],
+                # Même politique que l'écran : `verdict` ne porte aucun message,
+                # les deux autres la première ligne, bornée à 280 caractères.
+                "observation": observation_exportee(c["author_message"], politique),
+            }
+            for c in criteres
+        ],
     }
 
 

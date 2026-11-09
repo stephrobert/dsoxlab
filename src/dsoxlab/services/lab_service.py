@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -21,10 +22,30 @@ from ..models.hint import HintFile
 from ..models.lab import LabDefinition
 from ..runtimes.base import EventCallback, SessionSpec
 from ..runtimes.manager import RuntimeManager
-from ..sessions.store import hints_cost_total, hints_used_count, record_result
+from ..sessions.store import (
+    hint_requests_for,
+    hints_cost_total,
+    hints_used_count,
+    record_result,
+)
 from ..utils.shell import CommandError, run_command
 from ..validators.metadata import MetadataReport, validate_metadata
 from ..validators.structure import StructureReport, validate_structure
+from .rapport_de_criteres import (
+    PLUGIN,
+    ResultatDeCritere,
+    arguments_du_plugin,
+    environnement_du_plugin,
+    lire_rapport,
+    regrouper_par_declaration,
+)
+from .revision_catalogue import revision_du_catalogue
+from .tentative import (
+    criteres_en_json,
+    empreinte_du_lab,
+    indices_vus_en_json,
+    nouvel_identifiant,
+)
 
 _manager = RuntimeManager()
 
@@ -39,6 +60,11 @@ class CheckResult:
     #: suite entièrement skippée se confondait avec une suite entièrement
     #: ratée : `total` les comptait, donc `a_mesure()` répondait oui.
     skipped: int = 0
+    #: Le rapport structuré de pytest, un résultat par critère (lot A, 0.8.0).
+    #: ``None`` veut dire INCONNU : rapport absent, tronqué ou illisible, et
+    #: l'appelant garde alors le chemin texte (``echecs_de_tests``). Rien dans
+    #: le score, l'affichage ou les codes de sortie ne le lit encore.
+    criteres: tuple[ResultatDeCritere, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -116,7 +142,12 @@ def _parse_counts(output: str) -> tuple[int, int, int]:
     return passed, total, skipped
 
 
-def _resultat(output: str, *, ok: bool) -> CheckResult:
+def _resultat(
+    output: str,
+    *,
+    ok: bool,
+    criteres: tuple[ResultatDeCritere, ...] | None = None,
+) -> CheckResult:
     """Un CheckResult lu dans une sortie de pytest, comptes compris.
 
     Les deux chemins d'exécution de `check_lab` en construisent un, et ils
@@ -126,6 +157,7 @@ def _resultat(output: str, *, ok: bool) -> CheckResult:
     passed, total, skipped = _parse_counts(output)
     return CheckResult(
         ok=ok, output=output, passed=passed, total=total, skipped=skipped,
+        criteres=criteres,
     )
 
 
@@ -420,6 +452,14 @@ def evaluate_lab(root: Path, lab: LabDefinition, result: CheckResult) -> ScoreRe
         hints_used=used,
         blocking_failed=blocking_failed,
         failed_checks=echecs_nommes,
+        # Ce que la tentative consigne pour être relue plus tard (#336, lot B).
+        # Calculé ICI, juste avant l'inscription : `reset` efface les demandes
+        # d'indices, et la révision du catalogue peut changer entre deux checks.
+        attempt_id=nouvel_identifiant(),
+        lab_digest=empreinte_du_lab(lab),
+        catalog_revision=revision_du_catalogue(root),
+        criteria=criteres_en_json(result.criteres),
+        hints_seen=indices_vus_en_json(hint_requests_for(root, lab.id), hint_file),
     )
     return ScoreResult(
         check=result,
@@ -677,9 +717,77 @@ def check_lab(
     if resolved is not None and resolved.host:
         env["DSOXLAB_TARGET_HOST"] = resolved.host
 
-    if on_event is None:
-        # Mode legacy : capture en bloc, pas de streaming.
-        try:
+    return _check_avec_rapport(lab, pytest_cmd, tests_dir, repo_root, env, on_event)
+
+
+def _check_avec_rapport(
+    lab: LabDefinition,
+    pytest_cmd: list[str],
+    tests_dir: Path,
+    repo_root: Path,
+    env: dict[str, str],
+    on_event: Callable[[dict[str, Any]], None] | None,
+) -> CheckResult:
+    """Joue pytest avec le plugin du rapport, puis regroupe les critères déclarés.
+
+    Le rapport vit dans un répertoire temporaire que cette fonction retire. Les
+    critères que l'auteur déclare regroupent ses tests sous leur ``id``.
+    """
+    with tempfile.TemporaryDirectory(prefix="dsoxlab-rapport-") as repertoire:
+        rapport = Path(repertoire) / "rapport.jsonl"
+        env_rapport = dict(env)
+        environnement_du_plugin(env_rapport, rapport)
+        if on_event is None:
+            resultat = _check_en_bloc(
+                pytest_cmd, tests_dir, repo_root, env, env_rapport, rapport
+            )
+        else:
+            resultat = _check_en_flux(
+                pytest_cmd, tests_dir, repo_root, env, env_rapport, rapport, on_event
+            )
+        resultat.criteres = regrouper_par_declaration(
+            resultat.criteres, [(c.id, c.tests) for c in lab.criteria]
+        )
+        return resultat
+
+
+def _plugin_refuse(output: str, returncode: int) -> bool:
+    """pytest a-t-il refusé de démarrer à cause de NOTRE plugin ?
+
+    Le plugin se charge par ``-p`` et ``PYTHONPATH``. Si un lanceur exotique
+    écrase cette variable, pytest échoue avant de collecter (mesuré sur pytest
+    9.1.1 : une trace ``ImportError: Error importing plugin "dsoxlab_rapport"``
+    et un code 1, pas le 4 d'une erreur d'usage) : mieux vaut rejouer sans
+    plugin (et sans rapport, donc ``criteres`` à ``None``) que de transformer
+    une mesure en panne. On reconnaît le motif à son texte, jamais au code.
+    """
+    if returncode == 0:
+        return False
+    return (
+        f'Error importing plugin "{PLUGIN}"' in output
+        or f"No module named '{PLUGIN}'" in output
+    )
+
+
+def _check_en_bloc(
+    pytest_cmd: list[str],
+    tests_dir: Path,
+    repo_root: Path,
+    env: dict[str, str],
+    env_rapport: dict[str, str],
+    rapport: Path,
+) -> CheckResult:
+    """Mode legacy : capture en bloc, pas de streaming."""
+    try:
+        result = run_command(
+            [*pytest_cmd, *arguments_du_plugin(), "-v", str(tests_dir)],
+            cwd=repo_root,
+            timeout=300,
+            check=False,
+            env=env_rapport,
+        )
+        output = result.stdout + result.stderr
+        if _plugin_refuse(output, result.returncode):
             result = run_command(
                 [*pytest_cmd, "-v", str(tests_dir)],
                 cwd=repo_root,
@@ -687,29 +795,29 @@ def check_lab(
                 check=False,
                 env=env,
             )
-            output = result.stdout + result.stderr
-            return _resultat(output, ok=result.ok)
-        except CommandError as exc:
-            return CheckResult(ok=False, output=str(exc), passed=0, total=0)
-
-    # Mode streaming : pré-collecte pour le total, puis Popen ligne par ligne.
-    total_collected = _collect_test_count(pytest_cmd, tests_dir, repo_root, env)
-    on_event({"type": "collected", "total": total_collected})
-
-    output_lines: list[str] = []
-    try:
-        proc = subprocess.Popen(
-            [*pytest_cmd, "-v", "--no-header", "--tb=short", str(tests_dir)],
-            cwd=repo_root,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-    except FileNotFoundError as exc:
+            return _resultat(result.stdout + result.stderr, ok=result.ok)
+        return _resultat(output, ok=result.ok, criteres=lire_rapport(rapport))
+    except CommandError as exc:
         return CheckResult(ok=False, output=str(exc), passed=0, total=0)
 
+
+def _pytest_en_flux(
+    commande: list[str],
+    repo_root: Path,
+    env: dict[str, str],
+    on_event: Callable[[dict[str, Any]], None],
+) -> tuple[int, list[str]]:
+    """Lance pytest ligne par ligne, émet les évènements, rend (code, lignes)."""
+    output_lines: list[str] = []
+    proc = subprocess.Popen(
+        commande,
+        cwd=repo_root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
     assert proc.stdout is not None
     try:
         for brute in proc.stdout:
@@ -734,10 +842,40 @@ def check_lab(
         # Rien n'est enregistré : une validation interrompue ne vaut pas un
         # 0/100 dans l'historique de l'apprenant.
         raise Interrupted(Stage.TESTS) from None
+    return proc.wait(timeout=300), output_lines
 
-    rc = proc.wait(timeout=300)
-    output = "\n".join(output_lines)
-    return _resultat(output, ok=(rc == 0))
+
+def _check_en_flux(
+    pytest_cmd: list[str],
+    tests_dir: Path,
+    repo_root: Path,
+    env: dict[str, str],
+    env_rapport: dict[str, str],
+    rapport: Path,
+    on_event: Callable[[dict[str, Any]], None],
+) -> CheckResult:
+    """Mode streaming : pré-collecte pour le total, puis Popen ligne par ligne."""
+    total_collected = _collect_test_count(pytest_cmd, tests_dir, repo_root, env)
+    on_event({"type": "collected", "total": total_collected})
+
+    options = ["-v", "--no-header", "--tb=short", str(tests_dir)]
+    try:
+        rc, lignes = _pytest_en_flux(
+            [*pytest_cmd, *arguments_du_plugin(), *options],
+            repo_root,
+            env_rapport,
+            on_event,
+        )
+        if _plugin_refuse("\n".join(lignes), rc):
+            rc, lignes = _pytest_en_flux(
+                [*pytest_cmd, *options], repo_root, env, on_event
+            )
+            return _resultat("\n".join(lignes), ok=(rc == 0))
+    except FileNotFoundError as exc:
+        return CheckResult(ok=False, output=str(exc), passed=0, total=0)
+    return _resultat(
+        "\n".join(lignes), ok=(rc == 0), criteres=lire_rapport(rapport)
+    )
 
 
 def validate_all_structure(root: Path) -> list[StructureReport]:

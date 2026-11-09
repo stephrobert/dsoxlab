@@ -86,6 +86,7 @@ same lab object. It is described once here.
 | `skills` | array of strings | never empty; the validator requires it |
 | `distros` | array of strings | never empty; same |
 | `prerequisites` | array of strings | lab ids this one assumes already played — empty for most labs, meaningful on a capstone, which crosses several lessons and can only name one in `doc_url` |
+| `transfer_of` | string or null | the id of the lab this one is a transfer variant of, `null` on every other lab. A variant keeps its own id and its own results; the relation changes nothing in scores or export |
 | `doc_url` | string | the online guide, `http` or `https` |
 | `path` | string | **absolute** path of the lab directory, so an editor can open its files |
 | `runtime.type` | string | `shell` or `vm` |
@@ -256,7 +257,34 @@ chronological order, with nothing left for the reader to work out.
 | `results[].validated` | bool | **the verdict, stated** — see below |
 | `results[].attempted_at` | string | when the learner attempted the lab, ISO 8601, UTC |
 | `results[].exam` | object or null | as in `scores` |
+| `results[].failed_checks` / `blocking_failed` | array of strings | the checks that failed, and the subset that refuses an exam; empty on a line written before 0.7.0 |
+| `results[].attempt_id` | string or null | a uuid4 generated for each recorded attempt, so that the same result received twice (by file, then by push) is recognised |
+| `results[].lab_digest` | string or null | 16 hexadecimal characters: a SHA-256 of `lab.yaml`, `challenge/tests/**` (sorted, caches excluded) and `challenge/hints.yaml` when present. It does not depend on git |
+| `results[].catalog_revision` | string or null | the catalog revision **at the time of the check**. `catalog.version` keeps its meaning: the revision when the document was produced |
+| `results[].not_evaluated` | array of strings or null | the names of the **blocked** checks (a fixture error, phase `setup`, or a collection error), in the same format as `failed_checks`, of which it is a subset (a collection error, which has no test name, keeps its identifier): the score counts them as failures. A skipped test is not listed. At most 20 names |
+| `results[].hints_seen` | array or null | the hints taken for this lab at that moment, as `{"index", "id", "criterion"}`: `index` is the 0-based position, `id` is the `id` read in `hints.yaml` (`null` if absent), `criterion` is `null` until a hint is tied to a criterion. `[]` means none were taken. At most 20 entries |
+| `results[].criteria` | array or null | one entry per criterion: `{"id", "state", "phase", "mention", "observation"}` |
 | `count` | int | the number of lines, which always equals `results.length` |
+
+**Added in 0.8.0, by compatible extension.** `attempt_id`, `lab_digest`,
+`catalog_revision`, `not_evaluated`, `hints_seen` and `criteria` were added to
+each line. The schema name stays `dsoxlab-evidence-v1`, and no existing field
+changes meaning. On a line written before 0.8.0, all six are `null`: **`null`
+means unknown, never none**, while `[]` says that there really was nothing.
+
+In `criteria`, `id` is the pytest test id **without its file path**, restricted
+to letters, digits and `_ . : [ ] -` (at most 128 characters), so two failing
+cases of the same parametrized test are two distinct criteria. `state` is
+`satisfied`, `unsatisfied`, `not_evaluated` or `skipped`. A fixture error or a
+collection error is *not evaluated*: the check was blocked, which is not a
+failure of the learner. A skipped test (`skip`, `xfail`) is *skipped*: nothing
+was blocked, it simply does not apply. `phase` is `setup`, `call`, `teardown` or `collect`. `mention` is
+`teardown_error` when a test passed but its clean-up failed. `observation` is
+the message **the lab's author wrote** in the assertion (at most 280
+characters), or `null`: the text of a technical exception, a test id with a
+path or a raw pytest output never appears. `criteria` is not truncated, since
+cutting it would silently drop evidence; it is bounded by the number of tests
+of the lab.
 
 Four things this document says that `scores --json` left the reader to guess:
 
@@ -436,6 +464,49 @@ One thing this puts on the consumer: `catalog.id`, `lab_id` and `section` come
 attacker-controlled strings. Escape them before display, as you would any
 external input.
 
+### What `push` sends of an attempt
+
+`dsoxlab push` does not send the export document: it reduces each line to the
+model the portal keeps, and it never emits a line the portal would discard (a
+single discarded line empties the whole store on reading). Since 0.8.0 a pushed
+proof also carries, all additive and all `null` when unknown:
+
+| Field | Meaning |
+| --- | --- |
+| `attempt_id` | the uuid4 of the attempt |
+| `lab_digest` | the 16-hexadecimal digest of the lab as it was |
+| `not_evaluated` | the blocked checks, 20 names at most |
+| `hints_seen` | `{index, id, criterion}` per hint taken; `null` beyond 20 |
+| `criteria` | **only `{id, state}`** per criterion (no observation, phase or mention); `null` beyond 40 criteria |
+
+A malformed field becomes `null` and never causes a line to be refused. A list
+that is too long is `null` rather than truncated, since a truncated list would
+claim to be complete. When merging with the account, the key stays the triplet
+catalog, lab, attempt date: a local line that carries an `attempt_id`
+**replaces** the same attempt held without one (it is enriched, not added), never
+the other way round, and two lines with the same `attempt_id` but different dates
+remain two lines.
+
+The portal keeps at most 1,500,000 raw bytes and 350,000 compressed bytes for the
+proofs, measured on the payload where the store is an escaped string. Measured
+that way: a typical line weighed about 630 bytes before 0.8.0 (about 2,380
+attempts fit) and about 1,560 bytes with twelve criteria (about 960 attempts
+fit); a line with every list at its maximum weighs about 7,700 bytes (about 190
+attempts).
+
+**Before refusing, `push` lightens what it sends**, from the oldest attempts to
+the most recent and only as much as needed: `criteria` of the oldest line
+becomes `null`, then if that is not enough its `hints_seen`, then its
+`not_evaluated`, then the next line, until both limits hold. It never truncates a
+list, never removes a line, never touches a v1 field (counters, `validated`,
+`failed_checks`, `blocking_failed`), and never modifies the local database.
+`push` says how many old attempts were sent without their detail. When merging,
+the richest line wins for a given `attempt_id`: a lightened line never overwrites
+a detail the account already holds, and a local line that has more detail
+restores it. Pushing again therefore writes nothing. The floor is the v1 format
+itself: about 2,380 attempts at 630 bytes. Beyond that, even fully lightened, `push`
+refuses before sending and says which limit it is.
+
 ## `check`
 
 ```json
@@ -459,7 +530,10 @@ external input.
 | `check.passed` / `total` | int | tests passed, tests run |
 | `check.score` / `max_score` | int | the mark recorded in the catalog database |
 | `check.recorded` | bool | whether a mark was actually measured and written: `false` when no test could run (`total` is 0), which is an absence of measurement and not a zero |
-| `check.output` | string | pytest's raw output, where the detail of a failure lives |
+| `check.output` | string | pytest's raw output, where the detail of a failure lives. **Empty for a lab in `verdict`** (an exam): see `output_withheld` |
+| `check.output_withheld` | bool | `true` when `output` was withheld because the lab's `feedback` policy is `verdict`; an empty `output` alone would read as "pytest wrote nothing" |
+| `check.failed_checks` | array of strings | the names of the checks that failed, as in `export` |
+| `check.criteria` | array or null | one entry per criterion, `{id, state, phase, mention, observation}`, as in `export`; `observation` follows the lab's `feedback` policy (`null` in `verdict`); `null` when unknown |
 
 The command exits 1 when `ok` is false, and still prints the document.
 

@@ -89,6 +89,7 @@ le même objet lab. Il est décrit une fois, ici.
 | `skills` | liste de chaînes | jamais vide : le validator l'exige |
 | `distros` | liste de chaînes | jamais vide, de même |
 | `prerequisites` | liste de chaînes | les identifiants des labs que celui-ci suppose joués — vide pour la plupart, parlant sur un capstone, qui croise plusieurs leçons et ne peut en nommer qu'une dans `doc_url` |
+| `transfer_of` | chaîne ou null | l'identifiant du lab dont celui-ci est une variante de transfert, `null` sur tout autre lab. Une variante garde son identifiant et ses résultats ; la relation ne change rien aux scores ni à l'export |
 | `doc_url` | chaîne | le guide en ligne, en `http` ou `https` |
 | `path` | chaîne | chemin **absolu** du répertoire du lab, pour qu'un éditeur puisse ouvrir ses fichiers |
 | `runtime.type` | chaîne | `shell` ou `vm` |
@@ -259,7 +260,36 @@ tout, dans l'ordre chronologique, sans rien laisser à déduire au lecteur.
 | `results[].validated` | booléen | **le verdict, énoncé** — voir plus bas |
 | `results[].attempted_at` | chaîne | quand l'apprenant a tenté le lab, ISO 8601, UTC |
 | `results[].exam` | objet ou null | comme dans `scores` |
+| `results[].failed_checks` / `blocking_failed` | tableau de chaînes | les contrôles qui ont échoué, et le sous-ensemble qui refuse une épreuve ; vide sur une ligne écrite avant la 0.7.0 |
+| `results[].attempt_id` | chaîne ou null | un uuid4 généré pour chaque tentative enregistrée, afin qu'un même résultat reçu deux fois (par fichier, puis par push) se reconnaisse |
+| `results[].lab_digest` | chaîne ou null | 16 caractères hexadécimaux : un SHA-256 de `lab.yaml`, de `challenge/tests/**` (trié, caches exclus) et de `challenge/hints.yaml` s'il existe. Il ne dépend pas de git |
+| `results[].catalog_revision` | chaîne ou null | la révision du catalogue **au moment du check**. `catalog.version` garde son sens : la révision à la production du document |
+| `results[].not_evaluated` | tableau de chaînes ou null | les noms des vérifications **bloquées** (erreur de fixture, phase `setup`, ou erreur de collecte), au même format que `failed_checks`, dont c'est un sous-ensemble (une erreur de collecte, qui n'a pas de nom de test, garde son identifiant) : le score les compte en échec. Un test sauté n'y figure pas. 20 noms au plus |
+| `results[].hints_seen` | tableau ou null | les indices pris pour ce lab à ce moment, sous la forme `{"index", "id", "criterion"}` : `index` est la position (à partir de 0), `id` l'`id` lu dans `hints.yaml` (`null` s'il est absent), `criterion` vaut `null` tant qu'un indice n'est pas rattaché à un critère. `[]` veut dire qu'aucun n'a été pris. 20 entrées au plus |
+| `results[].criteria` | tableau ou null | une entrée par critère : `{"id", "state", "phase", "mention", "observation"}` |
 | `count` | entier | le nombre de lignes, toujours égal à la longueur de `results` |
+
+**Ajouté en 0.8.0, par extension compatible.** `attempt_id`, `lab_digest`,
+`catalog_revision`, `not_evaluated`, `hints_seen` et `criteria` sont ajoutés à
+chaque ligne. Le nom du schéma reste `dsoxlab-evidence-v1`, et aucun champ
+existant ne change de sens. Sur une ligne écrite avant la 0.8.0, les six valent
+`null` : **`null` veut dire inconnu, jamais aucun**, alors que `[]` dit qu'il n'y
+avait réellement rien.
+
+Dans `criteria`, `id` est l'identifiant du test pytest **sans son chemin de
+fichier**, réduit aux lettres, chiffres et `_ . : [ ] -` (128 caractères au
+plus) : deux cas en échec d'un même test paramétré sont donc deux critères
+distincts. `state` vaut `satisfied`, `unsatisfied`, `not_evaluated` ou `skipped`. Une
+erreur de fixture ou de collecte est *non évaluée* : la vérification a été
+bloquée, ce qui n'est pas un échec de l'apprenant. Un test sauté (`skip`,
+`xfail`) est *skipped* : rien n'a été bloqué, il ne s'applique simplement pas. `phase` vaut `setup`, `call`, `teardown`
+ou `collect`. `mention` vaut `teardown_error` quand un test a réussi mais que
+son nettoyage a échoué. `observation` est le message **que l'auteur du lab a
+écrit** dans l'assertion (280 caractères au plus), ou `null` : le texte d'une
+exception technique, un identifiant de test avec chemin ou une sortie brute de
+pytest n'apparaissent jamais. `criteria` n'est pas tronquée, car la couper
+ferait disparaître des preuves sans le dire ; elle est bornée par le nombre de
+tests du lab.
 
 Quatre choses que ce document dit, et que `scores --json` laissait deviner :
 
@@ -450,6 +480,51 @@ viennent **de ce catalogue non fiable**. Ce sont des données pédagogiques, et
 ce sont malgré tout des chaînes contrôlées par un tiers. Échappez-les avant de
 les afficher, comme toute entrée externe.
 
+### Ce que `push` envoie d'une tentative
+
+`dsoxlab push` n'envoie pas le document d'export : il réduit chaque ligne au
+modèle que le portail garde, et n'émet jamais une ligne que le portail
+écarterait (une seule ligne écartée vide tout le magasin à la relecture). Depuis
+la 0.8.0, une preuve poussée porte aussi, tout cela additif et à `null` quand
+c'est inconnu :
+
+| Champ | Sens |
+| --- | --- |
+| `attempt_id` | l'uuid4 de la tentative |
+| `lab_digest` | l'empreinte de 16 hexadécimaux du lab tel qu'il était |
+| `not_evaluated` | les vérifications bloquées, 20 noms au plus |
+| `hints_seen` | `{index, id, criterion}` par indice pris ; `null` au-delà de 20 |
+| `criteria` | **seulement `{id, state}`** par critère (ni observation, ni phase, ni mention) ; `null` au-delà de 40 critères |
+
+Un champ mal formé devient `null` et ne fait jamais refuser une ligne. Une liste
+trop longue vaut `null` plutôt qu'une liste tronquée, qui se donnerait pour
+complète. À la fusion avec le compte, la clé reste le triplet catalogue, lab,
+date de tentative : une ligne locale qui porte un `attempt_id` **remplace** la
+même tentative détenue sans identifiant (elle est enrichie, pas ajoutée), jamais
+l'inverse, et deux lignes de même `attempt_id` mais de dates différentes restent
+deux lignes.
+
+Le portail garde au plus 1 500 000 octets bruts et 350 000 octets compressés de
+preuves, mesurés sur la charge où le magasin est une chaîne échappée. Mesuré
+ainsi : une ligne typique pesait environ 630 octets avant la 0.8.0 (environ
+2 380 tentatives tiennent) et environ 1 560 octets avec douze critères (environ
+960 tentatives) ; une ligne dont toutes les listes sont au maximum pèse environ
+7 700 octets (environ 190 tentatives).
+
+**Avant de refuser, `push` allège ce qu'il envoie**, des tentatives les plus
+anciennes aux plus récentes et seulement autant qu'il le faut : le `criteria` de
+la ligne la plus ancienne passe à `null`, puis si cela ne suffit pas son
+`hints_seen`, puis son `not_evaluated`, puis la ligne suivante, jusqu'à ce que
+les deux limites tiennent. Il ne tronque jamais une liste, ne retire jamais une
+ligne, ne touche jamais un champ v1 (compteurs, `validated`, `failed_checks`,
+`blocking_failed`) et ne modifie jamais la base locale. `push` dit combien de
+tentatives anciennes sont parties sans leur détail. À la fusion, la ligne la plus
+riche gagne pour un même `attempt_id` : une ligne allégée n'écrase jamais un
+détail que le compte porte déjà, et une ligne locale qui en a davantage le
+rétablit. Pousser de nouveau n'écrit donc rien. Le plancher est le format v1
+lui-même : environ 2 380 tentatives à 630 octets. Au-delà, même allégé au
+maximum, `push` refuse avant d'envoyer et dit quelle limite.
+
 ## `check`
 
 ```json
@@ -473,7 +548,10 @@ les afficher, comme toute entrée externe.
 | `check.passed` / `total` | entier | tests réussis, tests joués |
 | `check.score` / `max_score` | entier | la note enregistrée dans la base du catalogue |
 | `check.recorded` | booléen | si une note a réellement été mesurée et inscrite : `false` quand aucun test n'a pu tourner (`total` vaut 0), ce qui est une absence de mesure et non un zéro |
-| `check.output` | chaîne | la sortie brute de pytest, où vit le détail d'un échec |
+| `check.output` | chaîne | la sortie brute de pytest, où vit le détail d'un échec. **Vide pour un lab en `verdict`** (une épreuve) : voir `output_withheld` |
+| `check.output_withheld` | booléen | `true` quand `output` est retenu parce que la politique `feedback` du lab est `verdict` ; un `output` vide seul se lirait « pytest n'a rien écrit » |
+| `check.failed_checks` | tableau de chaînes | les noms des contrôles en échec, comme dans `export` |
+| `check.criteria` | tableau ou null | une entrée par critère, `{id, state, phase, mention, observation}`, comme dans `export` ; `observation` suit la politique `feedback` du lab (`null` en `verdict`) ; `null` si inconnu |
 
 La commande sort en 1 quand `ok` vaut faux, et rend le document quand même.
 

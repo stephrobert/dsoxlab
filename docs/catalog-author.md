@@ -238,6 +238,16 @@ step with the code: adding a check without documenting it here fails the suite.
 | `metadata_exam_score_sans_epreuve` | `exam_passing_score` is declared on a `lab_type` that does not assess: only `challenge` and `capstone` do |
 | `metadata_blocking_check_inconnu` | `exam_blocking_checks` names a test that does not exist in `challenge/tests/test_functional.py`: a renamed test would disarm the requirement in silence |
 | `metadata_blocking_sans_epreuve` | `exam_blocking_checks` is declared on a `lab_type` that grades nobody: only `challenge` and `capstone` assess |
+| `metadata_feedback_inconnu` | `feedback` is outside `full`, `first-line`, `verdict`: the engine applies the default of the lab type instead |
+| `metadata_critere_id_invalide` | a `criteria[].id` does not match `[\w.:\[\]-]{1,128}` |
+| `metadata_critere_id_double` | two criteria declare the same `id` |
+| `metadata_critere_sans_test` | a criterion lists no test: it would never be evaluated |
+| `metadata_critere_test_inconnu` | a criterion names a test function that exists nowhere in `challenge/tests/`: a renamed test would empty the criterion in silence |
+| `metadata_critere_test_partage` | a test belongs to several criteria |
+| `metadata_lecons_vide` | a criterion declares an empty `lessons` list |
+| `metadata_lecons_trop` | a criterion lists more than five lessons |
+| `metadata_lecon_url_invalide` | a lesson is not an `http(s)` URL |
+| `metadata_lecon_doublon` | a criterion lists the same lesson twice |
 | `content_broken_links` | a relative link points at nothing |
 | `content_missing_english` | a document is translated on one side only |
 | `content_scoring_points_mismatch` | the tasks total a different number of points than announced |
@@ -247,6 +257,11 @@ step with the code: adding a check without documenting it here fails the suite.
 | `content_role_host_unknown` | a `roles` entry names an unknown host |
 | `content_prerequisite_unknown` | a `prerequisites` entry names no lab of this catalog |
 | `content_prerequisite_self` | a lab declares itself as its own prerequisite |
+| `content_transfer_invalid_id` | `transfer_of` is not a lab identifier |
+| `content_transfer_unknown` | `transfer_of` names no lab of this catalog |
+| `content_transfer_self` | a lab declares itself as its own transfer origin |
+| `content_transfer_chain` | `transfer_of` targets a lab that is itself a variant: a family is one original lab and its variants |
+| `content_transfer_validation` | a `validation` lab takes part in a transfer family, as variant or as origin |
 | `content_solution_plaintext` | a file under `solution/` is readable in the clear |
 | `content_fixture_missing` | a fixture is declared but absent from `fixtures/` |
 | `content_fixture_undeclared` | a file sits in `fixtures/` without being declared |
