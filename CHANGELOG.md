@@ -7,6 +7,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-09
+
+### Added
+
+- **The engine now produces an internal structured report of each `check`
+  run, with no visible change** (lot A of issue #336). A pytest plugin shipped
+  inside the wheel (`dsoxlab/rapport_pytest/dsoxlab_rapport.py`, standard
+  library and pytest only, no import of `dsoxlab`) is loaded with
+  `-p dsoxlab_rapport` from a directory placed first on the subprocess
+  `PYTHONPATH`, which covers all four ways `resolve_pytest_cmd` can launch
+  pytest. It writes one JSONL line per test phase into a temporary directory
+  that `check` removes afterwards. Both execution paths of `check_lab`
+  (captured and streamed) pass it and read the report back into a new
+  `CheckResult.criteres`.
+- **One result per criterion**, `ResultatDeCritere`: an identifier (the pytest
+  nodeid without its file path, sanitised to letters, digits and `_ . : [ ] -`,
+  at most 128 characters; two failing parametrized cases give two criteria; two
+  same-named tests in two files get their sanitised path back so they stay
+  distinct), the full nodeid, the phase, a state (`satisfied`, `unsatisfied`,
+  `not_evaluated`), where the message comes from, and the author's message when
+  there is one. A fixture error or a collection error is `not_evaluated`, never
+  `unsatisfied`; a teardown failure after a passing test stays `satisfied` with
+  a `teardown_error` mention. The author's message is the one written in the
+  `assert` or in `pytest.fail`, cut before pytest's own explanation; the text of
+  a technical exception is never kept, so it can never reach a learner by
+  accident.
+- `CheckResult.criteres` is `None` when the report is absent, truncated or
+  unreadable: unknown is not "zero criteria", and `check` then keeps the text
+  path it always had. If a launcher hides the plugin from pytest, the run is
+  replayed without it rather than turning a measurement into a failure.
+
+### Unchanged
+
+- The score, `failed_checks`, `blocking_failed`, what `check` prints, the JSON
+  export, `push` and the database, and every exit code. Nothing reads the new
+  report yet.
+
 ## [0.7.3] - 2026-11-03
 
 ### Fixed

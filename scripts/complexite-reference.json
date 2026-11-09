@@ -87,9 +87,9 @@
       "lignes": 78
     },
     "src/dsoxlab/services/lab_service.py::check_lab": {
-      "cognitive": 18,
-      "profondeur": 3,
-      "lignes": 134
+      "cognitive": 11,
+      "profondeur": 2,
+      "lignes": 84
     },
     "src/dsoxlab/validators/content.py::check_doc_url": {
       "cognitive": 21,

@@ -7,6 +7,44 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.8.0] - 2026-11-09
+
+### Ajouté
+
+- **Le moteur produit désormais un rapport structuré interne de chaque
+  exécution de `check`, sans aucun changement visible** (lot A de l'issue
+  #336). Un plugin pytest embarqué dans la roue
+  (`dsoxlab/rapport_pytest/dsoxlab_rapport.py`, bibliothèque standard et pytest
+  seulement, aucun import de `dsoxlab`) est chargé par `-p dsoxlab_rapport`
+  depuis un répertoire placé en tête du `PYTHONPATH` du sous-processus, ce qui
+  couvre les quatre façons dont `resolve_pytest_cmd` peut lancer pytest. Il
+  écrit une ligne JSONL par phase de test dans un répertoire temporaire que
+  `check` retire ensuite. Les deux chemins d'exécution de `check_lab` (capture
+  en bloc et flux) le passent et relisent le rapport dans un nouveau
+  `CheckResult.criteres`.
+- **Un résultat par critère**, `ResultatDeCritere` : un identifiant (le nodeid
+  pytest privé de son chemin de fichier, assaini en lettres, chiffres et
+  `_ . : [ ] -`, 128 caractères au plus ; deux cas paramétrés en échec donnent
+  deux critères ; deux tests homonymes dans deux fichiers retrouvent leur chemin
+  assaini pour rester distincts), le nodeid complet, la phase, un état
+  (`satisfied`, `unsatisfied`, `not_evaluated`), l'origine du message et le
+  message de l'auteur quand il existe. Une erreur de fixture ou de collecte
+  vaut `not_evaluated`, jamais `unsatisfied` ; un échec au teardown d'un test
+  réussi reste `satisfied` avec la mention `teardown_error`. Le message de
+  l'auteur est celui écrit dans l'`assert` ou dans `pytest.fail`, coupé avant
+  l'explication de pytest ; le texte d'une exception technique n'est jamais
+  conservé, et ne peut donc pas atteindre un apprenant par accident.
+- `CheckResult.criteres` vaut `None` quand le rapport est absent, tronqué ou
+  illisible : inconnu n'est pas « zéro critère », et `check` garde alors le
+  chemin texte qu'il a toujours eu. Si un lanceur masque le plugin à pytest,
+  l'exécution est rejouée sans lui, au lieu de transformer une mesure en panne.
+
+### Inchangé
+
+- Le score, `failed_checks`, `blocking_failed`, ce que `check` affiche,
+  l'export JSON, `push` et la base, et tous les codes de sortie. Rien ne lit
+  encore le nouveau rapport.
+
 ## [0.7.3] - 2026-11-03
 
 ### Corrigé

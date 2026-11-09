@@ -36,6 +36,11 @@ DONNEES_ATTENDUES = (
     # L'infra packagée : un dépôt de labs ne fournit ni Terraform ni cloud-init.
     "dsoxlab/templates/terraform/kvm/main.tf",
     "dsoxlab/templates/cloud-init/almalinux.yaml.tmpl",
+    # Le plugin pytest du rapport structuré (0.8.0) : chargé par `-p` depuis
+    # un répertoire placé en tête de PYTHONPATH, donc jamais importé par
+    # dsoxlab lui-même. Absent de la roue, `check` retomberait en silence sur
+    # le chemin texte (`criteres` à None) sans qu'aucun test unitaire ne rougisse.
+    "dsoxlab/rapport_pytest/dsoxlab_rapport.py",
 )
 
 
