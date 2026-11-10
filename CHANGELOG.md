@@ -7,6 +7,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-11-10
+
+One defect in the release check, and a correction to 0.8.2.
+
+### Fixed
+
+- **`scripts/check-release.py` no longer reports "CI green" on zero runs**
+  (#359). An empty JSON list is written `"[]"`, hence non-empty: none of the
+  "unknown state" branches opened, and the script fell into the green `else`.
+  Measured just before the `v0.8.2` tag: run from an unmerged branch, where CI
+  never runs, it reported "CI green on this commit" on a commit nothing had
+  built. That is the very fault this repository refuses elsewhere: `doctor` has
+  an exit code of its own, `10`, for "could not be measured". Here the verdict
+  decides a tag, and a version published on PyPI cannot be taken back.
+
+  The message names the cause and the move: CI runs only on `main` and on pull
+  requests, so merge first. It also recalls that `gh run list --commit <sha>`
+  needs the **full** SHA: given a short one it returns `[]` without an error.
+
+- **The count announced in the 0.8.2 entry was wrong, and is corrected in this
+  entry** (#359). It claimed "61 of its 66 labs target a single host" and "the
+  five that need the worker all declare it through `roles`". Counted target by
+  target, it is **59** labs on one host and **7** on two, and those seven did
+  **not** declare the worker. The count treated alternative `targets`, which a
+  learner picks with `--target`, as simultaneously required hosts; only `roles`
+  declares a cumulative need.
+
+  Those seven labs failed under 0.8.2 on
+  `ssh: connect to host 10.10.50.12: No route to host`, measured on real VMs:
+  up to 0.8.1, `provision` brought up the whole catalogue and the missing
+  declaration stayed invisible. Their `lab.yaml` files are fixed in the
+  catalogue, with a guard that refuses a lab naming a host it does not declare.
+
+  The `v0.8.2` tag is not moved: its entry keeps the wrong count as it was
+  published, with the dated correction below it. This version is the one whose
+  changelog is right at its tag.
+
 ## [0.8.2] - 2026-11-10
 
 One defect, and it made a whole catalogue unplayable on a machine that could
