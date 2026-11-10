@@ -410,6 +410,29 @@ def _verifier_ci(r: Rapport, *, ci_verifiee: bool = False) -> None:
     # script refusait donc un tag sain. Un contrôle qui se trompe de sujet
     # coûte plus cher que l'absence de contrôle : on finit par passer outre,
     # et le jour où il a raison, personne ne l'écoute.
+    # ZERO RUN N EST PAS UNE CI VERTE. Une liste vide rend un `stdout` à « [] »,
+    # donc non vide : aucune des branches « état inconnu » ci-dessus ne s'ouvre,
+    # et ce contrôle concluait alors au vert sur un commit QUE RIEN N A JAMAIS
+    # CONSTRUIT. Mesuré le 2026-11-10 avant le tag v0.8.2 : lancé depuis une
+    # branche non fusionnée, où la CI ne tourne jamais, le script annonçait
+    # « CI verte sur ce commit ».
+    #
+    # C'est la faute que ce dépôt refuse partout ailleurs : `doctor` a un code
+    # de sortie à lui (10) pour « n'a pas pu être mesuré », précisément pour ne
+    # jamais peindre en vert ce qu'il ignore. Ici le verdict décide d'un TAG, et
+    # une version publiée sur PyPI ne se reprend pas.
+    if not runs:
+        if ci_verifiee:
+            r.note("CI déclarée verte à la main", "aucun run sur ce commit ; --ci-verifiee.")
+        else:
+            r.attendre(
+                "Aucun run de CI sur ce commit",
+                "Rien n'a construit ce commit. La CI ne tourne que sur `main` et "
+                "sur les pull requests : fusionne d'abord, puis relance ce "
+                "contrôle. `gh run list --commit <sha>` exige le SHA COMPLET.",
+            )
+        return
+
     eprouvants = [x for x in runs if x.get("event") != _EVENEMENT_INFRA]
     ecartes = [
         x["name"] for x in runs

@@ -26,10 +26,26 @@ nonetheless play every one of its labs.
     `provision` with no `--host`.
 
   Measured on `kubernetes-dsoxlab-training`, which declares three hosts and
-  10752 MB: **61 of its 66 labs target a single host**, and none asks for more
-  than 6656 MB. The five that need the worker all declare it through `roles`.
-  Adding two labs on a third host therefore made all **66** labs unplayable on
-  an 8 GB machine, when before that addition the other 64 ran there.
+  10752 MB: **59 of its 66 labs target a single host**, and none asks for more
+  than 6656 MB. Adding two labs on a third host therefore made all **66** labs
+  unplayable on an 8 GB machine, when before that addition the other 64 ran
+  there.
+
+  > **Corrected on 2026-11-10, after measuring on real VMs.** This entry first
+  > claimed "61 of its 66 labs" and stated that "the five that need the worker
+  > all declare it through `roles`". Both were wrong, and the second said the
+  > opposite of the truth. The count treated **alternative** `targets`, the
+  > ones a learner picks with `--target`, as simultaneously required hosts,
+  > whereas only `roles` declares a cumulative need. Counted target by target:
+  > **59** labs on one host, **7** on two.
+  >
+  > And those seven did **not** declare the worker they use. Up to 0.8.1,
+  > `provision` brought up the whole catalogue and that missing declaration
+  > stayed invisible; 0.8.2 exposed it by making them fail on
+  > `ssh: connect to host 10.10.50.12: No route to host`. The catalogue's seven
+  > `lab.yaml` files have been fixed, and a guard there now refuses a lab that
+  > names a host without declaring it. The `v0.8.2` tag was not moved: only
+  > this entry is corrected.
 
   The precedent that governs the chosen shape: the **disk** portion of the same
   check had already been reduced to "inform without concluding" (issue #209),
