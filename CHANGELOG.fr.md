@@ -7,6 +7,45 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.8.3] - 2026-11-10
+
+Un défaut du contrôle de release, et une rectification de la 0.8.2.
+
+### Corrigé
+
+- **`scripts/check-release.py` ne conclut plus « CI verte » sur zéro run**
+  (#359). Une liste JSON vide s'écrit `"[]"`, donc non vide : aucune des
+  branches « état inconnu » ne s'ouvrait, et le script tombait dans le `else`
+  du vert. Mesuré juste avant le tag `v0.8.2` : lancé depuis une branche non
+  fusionnée, où la CI ne tourne jamais, il annonçait « CI verte sur ce commit »
+  sur un commit que rien n'avait construit. C'est la faute que ce dépôt refuse
+  ailleurs : `doctor` a un code de sortie à lui, `10`, pour « n'a pas pu être
+  mesuré ». Ici le verdict décide d'un tag, et une version publiée sur PyPI ne
+  se reprend pas.
+
+  Le message nomme la cause et le geste : la CI ne tourne que sur `main` et sur
+  les pull requests, donc il faut fusionner d'abord. Il rappelle aussi que
+  `gh run list --commit <sha>` exige le SHA **complet** : avec un SHA court il
+  rend `[]` sans erreur.
+
+- **Le décompte annoncé dans l'entrée 0.8.2 était faux, et il est rectifié
+  dans cette entrée** (#359). Elle annonçait « 61 de ses 66 labs ne visent
+  qu'un seul hôte » et « les cinq qui ont besoin du worker le déclarent tous par
+  un `roles` ». Compté cible par cible, c'est **59** labs sur un hôte et **7**
+  sur deux, et ces sept ne déclaraient **pas** le worker. Le décompte traitait
+  les `targets` alternatives, que l'apprenant choisit par `--target`, comme des
+  hôtes requis simultanément ; seul `roles` déclare un besoin cumulé.
+
+  Ces sept labs ont échoué avec la 0.8.2 sur
+  `ssh: connect to host 10.10.50.12: No route to host`, mesuré en VM : jusqu'à
+  la 0.8.1, `provision` montait tout le catalogue et le défaut de déclaration
+  restait invisible. Leurs `lab.yaml` sont corrigés côté catalogue, avec un
+  garde-fou qui refuse qu'un lab nomme un hôte sans le déclarer.
+
+  Le tag `v0.8.2` n'est pas déplacé : son entrée porte le décompte faux tel
+  qu'il a été publié, avec la rectification datée en dessous. Cette version-ci
+  est celle dont le journal est juste au tag.
+
 ## [0.8.2] - 2026-11-10
 
 Un défaut, et il rendait un catalogue entier injouable sur une machine qui
