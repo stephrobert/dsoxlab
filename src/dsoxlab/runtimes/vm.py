@@ -62,6 +62,67 @@ class TargetNotResolved(RuntimeError):
     est vide pour un lab ``runtime: vm``."""
 
 
+def _target_depuis_le_contexte(lab: LabDefinition) -> str | None:
+    """Lit ``ActiveContext.active_target`` depuis le repo du lab.
+
+    Best-effort : un contexte illisible ne doit pas empêcher de résoudre une
+    target, la priorité ayant quatre autres échelons derrière celui-ci.
+    """
+    try:
+        from ..config import read_context
+        from ..discovery.repo import find_meta_yml
+
+        meta_path = find_meta_yml(lab.path)
+        if meta_path is None:
+            return None
+        ctx = read_context(meta_path.parent)
+        return ctx.active_target or None
+    except Exception:  # noqa: BLE001 — best-effort
+        return None
+
+
+def resoudre_target(lab: LabDefinition, explicit_name: str | None = None) -> Target:
+    """Résout la target effective d'un lab selon la priorité documentée.
+
+    Priorité (décroissante) :
+
+    1. ``explicit_name`` (passé par la CLI via ``--target``).
+    2. Variable d'env ``DSOXLAB_TARGET``.
+    3. ``ActiveContext.active_target`` lu depuis
+       ``<repo>/.dsoxlab-context.json``.
+    4. ``lab.runtime.default``.
+    5. Première target déclarée.
+
+    HORS DE LA CLASSE À DESSEIN. ``start`` doit savoir quels hôtes monter
+    (issue #358) et ``doctor`` quels hôtes compter, sans instancier un runtime.
+    Si chacun refaisait cette priorité, ils divergeraient en silence : ``start``
+    monterait une machine que ``run`` n'utilise pas, et le diagnostic porterait
+    sur une autre encore. Une seule résolution, donc, et ``VmRuntime`` l'appelle
+    comme les autres.
+
+    Raises:
+        TargetNotResolved: si la liste ``runtime.targets`` est vide, ou si le
+            nom résolu ne matche aucune target.
+    """
+    if not lab.runtime.targets:
+        raise TargetNotResolved(_("err_vm_no_target", lab_id=lab.id))
+
+    name = (
+        explicit_name
+        or os.environ.get("DSOXLAB_TARGET", "").strip()
+        or _target_depuis_le_contexte(lab)
+        or None
+    )
+    target = lab.runtime.target(name)
+    if target is None:
+        available = ", ".join(t.name for t in lab.runtime.targets)
+        raise TargetNotResolved(_(
+            "err_vm_target_unknown",
+            name=name, lab_id=lab.id, available=available,
+        ))
+    return target
+
+
 class VmRuntime(BaseRuntime):
     """Runtime VM — invoque ``ansible-runner`` pour setup/cleanup.
 
@@ -286,53 +347,13 @@ class VmRuntime(BaseRuntime):
     def _resolve_target(
         self, lab: LabDefinition, explicit_name: str | None
     ) -> Target:
-        """Résout la target effective selon la priorité documentée.
-
-        Priorité (décroissante) :
-
-        1. ``explicit_name`` (passé par la CLI via ``--target``).
-        2. Variable d'env ``DSOXLAB_TARGET``.
-        3. ``ActiveContext.active_target`` lu depuis
-           ``<repo>/.dsoxlab-context.json``.
-        4. ``lab.runtime.default``.
-        5. Première target déclarée.
-
-        Raises:
-            TargetNotResolved: si la liste ``runtime.targets`` est vide,
-                ou si le nom résolu ne matche aucune target.
-        """
-        if not lab.runtime.targets:
-            raise TargetNotResolved(_("err_vm_no_target", lab_id=lab.id))
-
-        name = (
-            explicit_name
-            or os.environ.get("DSOXLAB_TARGET", "").strip()
-            or self._target_from_context(lab)
-            or None
-        )
-        target = lab.runtime.target(name)
-        if target is None:
-            available = ", ".join(t.name for t in lab.runtime.targets)
-            raise TargetNotResolved(_(
-                "err_vm_target_unknown",
-                name=name, lab_id=lab.id, available=available,
-            ))
-        return target
+        """Résout la target effective. Voir :func:`resoudre_target`."""
+        return resoudre_target(lab, explicit_name)
 
     @staticmethod
     def _target_from_context(lab: LabDefinition) -> str | None:
-        """Lit ``ActiveContext.active_target`` depuis le repo du lab."""
-        try:
-            from ..config import read_context
-            from ..discovery.repo import find_meta_yml
-
-            meta_path = find_meta_yml(lab.path)
-            if meta_path is None:
-                return None
-            ctx = read_context(meta_path.parent)
-            return ctx.active_target or None
-        except Exception:  # noqa: BLE001 — best-effort
-            return None
+        """Voir :func:`_target_depuis_le_contexte`."""
+        return _target_depuis_le_contexte(lab)
 
     def _repo_meta(self, lab: LabDefinition) -> RepoMetadata:
         meta_path = find_meta_yml(lab.path)

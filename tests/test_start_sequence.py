@@ -111,7 +111,7 @@ def etapes_simulees(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(parcours_cli, "run", _faux_run)
     monkeypatch.setattr(
         doctor, "collect_checks",
-        lambda _root, _meta: doctor.DoctorReport(
+        lambda _root, _meta, hosts=None: doctor.DoctorReport(
             required=[doctor._check("python", True, "3.13")],
         ),
     )
@@ -145,7 +145,7 @@ def test_un_echec_nomme_l_etape_et_sa_commande(
 
     monkeypatch.setattr(
         doctor, "collect_checks",
-        lambda _root, _meta: doctor.DoctorReport(
+        lambda _root, _meta, hosts=None: doctor.DoctorReport(
             required=[doctor._check("terraform", False, "introuvable")],
         ),
     )
@@ -216,12 +216,19 @@ def test_une_infra_deja_montee_n_est_pas_remontee(
 ) -> None:
     """L'idempotence exigée : relancé sur un lab prêt, il reprend la session.
 
-    On lit le state plutôt que de sonder en SSH : une machine éteinte reste
-    provisionnée, et « est-ce qu'elle répond » est la question de `status`.
+    La simulation porte sur `_hotes_a_monter`, la PRIMITIVE : c'est elle que
+    `_monter_l_infra` interroge, et `_infra_prete` n'en est qu'une lecture
+    booléenne. Simuler le dérivé laissait ce test passer sans rien mesurer
+    (constaté le 2026-11-10, quand la primitive a été introduite).
+
+    Ce docstring affirmait aussi qu'on « lit le state plutôt que de sonder en
+    SSH », ce qui n'était plus vrai : l'adresse seule ne suffit pas, et la
+    sonde a été ajoutée après que `provision` soit sorti en 8 sur des hôtes
+    muets pendant que `start` annonçait « rien à reconstruire ».
     """
     from dsoxlab.cli import demarrage
 
-    monkeypatch.setattr(demarrage, "_infra_prete", lambda _root: True)
+    monkeypatch.setattr(demarrage, "_hotes_a_monter", lambda _root, _hotes=None: [])
 
     resultat = runner.invoke(app, ["start", "lab-vm"])
 

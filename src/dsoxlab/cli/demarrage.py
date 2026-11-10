@@ -143,11 +143,28 @@ def _hote_repond(adresse: str, *, delai: float = 2.0) -> bool:
         return False
 
 
-def _infra_prete(root: Path) -> bool:
-    """L'infrastructure est-elle utilisable, ou faut-il (re)jouer provision ?
+def _hotes_a_monter(root: Path, hotes: list[str] | None = None) -> list[str]:
+    """Les FQDN qu'il faut encore monter : sans adresse, ou qui ne répondent pas.
 
-    Deux conditions, et la seconde a été apprise à l'usage : les hôtes ont une
-    adresse dans le state, **et** ils répondent.
+    C'est la primitive, et elle NOMME les hôtes au lieu de rendre un booléen,
+    parce que deux questions en dépendent et qu'elles doivent recevoir la même
+    réponse : *quoi provisionner* (``_monter_l_infra``) et *quelle mémoire
+    demander* (``_verifier_les_dependances``). Un hôte qui tourne déjà a sa
+    mémoire comptée dans le ``MemAvailable`` du poste : la redemander, c'est la
+    compter deux fois, et un second ``start`` sur une infrastructure déjà
+    debout sortait alors en code 2 sur une machine juste dimensionnée.
+
+    ``hotes`` restreint aux FQDN du lab joué (issue #358). Sans cette
+    restriction, le jugement portait sur tout le catalogue et rendait « à
+    monter » dès qu'un hôte n'avait pas d'adresse, **sans même sonder** : sur le
+    catalogue Kubernetes, 61 labs sur 66 ne visent qu'un hôte, et exiger les
+    trois rendait les 66 injouables sur une machine à 8 Go alors qu'aucun ne
+    demande plus de 6656 Mo. Un FQDN étranger au catalogue est écarté, et une
+    restriction qui n'en retient aucun retombe sur le catalogue entier : les
+    replis vont vers le pire cas, jamais vers le plus petit.
+
+    Deux conditions pour qu'un hôte compte comme prêt, et la seconde a été
+    apprise à l'usage : il a une adresse dans le state, **et** il répond.
 
     Se contenter de l'adresse produisait un enchaînement absurde, mesuré dans
     l'appliance : ``provision`` sortait en 8 sur « les hôtes n'ont pas répondu
@@ -158,41 +175,52 @@ def _infra_prete(root: Path) -> bool:
     d'Ansible que rien ne reliait à la cause.
 
     Sonder coûte au pire deux secondes par hôte, et rien quand tout répond.
-    Rejouer ``provision`` ne coûte pas davantage : il reprend sans rien
-    recréer, et il attend — ce qui est exactement ce qu'il faut ici.
     """
     from ..infra.inventory import build_inventory, read_terraform_outputs
 
     repo_meta = _read_repo(root)
     if repo_meta is None or not repo_meta.infra.hosts:
-        return True
+        return []
+    declares = [h.name for h in repo_meta.infra.hosts]
+    if hotes is not None and not hotes:
+        # Le lab ne demande aucun hôte : il n'y a rien à monter pour lui. Un
+        # lab `shell` est dans ce cas, et lui faire monter le catalogue serait
+        # provisionner des VM qu'il n'utilise pas. `None`, lui, veut dire
+        # « pas de restriction », donc tout le catalogue.
+        return []
+    vises = [fqdn for fqdn in (hotes or declares) if fqdn in declares] or declares
     try:
         sorties = read_terraform_outputs(repo_meta)
         inventaire = build_inventory(repo_meta, terraform_outputs=sorties)
     except Exception:  # noqa: BLE001 — une infra illisible est une infra à monter
-        return False
+        return vises
     # L'inventaire est imbriqué sous `all.children`, comme tout inventaire
     # Ansible : lire `labenv` à la racine rendait un dictionnaire vide, donc
     # « à provisionner » **toujours**. Le défaut n'est apparu qu'à l'essai réel,
     # où la relance a remonté une infrastructure déjà debout — un test qui
     # simule cette fonction ne pouvait pas le voir.
-    hotes = (
+    inventorie = (
         inventaire.get("all", {})
         .get("children", {})
         .get("labenv", {})
         .get("hosts", {})
     )
-    if not hotes:
-        return False
-    adresses = [
-        variables.get("ansible_host")
-        for variables in hotes.values()
-        if isinstance(variables, dict)
-    ]
-    # Un hôte sans adresse dans l'inventaire n'est pas joignable non plus.
-    if not adresses or not all(adresses):
-        return False
-    return all(_hote_repond(str(adresse)) for adresse in adresses)
+    a_monter = []
+    for fqdn in vises:
+        variables = inventorie.get(fqdn)
+        adresse = variables.get("ansible_host") if isinstance(variables, dict) else None
+        if not adresse or not _hote_repond(str(adresse)):
+            a_monter.append(fqdn)
+    return a_monter
+
+
+def _infra_prete(root: Path, hotes: list[str] | None = None) -> bool:
+    """L'infrastructure est-elle utilisable, ou faut-il (re)jouer provision ?
+
+    Vrai quand il ne reste rien à monter. Voir :func:`_hotes_a_monter`, qui
+    porte le jugement et les raisons.
+    """
+    return not _hotes_a_monter(root, hotes)
 
 
 @app.command("start", help=_("cmd_start_help"))
@@ -272,7 +300,24 @@ def _poser_le_contexte(situation: _Situation) -> None:
 def _verifier_les_dependances(situation: _Situation) -> None:
     from ..services.doctor import collect_checks
 
-    rapport = collect_checks(situation.root, _read_repo(situation.root))
+    # `hosts=` restreint le contrôle de ressources aux hôtes de ce lab-ci QUI NE
+    # TOURNENT PAS ENCORE (issue #358). Deux défauts se cumulaient :
+    #
+    #   - `doctor` additionnait la mémoire de TOUT le catalogue, ce contrôle est
+    #     requis, et `start` sortait donc en 2 pour un lab qui ne vise qu'une
+    #     machine ;
+    #   - il ne retirait pas les hôtes DÉJÀ DÉMARRÉS, dont la mémoire est
+    #     pourtant déjà prise dans le `MemAvailable` qu'il lit. Un second
+    #     `start` la comptait donc deux fois, et refusait sur un poste juste
+    #     dimensionné une infrastructure déjà debout.
+    #
+    # Le diagnostic lancé seul ne passe rien et garde le total du catalogue :
+    # c'est une information sur le pire cas, pas un refus.
+    rapport = collect_checks(
+        situation.root,
+        _read_repo(situation.root),
+        hosts=_hotes_a_monter(situation.root, _hotes_du_lab(situation)),
+    )
     manquants = rapport.failing()
     if manquants:
         console.print(_(
@@ -283,17 +328,47 @@ def _verifier_les_dependances(situation: _Situation) -> None:
     console.print(_("start_deps_ok", count=len(rapport.required)))
 
 
+def _hotes_du_lab(situation: _Situation) -> list[str]:
+    """Les FQDN dont CE lab a besoin, et aucun autre (issue #358).
+
+    La résolution passe par ``resoudre_target``, celle de ``run`` : si les deux
+    divergeaient, ``start`` monterait une machine que ``run`` n'utiliserait pas.
+    Les rôles comptent, ``Target.hosts()`` les inclut.
+
+    Rend une liste vide quand il n'y a rien à restreindre : un lab ``shell``,
+    ou une target qu'on ne sait pas résoudre. Dans ce dernier cas, se rabattre
+    sur le catalogue entier est le comportement d'avant, donc sûr : il monte
+    peut-être trop, il ne monte jamais trop peu.
+    """
+    if situation.lab.runtime.type is RuntimeType.SHELL:
+        return []
+    from ..runtimes.vm import TargetNotResolved, resoudre_target
+
+    try:
+        return resoudre_target(situation.lab, situation.target).hosts()
+    except TargetNotResolved:
+        # Pas à `start` de trancher ici : `run` lèvera avec son message, qui
+        # nomme les targets disponibles. L'étape d'infra ne doit pas devancer
+        # ce diagnostic par un message plus pauvre.
+        return []
+
+
 def _monter_l_infra(situation: _Situation) -> None:
     from .infrastructure import provisionner
 
-    if _infra_prete(situation.root):
+    hotes = _hotes_du_lab(situation)
+    if not _hotes_a_monter(situation.root, hotes):
         console.print(_("start_infra_already"))
         return
     # Le verrou couvre la seule étape qui écrit le state, et il est rendu avant
     # `run`, qui prend le sien (voir l'en-tête du module).
+    #
+    # On provisionne les hôtes DU LAB, et non les seuls manquants : un
+    # `provision` partiel laisserait Terraform détruire ce qui n'est pas dans
+    # ses cibles. C'est `provisionner` qui reprend sans rien recréer.
     verrou = _verrou(situation.root, "start")
     try:
-        provisionner(situation.root)
+        provisionner(situation.root, host=hotes or None)
     finally:
         verrou.release()
 

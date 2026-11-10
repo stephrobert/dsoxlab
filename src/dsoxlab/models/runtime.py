@@ -72,6 +72,31 @@ class Target:
     primaire, où tournent les tests). Vide = lab mono-hôte (défaut). Les FQDN
     doivent être déclarés dans ``meta.yml: infra.hosts[]`` et provisionnés."""
 
+    def hosts(self) -> list[str]:
+        """Les FQDN que cette cible met en jeu : l'hôte primaire et ses rôles.
+
+        C'est la réponse à « de quelles machines CE lab a-t-il besoin ? », et
+        elle est volontairement ici plutôt que chez l'appelant : ``doctor``,
+        ``start`` et l'inventaire doivent compter les mêmes hôtes, sans quoi
+        l'un monte une machine que l'autre n'utilise pas.
+
+        Les rôles comptent autant que l'hôte primaire : un lab de dépannage de
+        nœud travaille sur le worker désigné par un rôle, et l'oublier
+        sous-estimerait son besoin. Mesuré sur le catalogue Kubernetes : 5 labs
+        sur 66 ont besoin d'un second hôte, et tous les cinq le déclarent par
+        un rôle.
+
+        L'ordre est stable et l'hôte primaire vient en tête : ces listes
+        s'affichent, et une liste qui change d'ordre d'un appel à l'autre se
+        lit comme un changement d'état. Les doublons sont retirés, un rôle
+        pouvant désigner l'hôte primaire.
+        """
+        hotes = [self.host] if self.host else []
+        for fqdn in self.roles.values():
+            if fqdn and fqdn not in hotes:
+                hotes.append(fqdn)
+        return hotes
+
     def label(self, lang: str = "en") -> str:
         """Retourne le label dans la langue demandée, fallback EN."""
         if lang == "fr" and self.label_fr:

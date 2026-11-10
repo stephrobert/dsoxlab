@@ -7,6 +7,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-11-10
+
+One defect, and it made a whole catalogue unplayable on a machine that could
+nonetheless play every one of its labs.
+
+### Fixed
+
+- **`start <lab>` now brings up and counts only the hosts of THAT lab**
+  (issue #358). Three paths reasoned about the whole catalogue, never about the
+  lab being played:
+
+  - `doctor` summed the `ram_mb` of **every** host in `meta.yml`, and that
+    check is **required** as soon as a host is declared;
+  - `start` read `rapport.failing()` and exited with **code 2**;
+  - `_infra_prete` returned false as soon as one catalogue host had no address,
+    **without even probing**, and `start` then rebuilt the whole plan through a
+    `provision` with no `--host`.
+
+  Measured on `kubernetes-dsoxlab-training`, which declares three hosts and
+  10752 MB: **61 of its 66 labs target a single host**, and none asks for more
+  than 6656 MB. The five that need the worker all declare it through `roles`.
+  Adding two labs on a third host therefore made all **66** labs unplayable on
+  an 8 GB machine, when before that addition the other 64 ran there.
+
+  The precedent that governs the chosen shape: the **disk** portion of the same
+  check had already been reduced to "inform without concluding" (issue #209),
+  because comparing a theoretical maximum against a measurement painted red
+  installations that provision perfectly well. A `doctor` run on its own
+  therefore keeps the catalogue total, which is the useful figure outside a
+  lab; it is `start <lab>` that restricts, because it alone knows what its lab
+  needs.
+
+- **The memory of already-running hosts is no longer counted twice**
+  (issue #358). The check compares the **current** `MemAvailable` against the
+  demand, and that supply has already dropped by whatever the running machines
+  consume. A second `start` asked for their memory again, and so exited with
+  code 2 on an infrastructure that was **already up**, on a tightly sized
+  machine. The demand now covers only the lab's hosts that do not answer yet.
+
+### Changed
+
+- **`_hotes_a_monter` replaces `_infra_prete` as the primitive**, and it
+  **names** the hosts instead of returning a boolean. Two questions depend on
+  it and must get the same answer: what to provision, and what memory to ask
+  for. `_infra_prete` remains, as a boolean reading of it.
+
+- **`resoudre_target` moves out of `VmRuntime`** and becomes a function of the
+  `runtimes.vm` module. `start` must know which hosts to bring up without
+  instantiating a runtime; if each redid the resolution priority they would
+  silently diverge, and `start` would bring up a machine `run` does not use.
+
+- **`Target.hosts()` answers "which machines does this lab need?"**: the
+  primary host and those of its `roles`, deduplicated and in a stable order.
+  Roles count as much as the primary host, and ignoring them underestimated a
+  multi-host lab's needs.
+
+- **`None` and `[]` are no longer conflated** in the restriction. `None` means
+  "no restriction", hence the whole catalogue; `[]` means "this lab asks for no
+  host", hence a null demand. A `shell` lab falls in that second case, and the
+  first version of this fix had it claim the catalogue's 10752 MB for VMs it
+  never brings up. FQDNs of which none belong to the catalogue do fall back to
+  the whole catalogue: announcing "0 MB required" would be green on any machine.
+
 ## [0.8.1] - 2026-11-09
 
 Seven issues found on 0.8.0: six defects, and one feature.

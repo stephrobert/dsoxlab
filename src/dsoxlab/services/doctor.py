@@ -46,7 +46,7 @@ from ..infra import ansible as ansible_infra
 from ..infra import libvirt as libvirt_infra
 from ..infra.pont import IFNAMSIZ_UTILES, nom_du_pont, reseau_raccourci
 from ..models import LabDefinition, RepoMetadata
-from ..models.repo import InfraDefinition
+from ..models.repo import HostDefinition, InfraDefinition
 from ..models.runtime import RuntimeType
 from ..utils.shell import CommandError, CommandResult
 from .lab_service import get_all_labs, resolve_pytest_cmd
@@ -837,13 +837,44 @@ def nom_du_pool(infra: InfraDefinition) -> str:
     return str(infra.provider_config("kvm").get("storage_pool") or "default")
 
 
-def _check_resources(infra: InfraDefinition, provider: str) -> Check:
+def _hotes_a_compter(infra: InfraDefinition, hosts: list[str] | None) -> list[HostDefinition]:
+    """Les hôtes dont le contrôle de ressources additionne la demande.
+
+    ``hosts`` restreint aux FQDN demandés. Deux replis, et chacun va vers le
+    PIRE CAS, jamais vers le plus petit :
+
+    TROIS CAS, et ``None`` ne veut pas dire la même chose qu'une liste vide :
+
+    - ``None`` : pas de restriction, donc tout le catalogue. C'est ce que voit
+      le ``doctor`` lancé seul, et le comportement d'avant l'issue #358.
+    - ``[]`` : le lab ne demande **aucun** hôte, et sa demande est donc nulle.
+      C'est le cas d'un lab ``shell``, qui n'a pas d'infrastructure : lui faire
+      réclamer la mémoire du catalogue le refuserait sur une petite machine
+      pour des VM qu'il ne monte jamais.
+    - des FQDN dont **aucun** n'est au catalogue : repli sur tout le catalogue.
+      Ceux-là ne font pas une demande nulle ; annoncer « 0 Mo requis » serait
+      vert sur n'importe quelle machine, et le contrôle cesserait de contrôler.
+      Ce n'est pas à lui de refuser un hôte inconnu, l'inventaire le fera avec
+      un message qui nomme la cause.
+    """
+    if hosts is None:
+        return list(infra.hosts)
+    if not hosts:
+        return []
+    demandes = set(hosts)
+    retenus = [h for h in infra.hosts if h.name in demandes]
+    return retenus or list(infra.hosts)
+
+
+def _check_resources(infra: InfraDefinition, provider: str,
+                     hosts: list[str] | None = None) -> Check:
     """Ce que le poste offre, face à ce que le ``meta.yml`` déclare.
 
     Un provisionnement a déjà expiré sur un hôte à 2 vCPU / 4 Go (hôte prêt à
     181 secondes pour un délai de 180) sans que rien ne l'annonce. La somme des
     ``ram_mb`` du catalogue est la demande, ``MemAvailable`` est l'offre, et le
-    contrôle porte sur elles : deux mesures de même nature.
+    contrôle porte sur elles : deux mesures de même nature. ``hosts`` restreint
+    cette demande : voir :func:`_hotes_a_compter` (issue #358).
 
     Le disque, lui, est **affiché sans être jugé** (issue #209) — les tailles
     déclarées sont nominales quand les qcow2 s'allouent à la demande.
@@ -852,8 +883,9 @@ def _check_resources(infra: InfraDefinition, provider: str) -> Check:
     nommée, et le contrôle sort en ``unknown``, sauf si une portion mesurée
     manque déjà, auquel cas le manque prouvé l'emporte.
     """
-    besoin_ram = sum(h.ram_mb for h in infra.hosts)
-    besoin_disk = sum(h.disk_gb + h.extra_disk_gb for h in infra.hosts)
+    comptes = _hotes_a_compter(infra, hosts)
+    besoin_ram = sum(h.ram_mb for h in comptes)
+    besoin_disk = sum(h.disk_gb + h.extra_disk_gb for h in comptes)
 
     manque = False
     inconnu = False
@@ -1471,6 +1503,15 @@ class _CeQueLeDepotDemande:
     needs_vm: bool
     active: str
     candidates: list[str]
+    #: Les FQDN sur lesquels porte le contrôle de ressources. ``None`` veut dire
+    #: « pas de restriction », donc tout le catalogue : c'est ce que voit le
+    #: `doctor` lancé seul. Une liste VIDE veut dire « ce lab ne demande aucun
+    #: hôte », donc une demande nulle, et les deux ne se confondent pas — le
+    #: défaut d'un `field(default_factory=list)` les confondait, et `doctor`
+    #: annonçait « 0 Mo déclarés », vert sur n'importe quelle machine.
+    #: `start <lab>` y met les hôtes de son lab (issue #358). C'est le seul fait
+    #: d'ici qui vienne de l'APPELANT et non du dépôt.
+    hotes_demandes: list[str] | None = None
 
 
 def _ranger_docker(report: DoctorReport, labs: list[LabDefinition]) -> None:
@@ -1567,7 +1608,9 @@ def _ranger_materiel_local(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> N
     if ctx.repo_meta is None:
         return
     if ctx.repo_meta.infra.hosts:
-        report.required.append(_check_resources(ctx.repo_meta.infra, ctx.active))
+        report.required.append(
+            _check_resources(ctx.repo_meta.infra, ctx.active, ctx.hotes_demandes)
+        )
     # Le nom du pont ne dépend que du contrat : aucune sonde, donc aucune
     # raison de le taire quand l'hyperviseur manque. Il vaut mieux ici qu'au
     # premier `provision`, où l'échec arrive après le téléchargement de
@@ -1609,7 +1652,9 @@ def _ranger_outillage_vm(
         report.required.append(_check_iso_tool())
 
 
-def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
+def collect_checks(
+    root: Path, repo_meta: RepoMetadata | None, hosts: list[str] | None = None,
+) -> DoctorReport:
     """Construit le diagnostic pour le dépôt de labs situé en ``root``.
 
     Le classement requis/optionnel dépend de quatre faits du dépôt, et
@@ -1617,6 +1662,13 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
     des hôtes, quel provider est actif, et lesquels déclare-t-il. Ces faits
     sont rassemblés dans :class:`_CeQueLeDepotDemande`, et chaque phase du
     diagnostic les lit plutôt que de les recalculer.
+
+    ``hosts`` restreint le contrôle de ressources à ces FQDN. C'est
+    ``start <lab>`` qui le passe, avec les hôtes de ce lab (issue #358) ; le
+    ``doctor`` lancé seul ne le passe pas et garde le total du catalogue, qui
+    est l'information utile hors d'un lab : « monter tout le catalogue demande
+    tant ». Le reste du diagnostic ne dépend pas des hôtes retenus, et n'est
+    donc pas restreint.
     """
     labs = get_all_labs(root)
     declare_des_hotes = bool(repo_meta and repo_meta.infra.hosts)
@@ -1631,6 +1683,7 @@ def collect_checks(root: Path, repo_meta: RepoMetadata | None) -> DoctorReport:
         needs_vm=uses_vm(labs) or declare_des_hotes,
         active=repo_meta.infra.provider if repo_meta else "",
         candidates=list(repo_meta.infra.providers_available) if repo_meta else [],
+        hotes_demandes=list(hosts) if hosts is not None else None,
     )
     hypervisors = _hypervisor_checks()
 

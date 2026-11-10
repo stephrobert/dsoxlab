@@ -7,6 +7,71 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.8.2] - 2026-11-10
+
+Un défaut, et il rendait un catalogue entier injouable sur une machine qui
+pouvait pourtant jouer chacun de ses labs.
+
+### Corrigé
+
+- **`start <lab>` ne monte et ne compte plus que les hôtes de CE lab**
+  (issue #358). Trois chemins raisonnaient sur le catalogue entier, jamais sur
+  le lab joué :
+
+  - `doctor` additionnait les `ram_mb` de **tous** les hôtes du `meta.yml`, et
+    ce contrôle est **requis** dès qu'un hôte est déclaré ;
+  - `start` lisait `rapport.failing()` et sortait en **code 2** ;
+  - `_infra_prete` rendait faux dès qu'un hôte du catalogue n'avait pas
+    d'adresse, **sans même sonder**, et `start` remontait alors tout le plan
+    par un `provision` sans `--host`.
+
+  Mesuré sur `kubernetes-dsoxlab-training`, qui déclare trois hôtes et
+  10752 Mo : **61 de ses 66 labs ne visent qu'un seul hôte**, et aucun ne
+  demande plus de 6656 Mo. Les cinq qui ont besoin du worker le déclarent tous
+  par un `roles`. Ajouter deux labs sur un troisième hôte rendait donc les
+  **66** labs injouables sur une machine à 8 Go, alors qu'avant l'ajout les 64
+  autres y passaient.
+
+  Le précédent qui gouverne la forme retenue : la portion **disque** du même
+  contrôle avait déjà été ramenée à « informe sans conclure » (issue #209),
+  parce que comparer un maximum théorique à une mesure peignait en rouge des
+  installations qui provisionnent très bien. Le `doctor` lancé seul garde donc
+  le total du catalogue, qui est l'information utile hors d'un lab ; c'est
+  `start <lab>` qui restreint, parce que lui sait de quoi son lab a besoin.
+
+- **La mémoire des hôtes déjà démarrés n'est plus comptée deux fois**
+  (issue #358). Le contrôle compare le `MemAvailable` **du moment** à la
+  demande, et cette offre a déjà baissé de ce que consomment les machines en
+  marche. Un second `start` redemandait pourtant leur mémoire, et refusait
+  donc en code 2 une infrastructure **déjà debout** sur un poste juste
+  dimensionné. La demande ne porte plus que sur les hôtes du lab qui ne
+  répondent pas encore.
+
+### Modifié
+
+- **`_hotes_a_monter` remplace `_infra_prete` comme primitive**, et elle
+  **nomme** les hôtes au lieu de rendre un booléen. Deux questions en
+  dépendent et doivent recevoir la même réponse : quoi provisionner, et quelle
+  mémoire demander. `_infra_prete` reste, comme lecture booléenne.
+
+- **`resoudre_target` sort de `VmRuntime`** et devient une fonction du module
+  `runtimes.vm`. `start` doit savoir quels hôtes monter sans instancier un
+  runtime ; si chacun refaisait la priorité de résolution, ils divergeraient en
+  silence, et `start` monterait une machine que `run` n'utiliserait pas.
+
+- **`Target.hosts()` répond à « de quelles machines ce lab a-t-il besoin ? »** :
+  l'hôte primaire et ceux de ses `roles`, sans doublon et dans un ordre stable.
+  Les rôles comptent autant que l'hôte primaire, et les ignorer sous-estimait
+  le besoin d'un lab multi-hôtes.
+
+- **`None` et `[]` cessent d'être confondus** dans la restriction. `None` veut
+  dire « pas de restriction », donc tout le catalogue ; `[]` veut dire « ce lab
+  ne demande aucun hôte », donc une demande nulle. Un lab `shell` est dans ce
+  second cas, et la première version du correctif lui faisait réclamer les
+  10752 Mo du catalogue pour des VM qu'il ne monte jamais. Des FQDN dont aucun
+  n'est au catalogue retombent, eux, sur le catalogue entier : annoncer
+  « 0 Mo requis » serait vert sur n'importe quelle machine.
+
 ## [0.8.1] - 2026-11-09
 
 Sept issues relevées sur la 0.8.0 : six défauts, et une fonctionnalité.
