@@ -26,11 +26,26 @@ pouvait pourtant jouer chacun de ses labs.
     par un `provision` sans `--host`.
 
   Mesuré sur `kubernetes-dsoxlab-training`, qui déclare trois hôtes et
-  10752 Mo : **61 de ses 66 labs ne visent qu'un seul hôte**, et aucun ne
-  demande plus de 6656 Mo. Les cinq qui ont besoin du worker le déclarent tous
-  par un `roles`. Ajouter deux labs sur un troisième hôte rendait donc les
-  **66** labs injouables sur une machine à 8 Go, alors qu'avant l'ajout les 64
-  autres y passaient.
+  10752 Mo : **59 de ses 66 labs ne visent qu'un seul hôte**, et aucun ne
+  demande plus de 6656 Mo. Ajouter deux labs sur un troisième hôte rendait donc
+  les **66** labs injouables sur une machine à 8 Go, alors qu'avant l'ajout les
+  64 autres y passaient.
+
+  > **Rectification du 2026-11-10, après mesure en VM.** Cette entrée annonçait
+  > d'abord « 61 de ses 66 labs » et affirmait que « les cinq qui ont besoin du
+  > worker le déclarent tous par un `roles` ». Les deux étaient faux, et la
+  > seconde disait l'inverse du vrai. Le décompte comptait les `targets`
+  > **alternatives**, celles que l'apprenant choisit par `--target`, comme des
+  > hôtes requis simultanément, alors que seul `roles` déclare un besoin cumulé.
+  > Compté cible par cible : **59** labs sur un hôte, **7** sur deux.
+  >
+  > Et ces sept ne déclaraient **pas** le worker dont ils se servent. Jusqu'à la
+  > 0.8.1, `provision` montait tout le catalogue et ce défaut de déclaration
+  > restait invisible ; la 0.8.2 l'a révélé en les faisant échouer sur
+  > `ssh: connect to host 10.10.50.12: No route to host`. Les sept `lab.yaml` du
+  > catalogue ont été corrigés, et un garde-fou y refuse désormais qu'un lab
+  > nomme un hôte sans le déclarer. Le tag `v0.8.2` n'a pas été déplacé : seule
+  > cette entrée est rectifiée.
 
   Le précédent qui gouverne la forme retenue : la portion **disque** du même
   contrôle avait déjà été ramenée à « informe sans conclure » (issue #209),
