@@ -7,6 +7,62 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-11-14
+
+Open bugs settled, the most serious one being a silent loss of VMs.
+
+### Fixed
+
+- **`provision` no longer destroys machines that this `meta.yml` does not
+  declare** (#357). Two checkouts of one repository (two clones, two git
+  worktrees) share one Terraform state, named by `repo.id`. The one declaring
+  fewer hosts used to destroy the others' machines on its first `provision`,
+  without a word. `provision` (with or without `--host`) and
+  `destroy --optional-hosts` now name every machine of the state that is
+  neither a common nor an optional host of this `meta.yml`, and refuse with
+  the new exit code **12** (`HOTES_HORS_CONTRAT`). `provision --prune` destroys
+  them on purpose, naming them. `destroy` names them before asking, even with
+  `--yes`.
+
+  Refusing was chosen over the two other options. Keeping them silently in
+  `var.hosts` is impossible: this `meta.yml` does not know their size or
+  distribution. Destroying them after a warning still loses a VM that another
+  session may be using in the middle of a lab. A refusal costs one command;
+  a lost VM costs the other person's work. The refusal holds even with
+  `--host`, which would not destroy them: the next `provision` without
+  `--host` would, so it is better said at first contact.
+
+- **`run`, `reset` and `clean` name the gesture when no provider is resolved**
+  (#319). On a `vm` lab whose `infra.provider` is a list, with none active,
+  they printed a full Python traceback (`ProviderUnresolved`). They now print
+  the same message as `provision`, with `dsoxlab use --provider …`, and exit
+  with code 1, before any lock or playbook.
+
+- **`validate-structure` names each defect** (#335). The `doc_url` checked by
+  `--check-urls` were never printed: their heading was missing from the
+  display table, so the command exited 1 on its conclusion alone. Each defect
+  now has its own line (lab, file, field, message, and the URL when the message
+  does not carry it), printed without wrapping so CI logs do not cut the URL.
+  The conclusion gives the count: "2 lab(s) out of 63 have…". `--json` is
+  unchanged.
+
+- **`list-labs`: help without domain names, `--all`, and an empty result that
+  explains itself** (#308). The help of `--section`, `--level` and `--bloc`
+  quoted values from one catalogue ("linux, ansible…", "l1, lfcs…", "1-8"); it
+  now says where the value comes from. `--all` / `-a` ignores the active
+  context for one listing, without changing it. An empty result caused by the
+  context adding up with the filters says so, with the number of labs that
+  match without the context.
+
+### Not changed
+
+- **#358** (`start` and `doctor` counting the whole catalogue) was already
+  fixed in 0.8.2; nothing remained in the code. Two tests now cover its
+  interplay with the optional hosts of 0.9.0: `start` of a lab that names an
+  optional host through a role passes it to the provisioning, and `reset`
+  never removes an optional host. The point "measure what `destroy --host`
+  does to a shared base image" needs a real infrastructure and stays open.
+
 ## [0.9.0] - 2026-11-14
 
 Hosts that only a few labs need, without making every learner run them.

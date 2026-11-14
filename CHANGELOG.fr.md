@@ -7,6 +7,64 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.1] - 2026-11-14
+
+Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
+
+### Corrigé
+
+- **`provision` ne détruit plus les machines que ce `meta.yml` ne déclare pas**
+  (#357). Deux checkouts d'un même dépôt (deux clones, deux worktrees git)
+  partagent le même state Terraform, nommé par `repo.id`. Celui qui déclarait
+  le moins d'hôtes détruisait les machines de l'autre à son premier
+  `provision`, sans un mot. `provision` (avec ou sans `--host`) et
+  `destroy --optional-hosts` nomment désormais chaque machine du state qui
+  n'est ni un hôte commun ni un hôte optionnel de ce `meta.yml`, et refusent
+  avec le nouveau code de sortie **12** (`HOTES_HORS_CONTRAT`).
+  `provision --prune` les détruit volontairement, en les nommant. `destroy`
+  les nomme avant la question, même avec `--yes`.
+
+  Le refus a été préféré aux deux autres voies. Les garder en silence dans
+  `var.hosts` est impossible : ce `meta.yml` ignore leur taille et leur
+  distribution. Les détruire après un avertissement perd quand même une VM
+  qu'une autre session utilise peut-être en plein lab. Un refus coûte une
+  commande ; une VM perdue coûte le travail de l'autre. Le refus vaut même
+  avec `--host`, qui ne les détruirait pas : le `provision` suivant sans
+  `--host` le ferait, donc mieux vaut le dire au premier contact.
+
+- **`run`, `reset` et `clean` nomment le geste quand aucun provider n'est
+  résolu** (#319). Sur un lab `vm` dont `infra.provider` est une liste, sans
+  provider actif, ils affichaient une trace Python complète
+  (`ProviderUnresolved`). Ils affichent maintenant le même message que
+  `provision`, avec `dsoxlab use --provider …`, et sortent en 1, avant tout
+  verrou ou playbook.
+
+- **`validate-structure` nomme chaque défaut** (#335). Les `doc_url` contrôlées
+  par `--check-urls` n'étaient jamais affichées : leur rubrique manquait à la
+  table d'affichage, et la commande sortait en 1 sur sa seule conclusion.
+  Chaque défaut a maintenant sa ligne (lab, fichier, champ, message, et l'URL
+  quand le message ne la porte pas), imprimée sans repli pour que les journaux
+  de CI ne coupent pas l'URL. La conclusion donne le décompte : « 2 lab(s) sur
+  63 ont… ». `--json` ne change pas.
+
+- **`list-labs` : une aide sans nom de domaine, `--all`, et un vide qui
+  s'explique** (#308). L'aide de `--section`, `--level` et `--bloc` citait des
+  valeurs d'un seul catalogue (« linux, ansible… », « l1, lfcs… », « 1-8 ») ;
+  elle dit maintenant d'où vient la valeur. `--all` / `-a` ignore le contexte
+  actif le temps d'un listage, sans le modifier. Un résultat vide dû au cumul
+  du contexte et des filtres le dit, avec le nombre de labs qui satisfont les
+  filtres sans le contexte.
+
+### Inchangé
+
+- **#358** (`start` et `doctor` comptaient tout le catalogue) était déjà
+  corrigée en 0.8.2 ; rien ne restait dans le code. Deux tests couvrent
+  désormais son croisement avec les hôtes optionnels de la 0.9.0 : `start`
+  d'un lab qui cite un hôte optionnel par un rôle le passe au
+  provisionnement, et `reset` ne retire jamais un hôte optionnel. Le point
+  « mesurer ce que `destroy --host` fait d'une image de base partagée »
+  demande une infrastructure réelle et reste ouvert.
+
 ## [0.9.0] - 2026-11-14
 
 Des hôtes dont seuls quelques labs ont besoin, sans les faire tourner chez tous
