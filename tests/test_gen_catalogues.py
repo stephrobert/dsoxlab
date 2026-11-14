@@ -107,3 +107,60 @@ def test_la_table_trie_par_nombre_et_ecarte_les_catalogues_sans_lab(gen: Any) ->
     lignes = [ligne for ligne in table.splitlines() if ligne.startswith("| [`")]
     assert [ligne.split("`")[1] for ligne in lignes] == ["cat-b", "cat-a"]
     assert "_12 labs across 2 catalogs" in table
+
+
+# ── draft: true (#369) ───────────────────────────────────────────────────────
+
+BROUILLON = {**ENTREE, "id": "b", "depot": "https://github.com/proprio/cat-b", "draft": True}
+
+
+def test_une_entree_publiee_sans_lab_est_un_ecart(gen: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le défaut de la 0.9.2 : `catalog list` proposait un catalogue vide."""
+    arbres = {"cat-a": _arbre("meta.yml", "README.md")}
+    monkeypatch.setattr(gen, "_api", _api_simulee(gen, {"cat-a": _depot("cat-a")}, arbres))
+    comptes, ecarts = gen._mesurer_le_manifeste([ENTREE], None)
+    assert comptes == {ENTREE["depot"]: 0}
+    assert len(ecarts) == 1 and "draft: true" in ecarts[0] and "cat-a" in ecarts[0]
+
+
+def test_une_entree_draft_sans_lab_n_est_pas_un_ecart(gen: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    arbres = {"cat-b": _arbre("meta.yml")}
+    monkeypatch.setattr(gen, "_api", _api_simulee(gen, {"cat-b": _depot("cat-b")}, arbres))
+    comptes, ecarts = gen._mesurer_le_manifeste([BROUILLON], None)
+    assert comptes == {BROUILLON["depot"]: 0} and ecarts == []
+
+
+def test_une_entree_draft_est_mesuree_hors_de_la_table(gen: Any) -> None:
+    """Même avec des labs publiés, un brouillon n'entre pas dans la table."""
+    comptes = {ENTREE["depot"]: 3, BROUILLON["depot"]: 6}
+    table = gen._table("fr", [ENTREE, BROUILLON], comptes)
+    assert "cat-b" not in table
+    assert "_3 labs dans 1 catalogues" in table
+
+
+def test_un_depot_draft_n_est_pas_un_oubli(gen: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un dépôt public au manifeste en brouillon n'est pas « absent du manifeste »."""
+    depots = {"cat-a": _depot("cat-a"), "cat-b": _depot("cat-b")}
+    arbres = {"cat-b": _arbre("meta.yml", "labs/x/lab.yaml")}
+    monkeypatch.setattr(gen, "_api", _api_simulee(gen, depots, arbres))
+    assert gen._oublies([ENTREE, BROUILLON], None) == []
+
+
+def test_main_sort_en_1_sur_une_entree_publiee_vide(
+    gen: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """De bout en bout : le message dit de passer l'entrée en brouillon ou de la retirer."""
+    for nom in gen.CIBLES:
+        (tmp_path / nom).write_text(f"{gen.DEBUT}\n{gen.FIN}\n", encoding="utf-8")
+    monkeypatch.setattr(gen, "RACINE", tmp_path)
+    monkeypatch.setattr(gen, "_manifeste", lambda: [ENTREE, BROUILLON])
+    monkeypatch.setattr(gen, "_jeton", lambda: None)
+    depots = {"cat-a": _depot("cat-a"), "cat-b": _depot("cat-b")}
+    arbres = {"cat-a": _arbre("meta.yml"), "cat-b": _arbre("meta.yml")}
+    monkeypatch.setattr(gen, "_api", _api_simulee(gen, depots, arbres))
+    monkeypatch.setattr("sys.argv", ["gen-catalogues.py"])
+
+    assert gen.main() == 1
+    erreurs = capsys.readouterr().err
+    assert "cat-a" in erreurs and "draft: true" in erreurs
+    assert "cat-b" not in erreurs
