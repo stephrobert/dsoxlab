@@ -72,7 +72,7 @@ from ._commun import (
     _confirmer,
     _ensure_services,
     _interrompu,
-    _lab,
+    _lab_a_jouer,
     _lang,
     _resolve_lab,
     _root,
@@ -701,11 +701,7 @@ def reset(
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
-    try:
-        lab = _lab(root, lab_id, lang)
-    except ValueError as exc:
-        error(str(exc))
-        raise typer.Exit(1) from None
+    lab = _lab_a_jouer(root, lab_id, lang)
 
     # `reset` fait « clean + redémarrage » : il emporte donc STRICTEMENT PLUS
     # que `clean`, qui demande confirmation. Ne rien demander ici effaçait le
@@ -764,11 +760,7 @@ def clean(
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
-    try:
-        lab = _lab(root, lab_id, lang)
-    except ValueError as exc:
-        error(str(exc))
-        raise typer.Exit(1) from None
+    lab = _lab_a_jouer(root, lab_id, lang)
 
     if not yes:
         _confirmer("confirm_clean", lab_id=texte_affichable(lab.id))
