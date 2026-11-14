@@ -16,15 +16,10 @@
       "profondeur": 6,
       "lignes": 75
     },
-    "src/dsoxlab/cli/contexte.py::list_labs": {
-      "cognitive": 21,
-      "profondeur": 2,
-      "lignes": 39
-    },
     "src/dsoxlab/cli/destruction.py::destroy": {
-      "cognitive": 14,
+      "cognitive": 13,
       "profondeur": 2,
-      "lignes": 108
+      "lignes": 103
     },
     "src/dsoxlab/cli/infrastructure.py::provisionner": {
       "cognitive": 15,

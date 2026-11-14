@@ -22,17 +22,20 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Annotated
 
 import typer
 
 from ..config import (
+    ActiveContext,
     clear_context,
     read_context,
     set_active_provider,
     write_context,
 )
 from ..i18n import _
+from ..models import LabDefinition
 from ..reporting import (
     error,
     info,
@@ -140,28 +143,28 @@ def list_labs(
     bloc: Annotated[int | None, typer.Option("--bloc", "-b", help=_("opt_bloc"))] = None,
     long: Annotated[bool, typer.Option("--long", help=_("opt_labs_long"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+    tout: Annotated[bool, typer.Option("--all", "-a", help=_("opt_list_labs_all"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
-
-    effective_section = section or ctx.section
-    effective_level = level or ctx.level
+    # `--all` : le contexte ne filtre pas ce listage, et n'est pas modifié.
+    avec_contexte = bool(ctx.section or ctx.level) and not tout
 
     # En mode machine, aucun message d'ambiance : la sortie doit être un
     # document JSON et rien d'autre.
-    if (ctx.section or ctx.level) and not as_json:
+    if avec_contexte and not as_json:
         info(_("context_active", label=ctx.label()))
 
-    lang = _lang(root)
-    labs = _catalogue(root, lang, quiet=as_json)
-    if effective_section:
-        labs = [lab for lab in labs if lab.section == effective_section]
-    if effective_level:
-        labs = [lab for lab in labs if lab.level == effective_level]
-    if lab_type:
-        labs = [lab for lab in labs if lab.lab_type == lab_type]
-    if bloc is not None:
-        labs = [lab for lab in labs if lab.bloc == bloc]
+    catalogue = _catalogue(root, _lang(root), quiet=as_json)
+    filtres = _Filtres(section, level, lab_type, bloc)
+    labs = filtres.appliquer(catalogue, ctx if avec_contexte else None)
+    if not labs and avec_contexte and not as_json:
+        # Issue #308 : les filtres s'ajoutent au contexte, et un 0 muet se
+        # lisait « ce catalogue n'a aucun lab de ce genre » alors qu'il en a.
+        sans_contexte = filtres.appliquer(catalogue, None)
+        if sans_contexte:
+            info(_("list_labs_vide_par_contexte",
+                   label=ctx.label(), count=len(sans_contexte)))
     lab_ids = [lab.id for lab in labs]
     scores = get_best_scores(root, lab_ids)
     if as_json:
@@ -176,6 +179,34 @@ def list_labs(
 # ── show ──────────────────────────────────────────────────────────────────────
 
 # ── show ──────────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class _Filtres:
+    """Les filtres de ``list-labs``, appliqués avec ou sans le contexte actif.
+
+    Une option explicite l'emporte sur le champ du contexte qu'elle recouvre ;
+    les autres champs du contexte s'ajoutent. Les deux passes (avec et sans
+    contexte) doivent juger de la même façon, d'où une seule fonction.
+    """
+
+    section: str | None
+    level: str | None
+    lab_type: str | None
+    bloc: int | None
+
+    def appliquer(
+        self, labs: list[LabDefinition], ctx: ActiveContext | None
+    ) -> list[LabDefinition]:
+        section = self.section or (ctx.section if ctx else None)
+        level = self.level or (ctx.level if ctx else None)
+        return [
+            lab for lab in labs
+            if (not section or lab.section == section)
+            and (not level or lab.level == level)
+            and (not self.lab_type or lab.lab_type == self.lab_type)
+            and (self.bloc is None or lab.bloc == self.bloc)
+        ]
+
 
 @app.command("show", help=_("cmd_show_help"))
 def show(

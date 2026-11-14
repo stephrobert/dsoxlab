@@ -102,9 +102,12 @@ hint does not surface in a `git grep`; neither is needed in a new lab.
 **The tests.** pytest runs from the **catalog root**, so a `conftest.py` there
 is collected for every lab: that is where the `build_inventory` import below
 belongs, and where a catalog of `shell` labs resolves `<lab>/challenge/work`
-from the location of the test file. `dsoxlab new catalog` writes none; the
-Linux and Terraform catalogs each carry one at their root, and either is a
-reasonable starting point.
+from the location of the test file. `dsoxlab new catalog` writes one that
+carries only the `message(en=…, fr=…)` helper, and on purpose no
+`from dsoxlab… import`: a lab's tests must stay playable by a plain `pytest`.
+A catalog with `vm` labs adds the `build_inventory` import itself; the Linux
+catalog carries a complete example at its root, the Terraform catalog one for
+`shell` labs.
 
 
 ## `validate-structure` sees the labs it cannot load

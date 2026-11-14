@@ -143,11 +143,17 @@ def test_le_moteur_ne_cite_aucun_miroir_en_dur() -> None:
     """L'invariant, vérifié sur la source plutôt que sur la bonne volonté."""
     from dsoxlab.services import doctor
 
-    source = Path(doctor.__file__).read_text(encoding="utf-8")
+    # Depuis le découpage de doctor.py (#199), les contrôles vivent aussi dans
+    # doctor_controles/ : le contrôle d'accès sortant y a déménagé.
+    racine = Path(doctor.__file__).parent
+    fichiers = [Path(doctor.__file__), *sorted((racine / "doctor_controles").glob("*.py"))]
+    assert len(fichiers) > 1, "doctor_controles/ introuvable : le test ne lirait plus que doctor.py"
 
-    for miroir in ("cloud-images.ubuntu.com", "cloud.debian.org",
-                   "repo.almalinux.org"):
-        assert miroir not in source, f"« {miroir} » est écrit en dur dans doctor.py"
+    for fichier in fichiers:
+        source = fichier.read_text(encoding="utf-8")
+        for miroir in ("cloud-images.ubuntu.com", "cloud.debian.org",
+                       "repo.almalinux.org"):
+            assert miroir not in source, f"« {miroir} » est écrit en dur dans {fichier.name}"
 
 
 def test_un_acces_sortant_coupe_se_voit(monkeypatch: pytest.MonkeyPatch) -> None:

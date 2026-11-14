@@ -71,6 +71,25 @@ def _aucun_acces_reseau(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(doctor, "_joignable", lambda hote: True)
 
 
+#: Les variables par lesquelles git désigne SON dépôt à un sous-processus.
+_VARIABLES_GIT = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+                  "GIT_OBJECT_DIRECTORY", "GIT_PREFIX")
+
+
+@pytest.fixture(autouse=True)
+def _git_sans_le_depot_de_l_appelant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un test qui crée son dépôt git jetable ne doit parler qu'à lui.
+
+    Un hook git (pre-push, pre-commit) exporte ``GIT_DIR`` et ses voisines vers
+    ses sous-processus, et le fait toujours depuis un worktree. Héritées par la
+    suite, elles faisaient viser à chaque ``git`` lancé par un test le dépôt de
+    dsoxlab lui-même au lieu du dépôt d'essai : 37 tests en échec au pre-push
+    depuis un worktree, tous verts lancés à la main (mesuré le 2026-11-14).
+    """
+    for nom in _VARIABLES_GIT:
+        monkeypatch.delenv(nom, raising=False)
+
+
 # ── un catalogue d'essai, partagé par toute la suite ────────────────────────
 #
 # Il vivait dans `test_json_output.py`, où il a été écrit ; trois fichiers en

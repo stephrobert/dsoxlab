@@ -82,14 +82,42 @@ spreading `repo.*` any further.
 | Field | Required | Type | Notes |
 | --- | --- | --- | --- |
 | `portal_url` | no | string | Hand-in URL, in `https`. See [the portal policy](./security.md). |
+| `sync` | no | mapping | The synchronisation API used by `dsoxlab login` and `dsoxlab push`. See below. |
 
 ```yaml
 learning:
   portal_url: https://formation.example.org/my-learning/
+  sync:
+    protocol: learner-sync/1
+    api: https://api.example.org
+    issuer: https://issuer.example.org
+    oauth_domain: https://login.example.org
+    client_id: 0123456789abcdefghijkl
+    callback_url: https://formation.example.org/auth/cli/
 ```
 
-**What this URL does not say.** It does not say dsoxlab sends anything — it never
-does. It does not say the portal is reachable from the machine running dsoxlab,
+**`learning.sync`** declares where `dsoxlab push` hands proofs over without a
+browser. Absent by default: then `dsoxlab login` and `dsoxlab push` say this
+catalogue declares no synchronisation, and nothing leaves the machine. A sending
+needs three things to coincide, and two are missing by default: this block, a
+`dsoxlab login`, and a `dsoxlab push` typed by the learner.
+
+| Field | Notes |
+| --- | --- |
+| `protocol` | The contract spoken by the portal. Only `learner-sync/1` is implemented; any other value makes `push` refuse while naming what is expected. |
+| `api` | Root of the API, in `https`. Paths come from the protocol. |
+| `issuer` | The OIDC issuer, in `https`. It identifies the portal and names the local session file. Distinct from `oauth_domain`. |
+| `oauth_domain` | Root of the OAuth endpoints (`/oauth2/authorize`, `/oauth2/token`), in `https`. |
+| `client_id` | Id of the **public** OAuth client dedicated to the CLI (PKCE, no secret). Not the site's own client. |
+| `callback_url` | The `https` page where authorization returns when no loopback is possible; the learner pastes the code it shows. |
+| `callback_port` | Fixed port of the loopback return address, when the provider allows one. |
+
+Four public addresses and a public client id: that is why this block may live
+in a versioned repository. The complete descriptions are in
+[`schemas/meta.schema.json`](../schemas/meta.schema.json).
+
+**What `portal_url` does not say.** It does not say dsoxlab sends anything: only
+`sync`, a `login` and a `push` together do. It does not say the portal is reachable from the machine running dsoxlab,
 nor that the browser runs there too: a learner in WSL, in a VM or behind SSH
 reads a link and decides. And it does not say the portal is approved by anyone —
 it is *declared by this catalogue*, which is how the CLI presents it.

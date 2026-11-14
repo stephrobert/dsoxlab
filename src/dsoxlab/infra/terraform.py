@@ -208,6 +208,25 @@ def hotes_au_state(repo_meta: RepoMetadata) -> set[str] | None:
     return _cles_des_machines(data) if isinstance(data, dict) else None
 
 
+def hotes_hors_contrat(repo_meta: RepoMetadata) -> list[str]:
+    """Les machines du state que ce ``meta.yml`` ne déclare pas (issue #357).
+
+    Ni communes ni optionnelles : un ``apply`` sans ``-target`` les sortirait
+    du ``for_each`` et Terraform les **détruirait**. C'est le cas de deux
+    checkouts d'un même dépôt (deux clones, deux worktrees) qui partagent le
+    state, nommé par ``repo.id`` et non par chemin, et dont l'un déclare un
+    hôte que l'autre ignore.
+
+    Un state illisible rend une liste vide : Terraform échouera de lui-même
+    sur ce même fichier, avant de planifier quoi que ce soit.
+    """
+    presents = hotes_au_state(repo_meta)
+    if not presents:
+        return []
+    declares = {h.name for h in repo_meta.infra.hosts}
+    return sorted(presents - declares)
+
+
 def _est_une_machine(res: object) -> bool:
     """Une ressource ``host`` gérée, de l'un des types qui portent une machine."""
     return (

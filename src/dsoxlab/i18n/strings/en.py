@@ -32,10 +32,18 @@ STRINGS: dict[str, str] = {
     "opt_help":     "Show this message and exit.",
     "opt_lab_home": "Root of the lab catalog (default: auto-detected).",
     "opt_json":           "JSON output, meant for programs (editor extension, dashboard). Nothing else is printed.",
-    "opt_level":    "Filter by level (l1, l2, lfcs, rhcsa)",
-    "opt_section":  "Filter by section (linux, ansible, terraform, docker…)",
+    "opt_level":    "Filter by level: the `level` field of each lab.yaml",
+    "opt_section":
+        "Filter by section: the `section` field of each lab.yaml, or "
+        "`repo.category` from meta.yml when the lab declares none",
+    "opt_list_labs_all": "Ignore the active context (dsoxlab use) for this listing",
+    "list_labs_vide_par_contexte":
+        "No lab matches both the active context ({label}) and your filters, "
+        "while {count} lab(s) match without the context.\n"
+        "  dsoxlab list-labs --all ...   ignores the context for this listing\n"
+        "  dsoxlab use --reset           clears it",
     "opt_type":     "Filter by type: lab, challenge or capstone",
-    "opt_bloc":     "Filter by bloc number (1-8)",
+    "opt_bloc":     "Filter by bloc number (the position of the section in meta.yml)",
     "opt_top":      "Number of displayed results",
     "opt_doctor_strict":
         "exit 9 if a required check fails, 10 if it could not be measured (for a script, not a human)",
@@ -44,6 +52,24 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Infra provider to activate (e.g. kvm, outscale, incus). "
         "Overridden by DSOXLAB_PROVIDER. Persisted across commands.",
+    "opt_provision_prune":
+        "Destroy the machines the Terraform state holds but this meta.yml does "
+        "not declare (left by another checkout of the same repository)",
+    "hotes_hors_contrat":
+        "The Terraform state of '{repo}' holds machines that this meta.yml does "
+        "not declare: {hosts}. Another checkout of the same repository (a clone "
+        "or a git worktree) most likely created them, since both share one state. "
+        "Applying would destroy them, so nothing was changed.",
+    "hotes_hors_contrat_geste":
+        "Run `dsoxlab {geste}` from the checkout that declares them, or bring "
+        "this one up to date (git pull).\nTo really destroy them: "
+        "dsoxlab provision --prune",
+    "provision_prune_hotes":
+        "--prune: these machines are not declared in meta.yml and will be "
+        "destroyed: {hosts}",
+    "destroy_hotes_hors_contrat":
+        "This destroy also removes machines that this meta.yml does not declare: "
+        "{hosts}. Another checkout of the same repository may still be using them.",
     "opt_provision_bootstrap":
         "Replay the catalog's foundation (infra.bootstrap) even if it is already "
         "in place",
@@ -375,7 +401,8 @@ STRINGS: dict[str, str] = {
     "cmd_new_help":
         "Scaffold a catalog or a lab that matches the contract, ready to fill.",
     "cmd_new_catalog_help":
-        "Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/.",
+        "Scaffold an empty but complete catalog: meta.yml, labs/, ssh/, conftest.py, "
+        "CI and release workflows, pre-commit, governance files and its own tests.",
     "cmd_new_lab_help":
         "Scaffold a lab, discovered by the next list-labs.",
     "arg_new_id": "Id, lowercase, no spaces.",
@@ -788,10 +815,12 @@ Each lab declares:
     [dim]--reset / -r[/dim]         Clear the active context (show all labs again).
 
   [cyan]list-labs[/cyan]            List labs. Options:
-    [dim]--section / -s[/dim]       Filter by section.
+    [dim]--section / -s[/dim]       Filter by section: the [dim]section[/dim] of each lab.yaml.
     [dim]--level   / -l[/dim]       Filter by level.
     [dim]--type    / -t[/dim]       Filter by type: [bold]lab[/bold], [bold]challenge[/bold] or [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filter by bloc number (1-8).
+    [dim]--bloc    / -b[/dim]       Filter by bloc number.
+    [dim]--all     / -a[/dim]       Ignore the active context. Filters add up with the
+                       context; an empty result caused by it says so.
     [dim]--json[/dim]               The catalog as a machine document.
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
@@ -903,8 +932,9 @@ Each lab declares:
     [dim]--force[/dim]              Reinstall over it (loses progress).
 
   [cyan]new catalog <id>[/cyan]     Scaffolds an empty but compliant catalog: meta.yml,
-                       labs/, .gitignore, ssh/. It passes [cyan]validate-structure[/cyan]
-                       with no edit.
+                       labs/, ssh/, conftest.py, CI and release workflows,
+                       pre-commit, governance files and its own tests. It passes
+                       [cyan]validate-structure[/cyan] with no edit.
     [dim]--in <dir>[/dim]           Where to create it. Defaults to the current directory.
   [cyan]new lab <id>[/cyan]         Scaffolds a compliant lab, discovered by the next
                        [cyan]list-labs[/cyan]. Its test [bold]fails[/bold] until it is written: a
@@ -930,6 +960,9 @@ Each lab declares:
     [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
     [dim]--bootstrap[/dim]           Replay the catalog's foundation ([dim]infra.bootstrap[/dim])
                        even if it is already in place.
+    [dim]--prune[/dim]               Destroy the machines the state holds but this meta.yml
+                       does not declare. Without it, provision refuses (exit 12)
+                       and names them: another checkout probably uses them.
 
   [cyan]status [lab][/cyan]         Where the active lab stands, or the one you name:
                        [bold]not started[/bold], [bold]ready[/bold], [bold]in progress[/bold], [bold]validated[/bold], or
@@ -1181,6 +1214,7 @@ silent.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "All labs are valid.",
     "labs_have_issues":       "Some labs have structure or metadata issues.",
+    "labs_have_issues_count": "{count} lab(s) out of {total} have structure or metadata issues.",
     "opt_check_urls":
         "Also check that every doc_url answers (hits the network).",
     "structure_issues_header": "\n[bold]Lab structure:[/bold]",

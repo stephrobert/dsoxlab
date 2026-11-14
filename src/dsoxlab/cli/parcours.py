@@ -71,7 +71,7 @@ from ._commun import (
     _complete_lab_id,
     _ensure_services,
     _interrompu,
-    _lab,
+    _lab_a_jouer,
     _lang,
     _read_repo,
     _resolve_lab,
@@ -138,11 +138,7 @@ def run(
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
-    try:
-        lab = _lab(root, lab_id, lang)
-    except ValueError as exc:
-        error(str(exc))
-        raise typer.Exit(1) from None
+    lab = _lab_a_jouer(root, lab_id, lang)
 
     info(_("lab_starting", lab_id=texte_affichable(lab.id),
            runtime=lab.runtime.type.value))

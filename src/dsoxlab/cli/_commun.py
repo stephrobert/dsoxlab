@@ -240,6 +240,28 @@ def _lab(root: Path, lab_id: str, lang: str) -> LabDefinition:
     return find_lab(_catalogue(root, lang), lab_id)
 
 
+def _lab_a_jouer(root: Path, lab_id: str, lang: str) -> LabDefinition:
+    """Le lab que ``run``, ``reset`` ou ``clean`` vont dérouler, prêt à l'être.
+
+    Un identifiant inconnu sort en 1 avec son message. Un lab ``vm`` exige en
+    plus un provider résolu, et c'est ici qu'on le vérifie (issue #319) : plus
+    bas, ``require_provider()`` est atteint au fond du runtime, et
+    ``ProviderUnresolved`` s'en échappait en trace Python, là où ``provision``
+    nommait déjà le geste. On échoue donc tôt, avant tout verrou ou playbook,
+    avec le même message que les commandes d'infrastructure.
+    """
+    try:
+        lab = _lab(root, lab_id, lang)
+    except ValueError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from None
+    if lab.runtime.type.value in ("vm", "kvm", "incus"):
+        repo_meta = _read_repo(root)
+        if repo_meta is not None:
+            _require_provider(repo_meta)
+    return lab
+
+
 def _require_provider(repo_meta: RepoMetadata) -> str:
     """Retourne le provider actif, ou sort proprement s'il n'est pas résolu.
 

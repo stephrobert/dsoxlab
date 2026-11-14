@@ -32,10 +32,18 @@ STRINGS: dict[str, str] = {
     "opt_help":       "Affiche ce message et quitte.",
     "opt_lab_home":   "Racine du catalogue de labs (défaut : détecté automatiquement).",
     "opt_json":           "Sortie JSON, destinée aux programmes (extension d'éditeur, tableau de bord). Aucun autre affichage.",
-    "opt_level":      "Filtre par niveau (l1, l2, lfcs, rhcsa)",
-    "opt_section":    "Filtre par section (linux, ansible, terraform, docker…)",
+    "opt_level":      "Filtre par niveau : le champ `level` de chaque lab.yaml",
+    "opt_section":
+        "Filtre par section : le champ `section` de chaque lab.yaml, ou "
+        "`repo.category` du meta.yml quand le lab n'en déclare pas",
+    "opt_list_labs_all": "Ignore le contexte actif (dsoxlab use) pour ce listage",
+    "list_labs_vide_par_contexte":
+        "Aucun lab ne satisfait à la fois le contexte actif ({label}) et tes "
+        "filtres, alors que {count} lab(s) y satisfont sans le contexte.\n"
+        "  dsoxlab list-labs --all ...   ignore le contexte pour ce listage\n"
+        "  dsoxlab use --reset           l'efface",
     "opt_type":       "Filtre par type : lab, challenge ou capstone",
-    "opt_bloc":       "Filtre par numéro de bloc (1-8)",
+    "opt_bloc":       "Filtre par numéro de bloc (la position de la section dans le meta.yml)",
     "opt_top":        "Nombre de résultats affichés",
     "opt_doctor_strict":
         "sort en 9 si un contrôle requis échoue, en 10 s'il n'a pas pu être "
@@ -45,6 +53,24 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Provider d'infra à activer (ex. kvm, outscale, incus). "
         "Surchargé par DSOXLAB_PROVIDER. Persisté entre commandes.",
+    "opt_provision_prune":
+        "Détruire les machines que le state Terraform porte et que ce meta.yml "
+        "ne déclare pas (laissées par un autre checkout du même dépôt)",
+    "hotes_hors_contrat":
+        "Le state Terraform de « {repo} » porte des machines que ce meta.yml ne "
+        "déclare pas : {hosts}. Un autre checkout du même dépôt (un clone ou un "
+        "worktree git) les a sans doute créées, car les deux partagent le même "
+        "state. Les appliquer les détruirait : rien n'a été modifié.",
+    "hotes_hors_contrat_geste":
+        "Lance `dsoxlab {geste}` depuis le checkout qui les déclare, ou mets "
+        "celui-ci à jour (git pull).\nPour les détruire vraiment : "
+        "dsoxlab provision --prune",
+    "provision_prune_hotes":
+        "--prune : ces machines ne sont pas déclarées dans le meta.yml et vont "
+        "être détruites : {hosts}",
+    "destroy_hotes_hors_contrat":
+        "Ce destroy retire aussi des machines que ce meta.yml ne déclare pas : "
+        "{hosts}. Un autre checkout du même dépôt s'en sert peut-être encore.",
     "opt_provision_bootstrap":
         "Rejouer le socle du catalogue (infra.bootstrap) même s'il est déjà en "
         "place",
@@ -380,7 +406,8 @@ STRINGS: dict[str, str] = {
     "cmd_new_help":
         "Crée un catalogue ou un lab conforme au contrat, prêt à remplir.",
     "cmd_new_catalog_help":
-        "Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/.",
+        "Crée un catalogue vide mais complet : meta.yml, labs/, ssh/, conftest.py, "
+        "workflows de CI et de release, pre-commit, gouvernance et ses propres tests.",
     "cmd_new_lab_help":
         "Crée un lab conforme, découvert dès le prochain list-labs.",
     "arg_new_id": "Identifiant, en minuscules, sans espace.",
@@ -801,10 +828,12 @@ Chaque lab déclare :
     [dim]--reset / -r[/dim]         Efface le contexte actif (affiche de nouveau tous les labs).
 
   [cyan]list-labs[/cyan]            Liste les labs. Options :
-    [dim]--section / -s[/dim]       Filtre par section.
+    [dim]--section / -s[/dim]       Filtre par section : la [dim]section[/dim] de chaque lab.yaml.
     [dim]--level   / -l[/dim]       Filtre par niveau.
     [dim]--type    / -t[/dim]       Filtre par type : [bold]lab[/bold], [bold]challenge[/bold] ou [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc (1-8).
+    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc.
+    [dim]--all     / -a[/dim]       Ignore le contexte actif. Les filtres s'ajoutent au
+                       contexte ; un résultat vide qui lui est dû le dit.
     [dim]--long[/dim]               Toutes les colonnes, même sur un terminal étroit.
     [dim]--json[/dim]               Le catalogue, en document machine.
 
@@ -918,8 +947,9 @@ Chaque lab déclare :
     [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
 
   [cyan]new catalog <id>[/cyan]     Crée un catalogue vide mais conforme : meta.yml,
-                       labs/, .gitignore, ssh/. Il passe [cyan]validate-structure[/cyan]
-                       sans retouche.
+                       labs/, ssh/, conftest.py, workflows de CI et de release,
+                       pre-commit, gouvernance et ses propres tests. Il passe
+                       [cyan]validate-structure[/cyan] sans retouche.
     [dim]--in <dir>[/dim]           Où le créer. Défaut : le répertoire courant.
   [cyan]new lab <id>[/cyan]         Crée un lab conforme, découvert dès le prochain
                        [cyan]list-labs[/cyan]. Son test [bold]échoue[/bold] tant qu'il n'est pas
@@ -945,6 +975,9 @@ Chaque lab déclare :
     [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
     [dim]--bootstrap[/dim]           Rejoue le socle du catalogue ([dim]infra.bootstrap[/dim])
                        même s'il est déjà en place.
+    [dim]--prune[/dim]               Détruit les machines que le state porte et que ce
+                       meta.yml ne déclare pas. Sans elle, provision refuse
+                       (code 12) et les nomme : un autre checkout s'en sert.
 
   [cyan]status [lab][/cyan]         Où en est le lab actif, ou celui qu'on nomme :
                        [bold]non commencé[/bold], [bold]prêt[/bold], [bold]en cours[/bold], [bold]validé[/bold], ou [bold]dégradé[/bold]
@@ -1199,6 +1232,7 @@ hors ligne, elle se tait.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "Tous les labs sont valides.",
     "labs_have_issues":       "Des labs ont des problèmes de structure ou de métadonnées.",
+    "labs_have_issues_count": "{count} lab(s) sur {total} ont des problèmes de structure ou de métadonnées.",
     "opt_check_urls":
         "Vérifier aussi que chaque doc_url répond (sort sur le réseau).",
     "structure_issues_header": "\n[bold]Structure des labs :[/bold]",

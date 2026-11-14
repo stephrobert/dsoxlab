@@ -7,6 +7,116 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.1] - 2026-11-14
+
+Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
+
+### Corrigé
+
+- **`provision` ne détruit plus les machines que ce `meta.yml` ne déclare pas**
+  (#357). Deux checkouts d'un même dépôt (deux clones, deux worktrees git)
+  partagent le même state Terraform, nommé par `repo.id`. Celui qui déclarait
+  le moins d'hôtes détruisait les machines de l'autre à son premier
+  `provision`, sans un mot. `provision` (avec ou sans `--host`) et
+  `destroy --optional-hosts` nomment désormais chaque machine du state qui
+  n'est ni un hôte commun ni un hôte optionnel de ce `meta.yml`, et refusent
+  avec le nouveau code de sortie **12** (`HOTES_HORS_CONTRAT`).
+  `provision --prune` les détruit volontairement, en les nommant. `destroy`
+  les nomme avant la question, même avec `--yes`.
+
+  Le refus a été préféré aux deux autres voies. Les garder en silence dans
+  `var.hosts` est impossible : ce `meta.yml` ignore leur taille et leur
+  distribution. Les détruire après un avertissement perd quand même une VM
+  qu'une autre session utilise peut-être en plein lab. Un refus coûte une
+  commande ; une VM perdue coûte le travail de l'autre. Le refus vaut même
+  avec `--host`, qui ne les détruirait pas : le `provision` suivant sans
+  `--host` le ferait, donc mieux vaut le dire au premier contact.
+
+- **`run`, `reset` et `clean` nomment le geste quand aucun provider n'est
+  résolu** (#319). Sur un lab `vm` dont `infra.provider` est une liste, sans
+  provider actif, ils affichaient une trace Python complète
+  (`ProviderUnresolved`). Ils affichent maintenant le même message que
+  `provision`, avec `dsoxlab use --provider …`, et sortent en 1, avant tout
+  verrou ou playbook.
+
+- **`validate-structure` nomme chaque défaut** (#335). Les `doc_url` contrôlées
+  par `--check-urls` n'étaient jamais affichées : leur rubrique manquait à la
+  table d'affichage, et la commande sortait en 1 sur sa seule conclusion.
+  Chaque défaut a maintenant sa ligne (lab, fichier, champ, message, et l'URL
+  quand le message ne la porte pas), imprimée sans repli pour que les journaux
+  de CI ne coupent pas l'URL. La conclusion donne le décompte : « 2 lab(s) sur
+  63 ont… ». `--json` ne change pas.
+
+- **`list-labs` : une aide sans nom de domaine, `--all`, et un vide qui
+  s'explique** (#308). L'aide de `--section`, `--level` et `--bloc` citait des
+  valeurs d'un seul catalogue (« linux, ansible… », « l1, lfcs… », « 1-8 ») ;
+  elle dit maintenant d'où vient la valeur. `--all` / `-a` ignore le contexte
+  actif le temps d'un listage, sans le modifier. Un résultat vide dû au cumul
+  du contexte et des filtres le dit, avec le nombre de labs qui satisfont les
+  filtres sans le contexte.
+
+- **Incus : un hôte sans `role` ne fait plus échouer chaque `provision`.** Le
+  template posait `user.lab.role` même vide ; Incus efface une clé de config
+  vide, si bien que le provider échouait sur « Provider produced inconsistent
+  result after apply: element "user.lab.role" has vanished » et laissait
+  l'instance marquée à recréer, détruite et refaite à chaque `provision`
+  suivant. La clé n'est plus posée que si le rôle a une valeur. `role` est
+  optionnel dans le contrat : tout catalogue, et tout hôte optionnel de la
+  0.9.0, déclaré sans lui était touché sur Incus ; aucun des catalogues
+  mesurés le 2026-11-14 n'avait un tel hôte. Trouvé par le premier essai réel
+  des hôtes optionnels sur Incus.
+
+- **La documentation d'auteur dit ce que fait le moteur.** Quatre écarts
+  relevés en écrivant le volet auteur de la formation DSOXLab : `new catalog`
+  était dit n'écrire aucun `conftest.py` et, dans son aide, quatre éléments,
+  alors qu'il pose un socle complet (conftest, workflows de CI et de release,
+  pre-commit, gouvernance, ses propres tests) ; le `CONTRIBUTING` généré disait
+  encore de lancer `list-labs` avant `validate-structure`, conseil caduc depuis
+  la 0.1.97 ; `learning.sync`, que lisent `login` et `push`, n'était documenté
+  que dans le schéma JSON, et le contrat affirmait encore que dsoxlab n'envoie
+  « jamais » rien ; le guide d'auteur ne disait pas que le `conftest.py` généré
+  n'importe rien de dsoxlab, à dessein, si bien qu'un catalogue `vm` ajoute
+  lui-même `build_inventory`. Un test tient désormais chacun d'eux.
+
+### Modifié
+
+- **`services/doctor.py` est découpé en un paquet de familles de contrôles**
+  (#199) : `services/doctor_controles/` porte le modèle, l'outillage, KVM, les
+  pools libvirt, Incus, les ressources, le réseau, le catalogue et les
+  conteneurs, aucun module au-delà de 271 lignes. `services/doctor.py` (1710
+  lignes avant, 396 aujourd'hui) reste le point d'entrée : il réexporte chaque
+  nom et garde le classement requis/informatif et `collect_checks`. Aucun
+  changement de comportement : mêmes sorties, mêmes codes de sortie (9, 10),
+  et la suite de tests existante passe sans qu'un seul test soit modifié.
+
+### Inchangé
+
+- **#358** (`start` et `doctor` comptaient tout le catalogue) était déjà
+  corrigée en 0.8.2 ; rien ne restait dans le code. Deux tests couvrent
+  désormais son croisement avec les hôtes optionnels de la 0.9.0 : `start`
+  d'un lab qui cite un hôte optionnel par un rôle le passe au
+  provisionnement, et `reset` ne retire jamais un hôte optionnel. Le point
+  « mesurer ce que `destroy --host` fait d'une image de base partagée »
+  demande une infrastructure réelle et reste ouvert.
+
+### Mesuré
+
+- **Les hôtes optionnels sur Incus 7.2**, le 2026-11-14, avec cette branche et
+  un catalogue d'essai d'un hôte commun et de deux hôtes optionnels, tous sans
+  `role` : `provision` n'a monté que l'hôte commun (`.11`) ; le `run` d'un lab
+  qui cite le second hôte optionnel l'a monté en `.13` (index 2) et y a joué le
+  socle ; un second `provision` est sorti en 0 avec un plan Terraform sans
+  changement et les mêmes uuid d'instance ; `clean` a gardé l'hôte optionnel ;
+  `destroy --optional-hosts` l'a retiré seul, l'hôte commun gardant sa date de
+  création, son socle et le fragment SSH. Avant le correctif Incus de cette
+  version, le même essai échouait dès le premier `provision`.
+- **Un catalogue provisionné avant la 0.9.0 ne voit aucune adresse bouger** :
+  sur le catalogue Kubernetes, trois machines KVM en marche, un
+  `terraform plan` sur une copie de son state, avec les templates de la 0.9.0
+  et les variables qu'elle génère, n'a montré aucun changement (index 0, 1, 2
+  égaux aux anciens rangs). La PR de la 0.9.0 n'avait couvert ce point que par
+  des tests unitaires.
+
 ## [0.9.0] - 2026-11-14
 
 Des hôtes dont seuls quelques labs ont besoin, sans les faire tourner chez tous

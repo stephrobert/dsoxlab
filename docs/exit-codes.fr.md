@@ -32,6 +32,7 @@ version anglaise. Un code non documenté est un contrat que personne ne peut lir
 | `9` | `DOCTOR_REQUIS_KO` | `doctor --strict` : un contrôle **requis** a échoué, c'est établi | **réparer** ce que le tableau nomme |
 | `10` | `DOCTOR_INDETERMINE` | `doctor --strict` : un contrôle requis n'a pas pu être mesuré | **remesurer** — rien n'est conclu, donc rien n'est validé |
 | `11` | `BOOTSTRAP_ECHOUE` | le socle du catalogue (`infra.bootstrap`) a échoué, ou son playbook est déclaré et introuvable | lisez le déroulé, puis rejouez-le avec `dsoxlab provision --bootstrap`. Les machines sont debout ; ce qui manque est au-dessus d'elles |
+| `12` | `HOTES_HORS_CONTRAT` | le state Terraform porte des machines que ce `meta.yml` ne déclare pas (un autre checkout du même dépôt les a créées) ; `provision` et `destroy --optional-hosts` les détruiraient, donc ils refusent et les nomment | lancez la commande depuis le checkout qui les déclare, ou mettez celui-ci à jour ; `dsoxlab provision --prune` les détruit volontairement |
 | `127` | `EXECUTABLE_INTROUVABLE` | un exécutable attendu n'est pas dans le `PATH` | l'installer. 127 est le code que le shell rend lui-même ici, donc un script sait déjà le lire |
 | `130` | `INTERROMPU` | `128 + SIGINT`, un Ctrl-C | le message donne le geste de reprise |
 

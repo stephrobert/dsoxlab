@@ -101,12 +101,7 @@ def destroy(
         return
 
     targets = _cibles_terraform(repo_meta, provider, host)
-    if host:
-        # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
-        # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
-        # cibler un seul hôte emporte les autres (7 ressources détruites pour
-        # 1 demandée). On prévient plutôt que de laisser croire à un ciblage fin.
-        warn(_("destroy_host_not_isolated"))
+    _prevenir_avant_destruction(repo_meta, host)
 
     # destroy est irréversible et ne prévenait pas : un « dsoxlab destroy »
     # tapé dans le mauvais dépôt effaçait le parc sans un mot. --yes garde
@@ -175,6 +170,29 @@ def destroy(
     success(_("destroy_done"))
 
 
+def _prevenir_avant_destruction(
+    repo_meta: RepoMetadata, host: list[str] | None
+) -> None:
+    """Ce que ce destroy emporte sans que la commande le laisse deviner."""
+    from ..infra import terraform as tf
+
+    if host:
+        # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
+        # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
+        # cibler un seul hôte emporte les autres (7 ressources détruites pour
+        # 1 demandée). On prévient plutôt que de laisser croire à un ciblage fin.
+        warn(_("destroy_host_not_isolated"))
+
+    # Issue #357 : le state est partagé entre les checkouts d'un même dépôt. Ce
+    # destroy emporte donc aussi les machines qu'un autre checkout a montées ;
+    # on les nomme AVANT la question, et même avec --yes, puisque c'est
+    # précisément ce qui ne se voit pas depuis ce meta.yml.
+    if not host:
+        etrangers = tf.hotes_hors_contrat(repo_meta)
+        if etrangers:
+            warn(_("destroy_hotes_hors_contrat", hosts=", ".join(etrangers)))
+
+
 def _retirer_les_hotes_optionnels(
     ctx: typer.Context,
     root: Path,
@@ -196,6 +214,13 @@ def _retirer_les_hotes_optionnels(
     if host:
         error(_("destroy_optional_and_host"))
         raise typer.Exit(1)
+    # Le retrait passe par un apply SANS -target : il détruirait aussi les
+    # machines d'un autre checkout que ce meta.yml ignore (issue #357).
+    from .infrastructure import refuser_les_hotes_hors_contrat
+
+    refuser_les_hotes_hors_contrat(
+        repo_meta, elaguer=False, geste="destroy --optional-hosts"
+    )
     declares = [h.name for h in repo_meta.infra.optional_hosts]
     presents = tf.hotes_au_state(repo_meta)
     # Un state illisible : on vise tous les hôtes optionnels déclarés. En

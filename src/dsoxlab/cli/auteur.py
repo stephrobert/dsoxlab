@@ -86,7 +86,15 @@ def validate_structure_cmd(
     if rapport.ok:
         success(_("all_labs_valid"))
     else:
-        error(_("labs_have_issues"))
+        # Le décompte aide à trancher d'un coup d'œil entre une régression
+        # locale et une panne générale (issue #335). Une anomalie sans lab
+        # (le `meta.yml`) ne compte pas : elle n'est d'aucun lab.
+        fautifs = {a.lab for a in rapport.anomalies if a.lab}
+        if fautifs:
+            error(_("labs_have_issues_count",
+                    count=len(fautifs), total=rapport.labs_examines))
+        else:
+            error(_("labs_have_issues"))
         raise typer.Exit(ExitCode.ECHEC)
 
 

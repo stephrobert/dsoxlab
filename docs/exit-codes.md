@@ -32,6 +32,7 @@ documented is a contract nobody can read.
 | `9` | `DOCTOR_REQUIS_KO` | `doctor --strict`: a **required** check failed, and that is established | **repair** what the table names |
 | `10` | `DOCTOR_INDETERMINE` | `doctor --strict`: a required check could not be measured | **measure again** — nothing is concluded, so nothing is validated |
 | `11` | `BOOTSTRAP_ECHOUE` | the catalogue's foundation (`infra.bootstrap`) failed, or its playbook is declared and missing | read the play above, then replay it with `dsoxlab provision --bootstrap`. The machines are up; what is missing sits above them |
+| `12` | `HOTES_HORS_CONTRAT` | the Terraform state holds machines this `meta.yml` does not declare (another checkout of the same repository created them); `provision` and `destroy --optional-hosts` would destroy them, so they refuse and name them | run the command from the checkout that declares them, or bring this one up to date; `dsoxlab provision --prune` destroys them on purpose |
 | `127` | `EXECUTABLE_INTROUVABLE` | an expected executable is not in `PATH` | install it. 127 is the code the shell itself returns here, so a script already knows how to read it |
 | `130` | `INTERROMPU` | `128 + SIGINT`, a Ctrl-C | the message gives the gesture to resume |
 
