@@ -33,6 +33,12 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **La documentation du moteur disait deux choses fausses.**
+  `lab.<langue>.yaml` surcharge aussi le `label` de chaque critère, pas
+  seulement `title` et `description` ; et dans `docs/machine-output`,
+  `dsoxlab status` donne l'état d'un lab, quand la joignabilité des hôtes est
+  `dsoxlab infra status`.
+
 - **`scripts/gen-catalogues.py` refuse une entrée du manifeste qui ne publie
   aucun lab, sauf si elle est en brouillon.** La 0.9.2 mesurait `certificats` à
   zéro lab, l'écartait de la table du README, et laissait `catalog list` le
@@ -40,6 +46,27 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   (sortie en 1), avec un message qui dit de la passer en `draft: true` ou de la
   retirer. Une entrée en brouillon est mesurée, reste hors de la table même avec
   des labs, et n'est jamais signalée, pas même comme dépôt public oublié.
+
+### Modifié
+
+- **`dsoxlab new catalog` renvoie à la documentation du moteur au lieu de la
+  recopier** (#201). Le README qu'il écrivait portait une copie du contrat et
+  du cycle de vie d'un lab, figée le jour du `new catalog` ; un inventaire du
+  2026-11-14 a trouvé 50 fichiers faux dans 21 catalogues, nés pour la plupart
+  de ce squelette. La section devient « Le moteur, documenté là où il vit »,
+  avec des liens vers `contract-v1`, `commands`, `learner` et
+  `catalog-author`. Le workflow CI généré ne dit plus que `validate-structure`
+  ne voit que ce qui a chargé, faux depuis la 0.1.97.
+- **`validate-structure` signale la documentation du moteur qu'un catalogue a
+  recopiée et qui est devenue fausse** (nouvelle famille `stale_doc`, #201). Il
+  cherche des phrases connues pour être fausses dans les Markdown versionnés
+  hors de `labs/` et de `solution/`, CHANGELOG exclus : `list-labs` à lancer
+  avant `validate-structure` (faux depuis la 0.1.97), `dsoxlab status` comme
+  test de joignabilité des hôtes (c'est `dsoxlab infra status`), `runtime.host`
+  (jamais lu), des fixtures copiées à plat (faux depuis la 0.1.37). Mesuré sur
+  les catalogues le 2026-11-14 : 38 fichiers dans 18 catalogues, aucun faux
+  positif. `validate-structure --json` gagne le compte `stale_doc`, une clé
+  ajoutée sans rien casser.
 
 ### Documentation
 

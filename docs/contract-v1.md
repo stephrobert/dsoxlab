@@ -676,8 +676,9 @@ are what prove.
 
 ### `lab.<lang>.yaml`
 
-A `lab.fr.yaml` next to `lab.yaml` overrides `title` and `description` for that
-language, **and nothing else**. Any other key in it is ignored, and
+A `lab.fr.yaml` next to `lab.yaml` overrides `title`, `description` and the
+`label` of each criterion (matched by `id`) for that language, **and nothing
+else**. Any other key in it is ignored, and
 `validate-structure` says so. An `id` is tolerated there without being read: it
 names the lab for whoever opens the file.
 

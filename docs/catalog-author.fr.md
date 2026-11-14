@@ -286,6 +286,10 @@ la suite.
 | `bootstrap_absent` | `infra.bootstrap` nomme un playbook qui n'est pas sur le disque |
 | `bootstrap_hors_depot` | `infra.bootstrap` sort du catalogue (chemin absolu, ou `..`) |
 | `hote_en_double` | un nom d'hôte apparaît deux fois entre `infra.hosts` et `infra.optional_hosts`, qui partagent les mêmes noms |
+| `doc_perimee_list_labs_avant` | un Markdown hors `labs/` dit encore de lancer `list-labs` avant `validate-structure`, ou que le validateur ne voit pas un lab illisible ou absent : faux depuis la 0.1.97 |
+| `doc_perimee_status_joignabilite` | un Markdown hors `labs/` présente `dsoxlab status` comme le test de joignabilité des hôtes ; c'est `dsoxlab infra status` |
+| `doc_perimee_runtime_host` | un Markdown hors `labs/` dit que chaque `runtime.host` pointe un hôte ; ce champ n'a jamais été lu |
+| `doc_perimee_fixtures_a_plat` | un Markdown hors `labs/` dit que les fixtures sont copiées à plat ; elles gardent leur chemin déclaré depuis la 0.1.37 |
 
 **Ce qu'il vérifie et qu'il laissait passer :** un lab listé dans `meta.yml` sans
 rien sur le disque, et un `lab.yaml` que le moteur ne sait pas charger. Les deux

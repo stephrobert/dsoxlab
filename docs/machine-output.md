@@ -55,7 +55,8 @@ gives the whole table, with what each one means *and* the gesture it calls for �
 | `dsoxlab next` | the suggested lab and what remains | 0, or 1 with no active context (no document) |
 | `dsoxlab scores` | the score history and exam verdicts | 0 |
 | `dsoxlab check <id>` | the test result and the score | 0, or 1 when the lab fails (document still printed) |
-| `dsoxlab status` | SSH reachability of the declared hosts | 0, or 1 when a declared host does not answer (document still printed) |
+| `dsoxlab status [<id>]` | the state of the active or named lab | 0, or 1 if the id is unknown (no document) |
+| `dsoxlab infra status` | SSH reachability of the declared hosts | 0, or 1 when a declared host does not answer (document still printed) |
 | `dsoxlab doctor` | the environment diagnosis | 0, always — the verdict is in `ok`. With `--strict`, 9 (a required check fails) or 10 (a required check could not be measured) |
 | `dsoxlab validate-structure` | every contract issue found | 0, or 1 as soon as one lab fails (document still printed) |
 | `dsoxlab support` | the anonymised diagnostic report | 0 |
@@ -762,7 +763,7 @@ went wrong.
   ],
   "counts": {
     "contract": 0, "catalog": 0, "unknown_key": 1, "structure": 1,
-    "content": 1, "doc_url": 0, "metadata": 3
+    "content": 1, "doc_url": 0, "metadata": 3, "stale_doc": 0
   }
 }
 ```
@@ -794,7 +795,7 @@ Each issue:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `kind` | string | the family: `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
+| `kind` | string | the family: `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata`, `stale_doc` |
 | `key` | string | **the stable identity of the rule that fired** — filter, count and compare on this |
 | `params` | object | the facts of that rule, values reduced to strings and numbers |
 | `message` | string | the same thing said to a human, translated |
@@ -802,7 +803,7 @@ Each issue:
 | `path` | string or null | absolute path of the file at fault |
 | `field` | string or null | the metadata field at fault, on `metadata` issues only |
 
-`counts` always carries all six families. Omitting the empty ones would leave a
+`counts` always carries all eight families. Omitting the empty ones would leave a
 dashboard unable to tell a healthy family from one this version of the tool does
 not know about.
 

@@ -335,7 +335,7 @@ def test_validate_structure_rend_ok(catalogue: Path) -> None:
     # distinguer une famille saine d'une famille que cette version ignore.
     assert set(document["counts"]) == {
         "contract", "catalog", "unknown_key", "structure", "content", "doc_url",
-        "metadata",
+        "metadata", "stale_doc",
     }
     assert document["doc_urls_checked"] is False
 

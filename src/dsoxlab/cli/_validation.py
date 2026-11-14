@@ -55,6 +55,9 @@ _FAMILLES_ANOMALIES = (
     # qui manque à tous les autres contrôles (issue #198).
     "contract", "catalog", "unknown_key", "structure", "content", "doc_url",
     "metadata",
+    # `stale_doc` (0.9.3) : une phrase de la doc du moteur recopiée dans le
+    # catalogue et devenue fausse (#201).
+    "stale_doc",
 )
 
 

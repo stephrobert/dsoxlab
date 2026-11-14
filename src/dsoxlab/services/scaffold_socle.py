@@ -130,34 +130,18 @@ the contract version matches.
 
 ## How it works
 
-### The declarative contract (two levels)
+### The engine, documented where it lives
 
-The catalog is described by data, not code, which is what keeps the `dsoxlab`
-engine domain-agnostic:
+This catalog is played by `dsoxlab`, which documents its own contract and
+commands. This README does not repeat them, so that it cannot drift when the
+engine changes (dsoxlab issue #201):
 
-- **`meta.yml`** at the root declares the repository identity and the **order**
-  of the sections shown by `list-labs`;
-- **`lab.yaml`** per lab declares its `skills`, `level`, `runtime` (type,
-  fixtures, services), `distros`, `doc_url` and a `validation` block. A
-  `lab.fr.yaml` overrides `title` and `description` in French, and nothing else.
-
-`dsoxlab validate-structure` checks the whole contract: `meta.yml` is well
-formed, every referenced lab exists with a valid `lab.yaml`, every declared
-test and fixture file is really there, and every relative link in a README
-leads somewhere.
-
-### The lab lifecycle
-
-```bash
-dsoxlab list-labs              # browse the catalog
-dsoxlab show      <id>         # metadata and status of one lab
-dsoxlab run       <id>         # set the starting state
-dsoxlab challenge <id>         # read the mission, no step-by-step
-dsoxlab hint      <id>         # reveal a hint (deducted from the score)
-dsoxlab check     <id>         # run the tests, compute and record the score
-dsoxlab clean     <id>         # undo what the lab set up
-dsoxlab progress               # per-section progress, average score
-```
+- the contract: `meta.yml`, `lab.yaml`, `lab.<lang>.yaml`, the runtimes and
+  their fields: [contract](https://github.com/stephrobert/dsoxlab/blob/main/docs/contract-v1.md);
+- the commands and the life of a lab, from `run` to `check`:
+  [commands](https://github.com/stephrobert/dsoxlab/blob/main/docs/commands.md) and [playing a lab](https://github.com/stephrobert/dsoxlab/blob/main/docs/learner.md);
+- writing a lab, and what `validate-structure` checks:
+  [catalog author guide](https://github.com/stephrobert/dsoxlab/blob/main/docs/catalog-author.md).
 
 ### Runtimes
 
@@ -284,35 +268,18 @@ mettre l'outil à jour, tant que la version du contrat correspond.
 
 ## Comment ça marche
 
-### Le contrat déclaratif, à deux niveaux
+### Le moteur, documenté là où il vit
 
-Le catalogue est décrit par des données, pas par du code, et c'est ce qui garde
-le moteur `dsoxlab` indépendant du domaine :
+Ce catalogue se joue avec `dsoxlab`, qui documente lui-même son contrat et ses
+commandes. Ce README ne les répète pas, pour ne pas dériver quand le moteur
+change (issue dsoxlab #201) :
 
-- **`meta.yml`** à la racine déclare l'identité du dépôt et l'**ordre** des
-  sections affichées par `list-labs` ;
-- **`lab.yaml`** par lab déclare ses `skills`, son `level`, son `runtime`
-  (type, fixtures, services), ses `distros`, son `doc_url` et un bloc
-  `validation`. Un `lab.fr.yaml` surcharge `title` et `description` en
-  français, et rien d'autre.
-
-`dsoxlab validate-structure` contrôle tout le contrat : `meta.yml` bien formé,
-chaque lab référencé présent avec un `lab.yaml` valide, chaque fichier de test
-et de fixture déclaré réellement là, et chaque lien relatif d'un README qui
-mène quelque part.
-
-### Le cycle de vie d'un lab
-
-```bash
-dsoxlab list-labs              # parcourir le catalogue
-dsoxlab show      <id>         # métadonnées et état d'un lab
-dsoxlab run       <id>         # poser l'état de départ
-dsoxlab challenge <id>         # lire la mission, sans pas-à-pas
-dsoxlab hint      <id>         # révéler un indice (déduit du score)
-dsoxlab check     <id>         # lancer les tests, calculer et enregistrer le score
-dsoxlab clean     <id>         # défaire ce que le lab a posé
-dsoxlab progress               # avancement par section, score moyen
-```
+- le contrat : `meta.yml`, `lab.yaml`, `lab.<langue>.yaml`, les runtimes et
+  leurs champs : [contrat](https://github.com/stephrobert/dsoxlab/blob/main/docs/contract-v1.fr.md) ;
+- les commandes et la vie d'un lab, de `run` à `check` :
+  [commandes](https://github.com/stephrobert/dsoxlab/blob/main/docs/commands.fr.md) et [jouer un lab](https://github.com/stephrobert/dsoxlab/blob/main/docs/learner.fr.md) ;
+- écrire un lab, et ce que contrôle `validate-structure` :
+  [guide de l'auteur](https://github.com/stephrobert/dsoxlab/blob/main/docs/catalog-author.fr.md).
 
 ### Les runtimes
 
@@ -850,9 +817,9 @@ jobs:
         run: uv tool install 'dsoxlab>={moteur}'
 
       - name: List the labs
-        # D'ABORD : un `lab.yaml` qui lève au parsing disparaît du catalogue
-        # sans un mot, et `validate-structure` n'itère que sur ce qui a chargé.
-        # Un catalogue vide ici est un défaut, pas un succès.
+        # Un catalogue vide ici est un défaut, pas un succès : la commande
+        # prouve que le moteur charge les labs. `validate-structure`, plus bas,
+        # nomme ceux qu'il ne peut pas charger (depuis dsoxlab 0.1.97).
         run: |
           dsoxlab list-labs
           test "$(dsoxlab list-labs --json | python3 -c \\

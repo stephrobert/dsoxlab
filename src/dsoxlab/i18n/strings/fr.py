@@ -2103,6 +2103,23 @@ hors ligne, elle se tait.
         "Rejoue le lab : dsoxlab reset, puis dsoxlab run.",
 
     # ── clés inconnues dans un fichier du contrat ─────────────────────────────
+    "stale_doc_header":
+        "\n[bold red]Doc du moteur recopiée ici, et devenue fausse :[/bold red]",
+    "doc_perimee_list_labs_avant":
+        "{file} : \u00ab {excerpt} \u00bb est faux depuis dsoxlab {since} : "
+        "validate-structure signale seul les labs qu'il ne peut pas charger et "
+        "ceux déclarés mais absents. Renvoyez plutôt au moteur "
+        "(docs/{page} de dsoxlab).",
+    "doc_perimee_status_joignabilite":
+        "{file} : \u00ab {excerpt} \u00bb est faux depuis dsoxlab {since} : "
+        "`dsoxlab status` donne l'état d'un lab ; la joignabilité des hôtes, "
+        "c'est `dsoxlab infra status` (docs/{page} de dsoxlab).",
+    "doc_perimee_runtime_host":
+        "{file} : \u00ab {excerpt} \u00bb : `runtime.host` n'a jamais été lu ; "
+        "l'hôte se déclare dans `runtime.targets[].host` (docs/{page} de dsoxlab).",
+    "doc_perimee_fixtures_a_plat":
+        "{file} : \u00ab {excerpt} \u00bb est faux depuis dsoxlab {since} : une "
+        "fixture garde son chemin déclaré sous le workdir (docs/{page} de dsoxlab).",
     "unknown_keys_header": "\n[bold red]Clés que personne ne lit :[/bold red]",
     "catalog_issues_header":
         "\n[bold red]Labs que le moteur ne voit pas :[/bold red]",

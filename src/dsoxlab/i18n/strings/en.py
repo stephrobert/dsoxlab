@@ -2050,6 +2050,23 @@ silent.
         "Replay the lab: dsoxlab reset, then dsoxlab run.",
 
     # ── unknown keys in a contract file ───────────────────────────────────────
+    "stale_doc_header":
+        "\n[bold red]Engine documentation copied here, and now false:[/bold red]",
+    "doc_perimee_list_labs_avant":
+        "{file}: \u00ab {excerpt} \u00bb is false since dsoxlab {since}: "
+        "validate-structure reports on its own the labs it cannot load and the "
+        "labs declared but missing. Link to the engine instead "
+        "(dsoxlab docs/{page}).",
+    "doc_perimee_status_joignabilite":
+        "{file}: \u00ab {excerpt} \u00bb is false since dsoxlab {since}: "
+        "`dsoxlab status` gives the state of a lab; host reachability is "
+        "`dsoxlab infra status` (dsoxlab docs/{page}).",
+    "doc_perimee_runtime_host":
+        "{file}: \u00ab {excerpt} \u00bb: `runtime.host` was never read; the "
+        "host is `runtime.targets[].host` (dsoxlab docs/{page}).",
+    "doc_perimee_fixtures_a_plat":
+        "{file}: \u00ab {excerpt} \u00bb is false since dsoxlab {since}: a "
+        "fixture keeps its declared path under the workdir (dsoxlab docs/{page}).",
     "unknown_keys_header": "\n[bold red]Keys nothing reads:[/bold red]",
     "catalog_issues_header":
         "\n[bold red]Labs the engine cannot see:[/bold red]",

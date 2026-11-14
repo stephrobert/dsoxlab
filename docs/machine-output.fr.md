@@ -58,7 +58,8 @@ chacun signifie *et* le geste qu'il appelle — `7` se réessaie, `9` se répare
 | `dsoxlab next` | le lab suggéré et ce qui reste | 0, ou 1 sans contexte actif (aucun document) |
 | `dsoxlab scores` | l'historique des notes et les verdicts d'examen | 0 |
 | `dsoxlab check <id>` | le résultat des tests et la note | 0, ou 1 si le lab échoue (le document est rendu quand même) |
-| `dsoxlab status` | la joignabilité SSH des hôtes déclarés | 0, ou 1 dès qu'un hôte déclaré ne répond pas (le document est rendu quand même) |
+| `dsoxlab status [<id>]` | l'état du lab actif ou nommé | 0, ou 1 si l'identifiant est inconnu (aucun document) |
+| `dsoxlab infra status` | la joignabilité SSH des hôtes déclarés | 0, ou 1 dès qu'un hôte déclaré ne répond pas (le document est rendu quand même) |
 | `dsoxlab doctor` | le diagnostic de l'environnement | 0, toujours : le verdict est dans `ok`. Avec `--strict`, 9 (un requis échoue) ou 10 (un requis n'a pas pu être mesuré) |
 | `dsoxlab validate-structure` | chaque anomalie de contrat trouvée | 0, ou 1 dès qu'un lab échoue (le document est rendu quand même) |
 | `dsoxlab support` | le rapport de diagnostic anonymisé | 0 |
@@ -784,7 +785,7 @@ lire ce qui n'allait pas.
   ],
   "counts": {
     "contract": 0, "catalog": 0, "unknown_key": 1, "structure": 1,
-    "content": 1, "doc_url": 0, "metadata": 3
+    "content": 1, "doc_url": 0, "metadata": 3, "stale_doc": 0
   }
 }
 ```
@@ -816,7 +817,7 @@ Chaque anomalie :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `kind` | chaîne | la famille : `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata` |
+| `kind` | chaîne | la famille : `contract`, `catalog`, `unknown_key`, `structure`, `content`, `doc_url`, `metadata`, `stale_doc` |
 | `key` | chaîne | **l'identité stable de la règle qui a parlé** : c'est là-dessus qu'on filtre, compte et compare |
 | `params` | objet | les faits de cette règle, valeurs ramenées à des chaînes et des nombres |
 | `message` | chaîne | la même chose dite à un humain, traduite |
@@ -824,7 +825,7 @@ Chaque anomalie :
 | `path` | chaîne ou null | chemin absolu du fichier en cause |
 | `field` | chaîne ou null | le champ de métadonnée en cause, sur les anomalies `metadata` seulement |
 
-`counts` porte toujours les six familles. En omettre les vides laisserait un
+`counts` porte toujours les huit familles. En omettre les vides laisserait un
 tableau de bord incapable de distinguer une famille saine d'une famille que
 cette version de l'outil ne connaît pas.
 
