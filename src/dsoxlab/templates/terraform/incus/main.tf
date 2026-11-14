@@ -45,10 +45,10 @@ locals {
   # Hosts enrichis avec idx et IP statique calculée depuis le CIDR.
   # MAC déterministe pour réservation DHCP côté Incus (cf. device nic).
   hosts_with_idx = [
-    for idx, h in var.hosts : merge(h, {
-      idx = idx
-      mac = format("00:16:3e:cd:00:%02x", idx + 16) # OUI Xen/LXC
-      ip  = cidrhost(var.network_cidr, idx + 11)
+    for h in var.hosts : merge(h, {
+      idx = h.index
+      mac = format("00:16:3e:cd:00:%02x", h.index + 16) # OUI Xen/LXC
+      ip  = cidrhost(var.network_cidr, h.index + 11)
     })
   ]
 

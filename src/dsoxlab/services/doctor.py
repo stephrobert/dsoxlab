@@ -856,14 +856,19 @@ def _hotes_a_compter(infra: InfraDefinition, hosts: list[str] | None) -> list[Ho
       vert sur n'importe quelle machine, et le contrôle cesserait de contrôler.
       Ce n'est pas à lui de refuser un hôte inconnu, l'inventaire le fera avec
       un message qui nomme la cause.
+
+    « Tout le catalogue » veut dire ses hôtes COMMUNS (issue #365) : un hôte
+    optionnel ne se monte que pour un lab qui le cite, et ce lab le demande
+    alors par son nom. Le compter d'office ferait peser deux labs sur tous les
+    autres, ce que les hôtes optionnels existent pour éviter.
     """
     if hosts is None:
-        return list(infra.hosts)
+        return infra.common_hosts
     if not hosts:
         return []
     demandes = set(hosts)
     retenus = [h for h in infra.hosts if h.name in demandes]
-    return retenus or list(infra.hosts)
+    return retenus or infra.common_hosts
 
 
 def _check_resources(infra: InfraDefinition, provider: str,

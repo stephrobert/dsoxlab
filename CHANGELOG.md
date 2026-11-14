@@ -7,6 +7,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-14
+
+Hosts that only a few labs need, without making every learner run them.
+
+### Added
+
+- **`infra.optional_hosts` in `meta.yml`** (#365). Same fields as
+  `infra.hosts`, declared once. A lab uses one by naming it, as it names any
+  host, in `runtime.targets[].host` or `roles`; nothing new goes in
+  `lab.yaml`. The need behind it: two high-availability labs of the Kubernetes
+  catalogue want two more control planes and a load balancer, about 5.6 GB.
+  Added to `hosts`, they would have pushed every learner of that catalogue past
+  16 GB for the sake of two labs.
+
+  | Moment | What happens to an optional host |
+  | --- | --- |
+  | `provision` without `--host` | not started; one already running is kept |
+  | `run` or `start` of a lab that names it | started if it does not answer, then the catalogue's foundation is played on it |
+  | `clean`, `reset` | kept: rebuilding several machines on every try costs minutes |
+  | `destroy --optional-hosts` | removed, and only it |
+  | `destroy` | removed with everything else |
+  | `doctor` alone | not counted in the catalogue's memory |
+
+- **`dsoxlab destroy --optional-hosts`** removes the optional hosts labs have
+  started, and nothing else: the common hosts, their foundation and the SSH
+  fragment that reaches them stay. It cannot be combined with `--host`.
+
+- **`validate-structure` refuses a host name declared twice**
+  (`hote_en_double`) across `infra.hosts` and `infra.optional_hosts`: both feed
+  the same Terraform `for_each`, and a duplicate used to fail the first
+  `provision` on a message that did not name the `meta.yml`.
+
+### Changed
+
+- **A host's address derives from an explicit index, not from its rank in
+  `var.hosts`.** The three packaged templates (kvm, incus, outscale) read
+  `hosts[].index`, the host's position in the full list of the `meta.yml`,
+  common hosts first. Without it, starting one optional host without its
+  neighbour would shift an address from one provision to the next, and the
+  libvirt provider fails on any in-place update of a running domain. For a
+  catalogue without optional hosts, the index equals the former rank: no
+  address moves.
+
+- **The catalogue's foundation is replayed for a host that never received it**,
+  even when the playbook is unchanged. The marker now remembers which hosts
+  received it, and a `provision --host` adds to that list instead of replacing
+  it. A host removed by `destroy --optional-hosts` leaves the list, so that it
+  receives the foundation again when it comes back.
+
+- **`destroy --host` resolves its hosts like `provision --host`**, through the
+  same function: same messages, same exit codes.
+
+### Measured
+
+On a real libvirt 10 hypervisor, with a trial catalogue of one common host and
+two optional ones, on 2026-11-14: `provision` started only the common host;
+`run` of a lab naming the second optional host started it at `.13` (its
+position), not `.12` (its rank among running hosts), and played the foundation
+on it before `setup.yaml`; a second `provision` left a Terraform plan with no
+change and both libvirt domain ids untouched; `clean` kept the optional host;
+`destroy --optional-hosts` removed it alone, left the common host running with
+the same domain id and its foundation, rewrote the SSH fragment, and the next
+Terraform plan showed no change.
+
 ## [0.8.3] - 2026-11-10
 
 One defect in the release check, and a correction to 0.8.2.

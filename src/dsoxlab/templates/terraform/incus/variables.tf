@@ -23,6 +23,11 @@ variable "hosts" {
     vcpu          = number
     disk_gb       = number
     extra_disk_gb = number
+    # Position de l'hôte dans la liste COMPLÈTE du meta.yml (hôtes communs
+    # puis optionnels). L'adresse en dérive, jamais du rang dans cette
+    # liste : un hôte optionnel absent ne décale aucune autre machine
+    # (dsoxlab issue #365).
+    index = number
   }))
 }
 

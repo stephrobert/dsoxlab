@@ -276,6 +276,7 @@ step with the code: adding a check without documenting it here fails the suite.
 | `portail_refuse` | `learning.portal_url` does not pass [the portal policy](./security.md) — `https`, a hostname, no credentials, no control characters |
 | `bootstrap_absent` | `infra.bootstrap` names a playbook that is not on disk |
 | `bootstrap_hors_depot` | `infra.bootstrap` points outside the catalogue (absolute path, or `..`) |
+| `hote_en_double` | a host name appears twice across `infra.hosts` and `infra.optional_hosts`, which share one namespace |
 
 **What it checks that it used to miss:** a lab listed in `meta.yml` with nothing
 on disk, and a `lab.yaml` the engine cannot load. Both were silent until 0.1.97 —

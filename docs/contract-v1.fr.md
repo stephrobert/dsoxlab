@@ -117,6 +117,7 @@ pas d'ordres au moteur.
 | `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. **Sa longueur est bornée**, voir plus bas. |
 | `cidr` | non | chaîne | | Sous-réseau de ce réseau. |
 | `hosts` | non | liste de mappings | `[]` | Les VM. Voir ci-dessous. |
+| `optional_hosts` | non | liste de mappings | `[]` | VM montées seulement pour les labs qui les citent. Depuis 0.9.0. Voir ci-dessous. |
 | `providers` | non | mapping | `{}` | Surcharges par provider, lues par le module Terraform correspondant. Valeurs libres : chaque provider a ses variables. Voir ci-dessous celles que lisent les templates empaquetés. |
 
 Résolution du provider, première règle gagnante : `DSOXLAB_PROVIDER`, puis le
@@ -221,6 +222,52 @@ infra:
 | `disk_gb` | non | entier | `10` | |
 | `extra_disk_gb` | non | entier | `0` | Deuxième disque, pour les labs qui exigent un vrai périphérique bloc (partitionnement, LVM, RAID). |
 | `ip` | non | chaîne | | **Historique.** Les adresses viennent du provider et sont injectées dans l'inventaire généré. Ne pas les déclarer. |
+
+### `infra.optional_hosts[]` : les hôtes de quelques labs
+
+Certains labs ont besoin de machines que le reste du catalogue n'utilise
+jamais : trois plans de contrôle derrière un répartiteur de charge pour un lab
+de haute disponibilité, par exemple. Les ajouter à `hosts` les ferait tourner
+chez tous les apprenants, et ferait dépasser au catalogue la mémoire d'un poste
+modeste pour deux labs seulement.
+
+`optional_hosts` les déclare une fois, avec **les mêmes champs** que `hosts` :
+
+```yaml
+infra:
+  hosts:
+    - name: k8s-cp.lab
+      distro: ubuntu24
+  optional_hosts:
+    - name: k8s-cp2.lab
+      distro: ubuntu24
+      ram_mb: 2560
+      vcpu: 2
+    - name: k8s-lb.lab
+      distro: ubuntu24
+      ram_mb: 512
+```
+
+Un lab s'en sert en le citant, comme n'importe quel hôte : dans
+`runtime.targets[].host` ou dans `roles`. Rien d'autre ne se déclare dans le
+`lab.yaml`.
+
+| Moment | Ce que devient un hôte optionnel |
+| --- | --- |
+| `provision` (sans `--host`) | pas monté ; s'il tourne déjà, il est gardé |
+| `run` ou `start` d'un lab qui le cite | monté s'il ne répond pas encore, puis le socle du catalogue y est joué |
+| `clean`, `reset` | gardé : reconstruire plusieurs machines à chaque essai coûte des minutes |
+| `destroy --optional-hosts` | retiré, et lui seul : les hôtes communs et leur socle restent |
+| `destroy` | retiré avec tout le reste |
+| `doctor` seul | pas compté dans la mémoire du catalogue ; `start <lab>` le compte quand ce lab en a besoin |
+
+**Les adresses ne bougent pas.** L'adresse d'un hôte dérive de sa position dans
+la liste complète, hôtes communs d'abord, optionnels ensuite. Déclarer un hôte
+optionnel ne décale donc aucune machine commune, et monter un hôte optionnel
+sans son voisin ne décale ni l'un ni l'autre.
+
+`hosts` et `optional_hosts` partagent les mêmes noms : `validate-structure`
+refuse un nom déclaré deux fois (`hote_en_double`).
 
 ### `sections[]` (optionnel)
 

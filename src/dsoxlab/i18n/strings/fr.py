@@ -54,6 +54,9 @@ STRINGS: dict[str, str] = {
         "Socle en place ({playbook}). Les labs peuvent désormais le supposer.",
     "bootstrap_a_jour":
         "Socle déjà en place et inchangé : rien à rejouer.",
+    "hote_en_double":
+        "le meta.yml déclare deux fois l'hôte {name} (infra.hosts et "
+        "infra.optional_hosts partagent les mêmes noms) : provision échouerait.",
     "bootstrap_absent":
         "le meta.yml déclare infra.bootstrap et le fichier n'est pas là : {path}",
     "bootstrap_oublie":
@@ -639,6 +642,13 @@ STRINGS: dict[str, str] = {
     "ssh_fragment_no_include": "Fragment SSH écrit dans {path}, mais votre ~/.ssh/config ne contient pas [bold]Include ~/.ssh/config.d/*.conf[/bold] : ajoutez cette ligne en tête de fichier, sinon il ne sera jamais lu.",
     "ssh_fragment_removed": "Fragment SSH de [bold]{repo}[/bold] retiré : il pointait des machines détruites.",
     "destroy_done":        "Infrastructure détruite.",
+    "opt_destroy_optional_hosts": "Ne retire que les hôtes optionnels (meta.yml : infra.optional_hosts) que des labs ont montés. Les hôtes communs du catalogue ne sont pas touchés.",
+    "run_optional_hosts": "Ce lab utilise des hôtes optionnels qui ne tournent pas encore : {hosts}. Ils sont montés maintenant ; `clean` les garde, `dsoxlab destroy --optional-hosts` les retire.",
+    "destroy_optional_and_host": "--optional-hosts et --host ne se combinent pas : la première nomme déjà les machines à retirer.",
+    "destroy_optional_none": "Aucun hôte optionnel ne tourne : rien à retirer.",
+    "confirm_destroy_optional": "Détruire les hôtes optionnels {hosts} ? Leurs données seront perdues ; les hôtes communs sont gardés",
+    "destroy_optional_starting": "Retrait des hôtes optionnels : {hosts}…",
+    "destroy_optional_done": "Hôtes optionnels retirés : {hosts}. Les hôtes communs tournent toujours.",
     "destroy_failed":      "Destruction échouée : {error}",
     "snapshot_purge_done":
         "{count} fichier(s) de recouvrement de snapshot retiré(s) avant la "
@@ -968,6 +978,8 @@ Chaque lab déclare :
                        provisionnement échoué a laissées hors du state
                        Terraform. Sort en code non nul s'il en reste une.
     [dim]--yes[/dim]                 Ne demande pas confirmation, machines orphelines comprises.
+    [dim]--optional-hosts[/dim]      Ne retire que les hôtes optionnels montés par des labs ;
+                       les hôtes communs restent. `clean` ne les retire jamais.
 
   [cyan]completion install[/cyan]   Installe l'auto-complétion du shell (bash, zsh).
                        Rechargez ensuite votre shell : [bold]exec $SHELL[/bold]

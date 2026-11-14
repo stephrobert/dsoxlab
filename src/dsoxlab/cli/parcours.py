@@ -73,6 +73,7 @@ from ._commun import (
     _interrompu,
     _lab,
     _lang,
+    _read_repo,
     _resolve_lab,
     _root,
     _verrou,
@@ -84,6 +85,49 @@ logger = logging.getLogger(__name__)
 
 
 # ── run ───────────────────────────────────────────────────────────────────────
+
+def _monter_les_hotes_optionnels(
+    root: Path, lab: LabDefinition, target: str | None
+) -> None:
+    """Monte les hôtes optionnels que ce lab cite et qui ne répondent pas (issue #365).
+
+    Un hôte optionnel n'existe que pour les labs qui le citent, par
+    ``targets[].host`` ou ``roles`` : c'est donc au lancement du lab qu'il se
+    monte. Rien ne change pour un lab qui n'en cite aucun, c'est-à-dire pour
+    tous les labs d'avant la 0.9.0 : ``run`` n'y provisionne toujours rien.
+
+    On provisionne TOUS les hôtes du lab, communs compris, comme ``start`` :
+    ``provisionner`` reprend sans rien recréer ce qui existe déjà. Appelé sous
+    le verrou de ``run``, puisque ``provisionner`` n'en prend aucun.
+
+    Appelé HORS du ``try`` de ``run`` : ``typer.Exit`` est un RuntimeError, et
+    le ``except RuntimeError`` réécrirait en 2 le code que ``provisionner`` a
+    choisi (8 pour des hôtes muets, 11 pour un socle en échec).
+    """
+    from ..runtimes.vm import TargetNotResolved, resoudre_target
+
+    if lab.runtime.type.value not in ("vm", "kvm", "incus"):
+        return
+    repo_meta = _read_repo(root)
+    if repo_meta is None or not repo_meta.infra.optional_hosts:
+        return
+    try:
+        hotes = resoudre_target(lab, target).hosts()
+    except TargetNotResolved:
+        # `run_lab` lèvera avec son message, qui nomme les targets disponibles.
+        return
+    optionnels = {h.name for h in repo_meta.infra.optional_hosts}
+    if not optionnels.intersection(hotes):
+        return
+    from .demarrage import _hotes_a_monter
+    from .infrastructure import provisionner
+
+    a_monter = _hotes_a_monter(root, hotes)
+    if not a_monter:
+        return
+    info(_("run_optional_hosts", hosts=", ".join(sorted(a_monter))))
+    provisionner(root, host=hotes)
+
 
 @app.command("run", help=_("cmd_run_help"))
 def run(
@@ -108,6 +152,7 @@ def run(
     # propre session, blocage que personne ne comprendrait.
     with _verrou(root, "run"):
         _ensure_services(lab, root)
+        _monter_les_hotes_optionnels(root, lab, target)
         try:
             if lab.runtime.type.value in ("vm", "kvm", "incus"):
                 _run_ansible_with_progress(

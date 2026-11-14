@@ -31,7 +31,7 @@ from typing import Any
 
 from ..exit_codes import ExitCode
 from ..i18n import _
-from ..models.repo import RepoMetadata
+from ..models.repo import HostDefinition, RepoMetadata
 from ..utils.fichiers import ecrire_atomiquement
 from ..utils.shell import CommandError
 from . import libvirt
@@ -49,7 +49,7 @@ class InfraNotProvisioned(RuntimeError):
     """
 
 
-def _dire_l_hote_sans_ip(nom: str, tf_hosts: dict[str, str]) -> None:
+def _dire_l_hote_sans_ip(hote: HostDefinition, tf_hosts: dict[str, str]) -> None:
     """Journalise un hôte sans adresse, au niveau que la situation mérite.
 
     Deux situations qu'un seul message confondait, et qui n'appellent pas le
@@ -63,7 +63,13 @@ def _dire_l_hote_sans_ip(nom: str, tf_hosts: dict[str, str]) -> None:
       connaît pour que la comparaison soit immédiate.
 
     Le journal garde les deux, son handler étant en DEBUG, et `-v` les montre.
+
+    Un hôte OPTIONNEL sans adresse n'est ni l'un ni l'autre : c'est son état
+    normal tant qu'aucun lab qui le cite n'a été lancé (issue #365).
     """
+    if hote.optional:
+        return
+    nom = hote.name
     if tf_hosts:
         logger.warning(
             "Host %s has no IP although Terraform has outputs for %s: "
@@ -158,7 +164,7 @@ def build_inventory(
     for host_def in repo_meta.infra.hosts:
         ip = tf_hosts.get(host_def.name) or host_def.ip
         if not ip:
-            _dire_l_hote_sans_ip(host_def.name, tf_hosts)
+            _dire_l_hote_sans_ip(host_def, tf_hosts)
             continue
 
         inventory_hosts[host_def.name] = {

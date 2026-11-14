@@ -1,0 +1,21 @@
+repo:
+  id: kubernetes-dsoxlab-training
+  category: kubernetes
+
+infra:
+  provider: [kvm, incus]
+  network: lab-k8s
+  cidr: 10.10.50.0/24
+  hosts:
+    - name: k8s-cp.lab
+      distro: debian13
+      ram_mb: 4096
+    - name: k8s-w1.lab
+      distro: debian13
+  optional_hosts:
+    - name: k8s-cp2.lab
+      distro: debian13
+      ram_mb: 2560
+    - name: k8s-lb.lab
+      distro: debian13
+      ram_mb: 512

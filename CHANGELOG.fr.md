@@ -7,6 +7,72 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.0] - 2026-11-14
+
+Des hôtes dont seuls quelques labs ont besoin, sans les faire tourner chez tous
+les apprenants.
+
+### Ajouté
+
+- **`infra.optional_hosts` dans le `meta.yml`** (#365). Mêmes champs
+  qu'`infra.hosts`, déclarés une fois. Un lab s'en sert en le citant, comme
+  n'importe quel hôte, dans `runtime.targets[].host` ou `roles` : rien de
+  nouveau dans le `lab.yaml`. Le besoin d'origine : deux labs de haute
+  disponibilité du catalogue Kubernetes demandent deux plans de contrôle et un
+  répartiteur de charge de plus, environ 5,6 Go. Ajoutés à `hosts`, ils
+  auraient fait dépasser 16 Go à tous les apprenants de ce catalogue, pour deux
+  labs.
+
+  | Moment | Ce que devient un hôte optionnel |
+  | --- | --- |
+  | `provision` sans `--host` | pas monté ; s'il tourne déjà, il est gardé |
+  | `run` ou `start` d'un lab qui le cite | monté s'il ne répond pas, puis le socle du catalogue y est joué |
+  | `clean`, `reset` | gardé : reconstruire plusieurs machines à chaque essai coûte des minutes |
+  | `destroy --optional-hosts` | retiré, et lui seul |
+  | `destroy` | retiré avec tout le reste |
+  | `doctor` seul | pas compté dans la mémoire du catalogue |
+
+- **`dsoxlab destroy --optional-hosts`** retire les hôtes optionnels montés par
+  des labs, et rien d'autre : les hôtes communs, leur socle et le fragment SSH
+  qui les joint restent. L'option ne se combine pas avec `--host`.
+
+- **`validate-structure` refuse un nom d'hôte déclaré deux fois**
+  (`hote_en_double`) entre `infra.hosts` et `infra.optional_hosts` : les deux
+  alimentent le même `for_each` Terraform, et un doublon faisait échouer le
+  premier `provision` sur un message qui ne nommait pas le `meta.yml`.
+
+### Modifié
+
+- **L'adresse d'un hôte dérive d'un index explicite, et non de son rang dans
+  `var.hosts`.** Les trois templates packagés (kvm, incus, outscale) lisent
+  `hosts[].index`, la position de l'hôte dans la liste complète du `meta.yml`,
+  hôtes communs d'abord. Sans lui, monter un hôte optionnel sans son voisin
+  déplacerait une adresse d'un provisionnement au suivant, et le provider
+  libvirt échoue sur toute mise à jour en place d'un domaine en marche. Pour un
+  catalogue sans hôte optionnel, l'index vaut l'ancien rang : aucune adresse ne
+  bouge.
+
+- **Le socle du catalogue se rejoue pour un hôte qui ne l'a jamais reçu**, même
+  à playbook inchangé. Le marqueur retient désormais les hôtes servis, et un
+  `provision --host` complète cette liste au lieu de la remplacer. Un hôte
+  retiré par `destroy --optional-hosts` en sort, pour recevoir le socle à
+  nouveau quand il revient.
+
+- **`destroy --host` résout ses hôtes comme `provision --host`**, par la même
+  fonction : mêmes messages, mêmes codes de sortie.
+
+### Mesuré
+
+Sur un hyperviseur libvirt 10 réel, avec un catalogue d'essai d'un hôte commun
+et de deux hôtes optionnels, le 2026-11-14 : `provision` n'a monté que l'hôte
+commun ; le `run` d'un lab qui cite le second hôte optionnel l'a monté en `.13`
+(sa position), et non en `.12` (son rang parmi les hôtes montés), puis y a joué
+le socle avant `setup.yaml` ; un second `provision` a laissé un plan Terraform
+sans changement et les deux identifiants de domaine libvirt intacts ; `clean` a
+gardé l'hôte optionnel ; `destroy --optional-hosts` l'a retiré seul, a laissé
+l'hôte commun en marche avec le même identifiant de domaine et son socle, a
+réécrit le fragment SSH, et le plan Terraform suivant était vide.
+
 ## [0.8.3] - 2026-11-10
 
 Un défaut du contrôle de release, et une rectification de la 0.8.2.

@@ -188,7 +188,10 @@ def _hotes_a_monter(root: Path, hotes: list[str] | None = None) -> list[str]:
         # provisionner des VM qu'il n'utilise pas. `None`, lui, veut dire
         # « pas de restriction », donc tout le catalogue.
         return []
-    vises = [fqdn for fqdn in (hotes or declares) if fqdn in declares] or declares
+    # Le repli vise les hôtes COMMUNS : un hôte optionnel ne se monte que pour
+    # un lab qui le cite par son nom (issue #365).
+    communs = [h.name for h in repo_meta.infra.common_hosts]
+    vises = [fqdn for fqdn in (hotes or communs) if fqdn in declares] or communs
     try:
         sorties = read_terraform_outputs(repo_meta)
         inventaire = build_inventory(repo_meta, terraform_outputs=sorties)

@@ -197,6 +197,53 @@
             }
           }
         },
+        "optional_hosts": {
+          "type": "array",
+          "description": "Hosts provisioned only for the labs that name them (in runtime.targets[].host or roles), never by a catalogue-wide provision, and not counted in the memory the catalogue asks for. Same shape as hosts, and the same namespace: a name may appear only once across both lists. `clean` keeps them; `dsoxlab destroy --optional-hosts` removes them. Since 0.9.0.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "FQDN of the machine, the name labs refer to."
+              },
+              "distro": {
+                "type": "string",
+                "description": "Image and cloud-init to use. Values packaged with dsoxlab today: alma10, alma9, ubuntu26, ubuntu24, ubuntu22, debian13, debian12. Not enumerated here, because the list lives in the Terraform templates and grows with them."
+              },
+              "role": {
+                "type": "string",
+                "description": "Free-form role, exposed as an Ansible host_var."
+              },
+              "ram_mb": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1024
+              },
+              "vcpu": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1
+              },
+              "disk_gb": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 10
+              },
+              "extra_disk_gb": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Size of a second disk attached to the VM, for labs that need a real block device (partitioning, LVM, RAID). 0 = none."
+              }
+            }
+          }
+        },
         "providers": {
           "type": "object",
           "description": "Per-provider overrides, read by the matching Terraform module. Keys are provider names; values are free-form mappings, because each provider has its own variables. The keys described below are the ones the packaged templates read; any other key is passed through untouched.",

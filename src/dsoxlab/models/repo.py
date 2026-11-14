@@ -139,6 +139,28 @@ def _surcharger_les_sections(data: dict[str, Any], overrides: dict[str, Any]) ->
                 section[champ] = traduite[champ]
 
 
+def _host_definition(
+    h: dict[str, Any], champ: str, meta_path: Path, *, optional: bool = False
+) -> HostDefinition:
+    """Une entrée de ``infra.hosts`` ou de ``infra.optional_hosts``, même forme."""
+    return HostDefinition(
+        name=str(h["name"]),
+        # `or ""` plutôt que le défaut de .get() : une clé présente mais vide
+        # rend None, que str() transformerait en "None". ip est legacy/optionnel
+        # — calculé par Terraform en MVP.
+        ip=str(h.get("ip") or ""),
+        distro=str(h.get("distro") or ""),
+        role=str(h.get("role") or ""),
+        ram_mb=as_int(h.get("ram_mb"), 1024, f"{champ}[].ram_mb", meta_path),
+        vcpu=as_int(h.get("vcpu"), 1, f"{champ}[].vcpu", meta_path),
+        disk_gb=as_int(h.get("disk_gb"), 10, f"{champ}[].disk_gb", meta_path),
+        extra_disk_gb=as_int(
+            h.get("extra_disk_gb"), 0, f"{champ}[].extra_disk_gb", meta_path
+        ),
+        optional=optional,
+    )
+
+
 def _provider_overrides(value: object, meta_path: Path) -> dict[str, dict[str, Any]]:
     """Valide ``infra.providers`` : un mapping provider → mapping d'overrides."""
     if value is None:
@@ -284,6 +306,15 @@ class HostDefinition:
     RHCSA/LFCS qui exigent un vrai bloc device pour partitionner +
     LVM (ex. capstone RHCSA tâches 1-3). Le disque apparaît dans la
     VM comme ``/dev/vdb`` sur kvm/incus, ``/dev/xvdb`` sur outscale."""
+    optional: bool = False
+    """Vrai pour un hôte de ``meta.yml: infra.optional_hosts`` (0.9.0, issue
+    #365). Un tel hôte n'est provisionné que pour les labs qui le citent (par
+    ``targets[].host`` ou ``roles``), jamais par un ``provision`` du catalogue
+    entier, et il ne compte pas dans la mémoire que le catalogue demande.
+
+    Il vit pourtant dans la même liste que les autres, **après eux** : son
+    adresse dérive de sa position, et le placer à la fin garantit que déclarer
+    un hôte optionnel ne déplace aucune machine commune."""
 
 
 @dataclass
@@ -328,6 +359,16 @@ class InfraDefinition:
     """Overrides spécifiques par provider — lus par le module Terraform
     correspondant. Exemple : ``providers.aws.region``,
     ``providers.kvm.libvirt_uri``."""
+
+    @property
+    def common_hosts(self) -> list[HostDefinition]:
+        """Les hôtes du catalogue, ceux qu'un ``provision`` sans ``--host`` monte."""
+        return [h for h in self.hosts if not h.optional]
+
+    @property
+    def optional_hosts(self) -> list[HostDefinition]:
+        """Les hôtes optionnels, montés seulement pour les labs qui les citent."""
+        return [h for h in self.hosts if h.optional]
 
     def host(self, name: str) -> HostDefinition | None:
         """Retourne la HostDefinition par son nom, ou None."""
@@ -642,6 +683,9 @@ class RepoMetadata:
 
         infra_data = as_mapping(data.get("infra"), "infra", meta_path)
         hosts_data = as_mapping_list(infra_data.get("hosts"), "infra.hosts", meta_path)
+        optional_data = as_mapping_list(
+            infra_data.get("optional_hosts"), "infra.optional_hosts", meta_path
+        )
         # Provider courant : env > contexte session > meta.yml (string OU
         # liste à 1 élément) > non résolu ("") si liste à plusieurs sans
         # choix — voir InfraDefinition.require_provider().
@@ -657,23 +701,15 @@ class RepoMetadata:
             network=infra_data.get("network", ""),
             cidr=infra_data.get("cidr", ""),
             bootstrap=str(infra_data.get("bootstrap") or ""),
+            # Les hôtes optionnels APRÈS les communs : l'adresse d'un hôte dérive
+            # de sa position, et cet ordre garantit qu'en déclarer un ne déplace
+            # aucune machine commune (issue #365).
             hosts=[
-                HostDefinition(
-                    name=str(h["name"]),
-                    # `or ""` plutôt que le défaut de .get() : une clé présente
-                    # mais vide rend None, que str() transformerait en "None".
-                    # ip est legacy/optionnel — calculé par Terraform en MVP
-                    ip=str(h.get("ip") or ""),
-                    distro=str(h.get("distro") or ""),
-                    role=str(h.get("role") or ""),
-                    ram_mb=as_int(h.get("ram_mb"), 1024, "infra.hosts[].ram_mb", meta_path),
-                    vcpu=as_int(h.get("vcpu"), 1, "infra.hosts[].vcpu", meta_path),
-                    disk_gb=as_int(h.get("disk_gb"), 10, "infra.hosts[].disk_gb", meta_path),
-                    extra_disk_gb=as_int(
-                        h.get("extra_disk_gb"), 0, "infra.hosts[].extra_disk_gb", meta_path
-                    ),
-                )
+                _host_definition(h, "infra.hosts", meta_path)
                 for h in hosts_data
+            ] + [
+                _host_definition(h, "infra.optional_hosts", meta_path, optional=True)
+                for h in optional_data
             ],
             providers=_provider_overrides(infra_data.get("providers"), meta_path),
         )

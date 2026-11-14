@@ -74,8 +74,8 @@ locals {
 
   # IPs privées allouées aux VMs lab (offset +10 dans le subnet privé)
   hosts_with_ip = [
-    for idx, h in var.hosts : merge(h, {
-      private_ip = cidrhost(local.private_subnet_cidr, 10 + idx)
+    for h in var.hosts : merge(h, {
+      private_ip = cidrhost(local.private_subnet_cidr, 10 + h.index)
     })
   ]
 
