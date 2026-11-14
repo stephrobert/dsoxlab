@@ -7,6 +7,39 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Documentation
+
+- **Les décisions durables vivent désormais dans `docs/decisions/`, une fiche
+  par décision** (#203). Plusieurs modules portaient un raisonnement
+  d'architecture dans leurs commentaires : pourquoi un `flock` et pourquoi son
+  fichier n'est jamais supprimé, pourquoi `ansible-core` est déclaré malgré ses
+  100 Mo, pourquoi les paquets du premier démarrage ne bloquent pas. Ce
+  raisonnement était juste, mais mal rangé : il allongeait les fichiers, et ne
+  se retrouvait pas quand on cherchait « pourquoi ce choix ? ». Quatorze
+  fiches, chacune en anglais et en français, de même forme courte : contexte,
+  décision, conséquences, ce qui l'inverserait, statut et date. Les huit
+  décisions listées dans l'issue sont rejointes par six prises depuis : le
+  renversement des fixtures, l'état `degraded` d'un lab sans son moteur, les
+  trois issues d'un contrôle, l'index stable des hôtes optionnels, le refus des
+  hôtes hors contrat, et la table des catalogues mesurée sur les dépôts
+  publiés. Le raisonnement a été déplacé, pas résumé : chaque mesure garde sa
+  date.
+- **Le code garde une ligne et un renvoi.** `locking.py`, `pyproject.toml`, les
+  deux README des templates, `test_journal_en_anglais.py`,
+  `infra/terraform.py`, `scripts/gen-catalogues.py` et quelques docstrings
+  disent désormais l'essentiel en une ligne et renvoient à leur fiche. Les
+  commentaires qui expliquent une seule ligne restent où ils sont. Aucun
+  comportement ne change.
+- **`tests/test_decisions.py` tient le répertoire** : chaque fiche a ses
+  sections et sa jumelle dans l'autre langue, l'index cite chaque fiche, et
+  chaque renvoi `docs/decisions/…` écrit dans le dépôt mène à un fichier qui
+  existe. Il est montré capable de refuser un renvoi cassé.
+- `docs/README.md` et `docs/design-principles.md` (et leurs versions
+  françaises) renvoient au nouveau répertoire : les invariants disent ce qui
+  est vrai, les décisions disent pourquoi on l'a choisi.
+
 ## [0.9.2] - 2026-11-14
 
 ### Corrigé

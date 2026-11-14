@@ -167,7 +167,7 @@ def _moteur_indisponible() -> str | None:
     démarrer son démon et vérifier que le compte peut lui parler — donc elles se
     distinguent. Elles ne se distinguaient pas : un ``docker_available()`` faux
     valait « rien à signaler », si bien qu'un lab dont le démon venait de tomber
-    s'affichait ``ready``.
+    s'affichait ``ready``. Voir docs/decisions/0010-degraded-lab-when-engine-unreachable.md
     """
     from ..runtimes import services as svc
 

@@ -1,53 +1,18 @@
 """Verrou d'écriture par dépôt : une seule invocation modifie l'état à la fois.
 
-Deux terminaux ouverts, c'est le cas normal chez un apprenant. Rien n'empêchait
-jusqu'ici deux ``dsoxlab`` d'écrire en même temps sur le même état, et cet état
-est éparpillé :
+Deux terminaux ouverts, c'est le cas normal chez un apprenant, et l'état qu'ils
+partagent est éparpillé (``.dsoxlab-context.json`` réécrit en entier, state
+Terraform, inventaire et ``ssh_config`` en cache, conteneurs de
+``runtime.services``). Le verrou est un ``flock`` posé sous
+``~/.local/state/dsoxlab/<identité>/dsoxlab.lock``, à côté du state Terraform :
+le noyau le relâche à la fermeture du descripteur, donc aucun verrou périmé
+n'est à reprendre, et le fichier est tronqué au relâchement mais jamais
+supprimé. L'identité est ``repo.id`` d'abord, pour que deux clones partagent le
+verrou comme ils partagent le work-dir Terraform.
 
-- ``<repo>/.dsoxlab-context.json``, réécrit **en entier** par ``config._persist``
-  (deux écritures concurrentes : la dernière gagne, la première est perdue sans
-  trace) ;
-- le state Terraform sous ``~/.local/state/dsoxlab/<repo-id>/terraform/`` ;
-- l'inventaire et le fragment ``ssh_config`` régénérés en cache ;
-- les conteneurs de ``runtime.services``, nommés par dépôt donc partagés.
-
-La SQLite ``<repo>/.dsoxlab.db`` est la seule pièce déjà protégée, par SQLite.
-
-Où se pose le verrou, et pourquoi pas dans le dépôt
-===================================================
-
-Sous ``~/.local/state/dsoxlab/<identité>/dsoxlab.lock``, c'est-à-dire **à la
-racine du répertoire d'état de ce dépôt**, celui-là même qui porte le state
-Terraform. Le poser dans le dépôt de labs aurait paru plus naturel (c'est là
-que vivent ``.dsoxlab.db`` et ``.dsoxlab-context.json``), mais chaque dépôt
-fournisseur ignore ces deux fichiers **nommément**, pas par un motif : un
-troisième fichier apparaîtrait en untracked chez tous, et il faudrait modifier
-trois dépôts pour livrer un verrou.
-
-L'identité est ``repo.id`` quand le ``meta.yml`` est lisible, sinon le nom du
-répertoire suffixé d'une empreinte de son chemin absolu. Prendre ``repo.id`` en
-premier n'est pas un détail : deux clones du même catalogue partagent le **même**
-work-dir Terraform, donc doivent partager le verrou. Les sérialiser inutilement
-ne coûte rien ; les laisser s'écrire dessus coûte un state corrompu.
-
-Un verrou périmé, et pourquoi il n'existe pas ici
-=================================================
-
-Le verrou est un ``flock`` (``LOCK_EX | LOCK_NB``). Le noyau le relâche **de
-lui-même** quand le descripteur se ferme, y compris si le processus meurt d'un
-``SIGKILL``, et il ne survit évidemment pas à un redémarrage. Il n'y a donc
-aucun verrou à « reprendre » : la question de la reprise, qui est la vraie
-difficulté des verrous par fichier-sentinelle, ne se pose pas.
-
-Ce qui survit, c'est le **fichier**, et le nom de son ancien détenteur. On le
-tronque en le relâchant pour qu'il ne raconte pas une invocation terminée, et on
-ne le supprime **jamais** : effacer un fichier de verrou est la course classique
-où un processus retire sous les pieds d'un autre l'inode qu'il tient déjà.
-
-Le verrou n'est pas hérité par les sous-processus : Python crée ses descripteurs
-non héritables (PEP 446), et ``exec`` les referme. Le sous-shell ouvert par
-``dsoxlab run`` ne tient donc rien, ce qui est indispensable, puisque
-l'apprenant y tape ``dsoxlab check``.
+Voir docs/decisions/0002-per-catalog-flock-lock.md : pourquoi pas dans le dépôt
+de labs, pourquoi ``flock`` plutôt qu'un fichier sentinelle, pourquoi le fichier
+n'est jamais effacé, et pourquoi le sous-shell de ``run`` ne tient rien.
 """
 
 from __future__ import annotations

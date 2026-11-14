@@ -36,16 +36,9 @@ dependencies = [
     # ansible-runner pilote ansible-core programmatiquement (API officielle
     # Red Hat utilisée par AAP et ansible-navigator).
     #
-    # ATTENTION, ce commentaire a longtemps affirmé le contraire : ansible-runner
-    # ne tire PAS ansible-core en transitif. Mesuré sur une machine neuve, le
-    # tool installé pesait 18 Mo et son bin/ ne contenait ni `ansible` ni
-    # `ansible-playbook`. Conséquence : tout `dsoxlab run` sur un lab vm sortait
-    # en rc=127, code shell de « commande introuvable », que rien ne traduisait.
-    #
-    # ansible-core est donc déclaré explicitement. Il pèse environ 100 Mo, y
-    # compris pour un catalogue entièrement `shell` qui ne s'en servira jamais ;
-    # c'est le prix d'un outil qui marche à l'installation plutôt qu'après une
-    # commande que rien ne documente.
+    # ansible-runner ne tire PAS ansible-core : sans lui, tout `run` sur un lab
+    # vm sortait en rc=127. Déclaré explicitement, environ 100 Mo assumés.
+    # Voir docs/decisions/0003-explicit-ansible-core.md
     "ansible-runner>=2.4",
     "ansible-core>=2.16",
     # pytest + pytest-testinfra : dsoxlab check les invoque pour valider
@@ -97,18 +90,10 @@ src = ["src"]
 line-length = 100
 
 [tool.ruff.lint]
-# Le jeu de règles est déclaré ICI, en entier, et c'est le fond du sujet.
-#
-# Cette section disait « E/F sont actifs par défaut » et se contentait d'un
-# extend-select. Ruff 0.16 a élargi son jeu par défaut : la même commande, sur
-# le même code, est passée de 0 à 123 erreurs, dont aucune ne relevait de E, F
-# ou S. Personne n'avait décidé ce changement de périmètre — il est arrivé avec
-# une montée de version. Une configuration qui s'appuie sur le défaut d'un
-# linter se fait donc déplacer par lui.
-#
-# `select` remplace le défaut au lieu de l'étendre : ce fichier est désormais
-# la seule autorité sur ce que ce projet applique, et une future version de
-# ruff ne peut plus répondre à sa place.
+# Le jeu de règles est déclaré ICI, en entier : `select` remplace le défaut de
+# ruff au lieu de l'étendre, pour qu'une montée de version ne change pas le
+# périmètre à notre place (ruff 0.16 : de 0 à 123 erreurs le 2026-08-20).
+# Voir docs/decisions/0008-explicit-ruff-rule-set.md
 select = [
     "F",     # pyflakes : nom indéfini, import mort. Le socle non négociable.
     "E",     # pycodestyle (erreurs). E501 écarté plus bas, mesure à l'appui.
@@ -138,26 +123,9 @@ select = [
     "EXE",   # shebang et bit d'exécution cohérents.
     "FURB",  # refurb : tournures obsolètes que le typage ne voit pas.
 ]
-# Familles délibérément ÉCARTÉES, chacune mesurée sur ce code :
-#
-#   TRY  (86) — TRY003 (69) refuse les messages d'erreur écrits sur place, alors
-#               que ce contrat déclaratif tire sa valeur de phrases qui nomment
-#               le fichier et le champ fautifs. TRY004 (13) exigerait un
-#               `TypeError` là où les coercions du contrat lèvent `ValueError` :
-#               or `discovery/scanner.py` et le harnais de fuzz attrapent
-#               exactement `(KeyError, ValueError, YAMLError)`. Obéir ferait
-#               planter la CLI sur un `lab.yaml` mal typé au lieu de l'écarter.
-#   PLR  (71) — seuils arbitraires (nombre d'arguments, de branches).
-#   PLC  (88) — style d'import et de comparaison, sans classe de défaut derrière.
-#   N    (11) — N818 renommerait onze exceptions publiques (`HostReadyTimeout`…)
-#               que les dépôts de labs importent : une rupture d'API pour une
-#               convention de nommage.
-#   INP   (2) — vise les tests du lab de démonstration packagé, qui sont du
-#               CONTENU pédagogique, pas un paquet Python.
-#   PERF  (5) — micro-optimisation d'un CLI ; les boucles visées portent des
-#               commentaires qu'une compréhension avalerait.
-#   ANN, D, ARG, EM, FBT, TID, TC, SLF, T20, ERA, COM — soit redondantes avec
-#               mypy strict, soit purement stylistiques.
+# Familles délibérément ÉCARTÉES (TRY, PLR, PLC, N, INP, PERF, ANN, D, ARG, EM,
+# FBT, TID, TC, SLF, T20, ERA, COM) : chacune avec sa mesure sur ce code dans
+# docs/decisions/0008-explicit-ruff-rule-set.md
 ignore = [
     # Propre à un CLI qui orchestre des outils externes ; pas des vulnérabilités.
     "S603",  # subprocess appelé avec une liste d'arguments (sans shell) — la forme sûre
