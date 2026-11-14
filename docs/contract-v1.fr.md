@@ -353,7 +353,7 @@ validate-structure` le signale.
 | `level` | **oui** | chaîne | | Libre, jamais validé contre une liste. |
 | `skills` | **oui** | liste de chaînes | | Ne doit pas être vide. |
 | `distros` | **oui** | liste de chaînes | | Ne doit pas être vide. |
-| `doc_url` | **oui** | chaîne | | `http(s)` uniquement, et recontrôlée à l'affichage : voir [la politique d'URL](./security.fr.md). |
+| `doc_url` | **oui** | chaîne | | `http(s)` uniquement, et recontrôlée à l'affichage : voir [la politique d'URL](./security.fr.md). La leçon en anglais ; `lab.<langue>.yaml` peut donner la même leçon dans sa langue. |
 | `section` | non | chaîne | `repo.category` | Déclarée, elle est **toujours** conservée — y compris quand sa valeur se trouve nommer un domaine technique. |
 | `description` | non | chaîne | `""` | |
 | `track` | non | liste de chaînes | `[]` | |
@@ -400,7 +400,7 @@ critère qui regroupe plusieurs tests est *satisfait* seulement si tous le sont,
 et qu'aucun n'a échoué, et *sauté* sinon (tous sautés, ou satisfaits et sautés
 mêlés). Un critère déclaré dont aucun test n'a tourné n'apparaît pas. Les
 libellés se surchargent par `id` dans `lab.<lang>.yaml`
-(`criteria: [{id, label}]`), sur le modèle de `title` et `description`.
+(`criteria: [{id, label, lessons}]`), sur le modèle de `title` et `description`.
 
 `feedback` règle ce que `check` montre d'un critère raté, et ce que l'export
 porte dans `criteria[].observation` :
@@ -429,8 +429,9 @@ est que son auteur déclare explicitement `feedback: full` ou `first-line`.
 
 **`criteria[].lessons`.** Chaque critère déclaré peut porter `lessons`, une à
 cinq URL de leçons du site où le réviser, au format de `doc_url` (`http` ou
-`https`, une ancre `#...` est permise). Seul `lab.yaml` les porte, puisque le
-site traduit lui-même ses URL. `validate-structure` contrôle la forme, refuse
+`https`, une ancre `#...` est permise). `lab.yaml` porte les URL anglaises,
+et `lab.<langue>.yaml` peut donner, par `id` de critère, les URL des mêmes
+leçons dans sa langue (0.9.3). `validate-structure` contrôle la forme, refuse
 les doublons, une liste vide et plus de cinq entrées, et ne fait aucune requête
 réseau. Le moteur ne les **affiche jamais** dans `check` (une épreuve ne donne
 rien) et ne les **exporte jamais** : c'est le site qui les lit dans le catalogue
@@ -692,11 +693,18 @@ soit : ce sont les tests qui prouvent.
 
 ### `lab.<langue>.yaml`
 
-Un `lab.fr.yaml` posé à côté de `lab.yaml` surcharge `title`, `description` et
-le `label` de chaque critère (apparié par `id`) pour cette langue, **et rien
-d'autre**. Toute autre clé y est ignorée, et
+Un `lab.fr.yaml` posé à côté de `lab.yaml` surcharge `title`, `description`,
+`doc_url`, ainsi que le `label` et les `lessons` de chaque critère (appariés par
+`id`) pour cette langue, **et rien d'autre**. Toute autre clé y est ignorée, et
 `validate-structure` le dit. Un `id` y est toléré sans être lu : il nomme le
 lab pour qui ouvre le fichier.
+
+`lab.yaml` porte les valeurs anglaises, l'anglais étant la langue par défaut de
+l'outil. Une leçon existe dans chaque langue du site à une URL qui ne se déduit
+pas de l'autre, d'où `doc_url` et `lessons` dans la traduction (0.9.3) :
+`guide`, `show` et `list-labs --json` rendent l'URL de la langue de la session.
+`validate-structure` contrôle la forme de chaque URL qu'une traduction
+substitue, et `--check-urls` l'interroge.
 
 ---
 

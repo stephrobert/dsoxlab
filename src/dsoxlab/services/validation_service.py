@@ -387,12 +387,21 @@ def _anomalies_des_guides(
     réseau apprend surtout à relancer la CI sans lire le message.
     """
     from ..validators.content import check_doc_urls
+    from ..validators.metadata import variantes_traduites
 
     mauvais: list[Anomalie] = []
     muets: list[Anomalie] = []
+    # Les `doc_url` qu'une traduction substitue (0.9.3) se contrôlent aussi :
+    # c'est le lien que suit l'apprenant dans cette langue.
+    a_controler = list(labs) + [
+        variante
+        for lab in labs
+        for _lang, variante in variantes_traduites(lab)
+        if variante.doc_url and variante.doc_url != lab.doc_url
+    ]
     # Une requête par URL distincte, pas par lab : plusieurs labs jumellent la
     # même leçon, et les interroger tous n'apprend rien de plus.
-    for lab_id, url, souci in check_doc_urls(labs):
+    for lab_id, url, souci in check_doc_urls(a_controler):
         anomalie = Anomalie(
             "doc_url",
             souci.key,

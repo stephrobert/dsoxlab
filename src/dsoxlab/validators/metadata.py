@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from ..models.lab import FEEDBACK_POLICIES, LAB_STATUSES, LabDefinition
+from ..models.lab import FEEDBACK_POLICIES, LAB_STATUSES, LabDefinition, langues_traduites
+
+logger = logging.getLogger(__name__)
 
 #: Les trois premières formes supposent un apprenant qui fait ; ``validation``
 #: non — c'est une suite d'assertions qui défend un guide publié. Étendre
@@ -255,9 +258,52 @@ def _controler_le_seuil_sans_epreuve(
 
 
 
+def variantes_traduites(lab: LabDefinition) -> list[tuple[str, LabDefinition]]:
+    """Le lab relu dans chaque langue dont il a un ``lab.<lang>.yaml``.
+
+    `validate-structure` charge les labs en anglais. Sans cette relecture, une
+    URL que la traduction substitue (``doc_url``, ``criteria[].lessons``) ne
+    serait jamais contrôlée, et un apprenant francophone tomberait seul sur le
+    lien cassé. Une traduction qui empêche le lab de se charger est avalée ici :
+    le parseur l'avale aussi, et `unknown_key` signale déjà sa forme.
+    """
+    lab_yaml = lab.path / "lab.yaml"
+    variantes: list[tuple[str, LabDefinition]] = []
+    for lang in langues_traduites(lab_yaml):
+        try:
+            variantes.append((lang, LabDefinition.from_yaml(lab_yaml, lang)))
+        except Exception as exc:  # noqa: BLE001 - une traduction illisible ne fait pas disparaître le lab
+            # Le journal s'écrit en anglais : c'est ce que `support` collecte.
+            logger.warning("translation %s of %s not checked: %s", lang, lab_yaml, exc)
+    return variantes
+
+
+def _controler_les_urls_traduites(lab: LabDefinition, report: MetadataReport) -> None:
+    """``doc_url`` et ``criteria[].lessons`` de chaque traduction, hors réseau.
+
+    Seul ce qu'une traduction change est contrôlé : une URL héritée de
+    ``lab.yaml`` l'a déjà été, et la signaler deux fois n'apprend rien.
+    Le champ nomme la langue, puisque le message porte sur un autre fichier.
+    """
+    lecons_anglaises = {c.id: c.lessons for c in lab.criteria}
+    for lang, variante in variantes_traduites(lab):
+        champ = f"doc_url ({lang})"
+        if variante.doc_url != lab.doc_url:
+            if not variante.doc_url:
+                report.issues.append(
+                    MetadataIssue(champ, "metadata_field_empty", {"field": champ}))
+            elif urlparse(variante.doc_url).scheme not in ("http", "https"):
+                report.issues.append(MetadataIssue(
+                    champ, "metadata_doc_url_scheme", {"url": variante.doc_url}))
+        for critere in variante.criteria:
+            if critere.lessons != lecons_anglaises.get(critere.id):
+                _controler_les_lecons(critere, report)
+
+
 def validate_metadata(lab: LabDefinition) -> MetadataReport:
     """Check required fields and their consistency."""
     report = MetadataReport(lab_id=lab.id)
+    _controler_les_urls_traduites(lab, report)
 
     for champ, valeur in (
         ("id", lab.id),

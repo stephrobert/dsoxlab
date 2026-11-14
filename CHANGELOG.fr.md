@@ -7,7 +7,7 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Unreleased]
+## [0.9.3] - 2026-11-14
 
 ### Ajouté
 
@@ -30,6 +30,18 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `catalog list --drafts` la montre, et `catalog add <url>` ou `<id>`
   l'installe toujours. `catalog list --json` porte `draft` pour chaque entrée
   connue. `certificats` repasse en brouillon tant qu'il ne publie aucun lab.
+
+- **`doc_url` et `criteria[].lessons` se traduisent dans `lab.<lang>.yaml`.**
+  Une leçon existe dans chaque langue du site, à une URL qui ne se déduit pas de
+  l'autre, et un lab n'avait qu'un `doc_url` : `guide` envoyait un apprenant
+  anglophone sur la page française. `lab.yaml` porte désormais les URL
+  anglaises, comme il porte le `title` anglais, et `lab.fr.yaml` peut donner les
+  françaises ; `guide`, `show` et `list-labs --json` rendent l'URL de la langue
+  de la session, et une traduction qui ne les donne pas hérite des anglaises.
+  `validate-structure` contrôle la forme de chaque URL qu'une traduction
+  substitue, sans compter deux fois une URL héritée, et `--check-urls` interroge
+  aussi les `doc_url` traduits. Aucun catalogue existant ne change : un
+  `lab.yaml` qui garde son URL française se comporte comme avant.
 
 ### Corrigé
 

@@ -377,7 +377,7 @@ playbooks d'un lab doivent viser) et un `lab_<role>` par entrée de `roles`.
 
 | Fichier | Surcharge |
 | --- | --- |
-| `lab.fr.yaml` | `title` et `description` de ce lab, et rien d'autre |
+| `lab.fr.yaml` | `title`, `description` et `doc_url` de ce lab, le `label` et les `lessons` de ses critères, et rien d'autre |
 | `meta.fr.yml` | `repo.title`, `repo.description`, `sections[].title` et `sections[].description`, appariés **par `id`** |
 | `course.fr.yaml` | Les titres de sections du cours |
 
