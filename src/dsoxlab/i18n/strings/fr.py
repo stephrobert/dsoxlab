@@ -45,6 +45,24 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Provider d'infra à activer (ex. kvm, outscale, incus). "
         "Surchargé par DSOXLAB_PROVIDER. Persisté entre commandes.",
+    "opt_provision_prune":
+        "Détruire les machines que le state Terraform porte et que ce meta.yml "
+        "ne déclare pas (laissées par un autre checkout du même dépôt)",
+    "hotes_hors_contrat":
+        "Le state Terraform de « {repo} » porte des machines que ce meta.yml ne "
+        "déclare pas : {hosts}. Un autre checkout du même dépôt (un clone ou un "
+        "worktree git) les a sans doute créées, car les deux partagent le même "
+        "state. Les appliquer les détruirait : rien n'a été modifié.",
+    "hotes_hors_contrat_geste":
+        "Lance `dsoxlab {geste}` depuis le checkout qui les déclare, ou mets "
+        "celui-ci à jour (git pull).\nPour les détruire vraiment : "
+        "dsoxlab provision --prune",
+    "provision_prune_hotes":
+        "--prune : ces machines ne sont pas déclarées dans le meta.yml et vont "
+        "être détruites : {hosts}",
+    "destroy_hotes_hors_contrat":
+        "Ce destroy retire aussi des machines que ce meta.yml ne déclare pas : "
+        "{hosts}. Un autre checkout du même dépôt s'en sert peut-être encore.",
     "opt_provision_bootstrap":
         "Rejouer le socle du catalogue (infra.bootstrap) même s'il est déjà en "
         "place",
@@ -945,6 +963,9 @@ Chaque lab déclare :
     [dim]--host <fqdn>[/dim]         Ne cible qu'une machine. Répétable.
     [dim]--bootstrap[/dim]           Rejoue le socle du catalogue ([dim]infra.bootstrap[/dim])
                        même s'il est déjà en place.
+    [dim]--prune[/dim]               Détruit les machines que le state porte et que ce
+                       meta.yml ne déclare pas. Sans elle, provision refuse
+                       (code 12) et les nomme : un autre checkout s'en sert.
 
   [cyan]status [lab][/cyan]         Où en est le lab actif, ou celui qu'on nomme :
                        [bold]non commencé[/bold], [bold]prêt[/bold], [bold]en cours[/bold], [bold]validé[/bold], ou [bold]dégradé[/bold]

@@ -99,6 +99,14 @@ class ExitCode(IntEnum):
     #: `provision` a bel et bien créé quelque chose qu'il faudra retirer.
     BOOTSTRAP_ECHOUE = 11
 
+    #: Le state Terraform porte des machines que le ``meta.yml`` courant ne
+    #: déclare pas, ni communes ni optionnelles : un autre checkout du même
+    #: dépôt les a montées (issue #357). Un ``apply`` les détruirait, donc
+    #: ``provision`` refuse et les nomme. Distinct de ``IMPOSSIBLE`` parce
+    #: que le geste est un choix humain : changer de checkout, ou assumer la
+    #: destruction par ``--prune``.
+    HOTES_HORS_CONTRAT = 12
+
     #: Un exécutable attendu est introuvable dans le ``PATH``. 127 est le code
     #: que le shell rend lui-même dans ce cas : l'outil dit donc la même chose
     #: que son environnement, ce qu'un script sait déjà interpréter.

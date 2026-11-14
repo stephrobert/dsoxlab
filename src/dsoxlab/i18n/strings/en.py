@@ -44,6 +44,24 @@ STRINGS: dict[str, str] = {
     "opt_use_provider":
         "Infra provider to activate (e.g. kvm, outscale, incus). "
         "Overridden by DSOXLAB_PROVIDER. Persisted across commands.",
+    "opt_provision_prune":
+        "Destroy the machines the Terraform state holds but this meta.yml does "
+        "not declare (left by another checkout of the same repository)",
+    "hotes_hors_contrat":
+        "The Terraform state of '{repo}' holds machines that this meta.yml does "
+        "not declare: {hosts}. Another checkout of the same repository (a clone "
+        "or a git worktree) most likely created them, since both share one state. "
+        "Applying would destroy them, so nothing was changed.",
+    "hotes_hors_contrat_geste":
+        "Run `dsoxlab {geste}` from the checkout that declares them, or bring "
+        "this one up to date (git pull).\nTo really destroy them: "
+        "dsoxlab provision --prune",
+    "provision_prune_hotes":
+        "--prune: these machines are not declared in meta.yml and will be "
+        "destroyed: {hosts}",
+    "destroy_hotes_hors_contrat":
+        "This destroy also removes machines that this meta.yml does not declare: "
+        "{hosts}. Another checkout of the same repository may still be using them.",
     "opt_provision_bootstrap":
         "Replay the catalog's foundation (infra.bootstrap) even if it is already "
         "in place",
@@ -930,6 +948,9 @@ Each lab declares:
     [dim]--host <fqdn>[/dim]         Target a single machine. Repeatable.
     [dim]--bootstrap[/dim]           Replay the catalog's foundation ([dim]infra.bootstrap[/dim])
                        even if it is already in place.
+    [dim]--prune[/dim]               Destroy the machines the state holds but this meta.yml
+                       does not declare. Without it, provision refuses (exit 12)
+                       and names them: another checkout probably uses them.
 
   [cyan]status [lab][/cyan]         Where the active lab stands, or the one you name:
                        [bold]not started[/bold], [bold]ready[/bold], [bold]in progress[/bold], [bold]validated[/bold], or

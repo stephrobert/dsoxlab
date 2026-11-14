@@ -85,6 +85,10 @@ def provision(
         "--bootstrap",
         help=_("opt_provision_bootstrap"),
     )] = False,
+    elaguer: Annotated[bool, typer.Option(
+        "--prune",
+        help=_("opt_provision_prune"),
+    )] = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     """Lance terraform apply sur le provider courant avec progress bar."""
@@ -98,11 +102,13 @@ def provision(
         root,
         host=list(host) if host else None,
         rejouer_le_socle=rejouer_le_socle,
+        elaguer=elaguer,
     )
 
 
 def provisionner(
-    root: Path, *, host: list[str] | None = None, rejouer_le_socle: bool = False
+    root: Path, *, host: list[str] | None = None, rejouer_le_socle: bool = False,
+    elaguer: bool = False,
 ) -> None:
     """Le corps de ``provision``, **sans verrou** : l'appelant choisit sa portée.
 
@@ -123,8 +129,7 @@ def provisionner(
         raise typer.Exit(1)
 
     provider = _require_provider(repo_meta)
-
-    _refuser_ce_qui_echouerait_plus_tard(repo_meta, provider)
+    _refuser_ce_qui_echouerait_plus_tard(repo_meta, provider, elaguer=elaguer)
     info(_("provision_starting", provider=provider))
     targets = _cibles_terraform(repo_meta, provider, host)
 
@@ -383,9 +388,9 @@ def _attendre_les_hotes(
 
 
 def _refuser_ce_qui_echouerait_plus_tard(
-    repo_meta: RepoMetadata, provider: str
+    repo_meta: RepoMetadata, provider: str, *, elaguer: bool = False
 ) -> None:
-    """Les quatre causes d'échec connues d'avance, dites avant de perdre du temps.
+    """Les causes d'échec connues d'avance, dites avant de perdre du temps.
 
     Chacune vient d'un échec observé **après** `init` et son téléchargement de
     provider, parfois après l'image de base, sur un message de Terraform ou du
@@ -394,6 +399,10 @@ def _refuser_ce_qui_echouerait_plus_tard(
     infrastructure à moitié montée.
     """
     from ..infra import terraform as tf
+
+    # En premier : c'est le seul refus qui protège des machines en marche, et
+    # il ne lit qu'un fichier (issue #357).
+    refuser_les_hotes_hors_contrat(repo_meta, elaguer=elaguer)
 
     # Incus et KVM partagent le nom de réseau et le subnet du lab : ils ne
     # peuvent pas coexister. Si un AUTRE provider a encore de l'infra debout,
@@ -445,6 +454,35 @@ def _refuser_ce_qui_echouerait_plus_tard(
     if not ssh_key.is_file():
         error(_("provision_no_ssh_key", path=ssh_key))
         raise typer.Exit(1)
+
+
+def refuser_les_hotes_hors_contrat(
+    repo_meta: RepoMetadata, *, elaguer: bool, geste: str = "provision"
+) -> None:
+    """Refuse un apply qui détruirait des machines que ce ``meta.yml`` ignore.
+
+    Issue #357 : deux checkouts d'un même dépôt partagent le state Terraform,
+    nommé par ``repo.id``. Celui qui déclare le moins d'hôtes les détruisait
+    en silence au premier ``provision``, VM en cours de lab comprise.
+
+    Le refus vaut **même avec ``--host``**, qui ne les détruirait pas : l'écart
+    est là, et le ``provision`` suivant sans ``--host`` les emporterait. Mieux
+    vaut le dire au premier contact, avant d'avoir monté quoi que ce soit.
+    ``--prune`` assume la destruction, en nommant ce qui part.
+    """
+    from ..infra import terraform as tf
+
+    etrangers = tf.hotes_hors_contrat(repo_meta)
+    if not etrangers:
+        return
+    noms = ", ".join(etrangers)
+    if elaguer:
+        warn(_("provision_prune_hotes", hosts=noms))
+        return
+    logger.warning("state holds hosts absent from meta.yml: %s", noms)
+    error(_("hotes_hors_contrat", hosts=noms, repo=repo_meta.id))
+    info(_("hotes_hors_contrat_geste", geste=geste))
+    raise typer.Exit(ExitCode.HOTES_HORS_CONTRAT)
 
 
 def _cibles_terraform(
