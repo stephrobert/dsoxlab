@@ -24,6 +24,10 @@ from .schema_version import DEFAULT_SCHEMA_VERSION, read_schema_version
 #: sobre : le message complet de l'auteur, sa première ligne, ou le seul verdict.
 FEEDBACK_POLICIES: tuple[str, ...] = ("full", "first-line", "verdict")
 
+#: Les deux états de publication d'un lab. ``published`` est le défaut : un
+#: catalogue écrit avant l'apparition du champ ne change pas.
+LAB_STATUSES: tuple[str, ...] = ("published", "draft")
+
 
 @dataclass(frozen=True)
 class CriterionDecl:
@@ -355,6 +359,16 @@ class LabDefinition:
     ``validate-structure`` la signale ; l'exécution, elle, applique le défaut.
     Voir :attr:`feedback_policy`."""
 
+    status: str = "published"
+    """L'état de publication déclaré par ``status:``, tel quel.
+
+    ``published`` par défaut. ``draft`` retire le lab de ce qu'un apprenant
+    parcourt (``list-labs``, ``next``, ``course``, ``progress``) et de ce qui
+    quitte la machine (``export``, ``push``), sans l'empêcher d'être joué par
+    son identifiant. Une valeur hors de :data:`LAB_STATUSES` est conservée pour
+    que ``validate-structure`` la signale, et se comporte comme le défaut,
+    exactement comme ``feedback``. Voir :attr:`is_draft`."""
+
     bloc: int = 0               # bloc number 1-8; 0 = unassigned
     bloc_order: int = 0         # position within the bloc; 0 = unassigned
     bloc_name: str = ""         # nom lisible du bloc (section meta.yml), ex. "Fondamentaux (l1)"
@@ -377,6 +391,26 @@ class LabDefinition:
         ailleurs.
         """
         return self.lab_type != "validation"
+
+    @property
+    def is_draft(self) -> bool:
+        """Ce lab est-il un brouillon, donc hors du parcours de l'apprenant ?
+
+        Seule la valeur exacte ``draft`` compte : une valeur inconnue suit le
+        défaut (``published``) et ``validate-structure`` la signale.
+        """
+        return self.status == "draft"
+
+    @property
+    def is_offered(self) -> bool:
+        """Ce lab entre-t-il dans le parcours d'un apprenant ?
+
+        Oui s'il mesure quelqu'un (:attr:`is_exercise`) et s'il est publié
+        (pas :attr:`is_draft`). C'est la question que posent ``next``,
+        ``progress`` et ``start`` : un lab ``validation`` ne s'y achève jamais,
+        un brouillon n'y est pas encore.
+        """
+        return self.is_exercise and not self.is_draft
 
     @property
     def feedback_policy(self) -> str:
@@ -478,6 +512,9 @@ class LabDefinition:
             ),
             criteria=_lire_criteres(data, lab_yaml, lang),
             feedback=None if data.get("feedback") is None else str(data["feedback"]),
+            status=(
+                "published" if data.get("status") is None else str(data["status"])
+            ),
             bloc=as_int(data.get("bloc"), 0, "bloc", lab_yaml),
             bloc_order=as_int(data.get("bloc_order"), 0, "bloc_order", lab_yaml),
         )

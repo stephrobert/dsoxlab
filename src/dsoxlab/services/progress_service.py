@@ -242,6 +242,10 @@ def next_pending_lab(
         # premier, puisqu'il ne peut jamais être « validé ».
         if not lab.is_exercise:
             continue
+        # Un brouillon n'est pas encore proposé : `start` comme `next` passent
+        # par ici, et ni l'un ni l'autre ne doit l'offrir à un apprenant.
+        if lab.is_draft:
+            continue
         if lab.id not in scores:
             return lab
     return None

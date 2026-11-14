@@ -71,6 +71,9 @@ def lab_dict(
         "bloc_order": lab.bloc_order or None,
         "level": lab.level,
         "type": lab.lab_type,
+        # `published` ou `draft` (0.9.3). Tel que déclaré : une valeur inconnue
+        # passe, comme `type`, et `validate-structure` la signale.
+        "status": lab.status,
         # Le seuil de réussite d'un examen blanc, en pourcentage du barème.
         # `or None` comme les autres champs facultatifs : un lab ordinaire n'en
         # déclare pas, et 0 se lirait comme « réussi d'office ».

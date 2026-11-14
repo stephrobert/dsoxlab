@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from ..models.lab import FEEDBACK_POLICIES, LabDefinition
+from ..models.lab import FEEDBACK_POLICIES, LAB_STATUSES, LabDefinition
 
 #: Les trois premières formes supposent un apprenant qui fait ; ``validation``
 #: non — c'est une suite d'assertions qui défend un guide publié. Étendre
@@ -292,6 +292,17 @@ def validate_metadata(lab: LabDefinition) -> MetadataReport:
                     "value": lab.lab_type,
                     "expected": ", ".join(sorted(_VALID_LAB_TYPES)),
                 },
+            )
+        )
+    # Une valeur inconnue de `status` se comporte comme `published` : le
+    # parseur reste tolérant (garantie de v1), et c'est ici qu'on la dit.
+    # Une faute de frappe sur `draft` publierait sinon un brouillon en silence.
+    if lab.status not in LAB_STATUSES:
+        report.issues.append(
+            MetadataIssue(
+                "status",
+                "metadata_lab_type_invalid",
+                {"value": lab.status, "expected": ", ".join(LAB_STATUSES)},
             )
         )
     # Le seuil est un POURCENTAGE du barème. Hors de 1..100, il ne veut rien

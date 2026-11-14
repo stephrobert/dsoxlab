@@ -54,6 +54,7 @@ from ._commun import (
     LabHomeOption,
     _catalogue,
     _complete_lab_id,
+    _dire_si_brouillon,
     _lab,
     _lang,
     _root,
@@ -144,6 +145,7 @@ def list_labs(
     long: Annotated[bool, typer.Option("--long", help=_("opt_labs_long"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
     tout: Annotated[bool, typer.Option("--all", "-a", help=_("opt_list_labs_all"))] = False,
+    brouillons: Annotated[bool, typer.Option("--drafts", help=_("opt_list_labs_drafts"))] = False,
 ) -> None:
     root = _root(lab_home)
     ctx = read_context(root)
@@ -156,6 +158,9 @@ def list_labs(
         info(_("context_active", label=ctx.label()))
 
     catalogue = _catalogue(root, _lang(root), quiet=as_json)
+    if not brouillons:
+        # Un brouillon n'est montré qu'à qui le demande : son auteur.
+        catalogue = [lab for lab in catalogue if not lab.is_draft]
     filtres = _Filtres(section, level, lab_type, bloc)
     labs = filtres.appliquer(catalogue, ctx if avec_contexte else None)
     if not labs and avec_contexte and not as_json:
@@ -242,6 +247,7 @@ def show(
         })
         return
 
+    _dire_si_brouillon(lab)
     print_lab_detail(lab, status=status)
 
 

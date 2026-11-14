@@ -37,6 +37,17 @@ STRINGS: dict[str, str] = {
         "Filter by section: the `section` field of each lab.yaml, or "
         "`repo.category` from meta.yml when the lab declares none",
     "opt_list_labs_all": "Ignore the active context (dsoxlab use) for this listing",
+    "opt_list_labs_drafts": "Also list the labs declared status: draft, marked as such",
+    "opt_course_drafts": "Show the course of a lab declared status: draft",
+    "opt_catalog_list_drafts": "Also list the catalogues the manifest marks draft",
+    "lab_brouillon_info":
+        "{lab_id} is a draft (status: draft): it is hidden from list-labs, next "
+        "and progress, and its attempts are neither exported nor pushed.",
+    "lab_brouillon_marque": "draft",
+    "catalog_marque_brouillon": "(draft)",
+    "course_brouillon":
+        "{lab_id} is a draft (status: draft): its course is not published yet. "
+        "Its author reads it with dsoxlab course {lab_id} --drafts",
     "list_labs_vide_par_contexte":
         "No lab matches both the active context ({label}) and your filters, "
         "while {count} lab(s) match without the context.\n"
@@ -290,6 +301,9 @@ STRINGS: dict[str, str] = {
     "preuve_lab_validation":
         "{lab_id} defends a published guide and grades nobody: it produces no "
         "proof of practice.",
+    "preuve_lab_brouillon":
+        "{lab_id} is a draft (status: draft): it is not published, so its "
+        "attempts produce no proof.",
     "export_fichier_existe":
         "{path} already exists.",
     "export_fichier_existe_suite":
@@ -821,6 +835,8 @@ Each lab declares:
     [dim]--bloc    / -b[/dim]       Filter by bloc number.
     [dim]--all     / -a[/dim]       Ignore the active context. Filters add up with the
                        context; an empty result caused by it says so.
+    [dim]--drafts[/dim]             Also list the labs declared [bold]status: draft[/bold],
+                       marked as such. Hidden otherwise.
     [dim]--json[/dim]               The catalog as a machine document.
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
@@ -835,11 +851,14 @@ Each lab declares:
                        [dim]<id>[/dim] is optional: without it, the lab [bold]next[/bold] suggests.
 
   [cyan]run <id>[/cyan]             Start the lab environment (a shell, or a provisioned vm).
+                       A draft lab runs too, named by its id, with a line
+                       saying it is a draft. Same for check, submit and show.
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
                        declares them (course.yaml), otherwise scenario + README.
     [dim]--section / -s[/dim]       Section to display: number or id.
     [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
+    [dim]--drafts[/dim]             Show the course of a draft lab. Refused otherwise.
     [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
@@ -873,6 +892,7 @@ Each lab declares:
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]progress[/cyan]             Bloc-by-bloc progression summary (labs done, score, challenge, capstone).
+                       Draft labs are not counted, here nor in next.
     [dim]--json[/dim]               The same progression, as a document.
 
   [cyan]next[/cyan]                 Recommend the next lab to complete in the active context.
@@ -903,6 +923,7 @@ Each lab declares:
                        never overwritten: the account may hold attempts played on
                        another machine, and they are kept.
     [dim]--dry-run[/dim]            Say what would be sent and stop there.
+                       Attempts on a draft lab are never sent, nor exported.
 
   [cyan]logout[/cyan]               Forget the local session for this portal.
   [cyan]reset <id>[/cyan]           Clean + restart the lab from scratch
@@ -943,6 +964,8 @@ Each lab declares:
     [dim]--runtime <type>[/dim]     [bold]shell[/bold] (local workshop) or [bold]vm[/bold] (dedicated machine).
 
   [cyan]catalog list[/cyan]         Known catalogues, and the ones installed.
+    [dim]--drafts[/dim]             Also list the catalogues the manifest marks draft.
+                       Hidden otherwise; catalog add <url> still installs them.
     [dim]--json[/dim]               Machine document instead of tables.
   [cyan]catalog add <id|url>[/cyan] Installs a catalogue and makes it active. The id comes
                        from the packaged manifest; any git URL is accepted too,
@@ -1740,6 +1763,7 @@ silent.
     "field_skills":     "[bold]Skills:[/bold]",
     "field_doc":        "[bold]Doc:[/bold]",
     "field_transfer_of": "[bold]Transfer variant of:[/bold]",
+    "field_publication": "[bold]Publication:[/bold]",
     "field_track":      "[bold]Track:[/bold]",
     "field_certifs":    "[bold]Certifs:[/bold]",
     "field_type":       "[bold]Type:[/bold]",

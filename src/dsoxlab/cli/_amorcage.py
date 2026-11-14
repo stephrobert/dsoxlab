@@ -111,7 +111,8 @@ def _accueil() -> None:
         actif = None
     try:
         connus = [
-            (c.id, c.description(get_lang()), c.depot) for c in catalog.lire_manifeste()
+            (c.id, c.description(get_lang()), c.depot)
+            for c in catalog.proposes(catalog.lire_manifeste())
         ]
     except Exception:  # noqa: BLE001
         connus = []

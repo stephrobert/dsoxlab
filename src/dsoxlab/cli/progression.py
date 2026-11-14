@@ -70,6 +70,7 @@ from ._commun import (
     _catalogue,
     _complete_lab_id,
     _confirmer,
+    _dire_si_brouillon,
     _ensure_services,
     _interrompu,
     _lab_a_jouer,
@@ -98,6 +99,7 @@ def check(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
+    _dire_si_brouillon(lab, quiet=as_json)
     try:
         result, score, max_score = _run_check(root, lab, target, quiet=as_json)
     except Interrupted as exc:
@@ -269,6 +271,7 @@ def submit(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
+    _dire_si_brouillon(lab)
     try:
         result, score, max_score = _run_check(root, lab, target)
     except Interrupted as exc:
@@ -588,7 +591,11 @@ def progress(
     # compter dans une progression fabrique un dénominateur que rien ne peut
     # atteindre. `next` l'écartait déjà ; le contrat l'annonçait pour toute la
     # progression, et c'est ici que la promesse manquait.
-    labs = [lab for lab in labs if lab.is_exercise]
+    #
+    # Un brouillon non plus (`is_offered`, 0.9.3) : il n'est pas encore proposé
+    # à l'apprenant, et le compter fabriquerait un dénominateur qu'il ne voit
+    # pas dans `list-labs`.
+    labs = [lab for lab in labs if lab.is_offered]
     if effective_section:
         labs = [lab for lab in labs if lab.section == effective_section]
     if effective_level:
@@ -646,7 +653,8 @@ def next_lab(
     #
     # Le défaut se voyait en jouant le parcours : `catalog add` affiche
     # « dsoxlab next » parmi les deux gestes suivants, et `next` sortait en 1.
-    labs = _catalogue(root, lang, quiet=as_json)
+    # Un brouillon n'est l'étape suivante de personne, ni un lab « restant ».
+    labs = [lab for lab in _catalogue(root, lang, quiet=as_json) if not lab.is_draft]
     if ctx.section:
         labs = [lab for lab in labs if lab.section == ctx.section]
     if ctx.level:

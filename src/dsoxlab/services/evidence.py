@@ -93,7 +93,9 @@ def construire_document(
 
     Lève :class:`PreuveIntrouvable` quand ``lab_id`` n'a aucun résultat, ou
     quand ce lab est de type ``validation`` : celui-là défend un guide et ne note
-    personne, sa place n'est pas dans les preuves de pratique de quelqu'un.
+    personne, sa place n'est pas dans les preuves de pratique de quelqu'un. Même
+    refus pour un lab ``status: draft`` : il n'est pas publié, donc il n'atteste
+    rien auprès d'un tiers.
     """
     lignes_brutes = get_all_results(root)
 
@@ -105,6 +107,8 @@ def construire_document(
         lab = labs.get(lab_id)
         if lab is not None and not lab.is_exercise:
             raise PreuveIntrouvable(lab_id, cle="preuve_lab_validation")
+        if lab is not None and lab.is_draft:
+            raise PreuveIntrouvable(lab_id, cle="preuve_lab_brouillon")
         # Les résultats arrivent du plus ancien au plus récent : la dernière
         # ligne est donc la dernière tentative. On ne prend pas la meilleure —
         # une preuve atteste ce qui s'est passé, pas ce qu'on préfère montrer.
@@ -113,9 +117,12 @@ def construire_document(
             raise PreuveIntrouvable(lab_id, cle="preuve_sans_tentative")
         lignes_brutes = [pour_ce_lab[-1]]
     else:
+        # Un brouillon ne quitte pas la machine : ni l'export, ni le `push`,
+        # qui construit son envoi ici. Ses tentatives restent dans la base.
         lignes_brutes = [
             row for row in lignes_brutes
-            if (lab := labs.get(row["lab_id"])) is None or lab.is_exercise
+            if (lab := labs.get(row["lab_id"])) is None
+            or (lab.is_exercise and not lab.is_draft)
         ]
 
     lignes = [

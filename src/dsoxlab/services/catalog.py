@@ -54,9 +54,20 @@ class CatalogueConnu:
     depot: str
     description_en: str = ""
     description_fr: str = ""
+    draft: bool = False
+    """``draft: true`` au manifeste : le catalogue n'est pas encore proposé.
+
+    ``catalog list`` et l'accueil ne le montrent pas (sauf ``--drafts``), mais
+    ``catalog add`` l'installe toujours, par son URL comme par son id : le
+    manifeste facilite la découverte, il ne restreint rien."""
 
     def description(self, lang: str) -> str:
         return self.description_fr if lang == "fr" else self.description_en
+
+
+def proposes(connus: list[CatalogueConnu]) -> list[CatalogueConnu]:
+    """Les entrées du manifeste qu'on propose à un apprenant : hors brouillons."""
+    return [connu for connu in connus if not connu.draft]
 
 
 @dataclass(frozen=True)
@@ -113,6 +124,9 @@ def lire_manifeste() -> list[CatalogueConnu]:
             depot=depot,
             description_en=str(entree.get("description_en") or ""),
             description_fr=str(entree.get("description_fr") or ""),
+            # `is True` : seul un booléen vrai retire une entrée. Une chaîne
+            # « false » ne doit pas cacher un catalogue publié.
+            draft=entree.get("draft") is True,
         ))
     return connus
 

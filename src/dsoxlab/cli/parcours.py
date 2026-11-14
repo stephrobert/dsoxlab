@@ -69,6 +69,7 @@ from ._commun import (
     LabHomeOption,
     NoPagerOption,
     _complete_lab_id,
+    _dire_si_brouillon,
     _ensure_services,
     _interrompu,
     _lab_a_jouer,
@@ -139,6 +140,7 @@ def run(
     root = _root(lab_home)
     lang = _lang(root)
     lab = _lab_a_jouer(root, lab_id, lang)
+    _dire_si_brouillon(lab)
 
     info(_("lab_starting", lab_id=texte_affichable(lab.id),
            runtime=lab.runtime.type.value))
@@ -221,12 +223,20 @@ def course(
     next_section: Annotated[bool, typer.Option("--next", "-n", help=_("cmd_course_opt_next"))] = False,
     prev_section: Annotated[bool, typer.Option("--prev", "-p", help=_("cmd_course_opt_prev"))] = False,
     tout: Annotated[bool, typer.Option("--all", help=_("cmd_course_opt_all"))] = False,
+    brouillons: Annotated[bool, typer.Option("--drafts", help=_("opt_course_drafts"))] = False,
     no_pager: NoPagerOption = False,
     lab_home: LabHomeOption = None,
 ) -> None:
     root = _root(lab_home)
     lang = _lang(root)
     lab = _resolve_lab(root, lab_id, lang)
+    if lab.is_draft:
+        # Un cours de brouillon n'est pas prêt à être lu par un apprenant.
+        # L'auteur, lui, le relit en le demandant.
+        if not brouillons:
+            error(_("course_brouillon", lab_id=texte_affichable(lab.id)))
+            raise typer.Exit(1)
+        _dire_si_brouillon(lab)
 
 
     manifest = _manifeste_du_cours(lab, lang, tout=tout)
