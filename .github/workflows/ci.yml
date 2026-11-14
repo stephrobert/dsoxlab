@@ -497,6 +497,11 @@ jobs:
         run: uv run pre-commit run --all-files --show-diff-on-failure --color always
 
       - name: Run every hook (push stage)
+        # The catalogues hook counts labs on the published repositories through
+        # the GitHub API. The job token (contents: read) only lifts the anonymous
+        # rate limit; it reads public repositories and nothing else.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: uv run pre-commit run --all-files --hook-stage pre-push --show-diff-on-failure --color always
 
   # Short fuzzing regression over every input the engine does NOT produce
