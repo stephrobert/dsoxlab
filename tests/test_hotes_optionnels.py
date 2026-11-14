@@ -363,3 +363,12 @@ def test_run_ne_provisionne_rien_pour_un_lab_sans_optionnel(
     _cible(monkeypatch, ["cp.lab", "w1.lab"])
     parcours._monter_les_hotes_optionnels(depot, _Lab(), None)  # type: ignore[arg-type]
     assert montage == []
+
+
+@pytest.mark.parametrize("valeur", ['"cp2.lab"', "{name: cp2.lab}", "[cp2.lab]", "[{ram_mb: 512}]"])
+def test_optional_hosts_mal_forme_leve_dans_le_contrat(depot: Path, valeur: str) -> None:
+    # Le lab fautif est alors écarté avec un avertissement, sans trace Python.
+    meta = META.split("  optional_hosts:")[0] + f"  optional_hosts: {valeur}\n"
+    (depot / "meta.yml").write_text(meta, encoding="utf-8")
+    with pytest.raises((KeyError, ValueError)):
+        _meta(depot)
