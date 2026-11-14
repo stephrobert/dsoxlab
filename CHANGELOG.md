@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The engine documentation said two false things.** `lab.<lang>.yaml`
+  overrides the `label` of each criterion too, not only `title` and
+  `description`; and in `docs/machine-output`, `dsoxlab status` gives the state
+  of a lab, while host reachability is `dsoxlab infra status`.
+
 - **`scripts/gen-catalogues.py` refuses a manifest entry that publishes no lab,
   unless it is a draft.** Version 0.9.2 measured `certificats` at zero labs,
   left it out of the README table, and let `catalog list` offer it to learners
@@ -38,6 +43,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to mark it `draft: true` or remove it. A draft entry is measured, stays out of
   the table even with labs, and is never reported, nor as a forgotten public
   repository.
+
+### Changed
+
+- **`dsoxlab new catalog` links to the engine documentation instead of copying
+  it** (#201). The README it wrote carried a copy of the contract and of a
+  lab's lifecycle, frozen on the day of `new catalog`; an inventory on
+  2026-11-14 found 50 false files in 21 catalogues, most born from that
+  skeleton. The section is now "The engine, documented where it lives", with
+  links to `contract-v1`, `commands`, `learner` and `catalog-author`. The
+  generated CI workflow no longer says `validate-structure` only sees what
+  loaded, false since 0.1.97.
+- **`validate-structure` reports engine documentation that a catalogue copied
+  and that became false** (new family `stale_doc`, #201). It looks for known
+  false sentences in versioned Markdown outside `labs/` and `solution/`,
+  CHANGELOGs excluded: `list-labs` to run before `validate-structure` (false
+  since 0.1.97), `dsoxlab status` as the host reachability test (it is
+  `dsoxlab infra status`), `runtime.host` (never read), fixtures copied flat
+  (false since 0.1.37). Measured on the catalogues on 2026-11-14: 38 files in
+  18 catalogues, no false positive. `validate-structure --json` gains the
+  `stale_doc` count, an additive key.
 
 ### Documentation
 

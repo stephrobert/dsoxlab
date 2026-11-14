@@ -280,6 +280,10 @@ step with the code: adding a check without documenting it here fails the suite.
 | `bootstrap_absent` | `infra.bootstrap` names a playbook that is not on disk |
 | `bootstrap_hors_depot` | `infra.bootstrap` points outside the catalogue (absolute path, or `..`) |
 | `hote_en_double` | a host name appears twice across `infra.hosts` and `infra.optional_hosts`, which share one namespace |
+| `doc_perimee_list_labs_avant` | a Markdown outside `labs/` still says to run `list-labs` before `validate-structure`, or that the validator misses unloadable or missing labs: false since 0.1.97 |
+| `doc_perimee_status_joignabilite` | a Markdown outside `labs/` presents `dsoxlab status` as the reachability test of the hosts; that is `dsoxlab infra status` |
+| `doc_perimee_runtime_host` | a Markdown outside `labs/` says every `runtime.host` points to a host; that field was never read |
+| `doc_perimee_fixtures_a_plat` | a Markdown outside `labs/` says fixtures are copied flat; they keep their declared path since 0.1.37 |
 
 **What it checks that it used to miss:** a lab listed in `meta.yml` with nothing
 on disk, and a `lab.yaml` the engine cannot load. Both were silent until 0.1.97 —

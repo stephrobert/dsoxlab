@@ -33,14 +33,14 @@ from dsoxlab.services.scaffold_socle import version_du_moteur
 #: portaient déjà, à un titre près.
 SECTIONS_EN = [
     "What it is", "Requirements", "Install", "Your first lab",
-    "Keeping it up to date", "How it works", "The declarative contract",
-    "The lab lifecycle", "Runtimes", "The validation model",
+    "Keeping it up to date", "How it works", "The engine, documented where it lives",
+    "Runtimes", "The validation model",
     "Scoring, hints, progress", "Catalog", "Contributing", "License",
 ]
 SECTIONS_FR = [
     "Ce que c'est", "Prérequis", "Installation", "Votre premier lab",
-    "Garder à jour", "Comment ça marche", "Le contrat déclaratif",
-    "Le cycle de vie d'un lab", "Les runtimes", "Le modèle de validation",
+    "Garder à jour", "Comment ça marche", "Le moteur, documenté là où il vit",
+    "Les runtimes", "Le modèle de validation",
     "Score, indices, avancement", "Catalogue", "Contribuer", "Licence",
 ]
 
@@ -72,11 +72,12 @@ def test_l_invariant_des_douze_catalogues_est_produit(catalogue: Path) -> None:
     assert (catalogue / "labs").is_dir()
 
 
-def test_les_deux_readme_portent_les_quatorze_sections(catalogue: Path) -> None:
+def test_les_deux_readme_portent_les_treize_sections(catalogue: Path) -> None:
     """La structure de référence, dans les deux langues.
 
     C'est l'écart que ce socle ferme : quatre des douze catalogues n'avaient
-    aucun titre de niveau 2, donc zéro de ces quatorze sections.
+    aucun titre de niveau 2. Elles étaient quatorze ; le contrat et le cycle de
+    vie d'un lab, recopiés du moteur, sont devenus une section de liens (#201).
     """
     for nom, attendues in (("README.md", SECTIONS_EN),
                            ("README.fr.md", SECTIONS_FR)):
@@ -86,6 +87,23 @@ def test_les_deux_readme_portent_les_quatorze_sections(catalogue: Path) -> None:
             if not any(section.lower() in t.lower() for t in titres)
         ]
         assert not manquantes, f"{nom} : sections manquantes {manquantes}"
+
+
+def test_le_readme_renvoie_au_moteur_au_lieu_de_le_recopier(catalogue: Path) -> None:
+    """La doc du moteur recopiée dans un catalogue y dérive (#201).
+
+    L'inventaire du 2026-11-14 a trouvé 50 fichiers faux dans 21 catalogues,
+    la plupart nés de ce squelette : une copie du contrat et du cycle de vie
+    d'un lab, figée le jour du `new catalog`. Le squelette renvoie désormais à
+    la doc du moteur, qui suit ses versions.
+    """
+    for nom, suffixe in (("README.md", ".md"), ("README.fr.md", ".fr.md")):
+        texte = (catalogue / nom).read_text(encoding="utf-8")
+        for page in ("contract-v1", "commands", "learner", "catalog-author"):
+            assert f"dsoxlab/blob/main/docs/{page}{suffixe}" in texte, f"{nom} ne renvoie pas à {page}"
+        for recopie in ("The declarative contract", "The lab lifecycle", "Le contrat déclaratif",
+                        "Le cycle de vie d'un lab", "dsoxlab hint      <id>"):
+            assert recopie not in texte, f"{nom} recopie encore le moteur : {recopie!r}"
 
 
 def test_le_readme_ne_porte_aucun_tiret_cadratin(catalogue: Path) -> None:

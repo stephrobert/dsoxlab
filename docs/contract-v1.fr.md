@@ -692,8 +692,9 @@ soit : ce sont les tests qui prouvent.
 
 ### `lab.<langue>.yaml`
 
-Un `lab.fr.yaml` posé à côté de `lab.yaml` surcharge `title` et `description`
-pour cette langue, **et rien d'autre**. Toute autre clé y est ignorée, et
+Un `lab.fr.yaml` posé à côté de `lab.yaml` surcharge `title`, `description` et
+le `label` de chaque critère (apparié par `id`) pour cette langue, **et rien
+d'autre**. Toute autre clé y est ignorée, et
 `validate-structure` le dit. Un `id` y est toléré sans être lu : il nomme le
 lab pour qui ouvre le fichier.
 

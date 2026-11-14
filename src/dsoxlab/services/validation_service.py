@@ -56,6 +56,7 @@ FAMILLES = (
     "content",
     "doc_url",
     "metadata",
+    "stale_doc",
 )
 
 
@@ -305,6 +306,18 @@ def _anomalies_des_metadonnees(
     ]
 
 
+def _anomalies_de_la_doc_du_moteur(
+    root: Path, _labs: list[LabDefinition]
+) -> list[Anomalie]:
+    """Les phrases de la doc du moteur recopiées dans le catalogue, et fausses (#201)."""
+    from ..validators.doc_moteur import validate_doc_moteur
+
+    return [
+        Anomalie("stale_doc", a.key, a.params, chemin=a.path, rubrique="stale_doc_header")
+        for a in validate_doc_moteur(root).issues
+    ]
+
+
 #: La table, dans l'ordre où les familles sont jouées et affichées. C'est elle
 #: qui remplace les sept répétitions de l'ancienne fonction : ajouter une
 #: famille se fait ici, et les deux sorties la servent sans rien savoir d'elle.
@@ -316,6 +329,7 @@ TABLE: tuple[Famille, ...] = (
     Famille("structure", "structure_issues_header", _anomalies_de_structure),
     Famille("content", "content_issues_header", _anomalies_de_contenu),
     Famille("metadata", "metadata_issues_header", _anomalies_des_metadonnees),
+    Famille("stale_doc", "stale_doc_header", _anomalies_de_la_doc_du_moteur),
 )
 
 
