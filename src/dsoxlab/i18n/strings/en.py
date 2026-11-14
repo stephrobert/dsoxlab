@@ -1202,6 +1202,7 @@ silent.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "All labs are valid.",
     "labs_have_issues":       "Some labs have structure or metadata issues.",
+    "labs_have_issues_count": "{count} lab(s) out of {total} have structure or metadata issues.",
     "opt_check_urls":
         "Also check that every doc_url answers (hits the network).",
     "structure_issues_header": "\n[bold]Lab structure:[/bold]",

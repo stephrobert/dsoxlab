@@ -1220,6 +1220,7 @@ hors ligne, elle se tait.
     # ── validate-structure ────────────────────────────────────────────────────
     "all_labs_valid":         "Tous les labs sont valides.",
     "labs_have_issues":       "Des labs ont des problèmes de structure ou de métadonnées.",
+    "labs_have_issues_count": "{count} lab(s) sur {total} ont des problèmes de structure ou de métadonnées.",
     "opt_check_urls":
         "Vérifier aussi que chaque doc_url répond (sort sur le réseau).",
     "structure_issues_header": "\n[bold]Structure des labs :[/bold]",

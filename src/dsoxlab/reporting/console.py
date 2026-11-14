@@ -754,9 +754,17 @@ def print_validation(
     groupe par lab avec le détail des fichiers requis, ce qu'une liste à plat
     ne saurait pas dire.
     """
-    for famille in table:
-        anomalies = [a for a in rapport.anomalies if a.rubrique == famille.entete]
-        _rendre_famille(famille.entete, anomalies, root)
+    # Les rubriques de la table d'abord, dans son ordre, puis celles qu'elle ne
+    # porte pas. Les `doc_url` en défaut de `--check-urls` sont dans ce cas :
+    # elles faisaient échouer la commande sans qu'une seule ligne les nomme
+    # (issue #335), et la CI d'un catalogue ne lisait que la conclusion.
+    entetes = list(dict.fromkeys(
+        [famille.entete for famille in table]
+        + [a.rubrique for a in rapport.anomalies]
+    ))
+    for entete in entetes:
+        anomalies = [a for a in rapport.anomalies if a.rubrique == entete]
+        _rendre_famille(entete, anomalies, root)
 
     # Les guides injoignables, après les anomalies et sous leur propre titre :
     # ce n'est pas un défaut du lab, c'est un contrôle qui n'a pas regardé.
@@ -781,7 +789,9 @@ def _rendre_famille(entete: str, anomalies: list[Anomalie], root: Path) -> None:
         return
     console.print(_(entete))
     for anomalie in anomalies:
-        console.print(f"  [red]✘[/red] {_etiquette(anomalie, root)}")
+        # `soft_wrap` : la ligne n'est jamais repliée à la largeur du terminal.
+        # En CI, cette largeur vaut 80 colonnes et coupait l'URL en deux.
+        console.print(f"  [red]✘[/red] {_etiquette(anomalie, root)}", soft_wrap=True)
 
 
 def _etiquette(anomalie: Anomalie, root: Path) -> str:
@@ -799,6 +809,11 @@ def _etiquette(anomalie: Anomalie, root: Path) -> str:
         situation.append(texte_affichable(anomalie.champ))
     prefixe = " · ".join(situation)
     phrase = _(anomalie.cle, **anomalie.params)
+    # L'URL est le fait qu'on cherche devant « HTTP 404 » : la phrase ne la
+    # porte pas toujours, alors on l'ajoute.
+    url = str(anomalie.params.get("url") or "")
+    if url and url not in phrase:
+        phrase = f"{phrase} {texte_affichable(url)}"
     return f"{prefixe}: {phrase}" if prefixe else phrase
 
 
