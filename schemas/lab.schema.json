@@ -46,7 +46,7 @@
       "type": "string",
       "format": "uri",
       "pattern": "^https?://",
-      "description": "Online guide of the lab, opened by dsoxlab guide. http(s) only. validate-structure --check-urls also checks it answers."
+      "description": "Online guide of the lab in English, opened by dsoxlab guide. http(s) only. lab.<lang>.yaml may give the same guide in its language, which guide opens in that language. validate-structure --check-urls also checks it answers."
     },
 
     "section": {
@@ -130,7 +130,7 @@
             "minItems": 1,
             "maxItems": 5,
             "items": { "type": "string", "pattern": "^https?://" },
-            "description": "Optional. One to five URLs of site lessons where to review this criterion, in the format of doc_url (http or https, an #anchor is allowed). Only lab.yaml carries them. The engine never shows them in check (an exam gives nothing) and never exports them: the site reads them in the catalog to say, once a result is sent, which lessons to review. No network check."
+            "description": "Optional. One to five URLs of site lessons where to review this criterion, in the format of doc_url (http or https, an #anchor is allowed). lab.yaml carries the English URLs; lab.<lang>.yaml may give, per criterion id, those of the same lessons in its language. The engine never shows them in check (an exam gives nothing) and never exports them: the site reads them in the catalog to say, once a result is sent, which lessons to review. No network check."
           }
         }
       }

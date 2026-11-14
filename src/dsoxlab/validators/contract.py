@@ -315,16 +315,20 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
     "sections[].id", "sections[].title", "sections[].description", "sections[].labs",
 })
 
-#: Ce qu'un ``lab.<lang>.yaml`` peut porter. La surcharge ne vaut que pour
-#: ``title`` et ``description`` ; ``id`` est accepté parce qu'il nomme le lab
+#: Ce qu'un ``lab.<lang>.yaml`` peut porter. La surcharge vaut pour ``title``,
+#: ``description`` et ``doc_url`` ; ``id`` est accepté parce qu'il nomme le lab
 #: pour qui relit le fichier, et les 284 traductions des catalogues réels le
 #: portent déjà. Tout autre champ y serait ignoré, ce qui est exactement le
 #: défaut qu'on répare ailleurs.
 KNOWN_LAB_LANG_KEYS: frozenset[str] = frozenset({
     "id", "title", "description",
+    # 0.9.3 : la leçon jumelée existe dans chaque langue du site, à une URL qui
+    # ne se déduit pas de l'autre.
+    "doc_url",
     # 0.8.0 : les libellés des critères, appariés par `id` (comme les sections
-    # d'un `meta.<lang>.yml`). Rien d'autre d'un critère ne se traduit.
-    "criteria", "criteria[].id", "criteria[].label",
+    # d'un `meta.<lang>.yml`). 0.9.3 : leurs leçons aussi, pour la même raison
+    # que `doc_url`. Rien d'autre d'un critère ne se traduit.
+    "criteria", "criteria[].id", "criteria[].label", "criteria[].lessons",
 })
 
 #: Ce qu'un ``meta.<lang>.yml`` peut porter. ``sections[].id`` n'est pas une

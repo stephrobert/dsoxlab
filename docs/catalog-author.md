@@ -369,7 +369,7 @@ what a lab's playbooks must address) and one `lab_<role>` per entry of `roles`.
 
 | File | Overrides |
 | --- | --- |
-| `lab.fr.yaml` | `title` and `description` of that lab, and nothing else |
+| `lab.fr.yaml` | `title`, `description` and `doc_url` of that lab, the `label` and `lessons` of its criteria, and nothing else |
 | `meta.fr.yml` | `repo.title`, `repo.description`, `sections[].title` and `sections[].description`, matched **by `id`** |
 | `course.fr.yaml` | the section titles of the course |
 

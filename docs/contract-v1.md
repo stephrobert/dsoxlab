@@ -345,7 +345,7 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `level` | **yes** | string | — | Free-form, never validated against a list. |
 | `skills` | **yes** | list of strings | — | Must not be empty. |
 | `distros` | **yes** | list of strings | — | Must not be empty. |
-| `doc_url` | **yes** | string | — | `http(s)` only, and re-checked when displayed: see [the URL policy](./security.md). |
+| `doc_url` | **yes** | string | — | `http(s)` only, and re-checked when displayed: see [the URL policy](./security.md). The English lesson; `lab.<lang>.yaml` may give the same lesson in its language. |
 | `section` | no | string | `repo.category` | Declared, it is **always** kept — including when the value happens to name a technical domain. |
 | `description` | no | string | `""` | |
 | `track` | no | list of strings | `[]` | |
@@ -390,8 +390,8 @@ grouping several tests is *satisfied* only if all of them are, *unsatisfied* as
 soon as one is, *not evaluated* if one was blocked and none failed, and
 *skipped* otherwise (all skipped, or satisfied and skipped mixed). A declared
 criterion none of whose tests ran does not appear. Labels are matched by `id`
-in `lab.<lang>.yaml` (`criteria: [{id, label}]`), on the model of `title` and
-`description`.
+in `lab.<lang>.yaml` (`criteria: [{id, label, lessons}]`), on the model of
+`title` and `description`.
 
 `feedback` sets what `check` shows of a failed criterion, and what the export
 carries as `criteria[].observation`:
@@ -419,8 +419,9 @@ explicitly.
 
 **`criteria[].lessons`.** Each declared criterion may carry `lessons`, one to
 five URLs of lessons of the site where to review it, in the format of `doc_url`
-(`http` or `https`, an `#anchor` is allowed). Only `lab.yaml` carries them, since
-the site translates its own URLs. `validate-structure` checks the form, refuses
+(`http` or `https`, an `#anchor` is allowed). `lab.yaml` carries the English
+URLs, and `lab.<lang>.yaml` may give, per criterion `id`, the URLs of the same
+lessons in its language (0.9.3). `validate-structure` checks the form, refuses
 duplicates, an empty list and more than five, and makes no network request. The
 engine **never shows** them in `check` (an exam gives nothing) and **never
 exports** them: the site reads them in the catalog to say, once a result is
@@ -676,11 +677,18 @@ are what prove.
 
 ### `lab.<lang>.yaml`
 
-A `lab.fr.yaml` next to `lab.yaml` overrides `title`, `description` and the
-`label` of each criterion (matched by `id`) for that language, **and nothing
-else**. Any other key in it is ignored, and
+A `lab.fr.yaml` next to `lab.yaml` overrides `title`, `description`,
+`doc_url`, and the `label` and `lessons` of each criterion (matched by `id`) for
+that language, **and nothing else**. Any other key in it is ignored, and
 `validate-structure` says so. An `id` is tolerated there without being read: it
 names the lab for whoever opens the file.
+
+`lab.yaml` carries the English values, English being the tool's default
+language. A lesson exists in each language of the site at a URL that cannot be
+derived from the other, hence `doc_url` and `lessons` in the translation
+(0.9.3): `guide`, `show` and `list-labs --json` give the URL of the session's
+language. `validate-structure` checks the form of every URL a translation
+substitutes, and `--check-urls` queries it.
 
 ---
 

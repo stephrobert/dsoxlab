@@ -702,11 +702,15 @@ def test_des_lecons_mal_formees_sont_refusees(tmp_path: Path, lecons: str, cle: 
     assert cle in _issues_lecons(racine)
 
 
-def test_les_lecons_ne_se_traduisent_pas(tmp_path: Path) -> None:
+def test_les_lecons_se_traduisent_mais_pas_les_tests(tmp_path: Path) -> None:
+    """0.9.3 : une leçon existe dans chaque langue du site, à une URL qui ne se
+    déduit pas de l'autre, donc `lessons` se traduit. La liste des tests, elle,
+    ne dépend d'aucune langue et reste hors contrat dans `lab.fr.yaml`."""
     racine = _catalogue(
         tmp_path / "d", tests="def test_ok():\n    assert True\n",
         extra="criteria:\n  - {id: un, tests: [test_ok], lessons: [https://a.test/1]}\n",
-        lab_fr="criteria:\n  - {id: un, lessons: [https://a.test/1]}\n",
+        lab_fr="criteria:\n  - {id: un, tests: [test_ok], lessons: [https://a.test/fr/1]}\n",
     )
     chemins = " ".join(str(i.params) for i in validate_unknown_keys(racine).issues)
-    assert "criteria[].lessons" in chemins
+    assert "criteria[].lessons" not in chemins
+    assert "criteria[].tests" in chemins

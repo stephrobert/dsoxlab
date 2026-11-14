@@ -7,7 +7,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.3] - 2026-11-14
 
 ### Added
 
@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `catalog list --drafts` shows it, and `catalog add <url>` or `<id>` still
   installs it. `catalog list --json` carries `draft` for every known entry.
   `certificats` goes back to draft until it publishes a lab.
+
+- **`doc_url` and `criteria[].lessons` are translatable in `lab.<lang>.yaml`.**
+  A lesson exists in each language of the site at a URL that cannot be derived
+  from the other, and a lab had a single `doc_url`: `guide` sent an English
+  learner to the French page. `lab.yaml` now carries the English URLs, as it
+  carries the English `title`, and `lab.fr.yaml` may give the French ones;
+  `guide`, `show` and `list-labs --json` give the URL of the session's language,
+  and a translation without them inherits the English ones. `validate-structure`
+  checks the form of every URL a translation substitutes, without counting an
+  inherited one twice, and `--check-urls` queries translated `doc_url`s too. No
+  existing catalog changes: a `lab.yaml` that keeps its French URL behaves as
+  before.
 
 ### Fixed
 

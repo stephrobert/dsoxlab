@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -75,12 +76,38 @@ def _charger_document(lab_yaml: Path) -> dict[str, Any]:
     return data
 
 
-def _libelles_traduits(lab_yaml: Path, lang: str) -> dict[str, str]:
-    """Les libellés de critères de `lab.<lang>.yaml`, appariés par ``id``.
+def langues_traduites(lab_yaml: Path) -> tuple[str, ...]:
+    """Les langues pour lesquelles un ``lab.<lang>.yaml`` existe, ``en`` exclu.
+
+    ``lab.yaml`` porte l'anglais : un ``lab.en.yaml`` ne serait jamais lu.
+    Sert à `validate-structure`, qui doit contrôler aussi les URL qu'une
+    traduction substitue, et pas seulement celles du fichier anglais.
+    """
+    langues = {
+        p.name[len("lab."):-len(".yaml")]
+        for p in lab_yaml.parent.glob("lab.*.yaml")
+        if re.fullmatch(r"lab\.[a-z]{2}\.yaml", p.name)
+    }
+    langues.discard("en")
+    return tuple(sorted(langues))
+
+
+@dataclass(frozen=True)
+class _CritereTraduit:
+    """Ce qu'un ``lab.<lang>.yaml`` surcharge d'un critère : libellé et leçons."""
+
+    label: str | None = None
+    lessons: list[Any] | None = None
+
+
+def _criteres_traduits(lab_yaml: Path, lang: str) -> dict[str, _CritereTraduit]:
+    """Les libellés et les leçons de critères de `lab.<lang>.yaml`, appariés par ``id``.
 
     Même patron que les champs traduits : un fichier absent ou illisible est
-    avalé, le libellé anglais reste. Seuls ``id`` (clé d'appariement) et
-    ``label`` sont lus ; tout autre champ d'une data est ignoré.
+    avalé, l'anglais reste. Seuls ``id`` (clé d'appariement), ``label`` et
+    ``lessons`` sont lus ; tout autre champ d'une data est ignoré. Les leçons
+    se traduisent parce qu'une leçon du site existe dans chaque langue, à une
+    URL qui ne se déduit pas de l'autre.
     """
     if not lang or lang == "en":
         return {}
@@ -92,11 +119,15 @@ def _libelles_traduits(lab_yaml: Path, lang: str) -> dict[str, str]:
         return {}
     if not isinstance(data, dict) or not isinstance(data.get("criteria"), list):
         return {}
-    libelles: dict[str, str] = {}
+    traduits: dict[str, _CritereTraduit] = {}
     for c in data["criteria"]:
-        if isinstance(c, dict) and "id" in c and c.get("label"):
-            libelles[str(c["id"])] = str(c["label"])
-    return libelles
+        if not isinstance(c, dict) or "id" not in c:
+            continue
+        label = str(c["label"]) if c.get("label") else None
+        lessons = c["lessons"] if isinstance(c.get("lessons"), list) else None
+        if label is not None or lessons is not None:
+            traduits[str(c["id"])] = _CritereTraduit(label=label, lessons=lessons)
+    return traduits
 
 
 def _lire_validation(data: dict[str, Any], lab_yaml: Path) -> ValidationConfig:
@@ -120,19 +151,21 @@ def _lire_criteres(
 ) -> tuple[CriterionDecl, ...]:
     """Le bloc `criteria:`. Les anomalies de FOND (id invalide, test inconnu) se
     disent à l'auteur par `validate-structure`, jamais en écartant le lab."""
-    libelles = _libelles_traduits(lab_yaml, lang)
+    traduits = _criteres_traduits(lab_yaml, lang)
     criteres: list[CriterionDecl] = []
     for idx, c in enumerate(as_mapping_list(data.get("criteria"), "criteria", lab_yaml)):
         if "id" not in c:
             raise LabYamlError(f"{lab_yaml}: criteria[{idx}] doit contenir 'id'.")
         identifiant = str(c["id"])
+        traduit = traduits.get(identifiant, _CritereTraduit())
+        lecons = traduit.lessons if traduit.lessons is not None else c.get("lessons")
         criteres.append(CriterionDecl(
             id=identifiant,
             tests=tuple(as_str_list(c.get("tests"), f"criteria[{idx}].tests", lab_yaml)),
-            label=libelles.get(identifiant, str(c.get("label") or "")),
+            label=traduit.label if traduit.label is not None else str(c.get("label") or ""),
             lessons=(
-                tuple(as_str_list(c["lessons"], f"criteria[{idx}].lessons", lab_yaml))
-                if "lessons" in c else None
+                tuple(as_str_list(lecons, f"criteria[{idx}].lessons", lab_yaml))
+                if "lessons" in c or traduit.lessons is not None else None
             ),
         ))
     return tuple(criteres)
@@ -373,8 +406,11 @@ class LabDefinition:
     bloc_order: int = 0         # position within the bloc; 0 = unassigned
     bloc_name: str = ""         # nom lisible du bloc (section meta.yml), ex. "Fondamentaux (l1)"
 
-    # Translatable fields — overridden by lab.<lang>.yaml when available
-    _TRANSLATABLE = ("title", "description")
+    # Champs traduisibles, surchargés par lab.<lang>.yaml quand il existe.
+    # `doc_url` en fait partie (0.9.3) : la leçon jumelée existe dans chaque
+    # langue du site, à une URL qui ne se déduit pas de l'autre. `lab.yaml`
+    # porte l'URL anglaise, `lab.fr.yaml` la française, comme pour `title`.
+    _TRANSLATABLE = ("title", "description", "doc_url")
 
     @property
     def is_exercise(self) -> bool:
@@ -442,8 +478,8 @@ class LabDefinition:
         """Load a LabDefinition from a lab.yaml file.
 
         If ``lang`` != "en" and a ``lab.<lang>.yaml`` file exists in the same
-        directory, translatable fields (title, description) are overridden by
-        that file.
+        directory, translatable fields (title, description, doc_url, and the
+        label and lessons of each criterion) are overridden by that file.
 
         Raises:
             LabYamlError: le fichier sort du contrat. Le message n'est
