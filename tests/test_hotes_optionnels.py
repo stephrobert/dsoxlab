@@ -372,3 +372,122 @@ def test_optional_hosts_mal_forme_leve_dans_le_contrat(depot: Path, valeur: str)
     (depot / "meta.yml").write_text(meta, encoding="utf-8")
     with pytest.raises((KeyError, ValueError)):
         _meta(depot)
+
+
+# ── start et reset ─────────────────────────────────────────────────────────
+
+
+def _lab_vm(identifiant: str, roles: dict[str, str]) -> str:
+    lignes = "".join(f"        {role}: {hote}\n" for role, hote in roles.items())
+    return (
+        f"id: {identifiant}\ntitle: {identifiant}\nlevel: l1\nskills: [demo]\n"
+        "distros: [any]\ndoc_url: https://example.test/d/\n"
+        "runtime:\n  type: vm\n  targets:\n    - name: cible\n      host: cp.lab\n"
+        f"      roles:\n{lignes}  default: cible\n"
+    )
+
+
+@pytest.fixture
+def labs_vm(depot: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Deux labs vm : l'un cite l'optionnel lb.lab par un rôle, l'autre non."""
+    for nom, roles in (
+        ("avec-lb", {"lb": "lb.lab"}),
+        ("sans-optionnel", {"worker": "w1.lab"}),
+    ):
+        dossier = depot / "labs" / "demo" / nom
+        (dossier / "challenge" / "tests").mkdir(parents=True)
+        (dossier / "lab.yaml").write_text(_lab_vm(nom, roles), encoding="utf-8")
+        for playbook in ("setup.yaml", "cleanup.yaml"):
+            (dossier / playbook).write_text("- hosts: lab_target\n  tasks: []\n",
+                                            encoding="utf-8")
+    monkeypatch.delenv("DSOXLAB_TARGET", raising=False)
+    return depot
+
+
+@pytest.fixture
+def espion_start(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Ce que `start` passe à `provisionner`, sans rien monter ni jouer."""
+    from dsoxlab.cli import demarrage, infrastructure
+    from dsoxlab.services import doctor
+
+    vu: dict[str, Any] = {"host": "jamais appelé"}
+
+    def _faux_provision(root: Path, **kw: Any) -> None:
+        vu["host"] = kw.get("host")
+
+    monkeypatch.setattr(infrastructure, "provisionner", _faux_provision)
+    monkeypatch.setattr(demarrage, "provisionner", _faux_provision, raising=False)
+    monkeypatch.setattr(parcours, "run", lambda **kw: None)
+    monkeypatch.setattr(
+        doctor, "collect_checks",
+        lambda root, meta, hosts=None: doctor.DoctorReport(
+            required=[doctor._check("python", True, "3.13")]
+        ),
+    )
+    return vu
+
+
+def test_start_passe_l_optionnel_cite_par_un_role_a_provisionner(
+    labs_vm: Path, espion_start: dict[str, Any]
+) -> None:
+    resultat = runner.invoke(app, ["start", "avec-lb", "--lab-home", str(labs_vm)])
+    assert resultat.exit_code == 0, resultat.output
+    assert espion_start["host"] == ["cp.lab", "lb.lab"]
+
+
+def test_start_n_ajoute_aucun_optionnel_a_un_lab_qui_n_en_cite_pas(
+    labs_vm: Path, espion_start: dict[str, Any]
+) -> None:
+    resultat = runner.invoke(
+        app, ["start", "sans-optionnel", "--lab-home", str(labs_vm)]
+    )
+    assert resultat.exit_code == 0, resultat.output
+    assert espion_start["host"] == ["cp.lab", "w1.lab"]
+
+
+def test_reset_ne_retire_jamais_un_hote_optionnel_monte(
+    labs_vm: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`reset` rejoue cleanup puis setup ; il ne touche pas à Terraform.
+
+    On simule la frontière la plus basse, le playbook, et on observe tout ce
+    par où un retrait passerait : le retrait dédié, une destruction, un apply,
+    et des tfvars écrits avec `retires=`.
+    """
+    from dsoxlab.infra import ansible
+    from dsoxlab.infra.ansible import PlaybookResult
+    from dsoxlab.runtimes.vm import VmRuntime
+
+    _poser_le_state(tmp_path, ["cp.lab", "w1.lab", "lb.lab"])
+    appels: list[str] = []
+    playbooks: list[str] = []
+
+    def _noter(nom: str):  # type: ignore[no-untyped-def]
+        return lambda *a, **k: appels.append(nom)
+
+    for nom in ("retirer_hotes_optionnels", "destroy", "apply"):
+        monkeypatch.setattr(terraform, nom, _noter(nom))
+    ecrire = terraform.write_tfvars
+
+    def _tfvars(meta: Any, **kw: Any) -> Path:
+        if kw.get("retires"):
+            appels.append(f"tfvars retires={kw['retires']}")
+        return ecrire(meta, **kw)
+
+    monkeypatch.setattr(terraform, "write_tfvars", _tfvars)
+    monkeypatch.setattr(ansible, "is_available", lambda: True)
+    monkeypatch.setattr(
+        ansible, "run_playbook",
+        lambda playbook_path, **k: playbooks.append(Path(playbook_path).name)
+        or PlaybookResult(rc=0, status="successful"),
+    )
+    monkeypatch.setattr(VmRuntime, "_inventory", lambda self, meta, target: {})
+
+    resultat = runner.invoke(
+        app, ["reset", "avec-lb", "--yes", "--lab-home", str(labs_vm)]
+    )
+    assert resultat.exit_code == 0, resultat.output
+    # Le témoin que le chemin réel a été parcouru : sans lui, un reset qui
+    # sortirait tôt passerait ce test sans rien prouver.
+    assert playbooks == ["cleanup.yaml", "setup.yaml"]
+    assert appels == []
