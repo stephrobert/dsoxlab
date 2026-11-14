@@ -143,9 +143,14 @@ resource "incus_instance" "host" {
     )
     # Réservation DHCP statique côté Incus : la NIC reçoit toujours la
     # même IP au sein du bridge.
-    "user.lab.ip"   = each.value.ip
-    "user.lab.role" = each.value.role
-  }, lookup(var.provenance_config, each.value.name, {}))
+    "user.lab.ip" = each.value.ip
+    },
+    # Le rôle n'est posé que s'il a une valeur : Incus efface une clé de
+    # config vide, et le provider échoue alors sur « element "user.lab.role"
+    # has vanished », en laissant l'instance marquée à recréer (mesuré sur
+    # Incus 7.2 le 2026-11-14, hôte sans `role`).
+    each.value.role != "" ? { "user.lab.role" = each.value.role } : {},
+  lookup(var.provenance_config, each.value.name, {}))
 
   # NIC reliée au bridge lab + IP statique. Le ``hwaddr`` fixe la MAC,
   # ce qui permet à Incus de réserver l'IP via dnsmasq.

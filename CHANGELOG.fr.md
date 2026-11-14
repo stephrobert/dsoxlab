@@ -55,6 +55,17 @@ Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
   du contexte et des filtres le dit, avec le nombre de labs qui satisfont les
   filtres sans le contexte.
 
+- **Incus : un hôte sans `role` ne fait plus échouer chaque `provision`.** Le
+  template posait `user.lab.role` même vide ; Incus efface une clé de config
+  vide, si bien que le provider échouait sur « Provider produced inconsistent
+  result after apply: element "user.lab.role" has vanished » et laissait
+  l'instance marquée à recréer, détruite et refaite à chaque `provision`
+  suivant. La clé n'est plus posée que si le rôle a une valeur. `role` est
+  optionnel dans le contrat : tout catalogue, et tout hôte optionnel de la
+  0.9.0, déclaré sans lui était touché sur Incus ; aucun des catalogues
+  mesurés le 2026-11-14 n'avait un tel hôte. Trouvé par le premier essai réel
+  des hôtes optionnels sur Incus.
+
 ### Modifié
 
 - **`services/doctor.py` est découpé en un paquet de familles de contrôles**

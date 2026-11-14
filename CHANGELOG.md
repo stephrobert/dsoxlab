@@ -54,6 +54,16 @@ Open bugs settled, the most serious one being a silent loss of VMs.
   context adding up with the filters says so, with the number of labs that
   match without the context.
 
+- **Incus: a host without `role` no longer fails every `provision`.** The
+  template set `user.lab.role` even when empty; Incus drops an empty config
+  key, so the provider failed on "Provider produced inconsistent result after
+  apply: element "user.lab.role" has vanished" and left the instance tainted,
+  recreated on every following `provision`. The key is now set only when the
+  role has a value. `role` is optional in the contract, so any catalogue, and
+  any optional host of 0.9.0, declared without it was affected on Incus; none
+  of the catalogues measured on 2026-11-14 had such a host. Found by the first
+  real Incus run of the optional hosts.
+
 ### Changed
 
 - **`services/doctor.py` is split into a package of check families** (#199):
