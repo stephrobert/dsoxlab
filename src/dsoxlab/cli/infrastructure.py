@@ -465,10 +465,9 @@ def refuser_les_hotes_hors_contrat(
     nommé par ``repo.id``. Celui qui déclare le moins d'hôtes les détruisait
     en silence au premier ``provision``, VM en cours de lab comprise.
 
-    Le refus vaut **même avec ``--host``**, qui ne les détruirait pas : l'écart
-    est là, et le ``provision`` suivant sans ``--host`` les emporterait. Mieux
-    vaut le dire au premier contact, avant d'avoir monté quoi que ce soit.
-    ``--prune`` assume la destruction, en nommant ce qui part.
+    Le refus vaut **même avec ``--host``** : le ``provision`` suivant sans
+    ``--host`` les emporterait. ``--prune`` assume la destruction, en nommant ce
+    qui part. Voir docs/decisions/0013-refuse-out-of-contract-hosts.md
     """
     from ..infra import terraform as tf
 

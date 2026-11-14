@@ -42,7 +42,7 @@ affiché faute d'avoir mesuré — c'est exactement le défaut du contrôle du p
 qui rendait « ok » quand virsh ne répondait pas. Un contrôle en ``unknown``
 n'entre pas dans :meth:`DoctorReport.failing` (il ne prouve aucune panne),
 mais son jeton dit à un programme comme à un humain que rien n'est prouvé
-dans l'autre sens non plus."""
+dans l'autre sens non plus. Voir docs/decisions/0011-three-outcomes-for-a-check.md"""
 
 
 class FixKind(StrEnum):

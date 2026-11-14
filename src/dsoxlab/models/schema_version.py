@@ -6,11 +6,10 @@ numéro de version, un champ qui change de sens ne peut être ni annoncé, ni
 détecté, ni refusé : il se manifeste par un lab qui disparaît du catalogue,
 sans message.
 
-**À ne pas confondre avec ``reporting/machine.py: SCHEMA``.** Celui-là versionne
-la sortie JSON, donc ce que dsoxlab **écrit** pour un programme tiers. Celui-ci
-versionne ce que dsoxlab **lit** d'un dépôt de labs. Deux contrats distincts,
-deux publics, deux rythmes d'évolution : ils ne doivent jamais être couplés, ni
-incrémentés ensemble par réflexe.
+**À ne pas confondre avec ``reporting/machine.py: SCHEMA``**, qui versionne ce
+que dsoxlab **écrit** ; celui-ci versionne ce qu'il **lit**. Deux contrats,
+jamais incrémentés ensemble. Voir
+docs/decisions/0007-json-output-contract-distinct-from-schema-version.md
 
 Règle d'évolution de la v1, telle que ``docs/contract-v1.md`` la publie :
 

@@ -25,6 +25,7 @@ class RuntimeManager:
         # ``vm`` est la cible. ``kvm`` et ``incus`` sont des alias
         # historiques tolérés ; ils sont traités comme ``vm`` (la
         # discrimination du provider se fait via meta.yml: infra.provider).
+        # Voir docs/decisions/0001-two-runtimes.md
         rt_type = lab.runtime.type
         if rt_type == RuntimeType.SHELL:
             return ShellRuntime()

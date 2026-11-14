@@ -11,6 +11,9 @@ one of them was discovered **the day it was violated**. That is why each comes
 with its incident: a principle without its bug gets argued about, a principle
 with its bug gets respected.
 
+This page says **what is true**. Why a durable choice was made over its
+alternatives lives in [the architecture decisions](./decisions/README.md).
+
 The third column is the part worth reading twice. It names the test that holds
 the rule — and where it says *not guarded yet*, that is an honest gap, not an
 oversight to hide.
