@@ -57,7 +57,7 @@ def _arbre(*chemins: str, tronque: bool = False) -> dict[str, Any]:
 ENTREE = {"id": "a", "depot": "https://github.com/proprio/cat-a", "description_en": "A", "description_fr": "A"}
 
 
-def test_le_manifeste_ne_porte_aucun_chiffre() -> None:
+def test_le_manifeste_ne_porte_plus_aucun_chiffre() -> None:
     donnees = yaml.safe_load((RACINE / "src/dsoxlab/templates/catalogues.yml").read_text(encoding="utf-8"))
     assert all("labs" not in c for c in donnees["catalogues"])
 
