@@ -139,8 +139,25 @@ def empreinte_enregistree(repo_meta: RepoMetadata) -> str:
     return valeur if isinstance(valeur, str) else ""
 
 
+def hotes_enregistres(repo_meta: RepoMetadata) -> set[str]:
+    """Les hôtes qui ont reçu le socle enregistré, ou un ensemble vide."""
+    try:
+        donnees = json.loads(_fichier_etat(repo_meta).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    hotes = donnees.get("hosts") if isinstance(donnees, dict) else None
+    return {h for h in hotes if isinstance(h, str)} if isinstance(hotes, list) else set()
+
+
 def enregistrer(repo_meta: RepoMetadata, empreinte: str, hosts: list[str]) -> None:
-    """Retient qu'un socle a été posé — appelé **après** un succès, jamais avant."""
+    """Retient qu'un socle a été posé — appelé **après** un succès, jamais avant.
+
+    Les hôtes s'AJOUTENT à ceux déjà enregistrés pour la même empreinte : un
+    ``provision --host`` ne joue le socle que sur les hôtes qu'il a montés, et
+    remplacer la liste ferait oublier ceux qui l'avaient déjà reçu.
+    """
+    if empreinte == empreinte_enregistree(repo_meta):
+        hosts = sorted(hotes_enregistres(repo_meta) | set(hosts))
     ecrire_atomiquement(
         _fichier_etat(repo_meta),
         json.dumps(
@@ -150,6 +167,32 @@ def enregistrer(repo_meta: RepoMetadata, empreinte: str, hosts: list[str]) -> No
         )
         + "\n",
     )
+
+
+def oublier_hotes(repo_meta: RepoMetadata, noms: list[str]) -> None:
+    """Retire ces hôtes de ceux qui ont reçu le socle : ils viennent d'être détruits.
+
+    Sans cela, un hôte recréé plus tard passerait pour servi et resterait une
+    machine nue (issue #365). Le marqueur des autres hôtes, eux toujours debout,
+    est gardé : leur socle n'a pas bougé.
+    """
+    empreinte = empreinte_enregistree(repo_meta)
+    if not empreinte:
+        return
+    restants = hotes_enregistres(repo_meta) - set(noms)
+    try:
+        ecrire_atomiquement(
+            _fichier_etat(repo_meta),
+            json.dumps(
+                {"digest": empreinte, "hosts": sorted(restants)},
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+        )
+    except OSError as souci:
+        # Au pire, le socle sera rejoué : il est idempotent.
+        logger.warning("could not update the bootstrap marker: %s", souci)
 
 
 def oublier(repo_meta: RepoMetadata) -> bool:
@@ -178,12 +221,19 @@ def oublier(repo_meta: RepoMetadata) -> bool:
     return True
 
 
-def a_jouer(repo_meta: RepoMetadata, *, force: bool = False) -> tuple[Path, str] | None:
+def a_jouer(
+    repo_meta: RepoMetadata, *, force: bool = False, hosts: list[str] | None = None
+) -> tuple[Path, str] | None:
     """Le playbook à jouer et son empreinte, ou ``None`` s'il n'y a rien à faire.
 
     Rend ``None`` dans deux cas qui n'ont rien à voir et que l'appelant distingue
     par son message : le catalogue ne déclare pas de socle, ou le socle déjà posé
     est à jour.
+
+    ``hosts`` sont les hôtes que le provisionnement vient de rendre prêts. Le
+    socle se rejoue dès que l'un d'eux ne l'a jamais reçu, même à empreinte
+    inchangée : c'est le cas d'un hôte optionnel monté pour un lab après le
+    catalogue (issue #365), qui serait sinon resté une machine nue.
 
     Lève :class:`BootstrapAbsent` quand le fichier déclaré n'existe pas.
     """
@@ -195,5 +245,7 @@ def a_jouer(repo_meta: RepoMetadata, *, force: bool = False) -> tuple[Path, str]
 
     empreinte = empreinte_du_playbook(chemin)
     if not force and empreinte == empreinte_enregistree(repo_meta):
-        return None
+        nouveaux = set(hosts or ()) - hotes_enregistres(repo_meta)
+        if not nouveaux:
+            return None
     return chemin, empreinte

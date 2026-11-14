@@ -116,6 +116,7 @@ for a secret, and a catalogue gives the engine no orders.
 | `network` | no | string | — | Network the VMs join, dedicated to this repository. **Its length is bounded**, see below. |
 | `cidr` | no | string | — | Subnet of that network. |
 | `hosts` | no | list of mappings | `[]` | The VMs. See below. |
+| `optional_hosts` | no | list of mappings | `[]` | VMs started only for the labs that name them. Since 0.9.0. See below. |
 | `providers` | no | mapping | `{}` | Per-provider overrides, read by the matching Terraform module. Free-form values: each provider has its own variables. See below for the ones the packaged templates read. |
 
 Provider resolution, first rule wins: `DSOXLAB_PROVIDER`, then the session
@@ -217,6 +218,50 @@ infra:
 | `disk_gb` | no | integer | `10` | |
 | `extra_disk_gb` | no | integer | `0` | Second disk, for labs that need a real block device (partitioning, LVM, RAID). |
 | `ip` | no | string | — | **Legacy.** Addresses come from the provider and are injected into the generated inventory. Do not declare them. |
+
+### `infra.optional_hosts[]`: hosts a few labs need
+
+Some labs need machines the rest of the catalogue never uses: three control
+planes behind a load balancer for a high-availability lab, for example. Adding
+them to `hosts` would make every learner run them, and would push the catalogue
+past the memory of a modest workstation for the sake of two labs.
+
+`optional_hosts` declares them once, with the **same fields** as `hosts`:
+
+```yaml
+infra:
+  hosts:
+    - name: k8s-cp.lab
+      distro: ubuntu24
+  optional_hosts:
+    - name: k8s-cp2.lab
+      distro: ubuntu24
+      ram_mb: 2560
+      vcpu: 2
+    - name: k8s-lb.lab
+      distro: ubuntu24
+      ram_mb: 512
+```
+
+A lab uses one by naming it, as it names any host: in `runtime.targets[].host`
+or in `roles`. Nothing else is declared in the `lab.yaml`.
+
+| Moment | What happens to an optional host |
+| --- | --- |
+| `provision` (no `--host`) | not started; one already running is kept |
+| `run` / `start` of a lab that names it | started if it does not answer yet, then the catalogue's foundation is played on it |
+| `clean`, `reset` | kept: rebuilding several machines on every try costs minutes |
+| `destroy --optional-hosts` | removed, and only it: the common hosts and their foundation stay |
+| `destroy` | removed with everything else |
+| `doctor` alone | not counted in the catalogue's memory; `start <lab>` counts it when that lab needs it |
+
+**Addresses do not move.** A host's address derives from its position in the
+full list, common hosts first, then optional ones. Declaring an optional host
+therefore never shifts a common machine, and starting one optional host without
+its neighbour never shifts either of them.
+
+`hosts` and `optional_hosts` share one namespace: `validate-structure` refuses
+a name declared twice (`hote_en_double`).
 
 ### `sections[]` (optional)
 

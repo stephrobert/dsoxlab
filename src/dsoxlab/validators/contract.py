@@ -303,10 +303,15 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
     "repo.id", "repo.category", "repo.title", "repo.blog_url", "repo.description",
     "repo.issues_url", "repo.solutions",
     "infra.provider", "infra.network", "infra.cidr", "infra.hosts", "infra.providers",
-    "infra.bootstrap",
+    "infra.bootstrap", "infra.optional_hosts",
     "infra.hosts[].name", "infra.hosts[].distro", "infra.hosts[].role",
     "infra.hosts[].ram_mb", "infra.hosts[].vcpu", "infra.hosts[].disk_gb",
     "infra.hosts[].extra_disk_gb", "infra.hosts[].ip",
+    # 0.9.0 (issue #365) : même forme que infra.hosts.
+    "infra.optional_hosts[].name", "infra.optional_hosts[].distro",
+    "infra.optional_hosts[].role", "infra.optional_hosts[].ram_mb",
+    "infra.optional_hosts[].vcpu", "infra.optional_hosts[].disk_gb",
+    "infra.optional_hosts[].extra_disk_gb",
     "sections[].id", "sections[].title", "sections[].description", "sections[].labs",
 })
 
@@ -451,6 +456,7 @@ def validate_repo_fields(root: Path) -> ContractReport:
 
     report.issues += _anomalies_du_portail(data, meta)
     report.issues += _anomalies_du_socle(root, data, meta)
+    report.issues += _anomalies_des_hotes(data, meta)
 
     repo = data.get("repo")
     if not isinstance(repo, dict) or str(repo.get("category") or "").strip():
@@ -462,6 +468,36 @@ def validate_repo_fields(root: Path) -> ContractReport:
             path=meta, key="category_absente_avec_labs", params={"labs": labs},
         ))
     return report
+
+
+def _anomalies_des_hotes(data: dict[str, Any], meta: Path) -> list[ContractIssue]:
+    """Un FQDN déclaré deux fois, dans ``infra.hosts`` ou ``infra.optional_hosts``.
+
+    Les deux listes alimentent le même ``for_each`` Terraform, indexé par le
+    nom : un doublon y fait échouer le plan, au premier ``provision``, sur un
+    message qui ne nomme pas le ``meta.yml`` (issue #365). Le parseur, lui,
+    reste tolérant : c'est un lint.
+    """
+    infra = data.get("infra")
+    if not isinstance(infra, dict):
+        return []
+    vus: set[str] = set()
+    doublons: list[str] = []
+    for champ in ("hosts", "optional_hosts"):
+        entrees = infra.get(champ)
+        if not isinstance(entrees, list):
+            continue
+        for entree in entrees:
+            nom = str(entree.get("name") or "") if isinstance(entree, dict) else ""
+            if not nom:
+                continue
+            if nom in vus and nom not in doublons:
+                doublons.append(nom)
+            vus.add(nom)
+    return [
+        ContractIssue(path=meta, key="hote_en_double", params={"name": nom})
+        for nom in doublons
+    ]
 
 
 def _anomalies_du_socle(

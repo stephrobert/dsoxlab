@@ -22,8 +22,8 @@
       "lignes": 39
     },
     "src/dsoxlab/cli/destruction.py::destroy": {
-      "cognitive": 23,
-      "profondeur": 4,
+      "cognitive": 14,
+      "profondeur": 2,
       "lignes": 108
     },
     "src/dsoxlab/cli/infrastructure.py::provisionner": {
@@ -57,7 +57,7 @@
       "lignes": 32
     },
     "src/dsoxlab/infra/terraform.py::_ensure_kvm_dhcp_leases": {
-      "cognitive": 21,
+      "cognitive": 20,
       "profondeur": 3,
       "lignes": 94
     },
@@ -72,14 +72,14 @@
       "lignes": 102
     },
     "src/dsoxlab/infra/terraform.py::write_tfvars": {
-      "cognitive": 10,
+      "cognitive": 9,
       "profondeur": 2,
-      "lignes": 100
+      "lignes": 92
     },
     "src/dsoxlab/models/repo.py::RepoMetadata.from_yaml": {
-      "cognitive": 14,
+      "cognitive": 12,
       "profondeur": 1,
-      "lignes": 140
+      "lignes": 135
     },
     "src/dsoxlab/models/repo.py::_resolve_provider": {
       "cognitive": 26,

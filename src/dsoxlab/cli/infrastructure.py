@@ -490,7 +490,7 @@ def _poser_le_socle(
     from ..services.bootstrap import BootstrapAbsent, a_jouer, enregistrer
 
     try:
-        travail = a_jouer(repo_meta, force=force)
+        travail = a_jouer(repo_meta, force=force, hosts=hosts)
     except BootstrapAbsent as absent:
         # Même règle que pour une fixture déclarée et absente : le dire avec le
         # chemin attendu, plutôt que de laisser le premier lab buter dessus.

@@ -22,6 +22,7 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -70,6 +71,10 @@ def destroy(
         "--host",
         help=_("opt_destroy_host"),
     )] = None,
+    optional_hosts: Annotated[bool, typer.Option(
+        "--optional-hosts",
+        help=_("opt_destroy_optional_hosts"),
+    )] = False,
     yes: Annotated[bool, typer.Option(
         "--yes", "-y",
         help=_("opt_yes"),
@@ -78,7 +83,8 @@ def destroy(
 ) -> None:
     """Lance terraform destroy sur le provider courant avec progress bar."""
     from ..infra import terraform as tf
-    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled, host_targets
+    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled
+    from .infrastructure import _cibles_terraform
 
     root = _root(lab_home)
     repo_meta = _read_repo(root)
@@ -88,19 +94,14 @@ def destroy(
 
     provider = _require_provider(repo_meta)
 
-    targets: list[str] = []
+    if optional_hosts:
+        _retirer_les_hotes_optionnels(
+            ctx, root, repo_meta, provider, host=host, assume_yes=yes
+        )
+        return
+
+    targets = _cibles_terraform(repo_meta, provider, host)
     if host:
-        known = {h.name for h in repo_meta.infra.hosts}
-        for fqdn in host:
-            if fqdn not in known:
-                error(_("host_unknown", fqdn=fqdn, known=", ".join(sorted(known))))
-                raise typer.Exit(1)
-            try:
-                targets.extend(host_targets(provider, fqdn))
-            except NotImplementedError as exc:
-                error(str(exc))
-                raise typer.Exit(2) from None
-        info(_("terraform_target", hosts=", ".join(host), count=len(targets)))
         # Mesuré le 2026-07-23 : terraform détruit la cible ET tout ce qui en
         # dépend. Les volumes et disques cloud-init étant chaînés aux domaines,
         # cibler un seul hôte emporte les autres (7 ressources détruites pour
@@ -174,6 +175,76 @@ def destroy(
     success(_("destroy_done"))
 
 
+def _retirer_les_hotes_optionnels(
+    ctx: typer.Context,
+    root: Path,
+    repo_meta: RepoMetadata,
+    provider: str,
+    *,
+    host: list[str] | None,
+    assume_yes: bool,
+) -> None:
+    """``--optional-hosts`` : les hôtes optionnels partent, le catalogue reste.
+
+    ``clean`` les garde, pour ne pas reconstruire trois machines à chaque essai
+    d'un lab (décision de l'issue #365). C'est donc ici qu'on rend leur mémoire,
+    sans toucher aux hôtes communs ni au socle qu'ils portent.
+    """
+    from ..infra import terraform as tf
+    from ..infra.terraform import ProviderNotImplemented, TerraformNotInstalled
+
+    if host:
+        error(_("destroy_optional_and_host"))
+        raise typer.Exit(1)
+    declares = [h.name for h in repo_meta.infra.optional_hosts]
+    presents = tf.hotes_au_state(repo_meta)
+    # Un state illisible : on vise tous les hôtes optionnels déclarés. En
+    # retirer un qui n'existe pas ne coûte rien à Terraform.
+    noms = [n for n in declares if presents is None or n in presents]
+    if not noms:
+        info(_("destroy_optional_none"))
+        return
+
+    if not assume_yes:
+        _confirmer("confirm_destroy_optional", hosts=", ".join(noms))
+
+    ctx.call_on_close(_verrou(root, "destroy").release)
+    info(_("destroy_optional_starting", hosts=", ".join(noms)))
+    _purge_snapshots_before_destroy(repo_meta, noms)
+    try:
+        _run_terraform_init_with_spinner(
+            lambda cb: tf.init(repo_meta, on_event=cb)
+        )
+        _run_terraform_with_progress(
+            "destroy",
+            lambda cb: tf.retirer_hotes_optionnels(repo_meta, noms, on_event=cb),
+        )
+    except Interrupted as exc:
+        _interrompu(exc, "dsoxlab destroy --optional-hosts")
+    except ProviderNotImplemented as exc:
+        error(str(exc))
+        raise typer.Exit(2) from None
+    except TerraformNotInstalled as exc:
+        error(str(exc))
+        raise typer.Exit(3) from None
+    except Exception as exc:  # noqa: BLE001
+        error(_("destroy_failed", error=str(exc)))
+        raise typer.Exit(4) from None
+
+    if not _handle_orphans_after_destroy(repo_meta, assume_yes=assume_yes):
+        raise typer.Exit(ExitCode.ORPHELINS_NON_RETIRES)
+
+    # Le fragment SSH vise encore les hôtes communs : on le RÉÉCRIT sans les
+    # machines retirées, au lieu de le supprimer comme après une destruction totale.
+    from ..services.bootstrap import oublier_hotes
+    from .infrastructure import _ecrire_le_fragment_ssh
+
+    _ecrire_le_fragment_ssh(repo_meta)
+    oublier_hotes(repo_meta, noms)
+    _oublier_la_provenance(repo_meta, provider, noms)
+    success(_("destroy_optional_done", hosts=", ".join(noms)))
+
+
 def _oublier_la_provenance(
     repo_meta: RepoMetadata, provider: str, host: list[str] | None
 ) -> None:
@@ -196,7 +267,9 @@ def _oublier_la_provenance(
         logger.warning("could not update provenance index: %s", exc)
 
 
-def _purge_snapshots_before_destroy(repo_meta: RepoMetadata) -> None:
+def _purge_snapshots_before_destroy(
+    repo_meta: RepoMetadata, hosts: list[str] | None = None
+) -> None:
     """Retire les points de reprise **avant** que Terraform ne passe.
 
     Un snapshot externe laisse un fichier de recouvrement que Terraform ne
@@ -211,7 +284,7 @@ def _purge_snapshots_before_destroy(repo_meta: RepoMetadata) -> None:
     """
     from ..infra import snapshot as snapshot_infra
 
-    hosts = snapshot_infra.host_names(repo_meta)
+    hosts = hosts if hosts is not None else snapshot_infra.host_names(repo_meta)
     if not hosts:
         return
     try:

@@ -19,10 +19,10 @@ locals {
     substr(sha256(var.repo_id), 2, 2),
   )
   hosts_with_idx = [
-    for idx, h in var.hosts : merge(h, {
-      idx = idx
-      mac = format("%s:%02x", local.mac_prefix, idx + 16)
-      ip  = cidrhost(var.network_cidr, idx + 11)
+    for h in var.hosts : merge(h, {
+      idx = h.index
+      mac = format("%s:%02x", local.mac_prefix, h.index + 16)
+      ip  = cidrhost(var.network_cidr, h.index + 11)
     })
   ]
 

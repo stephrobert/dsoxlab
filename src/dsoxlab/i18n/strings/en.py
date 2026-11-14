@@ -53,6 +53,9 @@ STRINGS: dict[str, str] = {
         "Foundation in place ({playbook}). The labs can now assume it.",
     "bootstrap_a_jour":
         "Foundation already in place and unchanged: nothing to replay.",
+    "hote_en_double":
+        "meta.yml declares the host {name} twice (infra.hosts and "
+        "infra.optional_hosts share one namespace): provision would fail.",
     "bootstrap_absent":
         "meta.yml declares infra.bootstrap and the file is not there: {path}",
     "bootstrap_oublie":
@@ -630,6 +633,13 @@ STRINGS: dict[str, str] = {
     "ssh_fragment_no_include": "SSH fragment written to {path}, but your ~/.ssh/config has no [bold]Include ~/.ssh/config.d/*.conf[/bold] line: add it at the top of the file, otherwise the fragment is never read.",
     "ssh_fragment_removed": "SSH fragment for [bold]{repo}[/bold] removed: it pointed at destroyed machines.",
     "destroy_done":        "Infrastructure destroyed.",
+    "opt_destroy_optional_hosts": "Remove only the optional hosts (meta.yml: infra.optional_hosts) that labs have started. The catalogue's common hosts are not touched.",
+    "run_optional_hosts": "This lab uses optional hosts that are not running yet: {hosts}. Starting them now; `clean` keeps them, `dsoxlab destroy --optional-hosts` removes them.",
+    "destroy_optional_and_host": "--optional-hosts and --host cannot be combined: the first one already names the machines to remove.",
+    "destroy_optional_none": "No optional host is running: nothing to remove.",
+    "confirm_destroy_optional": "Destroy the optional hosts {hosts}? Their data will be lost; the common hosts are kept",
+    "destroy_optional_starting": "Removing the optional hosts: {hosts}…",
+    "destroy_optional_done": "Optional hosts removed: {hosts}. The common hosts are still running.",
     "destroy_failed":      "Destruction failed: {error}",
     "snapshot_purge_done":
         "{count} snapshot overlay file(s) removed before destruction: Terraform "
@@ -953,6 +963,8 @@ Each lab declares:
                        provisioning left defined outside the Terraform state.
                        Exits non-zero if any of them remains.
     [dim]--yes[/dim]                 Do not ask for confirmation, orphan machines included.
+    [dim]--optional-hosts[/dim]      Remove only the optional hosts labs have started;
+                       the common hosts stay up. `clean` never removes them.
 
   [cyan]completion install[/cyan]   Install shell auto-completion (bash, zsh).
                        Reload your shell afterwards: [bold]exec $SHELL[/bold]

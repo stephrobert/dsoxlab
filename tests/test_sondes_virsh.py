@@ -321,7 +321,7 @@ def test_apply_porte_les_avertissements_de_bail(
     jette la liste, l'écran ne saura jamais rien."""
     monkeypatch.setattr(terraform, "is_available", lambda: True)
     monkeypatch.setattr(terraform, "workdir", lambda meta: tmp_path)
-    monkeypatch.setattr(terraform, "write_tfvars", lambda meta: None)
+    monkeypatch.setattr(terraform, "write_tfvars", lambda meta, **_: None)
     # `apply` refuse de partir sans firmware EFI depuis l'issue #234, et ce test
     # tourne là où libvirt n'existe pas. On simule la sonde comme tout le reste
     # de l'environnement : le sujet ici est le relais des avertissements de bail,

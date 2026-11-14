@@ -38,7 +38,7 @@ import re
 import shutil
 import signal
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,7 +47,7 @@ from typing import Any
 from ..config import xdg_state_home
 from ..i18n import _
 from ..interrupt import EVENT_INTERRUPT, Interrupted, Stage, interruptible
-from ..models.repo import ProviderUnresolved, RepoMetadata
+from ..models.repo import HostDefinition, ProviderUnresolved, RepoMetadata
 from ..templates import terraform_template
 from ..utils.shell import CommandError, run_command
 from . import credentials as creds_mod
@@ -178,20 +178,127 @@ def workdir(repo_meta: RepoMetadata) -> Path:
 
 
 # Alias rétro-compat — déprécié, à supprimer
+#: Les ressources qui portent UNE machine, indexées par son FQDN (la clé du
+#: ``for_each`` des trois templates). Lire la clé plutôt que l'attribut
+#: ``name`` : incus remplace les points du FQDN par des tirets dans le nom.
+_HOST_RESOURCE_TYPES = frozenset({"libvirt_domain", "incus_instance", "outscale_vm"})
+
+
+def hotes_au_state(repo_meta: RepoMetadata) -> set[str] | None:
+    """Les FQDN dont le state du provider courant porte la machine.
+
+    Un state **absent** rend un ensemble vide : c'est un fait, rien n'existe.
+    Un state **illisible** rend ``None`` : on n'a pas pu savoir, et l'appelant
+    doit choisir le repli le moins destructeur.
+    """
+    provider = repo_meta.infra.provider
+    if not provider:
+        return set()
+    state_file = (
+        _xdg_state_home() / "dsoxlab" / repo_meta.id / "terraform" / provider
+        / "terraform.tfstate"
+    )
+    if not state_file.is_file():
+        return set()
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("tfstate unreadable (%s): %s", state_file, exc)
+        return None
+    return _cles_des_machines(data) if isinstance(data, dict) else None
+
+
+def _est_une_machine(res: object) -> bool:
+    """Une ressource ``host`` gérée, de l'un des types qui portent une machine."""
+    return (
+        isinstance(res, dict)
+        and res.get("mode", "managed") == "managed"
+        and res.get("type") in _HOST_RESOURCE_TYPES
+        and res.get("name") == "host"
+    )
+
+
+def _cles_des_machines(data: dict[str, Any]) -> set[str]:
+    """Les clés ``for_each`` (les FQDN) des machines d'un state déjà lu."""
+    cles = (
+        inst.get("index_key")
+        for res in data.get("resources", []) if _est_une_machine(res)
+        for inst in res.get("instances", []) if isinstance(inst, dict)
+    )
+    return {cle for cle in cles if isinstance(cle, str) and cle}
+
+
+def hotes_actifs(
+    repo_meta: RepoMetadata,
+    *,
+    demandes: Iterable[str] | None = None,
+    retires: Iterable[str] = (),
+) -> list[tuple[int, HostDefinition]]:
+    """Les hôtes que Terraform doit connaître, chacun avec son index stable.
+
+    Tous les hôtes communs, plus les hôtes optionnels (issue #365) qui sont :
+
+    - ``demandes`` par cet appel (un lab qui les cite, un ``--host``) ;
+    - ou **déjà au state** : un ``provision`` du catalogue ne doit pas
+      détruire les machines qu'un lab a montées, et c'est ce qu'il ferait en
+      les retirant de ``var.hosts``.
+
+    ... sauf ceux qui sont ``retires``, et c'est ainsi qu'ils se détruisent :
+    sortis de ``var.hosts``, ils sortent du ``for_each``, et Terraform ne
+    planifie la destruction QUE de leurs instances. Un ``destroy -target``
+    emporterait les autres machines, le state notant ses dépendances au niveau
+    de la ressource et non de l'instance (mesuré le 2026-07-23 : sept
+    ressources détruites pour une demandée).
+
+    Un state illisible fait retenir tous les hôtes optionnels : au pire on en
+    crée un de trop, alors que les écarter en détruirait.
+
+    L'index est la position dans la liste COMPLÈTE du ``meta.yml``, jamais dans
+    la liste rendue : sans cela, monter un hôte optionnel sans son voisin
+    décalerait l'adresse de l'un ou de l'autre d'un provisionnement au suivant.
+    """
+    voulus = set(demandes or ())
+    sortis = set(retires)
+    presents = hotes_au_state(repo_meta) if repo_meta.infra.optional_hosts else set()
+    actifs: list[tuple[int, HostDefinition]] = []
+    for index, h in enumerate(repo_meta.infra.hosts):
+        if h.optional:
+            if h.name in sortis:
+                continue
+            if presents is not None and h.name not in voulus and h.name not in presents:
+                continue
+        actifs.append((index, h))
+    return actifs
+
+
 def provider_dir(repo_meta: RepoMetadata) -> Path:
     """DEPRECATED : utilise ``workdir(repo_meta)`` à la place."""
     return workdir(repo_meta)
 
 
-def write_tfvars(repo_meta: RepoMetadata) -> Path:
+def _hotes_pour_terraform(actifs: list[tuple[int, HostDefinition]]) -> list[dict[str, Any]]:
+    """La variable ``hosts`` des templates, avec l'index stable de chaque hôte."""
+    return [
+        {
+            "name": h.name, "distro": h.distro, "role": h.role,
+            "ram_mb": h.ram_mb, "vcpu": h.vcpu, "disk_gb": h.disk_gb,
+            "extra_disk_gb": h.extra_disk_gb, "index": index,
+        }
+        for index, h in actifs
+    ]
+
+
+def write_tfvars(
+    repo_meta: RepoMetadata, *,
+    demandes: Iterable[str] | None = None, retires: Iterable[str] = (),
+) -> Path:
     """Génère ``<work-dir>/.dsoxlab.auto.tfvars.json``.
 
     Variables exposées à Terraform :
 
     - ``network_name``   : nom du réseau (libvirt, VPC, Net Outscale...)
     - ``network_cidr``   : CIDR
-    - ``hosts``          : liste des VMs (name, distro, role, ram_mb,
-      vcpu, disk_gb)
+    - ``hosts``          : les VMs que dit :func:`hotes_actifs`, avec leur index.
     - ``provider_config``: dict d'overrides du provider, enrichi
       automatiquement avec :
       - ``ssh_pubkey`` (lue depuis ``<repo>/ssh/id_ed25519.pub``)
@@ -201,6 +308,7 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
     """
     work = workdir(repo_meta)
     tfvars_path = work / ".dsoxlab.auto.tfvars.json"
+    actifs = hotes_actifs(repo_meta, demandes=demandes, retires=retires)
 
     # Charge la clé SSH publique du repo training pour la propager aux
     # templates cloud-init via provider_config.ssh_pubkey.
@@ -243,18 +351,7 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
         "repo_id": repo_meta.id,
         "network_name": repo_meta.infra.network,
         "network_cidr": network_cidr,
-        "hosts": [
-            {
-                "name": h.name,
-                "distro": h.distro,
-                "role": h.role,
-                "ram_mb": h.ram_mb,
-                "vcpu": h.vcpu,
-                "disk_gb": h.disk_gb,
-                "extra_disk_gb": h.extra_disk_gb,
-            }
-            for h in repo_meta.infra.hosts
-        ],
+        "hosts": _hotes_pour_terraform(actifs),
         "provider_config": provider_cfg,
     }
 
@@ -278,7 +375,7 @@ def write_tfvars(repo_meta: RepoMetadata) -> Path:
 
     payload.update(tfvars_de_provenance(
         repo_meta, provider=repo_meta.infra.provider,
-        ressources=[h.name for h in repo_meta.infra.hosts],
+        ressources=[h.name for _, h in actifs],
     ))
 
     tfvars_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -538,10 +635,10 @@ def _ensure_kvm_dhcp_leases(
     # hash du repo.id isolent les MAC entre dépôts. Doit rester synchronisé.
     digest = hashlib.sha256(repo_meta.id.encode("utf-8")).hexdigest()
     mac_prefix = f"52:54:{digest[0:2]}:{digest[2:4]}:00"
-    wanted = set(target_hosts) if target_hosts else None
+    wanted = {h.name for _, h in hotes_actifs(repo_meta, demandes=target_hosts)}
     avertissements: list[str] = []
-    for idx, host in enumerate(infra.hosts):
-        if wanted is not None and host.name not in wanted:
+    for idx, host in enumerate(infra.hosts):  # liste complète : l'index stable
+        if host.name not in wanted:
             continue
         mac = f"{mac_prefix}:{idx + 16:02x}"
         if mac.lower() in existing:
@@ -619,7 +716,7 @@ def apply(
     if repo_meta.infra.provider == "kvm" and not (libvirt.efi_loader() or "").strip():
         raise EfiLoaderUnavailable(_("err_efi_loader_introuvable"))
 
-    write_tfvars(repo_meta)
+    write_tfvars(repo_meta, demandes=target_hosts)
 
     # Le réseau KVM est figé (lifecycle ignore_changes) : on pose ici les baux
     # DHCP des hosts ajoutés après sa création, à chaud, sinon leur VM ne
@@ -870,6 +967,41 @@ def destroy(
         tfvars = tf_dir / ".dsoxlab.auto.tfvars.json"
         if tfvars.is_file():
             tfvars.unlink()
+
+
+def retirer_hotes_optionnels(
+    repo_meta: RepoMetadata,
+    noms: list[str],
+    *,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+) -> ProvisionResult:
+    """Détruit ces hôtes optionnels, et rien d'autre (issue #365).
+
+    Un ``apply`` SANS ``-target``, dont ``var.hosts`` ne porte plus ces hôtes :
+    Terraform planifie la destruction de leurs seules instances. Pas de
+    ``destroy -target``, qui emporte les autres machines (voir
+    :func:`hotes_actifs`).
+
+    Le revers est assumé : cet ``apply`` réaligne aussi le reste sur la
+    configuration, comme le ferait un ``provision``. Les hôtes communs ne sont
+    donc jamais détruits par lui, puisqu'ils restent dans ``var.hosts``.
+    """
+    if not is_available():
+        raise TerraformNotInstalled(_("err_terraform_missing"))
+
+    tf_dir = workdir(repo_meta)
+    write_tfvars(repo_meta, retires=noms)
+    cmd = ["terraform", f"-chdir={tf_dir}", "apply", "-input=false", "-auto-approve"]
+    if on_event is not None:
+        cmd.append("-json")
+        _stream_terraform(
+            cmd, env=_provider_env(repo_meta), on_event=on_event,
+            stage=Stage.TERRAFORM_DESTROY,
+        )
+    else:
+        with interruptible(Stage.TERRAFORM_DESTROY):
+            run_command(cmd, timeout=1800, env=_provider_env(repo_meta))
+    return _read_outputs(tf_dir, env=_provider_env(repo_meta))
 
 
 def host_targets(provider: str, fqdn: str) -> list[str]:
