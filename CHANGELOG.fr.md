@@ -7,6 +7,40 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Ajouté
+
+- **Un état brouillon pour un lab : `status: draft` dans `lab.yaml` (#369).**
+  Optionnel, `published` par défaut : aucun catalogue existant ne change. Un lab
+  brouillon est absent de `list-labs` (montré, marqué « brouillon », avec la
+  nouvelle option `list-labs --drafts`), de `next` et de `start`, de `course`
+  (sauf avec la nouvelle option `course <id> --drafts`) et de `progress`. Ses
+  tentatives ne partent ni à l'export ni par `push`, et `export --lab <id>` le
+  refuse. `run`, `check`, `submit` et `show` l'acceptent toujours par son
+  identifiant, avec une ligne qui dit que c'est un brouillon.
+  `validate-structure` le valide comme tout autre lab, et signale une valeur
+  inconnue, qui se comporte comme `published`, comme pour `feedback`. `scores`
+  ne change pas : c'est l'historique local de ce qui a été joué.
+  `list-labs --json` et `show --json` portent `status` pour chaque lab, un champ
+  ajouté sans rien casser. Documenté dans `docs/contract-v1`,
+  `docs/machine-output` et `schemas/lab.schema.json`.
+- **Un état brouillon pour un catalogue : `draft: true` au manifeste packagé.**
+  `catalog list` et l'accueil ne proposent plus une telle entrée ;
+  `catalog list --drafts` la montre, et `catalog add <url>` ou `<id>`
+  l'installe toujours. `catalog list --json` porte `draft` pour chaque entrée
+  connue. `certificats` repasse en brouillon tant qu'il ne publie aucun lab.
+
+### Corrigé
+
+- **`scripts/gen-catalogues.py` refuse une entrée du manifeste qui ne publie
+  aucun lab, sauf si elle est en brouillon.** La 0.9.2 mesurait `certificats` à
+  zéro lab, l'écartait de la table du README, et laissait `catalog list` le
+  proposer quand même aux apprenants. Une telle entrée est désormais un écart
+  (sortie en 1), avec un message qui dit de la passer en `draft: true` ou de la
+  retirer. Une entrée en brouillon est mesurée, reste hors de la table même avec
+  des labs, et n'est jamais signalée, pas même comme dépôt public oublié.
+
 ## [0.9.2] - 2026-11-14
 
 ### Corrigé

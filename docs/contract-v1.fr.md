@@ -366,6 +366,7 @@ validate-structure` le signale.
 | `transfer_of` | non | chaîne | absent | Identifiant du lab du même catalogue dont ce lab est une variante de transfert. Voir plus bas. |
 | `criteria` | non | liste de mappings | `[]` | Nomme les critères du lab : `{id, tests, label}`. Voir plus bas. |
 | `feedback` | non | énuméré | selon `lab_type` | Ce que `check` montre d'un critère raté : `full`, `first-line` ou `verdict`. Voir plus bas. |
+| `status` | non | énuméré | `published` | `published` ou `draft`. Un brouillon est poussé mais pas proposé aux apprenants. Voir plus bas. |
 | `bloc` | non | entier | dérivé | Normalement **pas écrit** : dérivé de `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | non | entier | dérivé | Même remarque. |
 | `runtime` | non | mapping | défauts shell | Voir ci-dessous. |
@@ -553,6 +554,41 @@ Absent, ou à `0`, le lab n'est pas un examen et aucun verdict n'est jamais
 rendu — c'est le cas de tout lab qui n'est ni un capstone ni un drill.
 `dsoxlab validate-structure` refuse une valeur hors de `1..100`.
 
+### `status` : un lab brouillon, poussé mais pas proposé (0.9.3)
+
+Un lab en cours peut vivre sur la branche par défaut sans être montré aux
+apprenants. Il le déclare :
+
+```yaml
+status: draft     # published (défaut) | draft
+```
+
+Sans le champ, le lab est `published` : aucun catalogue existant ne change. Ce
+que `draft` change, commande par commande :
+
+| Commande | Sur un lab `draft` |
+| --- | --- |
+| `list-labs` | Pas listé. `list-labs --drafts` le liste, marqué « brouillon ». `--json` porte `status` pour chaque lab. |
+| `next`, `start` sans identifiant | Jamais proposé, jamais compté comme restant. |
+| `course` | Refusé, sauf `course <id> --drafts` : c'est ainsi que son auteur le relit. |
+| `progress` | Pas compté, ni dans le tableau ni dans `--json`. |
+| `export`, `push` | Ses tentatives sont écartées. `export --lab <id>` le refuse, comme un lab `validation`. Les tentatives restent dans la base locale. |
+| `run`, `check`, `submit`, `show` | Fonctionnent comme d'habitude quand le lab est nommé par son identifiant, avec une ligne qui dit que c'est un brouillon (sur stderr sous `--json`). |
+| `scores` | Inchangé : c'est l'historique local de ce qui a été joué sur cette machine, et rien n'en sort. |
+| `validate-structure` | Le valide comme tout autre lab. |
+
+Une valeur inconnue suit la politique de `feedback` : le parseur la garde,
+`validate-structure` la signale (`metadata`), et le lab se comporte comme
+`published`. Une faute de frappe sur `draft` publie donc le lab, et la CI du
+catalogue le dit.
+
+Un **catalogue** peut aussi être en brouillon, dans le manifeste packagé avec
+dsoxlab (`src/dsoxlab/templates/catalogues.yml`) : une entrée `draft: true`
+n'est proposée ni par `catalog list` (sauf `--drafts`) ni par l'accueil, et
+`catalog add <url>` ou `catalog add <id>` l'installe toujours. La table du
+README l'écarte, et `scripts/gen-catalogues.py` refuse une entrée **sans**
+`draft` qui ne publie aucun lab.
+
 ### `runtime`
 
 | Champ | Obligatoire | Type | Défaut | Remarques |
@@ -668,6 +704,7 @@ lab pour qui ouvre le fichier.
 | Champ | Valeurs |
 | --- | --- |
 | `lab_type` | `lab`, `challenge`, `capstone`, `validation` |
+| `status` | `published`, `draft` |
 | `runtime.type` | `shell`, `vm`, `kvm`, `incus` |
 | `runtime.session` | `target`, `local` |
 | `schema_version` | `1` |

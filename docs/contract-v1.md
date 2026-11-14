@@ -358,6 +358,7 @@ of the contract and is ignored: `dsoxlab validate-structure` reports it.
 | `transfer_of` | no | string | absent | Id of the lab of the same catalog this lab is a transfer variant of. See below. |
 | `criteria` | no | list of mappings | `[]` | Names the criteria of the lab: `{id, tests, label}`. See below. |
 | `feedback` | no | enum | by `lab_type` | What `check` shows of a failed criterion: `full`, `first-line` or `verdict`. See below. |
+| `status` | no | enum | `published` | `published` or `draft`. A draft is pushed but not offered to learners. See below. |
 | `bloc` | no | integer | derived | Normally **not written**: derived from `meta.yml` `sections[].labs[]`. |
 | `bloc_order` | no | integer | derived | Same remark. |
 | `runtime` | no | mapping | shell defaults | See below. |
@@ -539,6 +540,41 @@ Left out, or set to `0`, the lab is not an exam and no verdict is ever
 rendered — which is the case of every lab that is not a capstone or a drill.
 `dsoxlab validate-structure` refuses a value outside `1..100`.
 
+### `status`: a draft lab, pushed but not offered (0.9.3)
+
+A lab in progress can live on the default branch without being shown to
+learners. Declare it:
+
+```yaml
+status: draft     # published (default) | draft
+```
+
+Left out, the lab is `published`: no existing catalog changes. What `draft`
+changes, command by command:
+
+| Command | On a `draft` lab |
+| --- | --- |
+| `list-labs` | Not listed. `list-labs --drafts` lists it, marked "draft". `--json` carries `status` for every lab. |
+| `next`, `start` without an id | Never suggested, never counted as remaining. |
+| `course` | Refused, unless `course <id> --drafts`: its author reads it that way. |
+| `progress` | Not counted, in the table or in `--json`. |
+| `export`, `push` | Its attempts are left out. `export --lab <id>` refuses it, like a `validation` lab. The attempts stay in the local database. |
+| `run`, `check`, `submit`, `show` | Work as usual when the lab is named by its id, with a line saying it is a draft (on stderr under `--json`). |
+| `scores` | Unchanged: it is the local history of what was played on this machine, and nothing leaves it. |
+| `validate-structure` | Validates it like any other lab. |
+
+An unknown value follows the policy of `feedback`: the parser keeps it,
+`validate-structure` flags it (`metadata`), and the lab behaves as
+`published`. A typo on `draft` therefore publishes the lab, and the catalog CI
+says so.
+
+A **catalog** can be a draft too, in the manifest packaged with dsoxlab
+(`src/dsoxlab/templates/catalogues.yml`): an entry with `draft: true` is not
+offered by `catalog list` (unless `--drafts`) nor by the welcome screen, and
+`catalog add <url>` or `catalog add <id>` still installs it. The README table
+leaves it out, and `scripts/gen-catalogues.py` refuses an entry **without**
+`draft` that publishes no lab.
+
 ### `runtime`
 
 | Field | Required | Type | Default | Notes |
@@ -652,6 +688,7 @@ names the lab for whoever opens the file.
 | Field | Values |
 | --- | --- |
 | `lab_type` | `lab`, `challenge`, `capstone`, `validation` |
+| `status` | `published`, `draft` |
 | `runtime.type` | `shell`, `vm`, `kvm`, `incus` |
 | `runtime.session` | `target`, `local` |
 | `schema_version` | `1` |

@@ -80,6 +80,7 @@ same lab object. It is described once here.
 | `bloc_order` | int or null | the rank inside that block — `next` follows this order |
 | `level` | string | free-form level (`l1`, `rhcsa`, …) |
 | `type` | string | `lab`, `challenge`, `capstone` or `validation` |
+| `status` | string | `published` or `draft` (0.9.3), as the `lab.yaml` declares it. A draft only appears under `list-labs --drafts`, or when named (`show`, `check`); `progress` and `next` never carry one. An unknown value is passed through, like `type` |
 | `exam_passing_score` | int or null | pass mark, as a percentage of the scale. `null` on an ordinary lab |
 | `difficulty` | string or null | free-form, never validated |
 | `estimated_time` | string or null | free-form, e.g. `"30m"` |

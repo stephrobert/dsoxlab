@@ -83,6 +83,7 @@ le même objet lab. Il est décrit une fois, ici.
 | `bloc_order` | entier ou null | le rang dans ce bloc : c'est l'ordre que suit `next` |
 | `level` | chaîne | niveau libre (`l1`, `rhcsa`…) |
 | `type` | chaîne | `lab`, `challenge`, `capstone` ou `validation` |
+| `status` | chaîne | `published` ou `draft` (0.9.3), tel que le `lab.yaml` le déclare. Un brouillon n'apparaît que sous `list-labs --drafts`, ou quand il est nommé (`show`, `check`) ; `progress` et `next` n'en portent jamais. Une valeur inconnue passe telle quelle, comme `type` |
 | `exam_passing_score` | entier ou null | seuil de réussite, en pourcentage du barème. `null` sur un lab ordinaire |
 | `difficulty` | chaîne ou null | libre, jamais validé |
 | `estimated_time` | chaîne ou null | libre, par exemple `"30m"` |
