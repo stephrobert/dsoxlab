@@ -32,10 +32,18 @@ STRINGS: dict[str, str] = {
     "opt_help":       "Affiche ce message et quitte.",
     "opt_lab_home":   "Racine du catalogue de labs (défaut : détecté automatiquement).",
     "opt_json":           "Sortie JSON, destinée aux programmes (extension d'éditeur, tableau de bord). Aucun autre affichage.",
-    "opt_level":      "Filtre par niveau (l1, l2, lfcs, rhcsa)",
-    "opt_section":    "Filtre par section (linux, ansible, terraform, docker…)",
+    "opt_level":      "Filtre par niveau : le champ `level` de chaque lab.yaml",
+    "opt_section":
+        "Filtre par section : le champ `section` de chaque lab.yaml, ou "
+        "`repo.category` du meta.yml quand le lab n'en déclare pas",
+    "opt_list_labs_all": "Ignore le contexte actif (dsoxlab use) pour ce listage",
+    "list_labs_vide_par_contexte":
+        "Aucun lab ne satisfait à la fois le contexte actif ({label}) et tes "
+        "filtres, alors que {count} lab(s) y satisfont sans le contexte.\n"
+        "  dsoxlab list-labs --all ...   ignore le contexte pour ce listage\n"
+        "  dsoxlab use --reset           l'efface",
     "opt_type":       "Filtre par type : lab, challenge ou capstone",
-    "opt_bloc":       "Filtre par numéro de bloc (1-8)",
+    "opt_bloc":       "Filtre par numéro de bloc (la position de la section dans le meta.yml)",
     "opt_top":        "Nombre de résultats affichés",
     "opt_doctor_strict":
         "sort en 9 si un contrôle requis échoue, en 10 s'il n'a pas pu être "
@@ -819,10 +827,12 @@ Chaque lab déclare :
     [dim]--reset / -r[/dim]         Efface le contexte actif (affiche de nouveau tous les labs).
 
   [cyan]list-labs[/cyan]            Liste les labs. Options :
-    [dim]--section / -s[/dim]       Filtre par section.
+    [dim]--section / -s[/dim]       Filtre par section : la [dim]section[/dim] de chaque lab.yaml.
     [dim]--level   / -l[/dim]       Filtre par niveau.
     [dim]--type    / -t[/dim]       Filtre par type : [bold]lab[/bold], [bold]challenge[/bold] ou [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc (1-8).
+    [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc.
+    [dim]--all     / -a[/dim]       Ignore le contexte actif. Les filtres s'ajoutent au
+                       contexte ; un résultat vide qui lui est dû le dit.
     [dim]--long[/dim]               Toutes les colonnes, même sur un terminal étroit.
     [dim]--json[/dim]               Le catalogue, en document machine.
 

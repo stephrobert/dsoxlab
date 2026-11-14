@@ -32,10 +32,18 @@ STRINGS: dict[str, str] = {
     "opt_help":     "Show this message and exit.",
     "opt_lab_home": "Root of the lab catalog (default: auto-detected).",
     "opt_json":           "JSON output, meant for programs (editor extension, dashboard). Nothing else is printed.",
-    "opt_level":    "Filter by level (l1, l2, lfcs, rhcsa)",
-    "opt_section":  "Filter by section (linux, ansible, terraform, docker…)",
+    "opt_level":    "Filter by level: the `level` field of each lab.yaml",
+    "opt_section":
+        "Filter by section: the `section` field of each lab.yaml, or "
+        "`repo.category` from meta.yml when the lab declares none",
+    "opt_list_labs_all": "Ignore the active context (dsoxlab use) for this listing",
+    "list_labs_vide_par_contexte":
+        "No lab matches both the active context ({label}) and your filters, "
+        "while {count} lab(s) match without the context.\n"
+        "  dsoxlab list-labs --all ...   ignores the context for this listing\n"
+        "  dsoxlab use --reset           clears it",
     "opt_type":     "Filter by type: lab, challenge or capstone",
-    "opt_bloc":     "Filter by bloc number (1-8)",
+    "opt_bloc":     "Filter by bloc number (the position of the section in meta.yml)",
     "opt_top":      "Number of displayed results",
     "opt_doctor_strict":
         "exit 9 if a required check fails, 10 if it could not be measured (for a script, not a human)",
@@ -806,10 +814,12 @@ Each lab declares:
     [dim]--reset / -r[/dim]         Clear the active context (show all labs again).
 
   [cyan]list-labs[/cyan]            List labs. Options:
-    [dim]--section / -s[/dim]       Filter by section.
+    [dim]--section / -s[/dim]       Filter by section: the [dim]section[/dim] of each lab.yaml.
     [dim]--level   / -l[/dim]       Filter by level.
     [dim]--type    / -t[/dim]       Filter by type: [bold]lab[/bold], [bold]challenge[/bold] or [bold]capstone[/bold].
-    [dim]--bloc    / -b[/dim]       Filter by bloc number (1-8).
+    [dim]--bloc    / -b[/dim]       Filter by bloc number.
+    [dim]--all     / -a[/dim]       Ignore the active context. Filters add up with the
+                       context; an empty result caused by it says so.
     [dim]--json[/dim]               The catalog as a machine document.
 
   [cyan]show <id>[/cyan]            Full details of a lab (skills, runtime, links …).
