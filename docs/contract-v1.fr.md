@@ -81,14 +81,42 @@ tiendra ici sans étaler `repo.*` davantage.
 | Champ | Obligatoire | Type | Remarques |
 | --- | --- | --- | --- |
 | `portal_url` | non | chaîne | URL de remise, en `https`. Voir [la politique du portail](./security.fr.md). |
+| `sync` | non | dictionnaire | L'API de synchronisation qu'emploient `dsoxlab login` et `dsoxlab push`. Voir plus bas. |
 
 ```yaml
 learning:
   portal_url: https://formation.example.org/mon-apprentissage/
+  sync:
+    protocol: learner-sync/1
+    api: https://api.example.org
+    issuer: https://issuer.example.org
+    oauth_domain: https://connexion.example.org
+    client_id: 0123456789abcdefghijkl
+    callback_url: https://formation.example.org/auth/cli/
 ```
 
-**Ce que cette URL ne dit pas.** Elle ne dit pas que dsoxlab envoie quoi que ce
-soit — il n'envoie rien, jamais. Elle ne dit pas que le portail est joignable
+**`learning.sync`** déclare où `dsoxlab push` remet les preuves sans navigateur.
+Absent par défaut : `dsoxlab login` et `dsoxlab push` disent alors que ce
+catalogue ne déclare aucune synchronisation, et rien ne quitte la machine. Un
+envoi exige trois choses à la fois, dont deux manquent par défaut : ce bloc, un
+`dsoxlab login`, et un `dsoxlab push` tapé par l'apprenant.
+
+| Champ | Remarques |
+| --- | --- |
+| `protocol` | Le contrat que parle le portail. Seul `learner-sync/1` est implémenté ; toute autre valeur fait refuser `push` en nommant ce qui est attendu. |
+| `api` | Racine de l'API, en `https`. Les chemins viennent du protocole. |
+| `issuer` | L'issuer OIDC, en `https`. Il identifie le portail et nomme le fichier de session local. Distinct d'`oauth_domain`. |
+| `oauth_domain` | Racine des points d'entrée OAuth (`/oauth2/authorize`, `/oauth2/token`), en `https`. |
+| `client_id` | Identifiant du client OAuth **public** dédié à la CLI (PKCE, sans secret). Pas le client du site. |
+| `callback_url` | La page `https` où revient l'autorisation quand aucun retour local n'est possible ; l'apprenant colle le code qu'elle affiche. |
+| `callback_port` | Port fixe de l'adresse de retour locale, quand le fournisseur en accepte une. |
+
+Quatre adresses publiques et un identifiant de client public : c'est pour cela
+que ce bloc peut vivre dans un dépôt versionné. Les descriptions complètes sont
+dans [`schemas/meta.schema.json`](../schemas/meta.schema.json).
+
+**Ce que `portal_url` ne dit pas.** Elle ne dit pas que dsoxlab envoie quoi que
+ce soit : seuls `sync`, un `login` et un `push` réunis le font. Elle ne dit pas que le portail est joignable
 depuis la machine où l'outil tourne, ni que le navigateur y tourne aussi : un
 apprenant dans WSL, dans une VM ou derrière SSH lit un lien et décide. Et elle ne
 dit pas que ce portail est approuvé par qui que ce soit — il est *déclaré par ce

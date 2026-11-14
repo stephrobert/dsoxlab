@@ -66,6 +66,18 @@ Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
   mesurés le 2026-11-14 n'avait un tel hôte. Trouvé par le premier essai réel
   des hôtes optionnels sur Incus.
 
+- **La documentation d'auteur dit ce que fait le moteur.** Quatre écarts
+  relevés en écrivant le volet auteur de la formation DSOXLab : `new catalog`
+  était dit n'écrire aucun `conftest.py` et, dans son aide, quatre éléments,
+  alors qu'il pose un socle complet (conftest, workflows de CI et de release,
+  pre-commit, gouvernance, ses propres tests) ; le `CONTRIBUTING` généré disait
+  encore de lancer `list-labs` avant `validate-structure`, conseil caduc depuis
+  la 0.1.97 ; `learning.sync`, que lisent `login` et `push`, n'était documenté
+  que dans le schéma JSON, et le contrat affirmait encore que dsoxlab n'envoie
+  « jamais » rien ; le guide d'auteur ne disait pas que le `conftest.py` généré
+  n'importe rien de dsoxlab, à dessein, si bien qu'un catalogue `vm` ajoute
+  lui-même `build_inventory`. Un test tient désormais chacun d'eux.
+
 ### Modifié
 
 - **`services/doctor.py` est découpé en un paquet de familles de contrôles**

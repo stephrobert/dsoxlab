@@ -44,7 +44,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab list-labs` | Liste tous les labs disponibles (filtrés par contexte actif si défini). |
 | `dsoxlab login` | Se connecter au portail que ce catalogue déclare, pour pouvoir y envoyer ses preuves |
 | `dsoxlab logout` | Oublier la session locale de ce portail |
-| `dsoxlab new catalog` | Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/. |
+| `dsoxlab new catalog` | Crée un catalogue vide mais complet : meta.yml, labs/, ssh/, conftest.py, workflows de CI et de release, pre-commit, gouvernance et ses propres tests. |
 | `dsoxlab new lab` | Crée un lab conforme, découvert dès le prochain list-labs. |
 | `dsoxlab next` | Recommande le prochain lab ou challenge à compléter dans le contexte actif. |
 | `dsoxlab progress` | Affiche la progression par bloc (labs complétés, score moyen, challenges et capstones). |

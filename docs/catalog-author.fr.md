@@ -104,8 +104,11 @@ l'autre n'est nécessaire dans un lab neuf.
 `conftest.py` posé là est collecté pour tous les labs : c'est là que va
 l'import de `build_inventory` décrit plus bas, et là qu'un catalogue de labs
 `shell` résout `<lab>/challenge/work` depuis l'emplacement du fichier de test.
-`dsoxlab new catalog` n'en écrit aucun ; les catalogues Linux et Terraform en
-portent chacun un à leur racine, et l'un ou l'autre est un bon point de départ.
+`dsoxlab new catalog` en écrit un qui ne porte que l'aide
+`message(en=…, fr=…)`, et à dessein aucun `from dsoxlab… import` : les tests
+d'un lab doivent rester jouables par un simple `pytest`. Un catalogue de labs
+`vm` ajoute lui-même l'import de `build_inventory` ; le catalogue Linux en porte
+un exemple complet à sa racine, le catalogue Terraform un pour des labs `shell`.
 
 
 ## `validate-structure` voit les labs qu'il ne peut pas charger

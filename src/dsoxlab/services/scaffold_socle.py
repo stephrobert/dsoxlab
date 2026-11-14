@@ -539,12 +539,11 @@ duplication. Use the `message(en=…, fr=…)` helper of `conftest.py`.
 ```bash
 dsoxlab validate-structure     # the contract, offline
 pytest tests/                  # this repository's own guardrails
-dsoxlab list-labs              # FIRST: a lab.yaml that raises disappears here
 ```
 
-Run `list-labs` **before** `validate-structure`: the validator iterates over
-the labs already loaded, so a lab whose `lab.yaml` raises passes validation
-without a word.
+`validate-structure` also reports the labs the engine cannot load (a
+`lab.yaml` that raises, a lab listed in `meta.yml` but absent from the disk),
+and fails on them: it is enough on its own.
 """
 
 CONTRIBUTING_FR = """\
@@ -592,12 +591,11 @@ version anglaise par duplication. Emploie le helper `message(en=…, fr=…)` de
 ```bash
 dsoxlab validate-structure     # le contrat, hors ligne
 pytest tests/                  # les garde-fous propres à ce dépôt
-dsoxlab list-labs              # D'ABORD : un lab.yaml qui lève disparaît ici
 ```
 
-Joue `list-labs` **avant** `validate-structure` : le validateur itère sur les
-labs déjà chargés, donc un lab dont le `lab.yaml` lève passe la validation sans
-un mot.
+`validate-structure` rapporte aussi les labs que le moteur ne peut pas charger
+(un `lab.yaml` qui lève, un lab listé dans le `meta.yml` mais absent du disque),
+et il échoue sur eux : il suffit à lui seul.
 """
 
 CODE_OF_CONDUCT_EN = """\

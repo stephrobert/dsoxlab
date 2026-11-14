@@ -64,6 +64,17 @@ Open bugs settled, the most serious one being a silent loss of VMs.
   of the catalogues measured on 2026-11-14 had such a host. Found by the first
   real Incus run of the optional hosts.
 
+- **The author documentation says what the engine does.** Four gaps found
+  while writing the author part of the DSOXLab course: `new catalog` was said to
+  write no `conftest.py` and, in its help, four items, when it lays a complete
+  foundation (conftest, CI and release workflows, pre-commit, governance, its
+  own tests); the generated `CONTRIBUTING` still said to run `list-labs` before
+  `validate-structure`, advice obsolete since 0.1.97; `learning.sync`, read by
+  `login` and `push`, was documented only in the JSON schema, and the contract
+  still claimed dsoxlab "never" sends anything; the author guide did not say
+  that the generated `conftest.py` deliberately imports nothing from dsoxlab,
+  so a `vm` catalogue adds `build_inventory` itself. A test now holds each one.
+
 ### Changed
 
 - **`services/doctor.py` is split into a package of check families** (#199):

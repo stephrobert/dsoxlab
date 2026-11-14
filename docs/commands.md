@@ -43,7 +43,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab list-labs` | List all available labs (filtered by active context if set). |
 | `dsoxlab login` | Sign in to the portal this catalog declares, so proofs can be pushed |
 | `dsoxlab logout` | Forget the local session for this portal |
-| `dsoxlab new catalog` | Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/. |
+| `dsoxlab new catalog` | Scaffold an empty but complete catalog: meta.yml, labs/, ssh/, conftest.py, CI and release workflows, pre-commit, governance files and its own tests. |
 | `dsoxlab new lab` | Scaffold a lab, discovered by the next list-labs. |
 | `dsoxlab next` | Recommend the next lab or challenge to complete in the active context. |
 | `dsoxlab progress` | Show progression by bloc (labs completed, average score, challenges and capstones). |

@@ -401,7 +401,8 @@ STRINGS: dict[str, str] = {
     "cmd_new_help":
         "Scaffold a catalog or a lab that matches the contract, ready to fill.",
     "cmd_new_catalog_help":
-        "Scaffold an empty catalog: meta.yml, labs/, .gitignore, ssh/.",
+        "Scaffold an empty but complete catalog: meta.yml, labs/, ssh/, conftest.py, "
+        "CI and release workflows, pre-commit, governance files and its own tests.",
     "cmd_new_lab_help":
         "Scaffold a lab, discovered by the next list-labs.",
     "arg_new_id": "Id, lowercase, no spaces.",
@@ -931,8 +932,9 @@ Each lab declares:
     [dim]--force[/dim]              Reinstall over it (loses progress).
 
   [cyan]new catalog <id>[/cyan]     Scaffolds an empty but compliant catalog: meta.yml,
-                       labs/, .gitignore, ssh/. It passes [cyan]validate-structure[/cyan]
-                       with no edit.
+                       labs/, ssh/, conftest.py, CI and release workflows,
+                       pre-commit, governance files and its own tests. It passes
+                       [cyan]validate-structure[/cyan] with no edit.
     [dim]--in <dir>[/dim]           Where to create it. Defaults to the current directory.
   [cyan]new lab <id>[/cyan]         Scaffolds a compliant lab, discovered by the next
                        [cyan]list-labs[/cyan]. Its test [bold]fails[/bold] until it is written: a

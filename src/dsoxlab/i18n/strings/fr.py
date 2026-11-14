@@ -406,7 +406,8 @@ STRINGS: dict[str, str] = {
     "cmd_new_help":
         "Crée un catalogue ou un lab conforme au contrat, prêt à remplir.",
     "cmd_new_catalog_help":
-        "Crée un catalogue vide : meta.yml, labs/, .gitignore, ssh/.",
+        "Crée un catalogue vide mais complet : meta.yml, labs/, ssh/, conftest.py, "
+        "workflows de CI et de release, pre-commit, gouvernance et ses propres tests.",
     "cmd_new_lab_help":
         "Crée un lab conforme, découvert dès le prochain list-labs.",
     "arg_new_id": "Identifiant, en minuscules, sans espace.",
@@ -946,8 +947,9 @@ Chaque lab déclare :
     [dim]--force[/dim]              Réinstalle par-dessus (perd la progression).
 
   [cyan]new catalog <id>[/cyan]     Crée un catalogue vide mais conforme : meta.yml,
-                       labs/, .gitignore, ssh/. Il passe [cyan]validate-structure[/cyan]
-                       sans retouche.
+                       labs/, ssh/, conftest.py, workflows de CI et de release,
+                       pre-commit, gouvernance et ses propres tests. Il passe
+                       [cyan]validate-structure[/cyan] sans retouche.
     [dim]--in <dir>[/dim]           Où le créer. Défaut : le répertoire courant.
   [cyan]new lab <id>[/cyan]         Crée un lab conforme, découvert dès le prochain
                        [cyan]list-labs[/cyan]. Son test [bold]échoue[/bold] tant qu'il n'est pas
