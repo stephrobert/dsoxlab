@@ -55,6 +55,17 @@ Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
   du contexte et des filtres le dit, avec le nombre de labs qui satisfont les
   filtres sans le contexte.
 
+### Modifié
+
+- **`services/doctor.py` est découpé en un paquet de familles de contrôles**
+  (#199) : `services/doctor_controles/` porte le modèle, l'outillage, KVM, les
+  pools libvirt, Incus, les ressources, le réseau, le catalogue et les
+  conteneurs, aucun module au-delà de 271 lignes. `services/doctor.py` (1710
+  lignes avant, 396 aujourd'hui) reste le point d'entrée : il réexporte chaque
+  nom et garde le classement requis/informatif et `collect_checks`. Aucun
+  changement de comportement : mêmes sorties, mêmes codes de sortie (9, 10),
+  et la suite de tests existante passe sans qu'un seul test soit modifié.
+
 ### Inchangé
 
 - **#358** (`start` et `doctor` comptaient tout le catalogue) était déjà

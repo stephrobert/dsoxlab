@@ -54,6 +54,16 @@ Open bugs settled, the most serious one being a silent loss of VMs.
   context adding up with the filters says so, with the number of labs that
   match without the context.
 
+### Changed
+
+- **`services/doctor.py` is split into a package of check families** (#199):
+  `services/doctor_controles/` holds the model, tooling, KVM, libvirt pools,
+  Incus, resources, network, catalogue and containers checks, none above 271
+  lines. `services/doctor.py` (1710 lines before, 396 now) stays the entry
+  point: it re-exports every name and keeps the required/informative ranking
+  and `collect_checks`. No behaviour change: same outputs, same exit codes
+  (9, 10), and the existing test suite passes without a single test modified.
+
 ### Not changed
 
 - **#358** (`start` and `doctor` counting the whole catalogue) was already
