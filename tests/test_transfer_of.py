@@ -264,6 +264,8 @@ class TestSansRegression:
         document = machine.lab_dict(_lab(tmp_path, "seul"))
 
         assert document.pop("transfer_of") is None
+        # `status` (0.9.3, #369) est le seul autre champ ajouté depuis.
+        assert document.pop("status") == "published"
         assert set(document) == {
             "id", "title", "section", "bloc", "bloc_order", "level", "type",
             "exam_passing_score", "difficulty", "estimated_time", "skills",

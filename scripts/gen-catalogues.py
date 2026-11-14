@@ -18,6 +18,12 @@ nombre de `labs/**/lab.yaml` dans son arbre git, lu par l'API GitHub.
     --check       mesure et sort en 1 si un README diffère de la mesure, ou si
                   un dépôt public porte des labs sans être dans le manifeste.
 
+UNE ENTRÉE `draft: true` est mesurée mais n'entre pas dans la table, et n'est
+pas un écart, même à zéro lab : c'est un catalogue annoncé comme pas prêt. Une
+entrée SANS `draft` qui ne publie aucun lab est en revanche un écart (sortie en
+1) : `catalog list` la proposerait vide à un apprenant. C'était le défaut de la
+0.9.2, qui proposait `certificats` sans un seul lab publié.
+
 Un contrôle qui n'a pas pu regarder ne conclut jamais au vert : sans réseau, ou
 sur un arbre git tronqué, le script sort en 2 et dit ce qu'il n'a pas pu lire.
 
@@ -74,6 +80,11 @@ class NonMesurable(RuntimeError):
 def _manifeste() -> list[dict[str, Any]]:
     donnees = yaml.safe_load(MANIFESTE.read_text(encoding="utf-8"))
     return list(donnees["catalogues"])
+
+
+def _brouillon(entree: dict[str, Any]) -> bool:
+    """`draft: true` au manifeste. Seul un booléen vrai compte, comme dans dsoxlab."""
+    return entree.get("draft") is True
 
 
 def _depot(url: str) -> tuple[str, str]:
@@ -145,6 +156,9 @@ def _mesurer_le_manifeste(catalogues: list[dict[str, Any]], jeton: str | None) -
         if infos.get("archived"):
             ecarts.append(f"{nom} est ARCHIVÉ : le manifeste propose un dépôt qui ne bouge plus")
         comptes[entree["depot"]] = _labs(_arbre(proprio, nom, infos["default_branch"], jeton))
+        if comptes[entree["depot"]] == 0 and not _brouillon(entree):
+            ecarts.append(f"{nom} ne publie aucun lab : `catalog list` le propose vide. "
+                          "Passe-le en `draft: true` ou retire-le du manifeste")
     return comptes, ecarts
 
 
@@ -175,7 +189,8 @@ def _oublies(catalogues: list[dict[str, Any]], jeton: str | None) -> list[str]:
 
 def _table(lang: str, catalogues: list[dict[str, Any]], comptes: dict[str, int]) -> str:
     cat, labs, sujet = EN_TETES[lang]
-    publies = [c for c in catalogues if comptes.get(c["depot"], 0) > 0]
+    publies = [c for c in catalogues
+               if comptes.get(c["depot"], 0) > 0 and not _brouillon(c)]
     lignes = [f"| {cat} | {labs} | {sujet} |", "|---|---:|---|"]
     for entree in sorted(publies, key=lambda c: (-comptes[c["depot"]], c["depot"])):
         _, depot = _depot(entree["depot"])
@@ -218,10 +233,11 @@ def main() -> int:
 
     ecarts += [f"{o} : dépôt public avec des labs, absent du manifeste. "
                "Ajoute-le à src/dsoxlab/templates/catalogues.yml" for o in oublies]
-    sans_lab = [_depot(c["depot"])[1] for c in catalogues if comptes.get(c["depot"]) == 0]
-    if sans_lab:
-        print(f"{len(sans_lab)} catalogue(s) sans lab publié, absent(s) de la table : "
-              f"{', '.join(sans_lab)}")
+    brouillons = [f"{_depot(c['depot'])[1]} ({comptes[c['depot']]} labs)"
+                  for c in catalogues if _brouillon(c) and c["depot"] in comptes]
+    if brouillons:
+        print(f"{len(brouillons)} catalogue(s) en brouillon, mesuré(s) mais absent(s) de la table : "
+              f"{', '.join(brouillons)}")
 
     perimes = []
     for nom, lang in CIBLES.items():
@@ -235,14 +251,16 @@ def main() -> int:
 
     for e in ecarts:
         print(f"  ✘ {e}", file=sys.stderr)
-    total = sum(comptes.values())
+    hors_brouillon = {c["depot"] for c in catalogues if not _brouillon(c)}
+    total = sum(n for depot, n in comptes.items() if depot in hors_brouillon)
     if arguments.check and perimes:
         print(f"{', '.join(perimes)} : table des catalogues périmée par rapport aux dépôts "
               "publiés. Joue `python3 scripts/gen-catalogues.py`.", file=sys.stderr)
     elif perimes:
         print(f"table régénérée dans {', '.join(perimes)} ({total} labs mesurés)")
     else:
-        print(f"table des catalogues à jour ({total} labs mesurés sur {len(comptes)} dépôts publiés)")
+        print(f"table des catalogues à jour ({total} labs mesurés sur "
+              f"{len(hors_brouillon & comptes.keys())} dépôts publiés hors brouillon)")
     return 1 if ecarts or (arguments.check and perimes) else 0
 
 

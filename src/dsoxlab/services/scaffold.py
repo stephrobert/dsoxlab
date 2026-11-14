@@ -129,6 +129,8 @@ doc_url: https://example.org/a-remplir   # REQUIS, http(s)
 lab_type: lab
 # feedback: full               # full | first-line | verdict. Défaut selon lab_type :
 #                             # lab = full, challenge = first-line, capstone = verdict.
+# status: draft                # published (défaut) | draft : poussé, mais absent de
+#                             # list-labs, next, progress, export et push.
 estimated_time: 30m
 """
 

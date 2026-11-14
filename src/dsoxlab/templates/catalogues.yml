@@ -36,6 +36,15 @@
 # refuse un README périmé, un dépôt privé ou archivé proposé ici, et un dépôt
 # public porteur de labs qui manquerait ici. Le hook de pre-push et la CI le
 # jouent.
+#
+# UNE ENTRÉE EN BROUILLON : `draft: true`
+#
+# Un catalogue dont le dépôt existe mais ne publie encore aucun lab porte
+# `draft: true`. `catalog list` et l'accueil ne le proposent pas (sauf
+# `catalog list --drafts`), `catalog add` l'installe toujours, et
+# `gen-catalogues.py` le mesure sans le mettre dans la table du README. Une
+# entrée SANS `draft` qui ne publie aucun lab est refusée par ce même script :
+# on la passe en brouillon ou on la retire, on ne la propose pas vide.
 
 schema_version: 1
 
@@ -122,6 +131,7 @@ catalogues:
 
   - id: certificats
     depot: https://github.com/stephrobert/certificats-dsoxlab-training
+    draft: true
     description_en: "Certificates: inventory a fleet, run an internal authority, renew and revoke"
     description_fr: "Certificats : inventorier un parc, tenir une autorité interne, renouveler et révoquer"
 

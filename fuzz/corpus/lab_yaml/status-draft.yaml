@@ -1,0 +1,7 @@
+id: lab-brouillon
+title: Lab brouillon
+level: c1
+status: draft
+runtime:
+  type: shell
+  workdir: challenge/work

@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A draft state for a lab: `status: draft` in `lab.yaml` (#369).** Optional,
+  `published` by default, so no existing catalog changes. A draft lab is left
+  out of `list-labs` (shown, marked "draft", with the new `list-labs --drafts`),
+  of `next` and `start`, of `course` (unless the new `course <id> --drafts`) and
+  of `progress`. Its attempts are neither exported nor pushed, and
+  `export --lab <id>` refuses it. `run`, `check`, `submit` and `show` still
+  accept it by its id, with a line saying it is a draft. `validate-structure`
+  validates it like any other lab, and flags an unknown value, which behaves as
+  `published`, as `feedback` does. `scores` is unchanged: it is the local
+  history of what was played. `list-labs --json` and `show --json` carry
+  `status` for every lab, an additive field. Documented in `docs/contract-v1`,
+  `docs/machine-output` and `schemas/lab.schema.json`.
+- **A draft state for a catalog: `draft: true` in the packaged manifest.**
+  `catalog list` and the welcome screen no longer offer such an entry;
+  `catalog list --drafts` shows it, and `catalog add <url>` or `<id>` still
+  installs it. `catalog list --json` carries `draft` for every known entry.
+  `certificats` goes back to draft until it publishes a lab.
+
+### Fixed
+
+- **`scripts/gen-catalogues.py` refuses a manifest entry that publishes no lab,
+  unless it is a draft.** Version 0.9.2 measured `certificats` at zero labs,
+  left it out of the README table, and let `catalog list` offer it to learners
+  anyway. Such an entry is now a discrepancy (exit 1), with a message that says
+  to mark it `draft: true` or remove it. A draft entry is measured, stays out of
+  the table even with labs, and is never reported, nor as a forgotten public
+  repository.
+
 ### Documentation
 
 - **Durable decisions now live in `docs/decisions/`, one record each** (#203).

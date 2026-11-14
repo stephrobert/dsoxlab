@@ -475,13 +475,26 @@ def _cellules_du_lab(
     return {
         "section": cellule_section,
         "id": texte_affichable(lab.id),
-        "title": texte_affichable(lab.title),
+        "title": _titre_de_ligne(lab),
         "type": _type_badge(lab.lab_type),
         "level": Text(neutraliser(lab.level), style=_level_color(lab.level)),
         "runtime": lab.runtime.type.value,
         "duration": texte_affichable(lab.estimated_time),
         "score": _cellule_de_score(lab.id, scores),
     }
+
+
+def _titre_de_ligne(lab: LabDefinition) -> str:
+    """Le titre d'une ligne de ``list-labs``, marqué quand le lab est un brouillon.
+
+    Un brouillon n'est listé que sous ``--drafts`` : sans la marque, l'auteur ne
+    le distinguerait pas des labs publiés qui l'entourent. Le titre, parce que
+    c'est la seule colonne élastique : la marque ne fait tomber aucune colonne.
+    """
+    titre = texte_affichable(lab.title)
+    if not lab.is_draft:
+        return titre
+    return f"{titre} [yellow]({_('lab_brouillon_marque')})[/yellow]"
 
 
 def print_labs_table(
@@ -558,6 +571,8 @@ def print_lab_detail(lab: LabDefinition, status: str | None = None) -> None:
         lines.append(
             f"{_('field_transfer_of')} {texte_affichable(lab.transfer_of)}"
         )
+    if lab.is_draft:
+        lines.append(f"{_('field_publication')} [yellow]{_('lab_brouillon_marque')}[/yellow]")
     if lab.track:
         lines.append(f"{_('field_track')}   {texte_affichable(', '.join(lab.track))}")
     if lab.certification_tags:
@@ -904,8 +919,9 @@ def print_catalogues(
         table.add_column(_("catalog_col_description"))
         table.add_column(_("catalog_col_depot"), style="dim")
         for connu in connus:
+            marque = f" {_('catalog_marque_brouillon')}" if connu.draft else ""
             table.add_row(
-                texte_affichable(connu.id),
+                texte_affichable(connu.id) + marque,
                 texte_affichable(connu.description(lang)),
                 texte_affichable(connu.depot),
             )

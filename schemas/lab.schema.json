@@ -140,6 +140,12 @@
       "enum": ["full", "first-line", "verdict"],
       "description": "What check shows of a failed criterion: the author's full message (full), only its first line (first-line), or the verdict alone (verdict). Default by lab_type: lab = full, challenge = first-line, capstone or any lab with exam_passing_score = verdict."
     },
+    "status": {
+      "type": "string",
+      "enum": ["published", "draft"],
+      "default": "published",
+      "description": "Publication state. published (default) changes nothing. draft hides the lab from list-labs (unless --drafts), next, course (unless --drafts), progress, export and push; run, check, submit and show still accept it by its id, with a line saying it is a draft. validate-structure validates it like any other lab and flags an unknown value, which behaves as published."
+    },
     "bloc": {
       "type": "integer",
       "description": "Position of the teaching bloc. Normally NOT written here: it is derived from meta.yml sections[].labs[]. Declaring it forces an exception and duplicates information that already lives elsewhere."

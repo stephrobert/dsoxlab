@@ -481,6 +481,28 @@ def _complete_lab_id(incomplete: str) -> list[tuple[str, str]]:
         return []
 
 
+def _dire_si_brouillon(lab: LabDefinition, *, quiet: bool = False) -> None:
+    """Une ligne qui dit qu'on joue un brouillon, quand c'en est un.
+
+    Un brouillon reste jouable par son identifiant : c'est ce qui permet à son
+    auteur de l'éprouver. Mais rien d'autre ne le distinguerait d'un lab
+    publié, alors qu'il est absent de ``list-labs``, de ``next`` et de
+    ``progress``, et que ses tentatives ne partent ni à l'export ni au portail.
+
+    ``quiet`` (mode ``--json``) envoie la ligne sur stderr : la sortie standard
+    ne porte alors qu'un document.
+    """
+    if not lab.is_draft:
+        return
+    from ..security.terminal import texte_affichable
+
+    message = _("lab_brouillon_info", lab_id=texte_affichable(lab.id))
+    if quiet:
+        note(message)
+    else:
+        info(message)
+
+
 def _resolve_lab(
     root: Path, lab_id: str | None, lang: str
 ) -> LabDefinition:

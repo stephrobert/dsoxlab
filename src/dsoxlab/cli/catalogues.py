@@ -45,12 +45,17 @@ logger = logging.getLogger(__name__)
 @catalog_app.command("list", help=_("cmd_catalog_list_help"))
 def catalog_list(
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
+    brouillons: Annotated[
+        bool, typer.Option("--drafts", help=_("opt_catalog_list_drafts"))
+    ] = False,
 ) -> None:
     """Les catalogues connus, et ceux qui sont installés."""
     from ..reporting.console import print_catalogues
-    from ..services.catalog import installes, lire_manifeste
+    from ..services.catalog import installes, lire_manifeste, proposes
 
     connus = lire_manifeste()
+    if not brouillons:
+        connus = proposes(connus)
     poses = installes()
 
     if as_json:
@@ -58,7 +63,7 @@ def catalog_list(
             "schema": 1,
             "known": [
                 {"id": c.id, "repository": c.depot,
-                 "description": c.description(get_lang())}
+                 "description": c.description(get_lang()), "draft": c.draft}
                 for c in connus
             ],
             "installed": [

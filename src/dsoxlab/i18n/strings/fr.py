@@ -37,6 +37,18 @@ STRINGS: dict[str, str] = {
         "Filtre par section : le champ `section` de chaque lab.yaml, ou "
         "`repo.category` du meta.yml quand le lab n'en déclare pas",
     "opt_list_labs_all": "Ignore le contexte actif (dsoxlab use) pour ce listage",
+    "opt_list_labs_drafts": "Liste aussi les labs déclarés status: draft, marqués comme tels",
+    "opt_course_drafts": "Affiche le cours d'un lab déclaré status: draft",
+    "opt_catalog_list_drafts": "Liste aussi les catalogues que le manifeste marque en brouillon",
+    "lab_brouillon_info":
+        "{lab_id} est un brouillon (status: draft) : il n'apparaît ni dans "
+        "list-labs, ni dans next, ni dans progress, et ses tentatives ne sont ni "
+        "exportées ni envoyées par push.",
+    "lab_brouillon_marque": "brouillon",
+    "catalog_marque_brouillon": "(brouillon)",
+    "course_brouillon":
+        "{lab_id} est un brouillon (status: draft) : son cours n'est pas encore "
+        "publié. Son auteur le lit avec dsoxlab course {lab_id} --drafts",
     "list_labs_vide_par_contexte":
         "Aucun lab ne satisfait à la fois le contexte actif ({label}) et tes "
         "filtres, alors que {count} lab(s) y satisfont sans le contexte.\n"
@@ -291,6 +303,9 @@ STRINGS: dict[str, str] = {
     "preuve_sans_tentative":
         "Aucun résultat enregistré pour {lab_id} : il n'y a pas encore de "
         "preuve à remettre. Jouez d'abord dsoxlab submit {lab_id}.",
+    "preuve_lab_brouillon":
+        "{lab_id} est un brouillon (status: draft) : il n'est pas publié, donc "
+        "ses tentatives ne produisent aucune preuve.",
     "preuve_lab_validation":
         "{lab_id} défend un guide publié et ne note personne : il ne produit "
         "aucune preuve de pratique.",
@@ -834,6 +849,8 @@ Chaque lab déclare :
     [dim]--bloc    / -b[/dim]       Filtre par numéro de bloc.
     [dim]--all     / -a[/dim]       Ignore le contexte actif. Les filtres s'ajoutent au
                        contexte ; un résultat vide qui lui est dû le dit.
+    [dim]--drafts[/dim]             Liste aussi les labs déclarés [bold]status: draft[/bold],
+                       marqués comme tels. Masqués sinon.
     [dim]--long[/dim]               Toutes les colonnes, même sur un terminal étroit.
     [dim]--json[/dim]               Le catalogue, en document machine.
 
@@ -849,6 +866,9 @@ Chaque lab déclare :
                        [dim]<id>[/dim] est optionnel : sans lui, le lab que [bold]next[/bold] suggère.
 
   [cyan]run <id>[/cyan]             Démarre l'environnement du lab (un shell, ou une vm provisionnée).
+                       Un lab brouillon se joue aussi, nommé par son identifiant,
+                       avec une ligne qui dit que c'est un brouillon. Idem pour
+                       check, submit et show.
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Affiche le cours, une section à la fois. Le découpage vient
                        du course.yaml du lab s'il en déclare un ; sinon il est
@@ -856,6 +876,7 @@ Chaque lab déclare :
     [dim]--section / -s[/dim]       Section à afficher : numéro ou identifiant.
     [dim]--next    / -n[/dim]       Section suivante.  [dim]--prev / -p[/dim] : précédente.
     [dim]--all[/dim]                Tout le cours d'un bloc, sans découpage.
+    [dim]--drafts[/dim]             Affiche le cours d'un lab brouillon. Refusé sinon.
     [dim]--no-pager[/dim]           Sans pagination.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
@@ -888,6 +909,7 @@ Chaque lab déclare :
                        [yellow]verdict reçu / recalé[/yellow] face à ce seuil.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
   [cyan]progress[/cyan]             Résumé de progression par bloc (labs faits, score, challenge, capstone).
+                       Les labs brouillons ne sont pas comptés, ici ni dans next.
     [dim]--json[/dim]               La même progression, en document.
 
   [cyan]next[/cyan]                 Recommande le prochain lab à compléter dans le contexte actif.
@@ -918,6 +940,8 @@ Chaque lab déclare :
                        Fusionnées, jamais écrasées : le compte peut porter des
                        tentatives jouées sur une autre machine, qui sont gardées.
     [dim]--dry-run[/dim]            Dire ce qui partirait, et s'arrêter là.
+                       Les tentatives d'un lab brouillon ne partent jamais, ni
+                       à l'export.
 
   [cyan]logout[/cyan]               Oublier la session locale de ce portail.
   [cyan]reset <id>[/cyan]           Nettoie et redémarre le lab depuis zéro
@@ -958,6 +982,8 @@ Chaque lab déclare :
     [dim]--runtime <type>[/dim]     [bold]shell[/bold] (atelier local) ou [bold]vm[/bold] (machine dédiée).
 
   [cyan]catalog list[/cyan]         Les catalogues connus, et ceux qui sont installés.
+    [dim]--drafts[/dim]             Liste aussi les catalogues que le manifeste marque en
+                       brouillon. Masqués sinon ; catalog add <url> les installe.
     [dim]--json[/dim]               Document machine plutôt que tableaux.
   [cyan]catalog add <id|url>[/cyan] Installe un catalogue et le rend actif. L'identifiant
                        vient du manifeste packagé ; une URL git quelconque est
@@ -1785,6 +1811,7 @@ hors ligne, elle se tait.
     "field_skills":     "[bold]Skills :[/bold]",
     "field_doc":        "[bold]Doc :[/bold]",
     "field_transfer_of": "[bold]Variante de transfert de :[/bold]",
+    "field_publication": "[bold]Publication :[/bold]",
     "field_track":      "[bold]Parcours :[/bold]",
     "field_certifs":    "[bold]Certifs :[/bold]",
     "field_type":       "[bold]Type :[/bold]",
