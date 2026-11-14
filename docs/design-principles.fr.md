@@ -12,6 +12,9 @@ Chaque règle ci-dessous était déjà appliquée sans avoir été écrite, et c
 chacune : un principe sans son bug se discute, un principe avec son bug se
 respecte.
 
+Cette page dit **ce qui est vrai**. Pourquoi un choix durable a été préféré aux
+autres voies, cela se lit dans [les décisions d'architecture](./decisions/README.fr.md).
+
 La troisième colonne est celle qu'il faut lire deux fois. Elle nomme le test qui
 tient la règle — et là où elle dit *pas encore gardé*, c'est un manque assumé, pas
 un oubli qu'on cache.
