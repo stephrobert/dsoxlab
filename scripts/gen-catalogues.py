@@ -222,10 +222,14 @@ def main() -> int:
 
     ecarts += [f"{o} : dépôt public avec des labs, absent du manifeste. "
                "Ajoute-le à src/dsoxlab/templates/catalogues.yml" for o in oublies]
-    sans_lab = [_depot(c["depot"])[1] for c in catalogues if comptes.get(c["depot"]) == 0]
-    if sans_lab:
-        print(f"{len(sans_lab)} catalogue(s) sans lab publié, absent(s) de la table : "
-              f"{', '.join(sans_lab)}")
+    # Un catalogue qui ne publie aucun lab n'a rien à proposer : `catalog list`
+    # le montrerait, et l'apprenant qui l'installe tomberait sur un dépôt vide.
+    # La 0.9.2 l'écartait de la table sans le refuser au manifeste (certificats,
+    # dépôt encore vide le 2026-11-14). Il en sort ; la détection des dépôts
+    # oubliés le signalera dès son premier lab publié.
+    ecarts += [f"{_depot(c['depot'])[1]} ne publie aucun lab : `dsoxlab catalog list` "
+               "le propose pour rien. Retire-le du manifeste jusqu'à son premier lab publié"
+               for c in catalogues if comptes.get(c["depot"]) == 0]
 
     perimes = []
     for nom, lang in CIBLES.items():

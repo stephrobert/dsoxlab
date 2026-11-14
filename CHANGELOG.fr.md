@@ -7,6 +7,18 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Corrigé
+
+- **`dsoxlab catalog list` ne propose plus un catalogue qui ne publie aucun
+  lab.** La 0.9.2 avait ajouté `certificats` au manifeste alors que son dépôt
+  était encore vide : un apprenant qui l'installait n'obtenait rien. Il sort du
+  manifeste, et `scripts/gen-catalogues.py` refuse désormais toute entrée qui ne
+  publie aucun lab, au lieu de seulement l'écarter de la table du README. Il
+  reviendra de lui-même : le contrôle qui cherche les dépôts publics absents du
+  manifeste le nommera dès son premier lab publié.
+
 ## [0.9.2] - 2026-11-14
 
 ### Corrigé

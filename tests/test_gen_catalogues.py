@@ -99,6 +99,18 @@ def test_un_depot_public_avec_des_labs_hors_manifeste_est_nomme(gen: Any, monkey
     assert gen._oublies([ENTREE], None) == ["cat-b (1 labs publiés)"]
 
 
+def test_un_catalogue_sans_lab_publie_est_refuse(gen: Any, monkeypatch: pytest.MonkeyPatch,
+                                                 capsys: pytest.CaptureFixture[str]) -> None:
+    arbres = {"cat-a": _arbre("meta.yml", "README.md")}
+    monkeypatch.setattr(gen, "_api", _api_simulee(gen, {"cat-a": _depot("cat-a")}, arbres))
+    monkeypatch.setattr(gen, "_manifeste", lambda: [ENTREE])
+    monkeypatch.setattr(gen, "_jeton", lambda: None)
+    monkeypatch.setattr(gen, "CIBLES", {})
+    monkeypatch.setattr("sys.argv", ["gen-catalogues.py", "--check"])
+    assert gen.main() == 1
+    assert "ne publie aucun lab" in capsys.readouterr().err
+
+
 def test_la_table_trie_par_nombre_et_ecarte_les_catalogues_sans_lab(gen: Any) -> None:
     entrees = [ENTREE, {**ENTREE, "depot": "https://github.com/proprio/cat-b", "description_en": "B"},
                {**ENTREE, "depot": "https://github.com/proprio/cat-c", "description_en": "C"}]

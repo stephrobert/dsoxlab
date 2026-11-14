@@ -120,11 +120,6 @@ catalogues:
     description_en: "Relational databases: install, secure, protect and replicate PostgreSQL and MySQL"
     description_fr: "Bases relationnelles : installer, sécuriser, protéger et répliquer PostgreSQL et MySQL"
 
-  - id: certificats
-    depot: https://github.com/stephrobert/certificats-dsoxlab-training
-    description_en: "Certificates: inventory a fleet, run an internal authority, renew and revoke"
-    description_fr: "Certificats : inventorier un parc, tenir une autorité interne, renouveler et révoquer"
-
   - id: artefacts
     depot: https://github.com/stephrobert/artefacts-dsoxlab-training
     description_en: "Artifact repositories: host, secure, sign and serve packages and images"
