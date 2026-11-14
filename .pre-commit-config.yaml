@@ -101,29 +101,22 @@ repos:
         pass_filenames: false
         files: '^(src/dsoxlab/.*\.py|docs/.*\.md|[A-Z]+(\.fr)?\.md|scripts/generer-doc\.py)$'
 
-      # La liste des catalogues ne s'écrit pas, elle se mesure. Elle a été
-      # écrite une fois, avec six dépôts, alors que le disque en portait douze :
-      # une campagne menée sur ces six a sauté 901 messages dans les six autres,
-      # sans qu'aucun contrôle le dise. Ce hook relit le disque et refuse une
-      # table périmée. Sans catalogue cloné à côté, il s'abstient au lieu de
-      # conclure, ce qui est le cas en CI.
-      - id: catalogues-readme
-        name: le README dit la même chose que le manifeste des catalogues
-        entry: python3 scripts/gen-catalogues.py --check
+      # La table des catalogues ne s'écrit pas, elle se MESURE sur les dépôts
+      # publiés. Écrite à la main, elle s'est périmée trois fois : six dépôts
+      # sur douze le 2026-10-17, et le 2026-11-14 64 labs annoncés pour
+      # Kubernetes quand le dépôt publié en portait 111, huit catalogues
+      # publics absents. Ce hook compte les labs par l'API GitHub et RÉÉCRIT la
+      # table si elle a dérivé : le push s'arrête alors sur un README modifié,
+      # à committer. Il tourne à CHAQUE push, pas seulement quand le manifeste
+      # change, puisque ce sont les catalogues qui bougent. Sans réseau, il sort
+      # en 2 au lieu de conclure.
+      - id: catalogues-publies
+        name: la table des catalogues est mesurée sur les dépôts publiés
+        entry: python3 scripts/gen-catalogues.py
         language: system
         pass_filenames: false
-        files: '^(README(\.fr)?\.md|src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
-
-      # Le contrôle qui compte, et le seul qui ne peut pas tourner en CI : le
-      # manifeste dit-il la même chose que le DISQUE ? C'est lui qui attrape
-      # le défaut réel, six catalogues oubliés sur douze. Sans catalogue cloné
-      # à côté, il s'abstient au lieu de conclure.
-      - id: catalogues-mesures
-        name: le manifeste des catalogues est mesuré sur le disque
-        entry: python3 scripts/gen-catalogues.py --mesurer
-        language: system
-        pass_filenames: false
-        files: '^(src/dsoxlab/templates/catalogues\.yml|scripts/gen-catalogues\.py)$'
+        always_run: true
+        stages: [pre-push]
 
       # ── Qualité : la dette se paie en même temps qu'on produit ──────────────
       #

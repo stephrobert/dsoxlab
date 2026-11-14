@@ -125,19 +125,25 @@ leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
 | Catalogue | Labs | Ce qu'il enseigne |
 |---|---:|---|
 | [`ansible-training`](https://github.com/stephrobert/ansible-training) | 113 | Ansible, du premier playbook aux collections |
+| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 111 | Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS |
+| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 93 | Les conteneurs, Docker, Compose et Swarm |
 | [`terraform-dsoxlab-training`](https://github.com/stephrobert/terraform-dsoxlab-training) | 91 | Terraform et l'infrastructure as code |
 | [`linux-dsoxlab-training`](https://github.com/stephrobert/linux-dsoxlab-training) | 89 | Administration Linux, RHCSA et LFCS |
-| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 64 | Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS |
+| [`publier-service-dsoxlab-training`](https://github.com/stephrobert/publier-service-dsoxlab-training) | 63 | Publier un service web derrière un reverse proxy, avec des certificats automatiques |
+| [`gitlab-ci-dsoxlab-training`](https://github.com/stephrobert/gitlab-ci-dsoxlab-training) | 29 | GitLab CI/CD, sur une forge hébergée par vos soins |
+| [`bdd-dsoxlab-training`](https://github.com/stephrobert/bdd-dsoxlab-training) | 17 | Bases relationnelles : installer, sécuriser, protéger et répliquer PostgreSQL et MySQL |
 | [`iam-dsoxlab-training`](https://github.com/stephrobert/iam-dsoxlab-training) | 16 | Gestion des identités et des accès, avec Keycloak et un annuaire |
+| [`dev-pour-ops-dsoxlab-training`](https://github.com/stephrobert/dev-pour-ops-dsoxlab-training) | 14 | Le développement pour les Ops, autour d'un outil hérité |
+| [`cloud-dsoxlab-training`](https://github.com/stephrobert/cloud-dsoxlab-training) | 13 | Le cloud, pratiqué contre un émulateur local |
 | [`devsecops-dsoxlab-training`](https://github.com/stephrobert/devsecops-dsoxlab-training) | 13 | DevSecOps, une application durcie version après version |
-| [`dev-pour-ops-dsoxlab-training`](https://github.com/stephrobert/dev-pour-ops-dsoxlab-training) | 10 | Le développement pour les Ops, autour d'un outil hérité |
+| [`artefacts-dsoxlab-training`](https://github.com/stephrobert/artefacts-dsoxlab-training) | 11 | Dépôts d'artefacts : héberger, sécuriser, signer et servir paquets et images |
+| [`mlops-dsoxlab-training`](https://github.com/stephrobert/mlops-dsoxlab-training) | 7 | MLOps : reproduire, livrer et exploiter un modèle |
 | [`python-dsoxlab-training`](https://github.com/stephrobert/python-dsoxlab-training) | 7 | Python, la construction pas à pas d'un outil de sécurité |
+| [`proxmox-dsoxlab-training`](https://github.com/stephrobert/proxmox-dsoxlab-training) | 6 | Proxmox VE : installer, exploiter, sécuriser et automatiser un hyperviseur |
 | [`cicd-dsoxlab-training`](https://github.com/stephrobert/cicd-dsoxlab-training) | 5 | Les pipelines CI/CD, sur une forge locale et sans compte en ligne |
-| [`cloud-dsoxlab-training`](https://github.com/stephrobert/cloud-dsoxlab-training) | 4 | Le cloud, pratiqué contre un émulateur local |
-| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 1 | Les conteneurs, Docker, Compose et Swarm |
 | [`github-actions-training`](https://github.com/stephrobert/github-actions-training) | 1 | GitHub Actions, des workflows rejoués en local |
 
-_414 labs dans 12 catalogues. Cette table est générée depuis `src/dsoxlab/templates/catalogues.yml` par `scripts/gen-catalogues.py`, le manifeste que lit `dsoxlab catalog list`._
+_699 labs dans 18 catalogues, comptés sur les dépôts publiés (`labs/**/lab.yaml` de leur branche par défaut). Cette table est générée par `scripts/gen-catalogues.py` depuis `src/dsoxlab/templates/catalogues.yml`, le manifeste que lit `dsoxlab catalog list` ; aucun chiffre n'y est écrit à la main._
 
 <!-- CATALOGUES:END -->
 

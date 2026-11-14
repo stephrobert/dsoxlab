@@ -7,6 +7,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-11-14
+
+### Fixed
+
+- **`dsoxlab catalog list` offers every public catalogue, and the README counts
+  their labs instead of reciting a hand-written figure.** The README announced
+  414 labs across 12 catalogues, 64 of them for Kubernetes; the published
+  repositories carried 699 labs across 18 catalogues, 111 for Kubernetes. Seven
+  public catalogues were missing from the packaged manifest, so `catalog list`
+  never offered them: publier-service, proxmox, gitlab-ci, bdd, certificats,
+  artefacts and mlops. The figures were typed into `templates/catalogues.yml`,
+  and the only check compared them with the local disk, and only when the
+  manifest itself changed.
+- **The manifest no longer carries any figure.** `scripts/gen-catalogues.py`
+  counts `labs/**/lab.yaml` on the default branch of each PUBLISHED repository
+  through the GitHub API, the one a learner clones, and rewrites the README
+  table. It refuses a private or archived repository listed in the manifest,
+  and names any public repository of the same owners that carries labs without
+  being listed. Without network, or on a truncated tree, it exits 2 instead of
+  concluding. A catalogue that publishes no lab yet (certificats, measured
+  today) stays in the manifest and out of the table.
+- **The pre-push hook runs it on every push**, not only when the manifest
+  changes, since the catalogues are what moves; CI runs the same hook with the
+  job token, which only lifts the anonymous rate limit.
+
 ## [0.9.1] - 2026-11-14
 
 Open bugs settled, the most serious one being a silent loss of VMs.
