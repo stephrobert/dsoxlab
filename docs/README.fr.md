@@ -36,6 +36,7 @@ Windows et macOS.
 | [Les codes de sortie](./exit-codes.fr.md) | Chaque code que la CLI rend, ce qu'il signifie et le geste qu'il appelle |
 | [Le modèle de menace](./security.fr.md) | Où passe la frontière de confiance, ce que le moteur refuse de faire, et ce dont il ne protège pas |
 | [Les invariants du projet](./design-principles.fr.md) | Les invariants, chacun avec l'incident qui l'a révélé et le test qui le tient — et ce que le projet promet à qui l'intègre |
+| [Les décisions d'architecture](./decisions/README.fr.md) | Pourquoi chaque choix durable a été fait : son contexte, ce qui a été écarté, ce qu'il coûte et ce qui l'inverserait |
 | [La marque](./brand.fr.md) | Nom, logo et conditions d'usage |
 
 Les contributeurs ont [CONTRIBUTING.fr.md](../CONTRIBUTING.fr.md) : installation,

@@ -220,8 +220,14 @@ def test_la_decision_sur_les_paquets_est_ecrite() -> None:
 
     readme = (Path(doctor.__file__).resolve().parent.parent
               / "templates" / "cloud-init" / "README.md")
+    assert "docs/decisions/0005-non-blocking-first-boot-packages.md" in (
+        readme.read_text(encoding="utf-8")
+    ), "le README des templates doit renvoyer à la décision"
 
-    texte = readme.read_text(encoding="utf-8")
+    # Le raisonnement vit dans son ADR depuis l'issue #203.
+    adr = (Path(__file__).resolve().parent.parent / "docs" / "decisions"
+           / "0005-non-blocking-first-boot-packages.fr.md")
+    texte = adr.read_text(encoding="utf-8")
     assert "degraded" in texte
     for ecarte in ("bloquer", "pré-cuire", "lab par lab"):
         assert ecarte in texte, f"l'option « {ecarte} » n'est pas tranchée"

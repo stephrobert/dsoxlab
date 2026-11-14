@@ -218,7 +218,8 @@ def hotes_hors_contrat(repo_meta: RepoMetadata) -> list[str]:
     hôte que l'autre ignore.
 
     Un state illisible rend une liste vide : Terraform échouera de lui-même
-    sur ce même fichier, avant de planifier quoi que ce soit.
+    sur ce même fichier, avant de planifier quoi que ce soit. Voir
+    docs/decisions/0013-refuse-out-of-contract-hosts.md
     """
     presents = hotes_au_state(repo_meta)
     if not presents:
@@ -263,18 +264,15 @@ def hotes_actifs(
       les retirant de ``var.hosts``.
 
     ... sauf ceux qui sont ``retires``, et c'est ainsi qu'ils se détruisent :
-    sortis de ``var.hosts``, ils sortent du ``for_each``, et Terraform ne
-    planifie la destruction QUE de leurs instances. Un ``destroy -target``
-    emporterait les autres machines, le state notant ses dépendances au niveau
-    de la ressource et non de l'instance (mesuré le 2026-07-23 : sept
-    ressources détruites pour une demandée).
+    sortis du ``for_each``, seules leurs instances partent (jamais de
+    ``destroy -target``, qui emporte les autres machines).
 
     Un state illisible fait retenir tous les hôtes optionnels : au pire on en
     crée un de trop, alors que les écarter en détruirait.
 
     L'index est la position dans la liste COMPLÈTE du ``meta.yml``, jamais dans
-    la liste rendue : sans cela, monter un hôte optionnel sans son voisin
-    décalerait l'adresse de l'un ou de l'autre d'un provisionnement au suivant.
+    la liste rendue, pour qu'aucune adresse ne bouge d'un provisionnement au
+    suivant. Voir docs/decisions/0012-optional-hosts-stable-index.md
     """
     voulus = set(demandes or ())
     sortis = set(retires)
@@ -996,14 +994,10 @@ def retirer_hotes_optionnels(
 ) -> ProvisionResult:
     """Détruit ces hôtes optionnels, et rien d'autre (issue #365).
 
-    Un ``apply`` SANS ``-target``, dont ``var.hosts`` ne porte plus ces hôtes :
-    Terraform planifie la destruction de leurs seules instances. Pas de
-    ``destroy -target``, qui emporte les autres machines (voir
-    :func:`hotes_actifs`).
-
-    Le revers est assumé : cet ``apply`` réaligne aussi le reste sur la
-    configuration, comme le ferait un ``provision``. Les hôtes communs ne sont
-    donc jamais détruits par lui, puisqu'ils restent dans ``var.hosts``.
+    Un ``apply`` SANS ``-target``, dont ``var.hosts`` ne porte plus ces hôtes,
+    qui réaligne aussi le reste sur la configuration (les hôtes communs restent
+    dans ``var.hosts``, donc ne partent jamais). Voir
+    docs/decisions/0012-optional-hosts-stable-index.md
     """
     if not is_available():
         raise TerraformNotInstalled(_("err_terraform_missing"))

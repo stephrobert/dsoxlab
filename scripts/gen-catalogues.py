@@ -4,12 +4,8 @@
 POURQUOI CE SCRIPT EXISTE
 
 `templates/catalogues.yml` est ce que `dsoxlab catalog list` montre à un
-apprenant. Il s'est périmé trois fois : le 2026-10-10 il annonçait trois
-catalogues quand six existaient, le 2026-10-17 six quand douze existaient, et le
-2026-11-14 le README annonçait 64 labs pour Kubernetes quand le dépôt publié en
-portait 111, et ignorait huit catalogues publics. La cause était la même à
-chaque fois : un chiffre écrit à la main, et un contrôle qui ne regardait que le
-disque local, seulement quand le manifeste lui-même changeait.
+apprenant, et il s'est périmé trois fois parce que ses chiffres s'écrivaient à
+la main. Voir docs/decisions/0014-catalog-table-measured-on-published-repos.md
 
 CE QUI CHANGE
 

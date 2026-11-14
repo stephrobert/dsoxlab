@@ -154,10 +154,17 @@ def test_le_choix_des_images_mutables_est_documente() -> None:
     défendable — une somme épinglée non tenue à jour servirait aux apprenants
     une image de plus en plus vulnérable — mais un choix non écrit ne se
     distingue pas d'un oubli.
+
+    Le raisonnement vit dans son ADR depuis l'issue #203 ; le README des
+    templates en garde l'essentiel et y renvoie.
     """
     readme = (TEMPLATES / "README.md").read_text(encoding="utf-8")
-
     assert "mutable" in readme.lower()
-    for domaine in ("cloud-images.ubuntu.com", "cloud.debian.org",
-                    "repo.almalinux.org"):
-        assert domaine in readme, f"{domaine} n'est pas couvert par la décision"
+    assert "docs/decisions/0004-mutable-upstream-images.md" in readme
+
+    for nom in ("0004-mutable-upstream-images.md", "0004-mutable-upstream-images.fr.md"):
+        adr = (RACINE / "docs" / "decisions" / nom).read_text(encoding="utf-8")
+        assert "mutable" in adr.lower()
+        for domaine in ("cloud-images.ubuntu.com", "cloud.debian.org",
+                        "repo.almalinux.org"):
+            assert domaine in adr, f"{domaine} n'est pas couvert par {nom}"

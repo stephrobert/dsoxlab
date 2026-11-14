@@ -1,27 +1,12 @@
 """Le journal parle une seule langue, et c'est l'anglais (#140).
 
-Le journal mélangeait le français et l'anglais. Ce n'est pas un détail
-d'esthétique : c'est le fichier que `dsoxlab support` collecte et qu'un
-utilisateur colle dans un rapport de bug.
+C'est le fichier que `dsoxlab support` collecte : il se cherche mot pour mot,
+se compare entre machines aux locales différentes, et voisine avec les sorties
+de terraform, ansible et virsh. Les appels `logger.*` restent hors du garde-fou
+i18n (on ne traduit pas le journal), mais ils ne doivent pas mélanger deux
+langues. Sans ce test, la règle se redéferait ligne par ligne.
 
-Les appels `logger.*` sont **délibérément exclus** du garde-fou i18n
-(`test_i18n_coverage.py`), et cette exclusion tient toujours : un message de
-journal n'est pas un texte d'interface, il ne passe pas par `_()`, et le
-traduire à l'exécution rendrait deux rapports incomparables selon la locale de
-qui les produit. Mais l'exclusion justifiait de ne pas le **traduire**, pas de
-le laisser incohérent.
-
-L'anglais l'emporte pour trois raisons, dans l'ordre de poids :
-
-1. un message de journal se cherche **mot pour mot** dans un moteur de
-   recherche ;
-2. il se compare entre deux machines aux locales différentes ;
-3. il est lu par quelqu'un qui **diagnostique**, pas par quelqu'un qui apprend —
-   et il voisine déjà avec les sorties de terraform, ansible et virsh, qui sont
-   anglaises.
-
-Sans ce test, la règle se redéfera ligne par ligne, ce qui est exactement ce
-qui s'est passé pour l'interface avant que son garde-fou n'existe.
+Voir docs/decisions/0006-log-in-english.md
 """
 
 from __future__ import annotations

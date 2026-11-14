@@ -6,6 +6,8 @@ le provider étant sélectionné dans le ``meta.yml: infra.provider``.
 
 Les types ``kvm`` et ``incus`` sont conservés pour rétro-compatibilité
 des anciens labs ; la cible est ``vm``.
+
+Voir docs/decisions/0001-two-runtimes.md
 """
 
 from dataclasses import dataclass, field

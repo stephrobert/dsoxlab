@@ -39,6 +39,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the table even with labs, and is never reported, nor as a forgotten public
   repository.
 
+### Documentation
+
+- **Durable decisions now live in `docs/decisions/`, one record each** (#203).
+  Several modules carried architecture reasoning in their comments: why a
+  `flock` and why its file is never deleted, why `ansible-core` is declared
+  despite its 100 MB, why first-boot packages do not block. That reasoning was
+  in the right words but in the wrong place: it made files long, and could not
+  be found when asking "why this choice?". Fourteen records, each in English
+  and French, with the same short shape: context, decision, consequences, what
+  would reverse it, status and date. The eight decisions listed in the issue
+  are joined by six taken since: the fixture reversal, the `degraded` state of
+  a lab without its engine, the three outcomes of a check, the stable index of
+  optional hosts, the refusal of out-of-contract hosts, and the catalogue table
+  measured on the published repositories. The reasoning was moved, not
+  summarized: every measurement keeps its date.
+- **The code keeps one line and a pointer.** `locking.py`, `pyproject.toml`,
+  the two template READMEs, `test_journal_en_anglais.py`, `infra/terraform.py`,
+  `scripts/gen-catalogues.py` and a few docstrings now say the essential in one
+  line and point at their record. Comments that explain a single line stay
+  where they are. No behaviour changes.
+- **`tests/test_decisions.py` keeps the directory honest**: each record has its
+  sections and its twin in the other language, the index lists every record,
+  and every `docs/decisions/…` pointer written in the repository leads to an
+  existing file. It is shown to refuse a broken pointer.
+- `docs/README.md` and `docs/design-principles.md` (and their French versions)
+  point at the new directory: the principles say what is true, the decisions
+  say why it was chosen.
+
 ## [0.9.2] - 2026-11-14
 
 ### Fixed

@@ -84,6 +84,9 @@ class FixtureError(RuntimeError):
 
     Hérite de ``RuntimeError`` parce que la CLI en attrape déjà un autour de
     ``run`` : le message, déjà traduit, s'affiche et la commande sort en 2.
+
+    Échouer plutôt qu'ignorer renverse une décision antérieure : voir
+    docs/decisions/0009-missing-fixture-fails-run.md
     """
 
 

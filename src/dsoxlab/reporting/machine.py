@@ -23,6 +23,10 @@ Le mode machine ne change **jamais** le verdict ni le code de retour d'une
 commande : il en change la forme. Un ``check`` en échec sort en 1 avec ou sans
 ``--json``, et une erreur dure (lab inconnu, ``meta.yml`` illisible) laisse la
 sortie standard vide, dit pourquoi sur la sortie d'erreur, et garde son code.
+
+``SCHEMA`` versionne ce que dsoxlab écrit, indépendamment de la version du paquet
+et de ``schema_version`` (ce qu'il lit). Voir
+docs/decisions/0007-json-output-contract-distinct-from-schema-version.md
 """
 
 from __future__ import annotations
