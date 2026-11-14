@@ -87,6 +87,24 @@ Les bugs ouverts soldés, dont le plus grave était une perte silencieuse de VM.
   « mesurer ce que `destroy --host` fait d'une image de base partagée »
   demande une infrastructure réelle et reste ouvert.
 
+### Mesuré
+
+- **Les hôtes optionnels sur Incus 7.2**, le 2026-11-14, avec cette branche et
+  un catalogue d'essai d'un hôte commun et de deux hôtes optionnels, tous sans
+  `role` : `provision` n'a monté que l'hôte commun (`.11`) ; le `run` d'un lab
+  qui cite le second hôte optionnel l'a monté en `.13` (index 2) et y a joué le
+  socle ; un second `provision` est sorti en 0 avec un plan Terraform sans
+  changement et les mêmes uuid d'instance ; `clean` a gardé l'hôte optionnel ;
+  `destroy --optional-hosts` l'a retiré seul, l'hôte commun gardant sa date de
+  création, son socle et le fragment SSH. Avant le correctif Incus de cette
+  version, le même essai échouait dès le premier `provision`.
+- **Un catalogue provisionné avant la 0.9.0 ne voit aucune adresse bouger** :
+  sur le catalogue Kubernetes, trois machines KVM en marche, un
+  `terraform plan` sur une copie de son state, avec les templates de la 0.9.0
+  et les variables qu'elle génère, n'a montré aucun changement (index 0, 1, 2
+  égaux aux anciens rangs). La PR de la 0.9.0 n'avait couvert ce point que par
+  des tests unitaires.
+
 ## [0.9.0] - 2026-11-14
 
 Des hôtes dont seuls quelques labs ont besoin, sans les faire tourner chez tous

@@ -83,6 +83,23 @@ Open bugs settled, the most serious one being a silent loss of VMs.
   never removes an optional host. The point "measure what `destroy --host`
   does to a shared base image" needs a real infrastructure and stays open.
 
+### Measured
+
+- **Optional hosts on Incus 7.2**, 2026-11-14, with this branch and a trial
+  catalogue of one common host and two optional ones, all without `role`:
+  `provision` started only the common host (`.11`); `run` of a lab naming the
+  second optional host started it at `.13` (index 2) and played the foundation
+  on it; a second `provision` exited 0 with a Terraform plan showing no change
+  and the same instance uuids; `clean` kept the optional host;
+  `destroy --optional-hosts` removed it alone, the common host keeping its
+  creation time, its foundation and the SSH fragment. Before the Incus fix of
+  this release, the same run failed at the first `provision`.
+- **A catalogue provisioned before 0.9.0 moves no address**: on the Kubernetes
+  catalogue, three KVM machines running, a `terraform plan` on a copy of its
+  state, with the 0.9.0 templates and the variables 0.9.0 generates, showed no
+  change (indexes 0, 1, 2 equal to the former ranks). The 0.9.0 pull request
+  had left this point covered by unit tests only.
+
 ## [0.9.0] - 2026-11-14
 
 Hosts that only a few labs need, without making every learner run them.
