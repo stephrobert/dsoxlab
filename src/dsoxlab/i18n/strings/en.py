@@ -421,13 +421,19 @@ STRINGS: dict[str, str] = {
         "Scaffold a lab, discovered by the next list-labs.",
     "arg_new_id": "Id, lowercase, no spaces.",
     "opt_new_dans": "Directory to create the catalog in. Defaults to the current one.",
+    "opt_new_github":
+        "GitHub owner (account or organization) of the repository <owner>/<id>. "
+        "Used by the README badges and the RELEASING commands.",
     "opt_new_runtime":
         "Lab runtime: shell (local workshop) or vm (dedicated machine).",
     "scaffold_catalogue_cree": "Catalog '{name}' created in {path}",
     "scaffold_socle_pose":
         "{count} files written: the reference README in both languages, the "
         "governance documents, a conftest.py with the bilingual message() "
-        "helper, a CI workflow and the repository guardrails.",
+        "helper, the CI with the security chain (zizmor, actionlint, poutine, "
+        "pre-commit parity, CodeQL), the release, Scorecard and Plumber "
+        "workflows behind the README badges, Dependabot, CODEOWNERS, issue "
+        "templates and the repository guardrails.",
     "scaffold_licence_posee":
         "LICENSE is CC BY 4.0, the licence of the collection. Replace the file "
         "if your catalog uses another one: GitHub only recognises a licence "
@@ -455,6 +461,14 @@ STRINGS: dict[str, str] = {
     "scaffold_id_invalide":
         "'{name}' cannot be used as an id: lowercase letters, digits, dot, "
         "dash and underscore only.",
+    "scaffold_github_invalide":
+        "'{name}' cannot be a GitHub owner: letters, digits and single dashes "
+        "only, 39 characters at most, no dash at either end.",
+    "scaffold_github_a_remplacer":
+        "No --github given: the README badges and the RELEASING commands use "
+        "the placeholder <owner>. Replace it with the GitHub account or "
+        "organization that will host {name}, or create the catalog again with "
+        "--github <owner>.",
     "scaffold_existe_deja":
         "{path} already exists. Pick another id, or remove that directory: "
         "a skeleton never overwrites work.",
@@ -957,6 +971,10 @@ Each lab declares:
                        pre-commit, governance files and its own tests. It passes
                        [cyan]validate-structure[/cyan] with no edit.
     [dim]--in <dir>[/dim]           Where to create it. Defaults to the current directory.
+    [dim]--github <owner>[/dim]     GitHub owner of the repository <owner>/<id>, written
+                       in the five README badges (CI, Scorecard, Plumber,
+                       SLSA 3, licence) and the RELEASING commands. Without
+                       it, they read [bold]<owner>[/bold], to replace.
   [cyan]new lab <id>[/cyan]         Scaffolds a compliant lab, discovered by the next
                        [cyan]list-labs[/cyan]. Its test [bold]fails[/bold] until it is written: a
                        skeleton green from the start would teach grading

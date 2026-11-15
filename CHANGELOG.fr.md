@@ -7,6 +7,59 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.4] - 2026-11-15
+
+### Ajouté
+
+- **`dsoxlab new catalog` écrit les cinq badges du README de la collection.**
+  Juste sous la ligne de langue de `README.md` et `README.fr.md` : CI, OpenSSF
+  Scorecard, conformité Plumber, SLSA 3 et licence, dans la forme qu'emploient
+  déjà les catalogues, avec les libellés Plumber et licence traduits en
+  français. Le badge de licence suit la licence que pose le squelette
+  (CC BY 4.0).
+- **`new catalog --github <propriétaire>`** : le compte ou l'organisation GitHub
+  du dépôt `<propriétaire>/<id>`. Il entre dans les badges et dans les commandes
+  de vérification de `RELEASING.md`, `RELEASING.fr.md` et `attester.yml`. Sans
+  lui, elles portent `<owner>`, et la commande dit de le remplacer. Un nom qui ne
+  peut pas être un nom GitHub est refusé avant toute écriture.
+- **Deux workflows de plus dans le squelette : `scorecard.yml` et
+  `plumber.yml`**, repris du catalogue cloud avec leurs épinglages par SHA et
+  leurs permissions minimales, plus le `.plumber.yaml` sans lequel l'action
+  Plumber refuse de tourner. Sans eux, les badges Scorecard et Plumber restaient
+  vides. Les deux se sautent tant que le dépôt est privé. `RELEASING` les décrit.
+
+### Corrigé
+
+- **Le `RELEASING` du squelette ne nomme plus un propriétaire GitHub réel.** Ses
+  commandes `gh attestation verify`, `cosign verify-blob` et de ruleset visaient
+  un compte fixe : un catalogue créé par quelqu'un d'autre aurait vérifié ses
+  releases contre le dépôt d'un tiers. Elles prennent désormais le propriétaire
+  de `--github`, ou `<owner>`.
+- **Le ruleset proposé par le `RELEASING` du squelette exige exactement les
+  contrôles que le squelette lance.** Repris d'un catalogue frère, il exigeait
+  Zizmor, Actionlint, Poutine, CodeQL et d'autres, que le `ci.yml` du squelette
+  ne lançait pas : appliqué tel quel, il bloquait toutes les pull requests. Le
+  squelette lance désormais ces jobs (voir Ajouté), et un test confronte les
+  contrôles exigés aux noms des jobs de `ci.yml`, dans les deux sens.
+- **Une seule version de `harden-runner` dans le squelette** : `ci.yml`,
+  `release.yml` et `attester.yml` passent en v2.22.3, l'épinglage des deux
+  nouveaux workflows. Un test refuse une action épinglée sur deux versions.
+- **Le squelette porte la chaîne de sécurité des catalogues frères**, reprise
+  de `applications-ia-dsoxlab-training` (e7db2da), où tous les jobs sont verts.
+  `ci.yml` gagne les jobs Zizmor, Actionlint, Poutine, Pre-commit parity et
+  CodeQL (python et actions) à côté de `Contract, guardrails and lint`, et le
+  ruleset de `RELEASING` exige ces sept contrôles sous leurs noms exacts. Un
+  test développe la matrice CodeQL et vérifie l'accord dans les deux sens. Le
+  squelette reçoit aussi `.github/dependabot.yml` (le modèle commun, `uv` et
+  `github-actions`), `.github/codeql/config.yml` (fixtures et solutions
+  exclues), `.github/CODEOWNERS` (le propriétaire de `--github`, ou `<owner>`),
+  deux gabarits d'issue et `.poutine.yml`. `SECURITY.md` et `SECURITY.fr.md`
+  suivent la référence : versions supportées, signalement privé par un avis de
+  sécurité GitHub de `<owner>/<id>`, délais de divulgation, un périmètre écrit
+  pour tout catalogue de labs, et ce que le dépôt ne demandera jamais.
+  `setup-uv` passe en v10.3.3 dans tous les workflows : chaque action garde une
+  seule version.
+
 ## [0.9.3] - 2026-11-14
 
 ### Ajouté

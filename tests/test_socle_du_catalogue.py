@@ -19,6 +19,7 @@ fonctionne, et c'est la règle du dépôt.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -167,11 +168,17 @@ def test_la_licence_est_le_texte_nu(catalogue: Path) -> None:
 
 def test_le_workflow_et_les_hooks_sont_bien_formes(catalogue: Path) -> None:
     """Un YAML produit cassé serait découvert au premier push, pas avant."""
-    for relatif in (".github/workflows/ci.yml", ".pre-commit-config.yaml",
-                    "meta.yml", "meta.fr.yml"):
+    for relatif in (".github/workflows/ci.yml", ".github/workflows/scorecard.yml",
+                    ".github/workflows/plumber.yml", ".plumber.yaml",
+                    ".pre-commit-config.yaml", "meta.yml", "meta.fr.yml"):
         chemin = catalogue / relatif
         assert chemin.is_file(), f"{relatif} manque"
         yaml.safe_load(chemin.read_text(encoding="utf-8"))
+
+
+#: Une clé `uses:` de YAML, en début de ligne. Un commentaire qui CITE une forme
+#: de `uses:` pour expliquer pourquoi on ne l'emploie pas n'en est pas une.
+_USES = re.compile(r"^\s*(?:-\s+)?uses:\s+(\S+)", re.MULTILINE)
 
 
 def test_les_actions_du_workflow_sont_epinglees_par_sha(catalogue: Path) -> None:
@@ -180,11 +187,12 @@ def test_les_actions_du_workflow_sont_epinglees_par_sha(catalogue: Path) -> None
     C'est la règle de ce projet, et un catalogue produit par l'outil ne doit
     pas démarrer en la violant.
     """
-    source = (catalogue / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8")
-    utilisations = re.findall(r"uses: +(\S+)", source)
+    utilisations = []
+    for workflow in sorted((catalogue / ".github" / "workflows").glob("*.yml")):
+        trouvees = _USES.findall(workflow.read_text(encoding="utf-8"))
+        assert trouvees, f"{workflow.name} n'utilise aucune action"
+        utilisations += [a for a in trouvees if not a.startswith("./")]
 
-    assert utilisations, "le workflow produit n'utilise aucune action"
     for action in utilisations:
         reference = action.split("@", 1)[-1]
         assert re.fullmatch(r"[0-9a-f]{40}", reference), (
@@ -529,3 +537,83 @@ def test_le_verrou_est_controle_au_commit(catalogue: Path) -> None:
         "le hook ne dit pas quoi faire : un catalogue neuf n'a pas de `uv.lock`, "
         "et le hook échouera jusqu'à ce que son auteur le crée."
     )
+
+
+def _controles_du_ruleset(releasing: Path) -> list[str]:
+    """Les contrôles obligatoires du ruleset que RELEASING propose d'appliquer."""
+    texte = releasing.read_text(encoding="utf-8")
+    trouve = re.search(r"<<'JSON'\n(.*?)\nJSON\n", texte, re.DOTALL)
+    assert trouve is not None, f"{releasing.name} ne porte plus la charge du ruleset"
+    charge = json.loads(trouve.group(1))
+    return [
+        controle["context"]
+        for regle in charge["rules"]
+        if regle["type"] == "required_status_checks"
+        for controle in regle["parameters"]["required_status_checks"]
+    ]
+
+
+def _noms_des_controles(ci: dict) -> set[str]:
+    """Les noms que GitHub donne aux contrôles d'un workflow, matrices développées.
+
+    Un job à matrice produit un contrôle par valeur : `CodeQL (${{ matrix.language }})`
+    sur `[python, actions]` donne `CodeQL (python)` et `CodeQL (actions)`, et
+    c'est sous ces noms-là que le ruleset doit les exiger.
+    """
+    noms: set[str] = set()
+    for cle, job in ci["jobs"].items():
+        nom = str(job.get("name", cle))
+        matrice = (job.get("strategy") or {}).get("matrix") or {}
+        variables = re.findall(r"\$\{\{\s*matrix\.(\w+)\s*\}\}", nom)
+        if not variables:
+            noms.add(nom)
+            continue
+        assert len(variables) == 1, f"{nom} : une seule variable de matrice gérée"
+        variable = variables[0]
+        for valeur in matrice[variable]:
+            noms.add(re.sub(r"\$\{\{\s*matrix\.\w+\s*\}\}", str(valeur), nom))
+    return noms
+
+
+def test_le_ruleset_n_exige_que_les_jobs_que_la_ci_lance(catalogue: Path) -> None:
+    """Un contrôle exigé qu'aucun job ne lance bloque toutes les pull requests.
+
+    Le ruleset de RELEASING avait été repris d'un catalogue frère : il exigeait
+    Zizmor, Actionlint, Poutine, CodeQL… que le `ci.yml` du squelette ne lançait
+    pas encore. Appliqué sur un catalogue neuf, il a bloqué toutes ses PR :
+    GitHub attend pour toujours un contrôle qui ne viendra jamais. Le squelette
+    lance désormais ces jobs ; le test tient l'accord dans les deux sens.
+    """
+    ci = yaml.safe_load(
+        (catalogue / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    jobs = _noms_des_controles(ci)
+
+    for nom in ("RELEASING.md", "RELEASING.fr.md"):
+        controles = _controles_du_ruleset(catalogue / nom)
+        assert controles, f"{nom} : le ruleset n'exige aucun contrôle"
+        orphelins = sorted(set(controles) - jobs)
+        assert not orphelins, (
+            f"{nom} exige {orphelins}, qu'aucun job de ci.yml ne lance "
+            f"(jobs : {sorted(jobs)})"
+        )
+        # Et l'inverse : un job de la CI que le ruleset n'exige pas peut
+        # rougir sans bloquer la fusion.
+        oublies = sorted(jobs - set(controles))
+        assert not oublies, f"{nom} n'exige pas {oublies}"
+
+
+def test_une_action_n_a_qu_une_version_dans_le_socle(catalogue: Path) -> None:
+    """Deux SHA pour la même action, c'est deux versions à suivre et à auditer.
+
+    Les workflows Scorecard et Plumber sont arrivés avec harden-runner v2.22.3
+    quand ci.yml, release.yml et attester.yml portaient encore v2.22.0.
+    """
+    versions: dict[str, set[str]] = {}
+    for workflow in (catalogue / ".github" / "workflows").glob("*.yml"):
+        for action in _USES.findall(workflow.read_text(encoding="utf-8")):
+            if "@" in action:
+                nom, reference = action.split("@", 1)
+                versions.setdefault(nom, set()).add(reference)
+    doublons = {nom: sorted(refs) for nom, refs in versions.items() if len(refs) > 1}
+    assert not doublons, f"actions épinglées sur plusieurs versions : {doublons}"

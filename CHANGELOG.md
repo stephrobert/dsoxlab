@@ -7,6 +7,57 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-11-15
+
+### Added
+
+- **`dsoxlab new catalog` writes the five README badges of the collection.**
+  Right under the language line of `README.md` and `README.fr.md`: CI, OpenSSF
+  Scorecard, Plumber compliance, SLSA 3 and licence, in the form the catalogs
+  already use, with the Plumber and licence labels translated in French. The
+  licence badge follows the licence the skeleton writes (CC BY 4.0).
+- **`new catalog --github <owner>`**: the GitHub account or organization of the
+  repository `<owner>/<id>`. It goes into the badges and into the verification
+  commands of `RELEASING.md`, `RELEASING.fr.md` and `attester.yml`. Without it,
+  they read `<owner>`, and the command says to replace it. An owner that cannot
+  be a GitHub name is refused before anything is written.
+- **Two more workflows in the skeleton: `scorecard.yml` and `plumber.yml`**,
+  taken from the cloud catalog with their SHA pins and minimal permissions, plus
+  the `.plumber.yaml` the Plumber action refuses to run without. Without them the
+  Scorecard and Plumber badges stayed empty. Both skip while the repository is
+  private. `RELEASING` describes them.
+
+### Fixed
+
+- **The skeleton's `RELEASING` no longer names a real GitHub owner.** Its
+  `gh attestation verify`, `cosign verify-blob` and ruleset commands pointed at
+  a fixed account: a catalog created by anyone else would have checked its
+  releases against someone else's repository. They now use the `--github`
+  owner, or `<owner>`.
+- **The ruleset proposed by the skeleton's `RELEASING` requires exactly the
+  checks the skeleton runs.** It was copied from a sibling catalog and required
+  Zizmor, Actionlint, Poutine, CodeQL and others that the skeleton's `ci.yml`
+  did not run: applied as is, it blocked every pull request. The skeleton now
+  runs those jobs (see Added), and a test checks the required checks against
+  the job names of `ci.yml`, both ways.
+- **One version of `harden-runner` in the skeleton**: `ci.yml`, `release.yml`
+  and `attester.yml` move to v2.22.3, the pin of the two new workflows. A test
+  refuses an action pinned to two versions.
+- **The skeleton carries the security chain of its sibling catalogs**, taken
+  from `applications-ia-dsoxlab-training` (e7db2da), where every job is green.
+  `ci.yml` gains the Zizmor, Actionlint, Poutine, Pre-commit parity and CodeQL
+  (python and actions) jobs next to `Contract, guardrails and lint`, and the
+  ruleset of `RELEASING` requires those seven checks by their exact names. A
+  test expands the CodeQL matrix and checks the agreement both ways. The
+  skeleton also gets `.github/dependabot.yml` (the common model, `uv` and
+  `github-actions`), `.github/codeql/config.yml` (fixtures and solutions left
+  out), `.github/CODEOWNERS` (the `--github` owner, or `<owner>`), two issue
+  templates and `.poutine.yml`. `SECURITY.md` and `SECURITY.fr.md` follow the
+  reference: supported versions, private report through a GitHub advisory of
+  `<owner>/<id>`, disclosure timelines, a scope written for any lab catalog,
+  and what the repository will never ask. `setup-uv` moves to v10.3.3 in every
+  workflow, so each action keeps a single version.
+
 ## [0.9.3] - 2026-11-14
 
 ### Added

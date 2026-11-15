@@ -68,6 +68,17 @@ def licence(nom: str = "cc-by-4.0") -> Path:
     return template_root() / "licences" / f"{nom}.txt"
 
 
+def plumber_config() -> Path:
+    """La configuration Plumber qu'un catalogue neuf reçoit en `.plumber.yaml`.
+
+    L'action Plumber refuse de tourner sans ce fichier. Il est repris du
+    catalogue cloud, et ne porte rien de propre à un catalogue : les contrôles
+    portent sur la CI (actions épinglées, sources autorisées, images), pas sur
+    ce que les labs enseignent. C'est une donnée, comme la licence.
+    """
+    return template_root() / "plumber" / "plumber.yaml"
+
+
 def catalogues_manifeste() -> Path:
     """Le manifeste des catalogues connus, packagé avec l'outil.
 

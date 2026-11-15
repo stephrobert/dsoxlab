@@ -33,6 +33,9 @@ pour ce qu'il exécute.
 
 from __future__ import annotations
 
+import re
+from urllib.parse import quote
+
 #: Le plancher commun aux douze catalogues établis, posé le 2026-10-17. Il ne
 #: sert que de repli quand la version du moteur est introuvable.
 from dsoxlab import __version__
@@ -40,12 +43,13 @@ from dsoxlab import __version__
 _PLANCHER_COMMUN = "0.5.0"
 
 # Les actions sont épinglées par SHA de 40 caractères, avec la version en
-# commentaire : un tag est déplaçable, un SHA non. Ces quatre-là sont celles
-# qui passent aujourd'hui dans la CI des douze catalogues, relevées plutôt
-# qu'inventées.
-_SHA_HARDEN = "351661ca32ac09a36dc5ee2d536e3128f2a3c8ed"  # v2.22.0
+# commentaire : un tag est déplaçable, un SHA non. Ces trois-là sont celles de
+# la chaîne de sécurité éprouvée sur applications-ia-dsoxlab-training
+# (e7db2da), relevées plutôt qu'inventées, et chaque workflow du socle emploie
+# les mêmes : un catalogue neuf n'a qu'une version de chaque action.
+_SHA_HARDEN = "46b06cea07f9e64621fdf066ba77ac6915163d43"  # v2.22.3
 _SHA_CHECKOUT = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # v7.0.1
-_SHA_SETUP_UV = "c18668ad3cf93ea998bef934396af7bb5c839dc7"  # v10.2.0
+_SHA_SETUP_UV = "68559e99cc807c1eb7e9238fd43a15bba460eec2"  # v10.3.3
 
 
 # ── README : quatorze sections, dont sept génériques ─────────────────────────
@@ -59,6 +63,8 @@ README_EN = """\
 # {id}
 
 **Language:** [English](./README.md) · [Français](./README.fr.md)
+
+{badges}
 
 TO FILL IN: one paragraph. What this catalog teaches, and to whom.
 
@@ -198,6 +204,8 @@ README_FR = """\
 # {id}
 
 **Langue :** [English](./README.md) · [Français](./README.fr.md)
+
+{badges}
 
 À REMPLIR : un paragraphe. Ce que ce catalogue apprend, et à qui.
 
@@ -650,72 +658,187 @@ Covenant](https://www.contributor-covenant.org), version 2.1.
 SECURITY_EN = """\
 # Security policy
 
-## What this repository contains
+**Language:** [English](./SECURITY.md) · [Français](./SECURITY.fr.md)
 
-A catalog of training labs: declarative files (`meta.yml`, `lab.yaml`),
-statements in Markdown, Ansible playbooks, and `pytest` tests. **It executes
-nothing by itself**: labs are played by the `dsoxlab` CLI, which lives in its
-own repository.
+## Supported versions
+
+`{id}` is under active development. Security fixes are applied to the latest
+version of the `main` branch.
+
+| Version | Supported |
+| --- | --- |
+| latest (`main`) | yes |
+| older | no |
 
 ## Reporting a vulnerability
 
-Do **not** open a public issue. Use GitHub's private vulnerability reporting on
-this repository, or write to the maintainers.
+**Do not open a public issue for a security vulnerability.**
 
-Please include what you found, how to reproduce it, and what you think the
-impact is. You will get an acknowledgement, and a fix or an explanation of why
-it is not one.
+If you believe you have found one, report it privately:
 
-## What counts as a vulnerability here
+- Preferred: open a
+  [private security advisory](https://github.com/{proprietaire}/{id}/security/advisories/new)
+  on GitHub.
+- Otherwise: TO FILL IN, a contact address of the maintainers.
 
-- **A secret committed by mistake**: a token, a private key, a vault password.
-  Report it even if it looks revoked: it stays in git history.
-- **A lab that runs something unexpected on the learner's machine**, beyond
-  what its statement announces.
-- **A reference solution readable in clear text** where it is meant to be
-  encrypted: it is not a system flaw, but it destroys the exercise.
+Please include:
 
-## What does not
+- a description of the vulnerability and its impact,
+- the steps to reproduce it (command, environment, `dsoxlab --version`),
+- any relevant logs or proof of concept.
 
-A lab that deliberately sets up a vulnerable system is the subject being
-taught, not a defect. A lab that asks the learner to weaken a configuration
-does so inside its own machine, which `dsoxlab destroy` gives back.
+We will keep you posted on the fix and credit you in the release notes if you
+wish.
+
+## Disclosure policy
+
+We practise coordinated disclosure and commit to the following timelines,
+counted from the moment we receive your report:
+
+| Step | Target |
+| --- | --- |
+| Acknowledging your report | within **48 hours** |
+| Initial assessment and severity triage | within **5 days** |
+| Fix released, or a written remediation plan | within **30 days** |
+| Public disclosure of the vulnerability | within **90 days** |
+
+We publish the advisory as soon as a fix is available, or at the **90-day** mark
+at the latest, whichever comes first. If a vulnerability is being actively
+exploited, we may disclose sooner to protect users. If a complex fix needs more
+time, we tell you before the deadline and agree a new date with you, rather than
+letting it lapse in silence.
+
+## Scope
+
+This repository ships **lab content**: declarative files (`meta.yml`,
+`lab.yaml`), briefs in Markdown, fixtures, Ansible playbooks, `pytest` tests and
+encrypted reference solutions. **It executes nothing by itself**: the labs are
+played by the external `dsoxlab` CLI, which lives in its own repository.
+
+CodeQL analyses neither `labs/**/fixtures/**` nor `labs/**/solution/**` (see
+[`.github/codeql/config.yml`](.github/codeql/config.yml)). What the repository
+ships as **its own** tooling (workflows, validation scripts, pytest tests) stays
+fully analysed.
+
+In scope:
+
+- dangerous or malicious lab material, notably a test, a fixture or a playbook
+  that runs something on the learner's machine beyond what its brief announces,
+  reaches the network without saying so, or exfiltrates data;
+- a leak of a real secret, a private key, a vault password or an API token
+  committed by mistake, even if it looks revoked: it stays in the git history;
+- a reference solution shipped in clear text, which spoils the lab and stays in
+  the history;
+- an action referenced without pinning by SHA in what the repository ships.
+
+Out of scope:
+
+- a lab that deliberately sets up a vulnerable system: the flaw is the subject
+  being taught, and it lives inside the lab's own machine or working directory;
+- vulnerabilities of the `dsoxlab` engine itself, which belong to
+  [its own repository](https://github.com/stephrobert/dsoxlab);
+- those of any third-party dependency, to be reported to its project;
+- a lab that fails or grades wrongly: that is a defect, open a public issue.
+
+## What this repository will never ask you
+
+No lab requires a real secret, a personal account or a payment method. If a
+brief asks you for one, that is a defect of the catalog: report it.
 """
 
 SECURITY_FR = """\
 # Politique de sécurité
 
-## Ce que contient ce dépôt
+**Langue :** [English](./SECURITY.md) · [Français](./SECURITY.fr.md)
 
-Un catalogue de labs de formation : des fichiers déclaratifs (`meta.yml`,
-`lab.yaml`), des énoncés en Markdown, des playbooks Ansible et des tests
-`pytest`. **Il n'exécute rien par lui-même** : les labs sont joués par la CLI
-`dsoxlab`, qui vit dans son propre dépôt.
+## Versions supportées
+
+`{id}` est en développement actif. Les correctifs de sécurité sont appliqués à
+la dernière version de la branche `main`.
+
+| Version | Supportée |
+| --- | --- |
+| dernière (`main`) | oui |
+| plus anciennes | non |
 
 ## Signaler une vulnérabilité
 
-N'ouvre **pas** d'issue publique. Emploie le signalement privé de GitHub sur ce
-dépôt, ou écris aux mainteneurs.
+**N'ouvrez pas d'issue publique pour une vulnérabilité de sécurité.**
 
-Indique ce que tu as trouvé, comment le reproduire, et l'impact que tu lui
-prêtes. Tu recevras un accusé de réception, puis une correction ou l'explication
-de pourquoi ce n'en est pas une.
+Si vous pensez avoir trouvé une vulnérabilité, signalez-la en privé :
 
-## Ce qui compte comme une vulnérabilité ici
+- De préférence : ouvrez un
+  [avis de sécurité privé](https://github.com/{proprietaire}/{id}/security/advisories/new)
+  sur GitHub.
+- Sinon : À REMPLIR, une adresse de contact des mainteneurs.
 
-- **Un secret commité par erreur** : un jeton, une clé privée, un mot de passe
-  de vault. Signale-le même s'il semble révoqué : il reste dans l'historique
-  git.
-- **Un lab qui exécute sur le poste de l'apprenant autre chose** que ce que son
-  énoncé annonce.
-- **Une solution de référence lisible en clair** là où elle est censée être
-  chiffrée : ce n'est pas une faille du système, mais cela détruit l'exercice.
+Merci d'inclure :
 
-## Ce qui n'en est pas
+- une description de la vulnérabilité et de son impact,
+- les étapes pour la reproduire (commande, environnement, `dsoxlab --version`),
+- tout journal ou preuve de concept pertinent.
 
-Un lab qui monte délibérément un système vulnérable enseigne précisément ce
-sujet, ce n'est pas un défaut. Un lab qui demande d'affaiblir une configuration
-le fait dans sa propre machine, que `dsoxlab destroy` rend.
+Nous vous tiendrons informé de l'avancement du correctif et vous créditerons
+dans les notes de version si vous le souhaitez.
+
+## Politique de divulgation
+
+Nous pratiquons la divulgation coordonnée et nous engageons sur les délais
+suivants, décomptés à partir de la réception de votre signalement :
+
+| Étape | Délai visé |
+| --- | --- |
+| Accusé de réception de votre signalement | sous **48 heures** |
+| Évaluation initiale et qualification de la sévérité | sous **5 jours** |
+| Correctif publié, ou plan de remédiation écrit | sous **30 jours** |
+| Divulgation publique de la vulnérabilité | sous **90 jours** |
+
+Nous publions l'avis de sécurité dès qu'un correctif est disponible, ou au plus
+tard à l'échéance des **90 jours**, selon ce qui arrive en premier. Si une
+vulnérabilité est activement exploitée, nous pouvons la divulguer plus tôt pour
+protéger les utilisateurs. Si un correctif complexe demande plus de temps, nous
+vous prévenons avant l'échéance et convenons d'une nouvelle date avec vous,
+plutôt que de la laisser expirer sans rien dire.
+
+## Périmètre
+
+Ce dépôt livre du **contenu de labs** : fichiers déclaratifs (`meta.yml`,
+`lab.yaml`), énoncés en Markdown, fixtures, playbooks Ansible, tests `pytest` et
+solutions de référence chiffrées. **Il n'exécute rien par lui-même** : les labs
+sont joués par la CLI externe `dsoxlab`, qui vit dans son propre dépôt.
+
+CodeQL n'analyse ni `labs/**/fixtures/**` ni `labs/**/solution/**` (voir
+[`.github/codeql/config.yml`](.github/codeql/config.yml)). Ce que le dépôt livre
+comme outillage **propre** (workflows, scripts de validation, tests pytest) reste
+entièrement analysé.
+
+Dans le périmètre :
+
+- un matériau de lab dangereux ou malveillant, notamment un test, une fixture ou
+  un playbook qui exécuterait sur le poste de l'apprenant autre chose que ce que
+  son énoncé annonce, accéderait au réseau sans le dire, ou exfiltrerait des
+  données ;
+- la fuite d'un vrai secret, d'une clé privée, d'un mot de passe de coffre ou
+  d'un jeton d'API commité par erreur, même s'il semble révoqué : il reste dans
+  l'historique git ;
+- une solution de référence livrée en clair, qui gâche le lab et reste dans
+  l'historique ;
+- une action référencée sans épinglage par SHA dans ce que le dépôt livre.
+
+Hors périmètre :
+
+- un lab qui met en place un système volontairement vulnérable : la faille est
+  le sujet enseigné, et elle vit dans la machine ou le répertoire de travail du
+  lab ;
+- les vulnérabilités du moteur `dsoxlab` lui-même, qui relèvent de
+  [son propre dépôt](https://github.com/stephrobert/dsoxlab) ;
+- celles d'une dépendance tierce, à signaler à son projet ;
+- un lab qui échoue ou note mal : c'est un défaut, ouvrez une issue publique.
+
+## Ce que ce dépôt ne vous demandera jamais
+
+Aucun lab n'exige de vrai secret, de compte personnel ni de moyen de paiement.
+Si un énoncé vous en demande un, c'est un défaut du catalogue : signalez-le.
 """
 
 CHANGELOG_EN = """\
@@ -760,12 +883,20 @@ labs, ce qui casse la progression déjà enregistrée des apprenants.
 # ── Intégration continue : les trois contrôles qu'un catalogue doit jouer ───
 
 CI = """\
-# La CI d'un catalogue de labs joue trois contrôles, et aucun ne demande
+# La CI d'un catalogue de labs, et aucun de ses jobs ne demande
 # d'infrastructure : ils sont donc tous jouables sur un runner public.
+#
+# Le job « Contract, guardrails and lint » vérifie le catalogue :
 #
 #   1. le contrat est valide, hors ligne (`validate-structure`) ;
 #   2. les garde-fous propres au dépôt passent (`pytest tests/`) ;
 #   3. le python du catalogue est propre (`ruff`).
+#
+# Les autres forment la chaîne de sécurité des catalogues de la collection :
+# zizmor, actionlint et poutine sur les workflows, la parité pre-commit, et
+# CodeQL sur le python et les workflows. Leurs noms (`name:`) sont les
+# contrôles qu'exige le ruleset décrit dans RELEASING : un job renommé ici doit
+# l'être là-bas, sinon le ruleset attend un contrôle qui ne viendra jamais.
 #
 # Ce qu'elle NE fait PAS, et c'est délibéré : jouer les labs. Un lab `vm`
 # demande un hyperviseur, et un lab `shell` demande les outils de son domaine.
@@ -787,12 +918,224 @@ permissions:
   contents: read
 
 jobs:
+  # Fast security gate - the other jobs depend on it.
+  zizmor:
+    name: Zizmor (workflow static analysis)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@{sha_checkout} # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Zizmor
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          # Dependabot met à jour le SHA de l'ACTION, jamais cet input, qui
+          # épingle le BINAIRE : il est donc le seul de la chaîne à vieillir en
+          # silence. Mesuré le 2026-09-15 : la 1.26.1 refuse de charger un
+          # workflow qui appelle `uses: $/...`, la forme « self-repository »
+          # que GitHub a publiée en juillet 2026, et échoue sur « malformed
+          # uses ref » sans auditer quoi que ce soit. La 1.30.1 la lit, et la
+          # recommande même contre la forme relative.
+          #
+          # Et 1.30.0, pas 1.30.1 : l'action embarque sa propre table de
+          # versions connues, avec le digest de chaque image. Elle s'arrête à
+          # la dernière publiée avant SA dernière release, et répond « Unknown
+          # version » pour tout ce qui vient après. La 1.30.1 est sortie le
+          # 2026-09-09, après la v0.6.3 de l'action : elle est donc refusée.
+          version: "1.30.0"
+          advanced-security: false
+          # Les workflows DU CATALOGUE, et eux seuls. La cible reste explicite,
+          # comme dans les catalogues voisins : un lab qui livrerait un workflow
+          # en fixture serait jugé par ses tests, pas par la CI du dépôt.
+          inputs: .github/workflows
+
+  # Workflow syntax gate. actionlint is the only scanner that rejects an
+  # invalid permission scope (e.g. the tempting-but-nonexistent
+  # `administration: read`) and shellchecks every `run:` block.
+  # Installed from the pinned release tarball with a SHA-256 check - same
+  # pattern as trufflehog below, so no extra third-party action enters the
+  # trust boundary just to lint.
+  actionlint:
+    name: Actionlint (workflow syntax)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@{sha_checkout} # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint (verified release binary)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://github.com/rhysd/actionlint/releases/download/v${{ACTIONLINT_VERSION}}"
+          asset="actionlint_${{ACTIONLINT_VERSION}}_linux_amd64.tar.gz"
+          curl -fsSL -o "${{workdir}}/${{asset}}" "${{base}}/${{asset}}"
+          curl -fsSL -o "${{workdir}}/checksums.txt" "${{base}}/actionlint_${{ACTIONLINT_VERSION}}_checksums.txt"
+          (cd "${{workdir}}" && grep " ${{asset}}$" checksums.txt | sha256sum -c -)
+          tar -xzf "${{workdir}}/${{asset}}" -C "${{workdir}}" actionlint
+          sudo install -m 0755 "${{workdir}}/actionlint" /usr/local/bin/actionlint
+          actionlint --version
+
+      - name: Run actionlint
+        run: actionlint -color
+
+  # CI/CD exploit-chain analysis: models triggers, permissions and data flow to
+  # surface full attack scenarios (untrusted checkout exec, injection, risky
+  # default permissions). Complements zizmor rather than duplicating it.
+  poutine:
+    name: Poutine (CI/CD exploit chains)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@{sha_checkout} # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Poutine
+        uses: boostsecurityio/poutine-action@e240ebd3eff8b2db5a8e5f6b28f58739d7db2247 # v1.1.4
+
+  # Parity gate - run EVERY pre-commit hook (commit AND push stages) exactly as
+  # a contributor's local pre-commit would. Nothing enforced locally (hygiene,
+  # validate-structure, the lock, the guardrails, the writing rules) can then be slipped
+  # past with `git commit --no-verify`: any failing hook refuses the PR. This is
+  # the single source of truth - the CI runs the .pre-commit-config.yaml, not a
+  # hand-maintained copy of its steps.
+  pre-commit:
+    name: Pre-commit parity (all hooks)
+    needs: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # Pas de `DSOXLAB_PROVIDER` ici : un provider non résolu n'est pas une
+    # erreur pour `validate-structure`, seules les commandes d'infrastructure
+    # en exigent un. Un catalogue dont `infra.provider` est une liste de
+    # candidats peut en poser un ici si un hook en a besoin.
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@{sha_checkout} # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # trufflehog walks git history
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@{sha_uv} # v10.3.3
+
+      - name: Install trufflehog (verified release binary; the hook runs with --no-update)
+        # Download the pinned release tarball and verify its SHA-256 against the
+        # published checksums before use - no piped remote script (Plumber
+        # ISSUE-411). The skeleton's .pre-commit-config.yaml has no trufflehog
+        # hook yet: the sibling catalogs add one
+        # (`trufflehog git file://. --since-commit HEAD --results=verified
+        # --fail --no-update`), and this step is what lets it run here.
+        env:
+          TRUFFLEHOG_VERSION: "3.95.2"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v${{TRUFFLEHOG_VERSION}}"
+          asset="trufflehog_${{TRUFFLEHOG_VERSION}}_linux_amd64.tar.gz"
+          curl -fsSL -o "${{workdir}}/${{asset}}" "${{base}}/${{asset}}"
+          curl -fsSL -o "${{workdir}}/checksums.txt" "${{base}}/trufflehog_${{TRUFFLEHOG_VERSION}}_checksums.txt"
+          (cd "${{workdir}}" && grep " ${{asset}}$" checksums.txt | sha256sum -c -)
+          tar -xzf "${{workdir}}/${{asset}}" -C "${{workdir}}" trufflehog
+          sudo install -m 0755 "${{workdir}}/trufflehog" /usr/local/bin/trufflehog
+          trufflehog --version
+
+      - name: Run every hook (commit stage)
+        run: uvx pre-commit@4.6.0 run --all-files --show-diff-on-failure --color always
+
+      - name: Run every hook (push stage)
+        run: uvx pre-commit@4.6.0 run --all-files --hook-stage pre-push --show-diff-on-failure --color always
+
+      # A lock file that has drifted from its pyproject locks nothing: the
+      # vulnerability scanners keep reading uv.lock, which no longer describes
+      # what gets installed. `--check` neither resolves nor writes; it fails if
+      # the lock is stale. This check only became possible once dsoxlab left
+      # the dev group: as a local path source, it made the lock unresolvable
+      # anywhere ../dsoxlab is absent, CI included.
+      - name: The lock still describes the pyproject
+        run: uv lock --check
+
+  codeql:
+    name: CodeQL (${{{{ matrix.language }}}})
+    needs: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@{sha_checkout} # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{{{ matrix.language }}}}
+          # Neither Python nor workflows compile: there is no build to observe,
+          # and saying so spares CodeQL the search for a build command that
+          # does not exist.
+          build-mode: none
+          queries: security-extended
+          # Le matériau pédagogique est volontairement vulnérable, et le fichier
+          # dit pourquoi l'exclure plutôt que de corriger ce qui est le sujet.
+          config-file: ./.github/codeql/config.yml
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+
   contrat:
     name: Contract, guardrails and lint
     runs-on: ubuntu-24.04
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@{sha_harden} # v2.22.0
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
         with:
           egress-policy: audit
 
@@ -802,7 +1145,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@{sha_uv} # v10.2.0
+        uses: astral-sh/setup-uv@{sha_uv} # v10.3.3
 
       - name: Install dsoxlab
         # La borne est DÉCLARÉE, et non supposée. `uv tool install dsoxlab`
@@ -1132,7 +1475,7 @@ jobs:
       digest: ${{{{ steps.bundle.outputs.digest }}}}
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1270,7 +1613,7 @@ jobs:
       id-token: write # OIDC keyless pour la signature cosign
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1365,8 +1708,8 @@ ATTESTER = r"""# Atteste la provenance d'un artefact, et rien d'autre.
 # contrôle avec :
 #
 #   gh attestation verify <archive> \
-#     --repo <owner>/<repo> \
-#     --signer-workflow <owner>/<repo>/.github/workflows/attester.yml
+#     --repo {proprietaire}/{id} \
+#     --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 #
 # Une archive attestée depuis le job de build échouerait à ce contrôle.
 name: Attester la provenance
@@ -1404,7 +1747,7 @@ jobs:
       contents: read
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1437,6 +1780,480 @@ jobs:
           path: provenance.intoto.jsonl
           if-no-files-found: error
           retention-days: 1
+"""
+
+
+#: Le workflow OpenSSF Scorecard : c'est lui qui remplit le badge Scorecard du
+#: README. Sans lui, le badge reste vide, et rien ne le dit.
+#
+# Repris du catalogue cloud, le plus récent de la collection, avec ses SHA. Une
+# seule différence : la condition `if` qui le saute tant que le dépôt est
+# privé, reprise du catalogue python. Un catalogue neuf naît souvent privé, et
+# Scorecard ne sait ni lire ni publier un dépôt privé : sans elle, le premier
+# push sur `main` serait rouge pour une raison qui n'est pas une faute.
+SCORECARD = """\
+# OpenSSF Scorecard: measures the repository's supply-chain security posture
+# (branch protection, pinned dependencies, token permissions, code review, ...)
+# and publishes the result to the public Scorecard viewer and the README badge.
+name: OpenSSF Scorecard
+
+on:
+  push:
+    branches: [main]
+
+  branch_protection_rule:
+
+  schedule:
+    - cron: '31 5 * * 3'
+
+  workflow_dispatch:
+
+permissions: {{}}
+
+concurrency:
+  group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    # Scorecard needs a public repository (commit-graph API + result
+    # publication). Skips while private; activates once public.
+    if: ${{{{ !github.event.repository.private }}}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to Code Scanning
+      id-token: write          # publish results to the OpenSSF Scorecard API
+      actions: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true # publish to the OpenSSF viewer (drives the README badge)
+
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: results.sarif
+"""
+
+
+#: Le workflow Plumber : c'est lui qui publie le score du badge Plumber.
+#
+# Repris tel quel du catalogue cloud. Il lit `.plumber.yaml`, que le socle pose
+# aussi : l'action refuse de tourner sans ce fichier.
+PLUMBER = """\
+# Validates this catalogue's own CI/CD with Plumber (getplumber.io): it analyzes the
+# repo's GitHub Actions workflows and repository settings against .plumber.yaml,
+# uploads findings to Code Scanning, publishes the compliance score to the
+# README badge, and fails below the threshold. The action verifies the
+# downloaded Plumber binary's SLSA build-provenance attestation before running.
+#
+# This workflow runs ONLY in trusted contexts (push to main, schedule, manual):
+# it needs a privileged token (Administration:read) to verify branch protection,
+# and that secret must never be exposed to pull_request runs - especially from
+# forks. Pull requests run ci.yml, which uses no secrets.
+name: Plumber compliance
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 2 * * 1'
+  workflow_dispatch:
+
+permissions: {{}}
+
+concurrency:
+  group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
+  cancel-in-progress: true
+
+jobs:
+  plumber:
+    name: Plumber analyze
+    # Skips while private (SARIF upload needs Advanced Security, free on public
+    # repos); activates automatically once the repo is public.
+    if: ${{{{ !github.event.repository.private }}}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The privileged token lives in this protected environment, which is
+    # restricted to the main branch - it is unreachable from pull_request runs.
+    environment: security
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to Code Scanning
+      actions: read            # read the workflow run for Plumber status
+      id-token: write          # OIDC to publish the score to score.getplumber.io
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Plumber compliance scan
+        # No `version:` input: the action installs the binary of its own release
+        # (the default in its action.yml), so Dependabot moves both together.
+        uses: getplumber/plumber@ec8cb3a7edd6a324b33e85109b627b2df6023d94 # v0.7.23
+        with:
+          verify-attestation: "true"   # check the binary's SLSA provenance before running
+          # Gate on the Plumber Score itself. `threshold` is DEPRECATED and its
+          # value 100 is explicitly "treated as unset" by the action - it gated
+          # nothing. min-points + soft-fail:false is the real gate: the job only
+          # passes at a full 100/100, and any finding fails it.
+          min-points: "100"
+          soft-fail: "false"
+          upload-sarif: "true"          # findings to the Security tab (internal)
+          upload-artifacts: "false"     # no downloadable artifact published
+          score-push: "true"           # publish the score (drives the README badge)
+          # Fine-grained PAT (Administration + Contents + Metadata = Read),
+          # stored as an environment secret in the protected `security`
+          # environment, so branchMustBeProtected is verified for real.
+          #
+          # The token does TWO things: besides the branch-protection check, the
+          # action uses it to verify the provenance attestation of the binary it
+          # has just downloaded, through `gh attestation verify`. An empty token
+          # fails that step with `exit 4` on "set the GH_TOKEN environment
+          # variable", and the whole job falls over before analysing anything.
+          # Hence the fallback to the job token: with no PAT, provenance is
+          # still verified and only the branch-protection check abstains.
+          github-token: ${{{{ secrets.PLUMBER_ADMIN_TOKEN || github.token }}}}
+"""
+
+
+# ── Les badges du README ────────────────────────────────────────────────────
+#
+# Les catalogues de la collection portent cinq badges sous la ligne de langue :
+# CI, OpenSSF Scorecard, Plumber, SLSA 3 et licence. Leur forme est reprise du
+# catalogue cloud. Le badge SLSA 3 tient parce que le socle pose `attester.yml`
+# (voir ATTESTER) ; Scorecard et Plumber parce qu'il pose leurs workflows.
+
+#: Le propriétaire GitHub écrit quand l'auteur n'en donne pas. C'est un
+#: emplacement, pas un nom : aucun propriétaire réel n'est codé dans le moteur,
+#: et la CLI dit de le remplacer.
+PROPRIETAIRE_PAR_DEFAUT = "<owner>"
+
+#: Un nom de compte ou d'organisation GitHub : lettres, chiffres et tirets
+#: isolés, 39 caractères au plus, sans tiret en tête ni en queue. Il entre dans
+#: des URL, du Markdown et des commandes : on le borne avant de l'écrire.
+_PROPRIETAIRE_VALIDE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
+
+#: La licence posée par défaut, et son libellé sur le badge.
+_LICENCE_PAR_DEFAUT = "cc-by-4.0"
+_LIBELLES_LICENCE = {"cc-by-4.0": "CC BY 4.0"}
+
+
+def proprietaire_valide(proprietaire: str) -> bool:
+    """Le nom donné à `--github` peut-il être celui d'un compte GitHub ?"""
+    return bool(_PROPRIETAIRE_VALIDE.match(proprietaire))
+
+
+def badges(identifiant: str, proprietaire: str, langue: str) -> str:
+    """Les cinq lignes de badges du README, dans la langue demandée.
+
+    Seuls deux libellés se traduisent, comme dans les catalogues : celui de
+    Plumber et celui de la licence. Le badge de licence suit la licence que le
+    socle pose, pour ne jamais annoncer une licence que `LICENSE` ne porte pas.
+    """
+    depot = f"{proprietaire}/{identifiant}"
+    licence = _LIBELLES_LICENCE[_LICENCE_PAR_DEFAUT]
+    francais = langue == "fr"
+    mot_licence = "Licence" if francais else "License"
+    sep_licence = " : " if francais else ": "
+    plumber = "Conformité Plumber" if francais else "Plumber compliance"
+    ci = (
+        f"[![CI](https://github.com/{depot}/actions/workflows/ci.yml/badge.svg)]"
+        f"(https://github.com/{depot}/actions/workflows/ci.yml)"
+    )
+    scorecard = (
+        f"[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/{depot}"
+        f"?label=OpenSSF%20Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/{depot})"
+    )
+    conformite = (
+        f"[![{plumber}](https://score.getplumber.io/github.com/{depot}.svg)]"
+        f"(https://score.getplumber.io/github.com/{depot})"
+    )
+    slsa = "[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)"
+    badge_licence = (
+        f"[![{mot_licence}{sep_licence}{licence}](https://img.shields.io/badge/"
+        f"{mot_licence}-{quote(licence)}-lightgrey.svg)](./LICENSE)"
+    )
+    return "\n".join((ci, scorecard, conformite, slsa, badge_licence))
+
+
+# ── La chaîne de sécurité des catalogues frères ──────────────────────────────
+#
+# Reprise de applications-ia-dsoxlab-training (e7db2da), le premier catalogue
+# neuf où elle a été éprouvée de bout en bout : tous ses jobs verts, et un
+# ruleset qui exige les sept contrôles. Les commentaires propres à ce catalogue
+# ont été rendus génériques.
+
+#: Dependabot : le modèle commun, écosystèmes `uv` et `github-actions`.
+DEPENDABOT = """\
+# Règles Dependabot communes aux catalogues de labs dsoxlab.
+#
+# Ce fichier est le MÊME modèle dans tous les catalogues de la collection :
+# l'écosystème `uv` pour le verrou Python, `github-actions` pour les workflows.
+# Une divergence se corrige en réalignant le dépôt sur ce modèle, pas en
+# adaptant le modèle au dépôt.
+#
+# Ce que le modèle règle : le NOMBRE de pull requests. Sans bloc `groups`,
+# Dependabot ouvre une branche, une PR et une CI complète PAR DÉPENDANCE.
+# Mesuré le 2026-09-15 sur cinq dépôts de la collection : celui dont
+# l'écosystème de paquets n'avait aucun groupe portait 6 PR ouvertes, dont 5
+# pour cinq paquets de la même famille qui sortent leurs versions le même jour
+# et ne se fusionnent jamais séparément.
+version: 2
+updates:
+  # --- Paquets Python ------------------------------------------------------
+  #
+  # Le dépôt verrouille ses dépendances dans `uv.lock` : c'est le verrou que
+  # Dependabot fait avancer, et c'est lui que les scanners de vulnérabilités
+  # lisent. Sans verrou, une contrainte `>=` laisse chaque installation
+  # résoudre ce qu'elle veut et aucun outil ne peut affirmer ce qui tourne.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    # Laisser décanter une nouvelle release : un paquet compromis est
+    # généralement retiré en quelques jours, et le cooldown réduit d'autant la
+    # fenêtre pendant laquelle on l'aurait tiré.
+    #
+    # Les paliers semver sont supportés pour les écosystèmes de PAQUETS : une
+    # majeure attend deux semaines, un correctif trois jours.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      deps-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # --- Actions GitHub ------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    # `default-days` SEUL ici : les paliers semver-{major,minor,patch}-days ne
+    # sont PAS supportés pour l'écosystème github-actions. Les déclarer fait
+    # échouer la validation du fichier côté GitHub, qui cesse alors d'ouvrir
+    # des PR - et cela ressemble exactement à « aucune mise à jour
+    # disponible ».
+    cooldown:
+      default-days: 7
+    # Un lot par semaine plutôt qu'une branche par action. Des catalogues de
+    # la collection ont eu cinq PR ouvertes en même temps, dont trois pour les
+    # trois actions github/codeql-action/*, qui sortent toujours la même
+    # version le même jour.
+    #
+    # Les majeures restent seules : ce sont elles qui cassent, elles méritent
+    # d'être lues, et les grouper ferait qu'une action incompatible bloquerait
+    # toutes les autres du lot.
+    #
+    # Les alertes de sécurité restent hors groupe, ce qui est le défaut
+    # (`applies-to: version-updates`) : elles sont urgentes et méritent une PR
+    # ciblée plutôt que d'attendre le lot hebdomadaire.
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+"""
+
+#: CodeQL : ce que la CI analyse, et ce qu'elle laisse de côté à dessein.
+CODEQL_CONFIG = """\
+# Configuration CodeQL d'un catalogue de labs.
+#
+# Les fixtures sont le point de départ des labs. Certaines sont volontairement
+# fautives, parce que la faute est le sujet du lab : les analyser ferait des
+# alertes permanentes sans rien protéger. Les solutions sont chiffrées : CodeQL
+# n'en lirait rien.
+#
+# Restent analysés, et ce sont eux qui peuvent nuire à quelqu'un :
+#
+#   .github/workflows/   les workflows du catalogue lui-même
+#   scripts/             l'outillage de validation des labs
+#   labs/**/challenge/   les tests pytest joués sur la machine de l'apprenant
+name: "Catalogue de labs, hors fixtures et solutions des labs"
+
+paths-ignore:
+  - "labs/**/fixtures/**"
+  - "labs/**/solution/**"
+"""
+
+#: CODEOWNERS : le propriétaire de `--github`, ou l'emplacement `<owner>`.
+CODEOWNERS = """\
+# Default owner for everything in the repository: GitHub requests their review
+# on every pull request. The ruleset proposed in RELEASING does not REQUIRE a
+# code-owner review (a single maintainer cannot approve their own pull
+# request); turn `require_code_owner_review` on once the catalog has several.
+* @{proprietaire}
+
+# The CI/CD chain is the most sensitive surface in the repo: any change here can
+# exfiltrate secrets or weaken every other gate. Owned explicitly so a review is
+# always requested, even if the default owner above is ever broadened.
+/.github/workflows/ @{proprietaire}
+/.github/dependabot.yml @{proprietaire}
+/.plumber.yaml @{proprietaire}
+/.poutine.yml @{proprietaire}
+/.pre-commit-config.yaml @{proprietaire}
+
+# Encrypted trainer solutions (ansible-vault): a leak here defeats every lab.
+/labs/*/solution/ @{proprietaire}
+"""
+
+#: Les gabarits d'issue : le défaut d'un lab ici, celui du moteur chez lui, et
+#: une vulnérabilité en privé, jamais dans une issue publique.
+ISSUE_CONFIG = """\
+# `blank_issues_enabled: true` est délibéré : une version de dsoxlab
+# antérieure à `support --issue` dépose un corps libre, et cette voie doit
+# continuer de marcher.
+blank_issues_enabled: true
+contact_links:
+  - name: "Security vulnerability / Vulnérabilité de sécurité"
+    url: https://github.com/{proprietaire}/{id}/security/advisories/new
+    about: "Report it privately, never in a public issue. / Signalez-la en privé, jamais dans une issue publique."
+  - name: "dsoxlab tool defect / Défaut de l'outil dsoxlab"
+    url: https://github.com/stephrobert/dsoxlab/issues/new/choose
+    about: "The engine crashes or misbehaves, regardless of a lab. / Le moteur plante ou se comporte mal, indépendamment d'un lab."
+"""
+
+ISSUE_LAB = """\
+name: "Lab problem / Problème sur un lab"
+description: "Wrong statement, test failing wrongly, missing fixture or documentation / Énoncé faux, test qui échoue à tort, fixture ou documentation manquante"
+labels: ["lab"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository, `{proprietaire}/{id}`, holds the **labs**. For a
+        defect of the tool itself (`dsoxlab` crashes, a command misbehaves),
+        open the issue on https://github.com/stephrobert/dsoxlab/issues instead.
+
+        Ce dépôt, `{proprietaire}/{id}`, porte les **labs**. Pour un défaut
+        de l'outil lui-même (`dsoxlab` plante, une commande se comporte mal),
+        ouvrez plutôt l'issue sur https://github.com/stephrobert/dsoxlab/issues
+  - type: input
+    id: lab
+    attributes:
+      label: "Lab / Lab concerné"
+      description: "The id given by `dsoxlab list-labs`. / L'identifiant rendu par `dsoxlab list-labs`."
+      placeholder: "<lab-id>"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "What happened / Ce qui s'est passé"
+      description: "What you expected, and what you got instead. / Ce que vous attendiez, et ce que vous avez obtenu à la place."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "Steps to reproduce / Étapes pour reproduire"
+      description: "The exact commands, and from which directory. / Les commandes exactes, depuis quel répertoire."
+      placeholder: |
+        1. dsoxlab run <lab>
+        2. ...
+    validations:
+      required: false
+  - type: textarea
+    id: support
+    attributes:
+      label: "Diagnostic report / Rapport de diagnostic"
+      description: >-
+        Output of `dsoxlab support`, anonymised by default. /
+        Sortie de `dsoxlab support`, anonymisée par défaut : ni chemin
+        personnel, ni adresse publique, ni nom de machine.
+      render: markdown
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: "Operating system / Système d'exploitation"
+      placeholder: Ubuntu 24.04 / AlmaLinux 10 / ...
+    validations:
+      required: false
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: "Lab runtime / Runtime du lab"
+      options:
+        - shell
+        - vm
+        - not applicable
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Output / logs (Sortie / journaux)"
+      description: "Rendered as code, no backticks needed. / Rendu comme du code, pas besoin de backticks."
+      render: shell
+    validations:
+      required: false
+"""
+
+#: Poutine : les acquittements ciblés, action par action.
+POUTINE = """\
+# Poutine - CI/CD exploit-chain analysis.
+#
+# Targeted acknowledgements ONLY. The rule stays globally enabled so any OTHER
+# third-party action keeps being flagged: each skip below names one exact purl.
+#
+# `github_action_from_unverified_creator_used` fires on any action whose owner
+# is not a Marketplace "verified creator". That status is a Marketplace
+# publishing formality, not a security verdict - several first-class security
+# tools do not carry it. Each action below is pinned by commit SHA, listed in
+# `.plumber.yaml: trustedGithubActions`, and vetted by hand.
+skip:
+  - rule: github_action_from_unverified_creator_used
+    purl:
+      # Official action of the plumber scanner itself (getplumber.io), which
+      # gates this very repo's compliance.
+      - pkg:githubactions/getplumber/plumber
+      # Official action of the zizmor scanner (zizmorcore), the workflow static
+      # analysis gate in ci.yml.
+      - pkg:githubactions/zizmorcore/zizmor-action
+      # Official action of poutine itself (BoostSecurity), the scanner running
+      # this very configuration.
+      - pkg:githubactions/boostsecurityio/poutine-action
+      # Astral - maintainer of uv and ruff, the toolchain this repo builds on.
+      - pkg:githubactions/astral-sh/setup-uv
+      # StepSecurity - harden-runner, the egress-monitoring baseline required as
+      # the first step of every job.
+      - pkg:githubactions/step-security/harden-runner
+      # Sigstore - the upstream project behind cosign keyless signing.
+      - pkg:githubactions/sigstore/cosign-installer
 """
 
 
@@ -1576,7 +2393,7 @@ workflow, and not rebuilt by someone else:
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id}
+  --repo {proprietaire}/{id}
 ```
 
 **The check that establishes Build Level 3** names the signing workflow. It
@@ -1586,8 +2403,8 @@ holds:
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id} \
-  --signer-workflow stephrobert/{id}/.github/workflows/attester.yml
+  --repo {proprietaire}/{id} \
+  --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 ```
 
 Keyless Cosign signature. **Both** certificate flags are mandatory: without
@@ -1597,7 +2414,7 @@ of its meaning.
 ```bash
 cosign verify-blob \
   --bundle {id}-<version>.tar.gz.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/stephrobert/{id}/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/{proprietaire}/{id}/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   {id}-<version>.tar.gz
 ```
@@ -1610,7 +2427,17 @@ cosign verify-blob \
 
 ## GitHub settings to do once
 
-Two workflows need configuration that does not live in the repository:
+Two workflows feed the README badges, and both skip while the repository is
+private: Scorecard cannot read a private repository, and Plumber's SARIF upload
+needs Advanced Security, free on public repositories.
+
+- **`scorecard.yml`** runs OpenSSF Scorecard on every push to `main`, weekly and
+  on branch protection changes, and publishes the result to the public viewer
+  that the Scorecard badge reads. It needs no secret.
+- **`plumber.yml`** checks the CI against `.plumber.yaml` and publishes the score
+  that the Plumber badge reads. The action refuses to run without that file.
+
+Two settings do not live in the repository:
 
 - **`plumber.yml`** expects a `security` environment, restricted to the `main`
   branch, holding the `PLUMBER_ADMIN_TOKEN` secret: a fine-grained PAT with
@@ -1628,15 +2455,18 @@ A ruleset is a GitHub setting, not a file of the repository: it does not travel
 with a `git push`. It is set **once**, after the repository is created and the
 CI has run for the first time (a required check must have run at least once for
 GitHub to offer it). The payload below takes over the rules of the sibling
-catalogs; the contexts are the job names of `ci.yml`, the CodeQL matrix giving
-two.
+catalogs. Its required checks are the job names of **this** repository's
+`ci.yml`, and only those: the seven jobs of the skeleton, the CodeQL matrix
+giving two (`CodeQL (python)` and `CodeQL (actions)`). A check that no workflow
+runs stays "expected" forever and blocks every pull request. When you rename or
+add a job in `ci.yml`, change its `name:` here too, and not before.
 
 No approval is required (`required_approving_review_count: 0`): the repository
 has a single maintainer, who cannot approve their own pull request. Going
 through a pull request, resolving threads and a green CI stay mandatory.
 
 ```bash
-gh api --method POST repos/stephrobert/{id}/rulesets \
+gh api --method POST repos/{proprietaire}/{id}/rulesets \
   --input - <<'JSON'
 {{
   "name": "Protection de main",
@@ -1660,7 +2490,7 @@ gh api --method POST repos/stephrobert/{id}/rulesets \
         {{"context": "Actionlint (workflow syntax)"}},
         {{"context": "Poutine (CI/CD exploit chains)"}},
         {{"context": "Pre-commit parity (all hooks)"}},
-        {{"context": "Contrat du catalogue (leçons jumelées comprises)"}},
+        {{"context": "Contract, guardrails and lint"}},
         {{"context": "CodeQL (python)"}},
         {{"context": "CodeQL (actions)"}}]}}}}
   ]
@@ -1811,7 +2641,7 @@ ce dépôt, et non reconstruite par quelqu'un d'autre :
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id}
+  --repo {proprietaire}/{id}
 ```
 
 **La vérification qui atteste le niveau 3** nomme le workflow signataire. Elle
@@ -1821,8 +2651,8 @@ confirmer que la chaîne tient :
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id} \
-  --signer-workflow stephrobert/{id}/.github/workflows/attester.yml
+  --repo {proprietaire}/{id} \
+  --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 ```
 
 Signature Cosign keyless. Les **deux** options de certificat sont obligatoires :
@@ -1832,7 +2662,7 @@ la vérification de son sens.
 ```bash
 cosign verify-blob \
   --bundle {id}-<version>.tar.gz.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/stephrobert/{id}/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/{proprietaire}/{id}/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   {id}-<version>.tar.gz
 ```
@@ -1845,7 +2675,18 @@ cosign verify-blob \
 
 ## Réglages GitHub à faire une fois
 
-Deux workflows ont besoin d'une configuration qui ne vit pas dans le dépôt :
+Deux workflows alimentent les badges du README, et tous deux se sautent tant
+que le dépôt est privé : Scorecard ne sait pas lire un dépôt privé, et l'envoi
+SARIF de Plumber demande Advanced Security, gratuit sur un dépôt public.
+
+- **`scorecard.yml`** joue OpenSSF Scorecard à chaque push sur `main`, chaque
+  semaine et à chaque changement de protection de branche, et publie le
+  résultat sur le site public que lit le badge Scorecard. Il ne demande aucun
+  secret.
+- **`plumber.yml`** contrôle la CI d'après `.plumber.yaml` et publie le score que
+  lit le badge Plumber. L'action refuse de tourner sans ce fichier.
+
+Deux réglages ne vivent pas dans le dépôt :
 
 - **`plumber.yml`** attend un environnement `security`, restreint à la branche
   `main`, portant le secret `PLUMBER_ADMIN_TOKEN` : un PAT à portée fine avec
@@ -1863,8 +2704,12 @@ Un ruleset est un réglage GitHub, pas un fichier du dépôt : il ne voyage pas
 avec un `git push`. Il se pose **une fois**, après la création du dépôt et le
 premier passage de la CI (un contrôle obligatoire doit avoir tourné au moins
 une fois pour que GitHub le propose). La charge ci-dessous reprend les règles
-des catalogues voisins ; les contextes sont les noms des jobs de `ci.yml`, la
-matrice CodeQL en donnant deux.
+des catalogues voisins. Ses contrôles obligatoires sont les noms des jobs du
+`ci.yml` de **ce** dépôt, et eux seuls : les sept jobs du squelette, la matrice
+CodeQL en donnant deux (`CodeQL (python)` et `CodeQL (actions)`). Un contrôle
+qu'aucun workflow ne lance reste « attendu » pour toujours et bloque toutes les
+pull requests. Quand tu renommes ou ajoutes un job dans `ci.yml`, change son
+`name:` ici aussi, et pas avant.
 
 Aucune approbation n'est exigée (`required_approving_review_count: 0`) : le
 dépôt n'a qu'un mainteneur, qui ne peut pas approuver sa propre pull request.
@@ -1872,7 +2717,7 @@ Le passage par pull request, la résolution des fils et la CI verte restent
 obligatoires.
 
 ```bash
-gh api --method POST repos/stephrobert/{id}/rulesets \
+gh api --method POST repos/{proprietaire}/{id}/rulesets \
   --input - <<'JSON'
 {{
   "name": "Protection de main",
@@ -1896,7 +2741,7 @@ gh api --method POST repos/stephrobert/{id}/rulesets \
         {{"context": "Actionlint (workflow syntax)"}},
         {{"context": "Poutine (CI/CD exploit chains)"}},
         {{"context": "Pre-commit parity (all hooks)"}},
-        {{"context": "Contrat du catalogue (leçons jumelées comprises)"}},
+        {{"context": "Contract, guardrails and lint"}},
         {{"context": "CodeQL (python)"}},
         {{"context": "CodeQL (actions)"}}]}}}}
   ]
@@ -1919,7 +2764,7 @@ def licence_par_defaut() -> str:
     """
     from ..templates import licence
 
-    return licence().read_text(encoding="utf-8")
+    return licence(_LICENCE_PAR_DEFAUT).read_text(encoding="utf-8")
 
 
 def version_du_moteur() -> str:
@@ -1944,17 +2789,35 @@ def version_du_moteur() -> str:
     return brute if brute and brute != "0.0.0" else _PLANCHER_COMMUN
 
 
-def fichiers_du_socle(identifiant: str) -> dict[str, str]:
+def config_plumber() -> str:
+    """Le `.plumber.yaml` du socle, lu dans les gabarits packagés."""
+    from ..templates import plumber_config
+
+    return plumber_config().read_text(encoding="utf-8")
+
+
+def fichiers_du_socle(
+    identifiant: str, proprietaire: str = PROPRIETAIRE_PAR_DEFAUT
+) -> dict[str, str]:
     """Les fichiers du socle, par chemin relatif à la racine du catalogue.
 
     Un seul endroit décide de ce qu'un catalogue porte : ce dictionnaire. Le
     jour où la collection en ajoute un, il s'ajoute ici et tous les nouveaux
     catalogues l'ont, sans qu'on ait à s'en souvenir.
+
+    `proprietaire` est le compte ou l'organisation GitHub du dépôt
+    `<proprietaire>/<identifiant>`. Il sert aux badges du README et aux
+    commandes de vérification de RELEASING. Absent, c'est l'emplacement
+    `<owner>`, que l'auteur remplace.
     """
     return {
         "LICENSE": licence_par_defaut(),
-        "README.md": README_EN.format(id=identifiant),
-        "README.fr.md": README_FR.format(id=identifiant),
+        "README.md": README_EN.format(
+            id=identifiant, badges=badges(identifiant, proprietaire, "en")
+        ),
+        "README.fr.md": README_FR.format(
+            id=identifiant, badges=badges(identifiant, proprietaire, "fr")
+        ),
         "meta.fr.yml": META_FR.format(id=identifiant),
         "conftest.py": CONFTEST,
         "pyproject.toml": PYPROJECT.format(id=identifiant),
@@ -1962,8 +2825,8 @@ def fichiers_du_socle(identifiant: str) -> dict[str, str]:
         "CONTRIBUTING.fr.md": CONTRIBUTING_FR,
         "CODE_OF_CONDUCT.md": CODE_OF_CONDUCT_EN,
         "CODE_OF_CONDUCT.fr.md": CODE_OF_CONDUCT_FR,
-        "SECURITY.md": SECURITY_EN,
-        "SECURITY.fr.md": SECURITY_FR,
+        "SECURITY.md": SECURITY_EN.format(id=identifiant, proprietaire=proprietaire),
+        "SECURITY.fr.md": SECURITY_FR.format(id=identifiant, proprietaire=proprietaire),
         "CHANGELOG.md": CHANGELOG_EN,
         "CHANGELOG.fr.md": CHANGELOG_FR,
         ".github/workflows/ci.yml": CI.format(
@@ -1971,9 +2834,24 @@ def fichiers_du_socle(identifiant: str) -> dict[str, str]:
             moteur=version_du_moteur(),
         ),
         ".github/workflows/release.yml": RELEASE.format(id=identifiant),
-        ".github/workflows/attester.yml": ATTESTER.format(id=identifiant),
-        "RELEASING.md": RELEASING_EN.format(id=identifiant),
-        "RELEASING.fr.md": RELEASING_FR.format(id=identifiant),
+        ".github/workflows/attester.yml": ATTESTER.format(
+            id=identifiant, proprietaire=proprietaire
+        ),
+        ".github/workflows/scorecard.yml": SCORECARD.format(),
+        ".github/dependabot.yml": DEPENDABOT,
+        ".github/codeql/config.yml": CODEQL_CONFIG,
+        ".github/CODEOWNERS": CODEOWNERS.format(proprietaire=proprietaire),
+        ".github/ISSUE_TEMPLATE/config.yml": ISSUE_CONFIG.format(
+            id=identifiant, proprietaire=proprietaire
+        ),
+        ".github/ISSUE_TEMPLATE/lab_report.yml": ISSUE_LAB.format(
+            id=identifiant, proprietaire=proprietaire
+        ),
+        ".poutine.yml": POUTINE,
+        ".github/workflows/plumber.yml": PLUMBER.format(),
+        ".plumber.yaml": config_plumber(),
+        "RELEASING.md": RELEASING_EN.format(id=identifiant, proprietaire=proprietaire),
+        "RELEASING.fr.md": RELEASING_FR.format(id=identifiant, proprietaire=proprietaire),
         ".pre-commit-config.yaml": PRE_COMMIT.format(moteur=version_du_moteur()),
         "tests/test_contrat_du_catalogue.py": TEST_CONTRAT,
         "tests/outils/pas_de_tiret_cadratin.py": TEST_TIRET,
