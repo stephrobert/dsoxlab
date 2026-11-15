@@ -35,6 +35,15 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   un compte fixe : un catalogue créé par quelqu'un d'autre aurait vérifié ses
   releases contre le dépôt d'un tiers. Elles prennent désormais le propriétaire
   de `--github`, ou `<owner>`.
+- **Le ruleset proposé par le `RELEASING` du squelette n'exige plus que le
+  contrôle que le squelette lance**, le job `Contract, guardrails and lint` de
+  `ci.yml`. Repris d'un catalogue frère, il exigeait Zizmor, Actionlint,
+  Poutine, CodeQL et d'autres, qu'aucun workflow d'un catalogue neuf ne lance :
+  appliqué tel quel, il bloquait toutes les pull requests. Un test confronte
+  désormais chaque contrôle exigé aux noms des jobs de `ci.yml`.
+- **Une seule version de `harden-runner` dans le squelette** : `ci.yml`,
+  `release.yml` et `attester.yml` passent en v2.22.3, l'épinglage des deux
+  nouveaux workflows. Un test refuse une action épinglée sur deux versions.
 
 ## [0.9.3] - 2026-11-14
 

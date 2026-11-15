@@ -46,7 +46,7 @@ _PLANCHER_COMMUN = "0.5.0"
 # commentaire : un tag est déplaçable, un SHA non. Ces quatre-là sont celles
 # qui passent aujourd'hui dans la CI des douze catalogues, relevées plutôt
 # qu'inventées.
-_SHA_HARDEN = "351661ca32ac09a36dc5ee2d536e3128f2a3c8ed"  # v2.22.0
+_SHA_HARDEN = "46b06cea07f9e64621fdf066ba77ac6915163d43"  # v2.22.3
 _SHA_CHECKOUT = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # v7.0.1
 _SHA_SETUP_UV = "c18668ad3cf93ea998bef934396af7bb5c839dc7"  # v10.2.0
 
@@ -799,7 +799,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@{sha_harden} # v2.22.0
+        uses: step-security/harden-runner@{sha_harden} # v2.22.3
         with:
           egress-policy: audit
 
@@ -1139,7 +1139,7 @@ jobs:
       digest: ${{{{ steps.bundle.outputs.digest }}}}
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1277,7 +1277,7 @@ jobs:
       id-token: write # OIDC keyless pour la signature cosign
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1411,7 +1411,7 @@ jobs:
       contents: read
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -1863,8 +1863,10 @@ A ruleset is a GitHub setting, not a file of the repository: it does not travel
 with a `git push`. It is set **once**, after the repository is created and the
 CI has run for the first time (a required check must have run at least once for
 GitHub to offer it). The payload below takes over the rules of the sibling
-catalogs; the contexts are the job names of `ci.yml`, the CodeQL matrix giving
-two.
+catalogs. Its required checks are the job names of **this** repository's
+`ci.yml`, and only those: today, the single job `Contract, guardrails and lint`.
+A check that no workflow runs stays "expected" forever and blocks every pull
+request. When you add a job to `ci.yml`, add its `name:` here, and not before.
 
 No approval is required (`required_approving_review_count: 0`): the repository
 has a single maintainer, who cannot approve their own pull request. Going
@@ -1891,13 +1893,7 @@ gh api --method POST repos/{proprietaire}/{id}/rulesets \
     {{"type": "required_status_checks", "parameters": {{
       "strict_required_status_checks_policy": true,
       "required_status_checks": [
-        {{"context": "Zizmor (workflow static analysis)"}},
-        {{"context": "Actionlint (workflow syntax)"}},
-        {{"context": "Poutine (CI/CD exploit chains)"}},
-        {{"context": "Pre-commit parity (all hooks)"}},
-        {{"context": "Contrat du catalogue (leçons jumelées comprises)"}},
-        {{"context": "CodeQL (python)"}},
-        {{"context": "CodeQL (actions)"}}]}}}}
+        {{"context": "Contract, guardrails and lint"}}]}}}}
   ]
 }}
 JSON
@@ -2109,8 +2105,11 @@ Un ruleset est un réglage GitHub, pas un fichier du dépôt : il ne voyage pas
 avec un `git push`. Il se pose **une fois**, après la création du dépôt et le
 premier passage de la CI (un contrôle obligatoire doit avoir tourné au moins
 une fois pour que GitHub le propose). La charge ci-dessous reprend les règles
-des catalogues voisins ; les contextes sont les noms des jobs de `ci.yml`, la
-matrice CodeQL en donnant deux.
+des catalogues voisins. Ses contrôles obligatoires sont les noms des jobs du
+`ci.yml` de **ce** dépôt, et eux seuls : aujourd'hui, l'unique job
+`Contract, guardrails and lint`. Un contrôle qu'aucun workflow ne lance reste
+« attendu » pour toujours et bloque toutes les pull requests. Quand tu ajoutes
+un job à `ci.yml`, ajoute son `name:` ici, et pas avant.
 
 Aucune approbation n'est exigée (`required_approving_review_count: 0`) : le
 dépôt n'a qu'un mainteneur, qui ne peut pas approuver sa propre pull request.
@@ -2138,13 +2137,7 @@ gh api --method POST repos/{proprietaire}/{id}/rulesets \
     {{"type": "required_status_checks", "parameters": {{
       "strict_required_status_checks_policy": true,
       "required_status_checks": [
-        {{"context": "Zizmor (workflow static analysis)"}},
-        {{"context": "Actionlint (workflow syntax)"}},
-        {{"context": "Poutine (CI/CD exploit chains)"}},
-        {{"context": "Pre-commit parity (all hooks)"}},
-        {{"context": "Contrat du catalogue (leçons jumelées comprises)"}},
-        {{"context": "CodeQL (python)"}},
-        {{"context": "CodeQL (actions)"}}]}}}}
+        {{"context": "Contract, guardrails and lint"}}]}}}}
   ]
 }}
 JSON

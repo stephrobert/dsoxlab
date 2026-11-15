@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a fixed account: a catalog created by anyone else would have checked its
   releases against someone else's repository. They now use the `--github`
   owner, or `<owner>`.
+- **The ruleset proposed by the skeleton's `RELEASING` only requires the check
+  the skeleton runs**, the `Contract, guardrails and lint` job of `ci.yml`. It
+  was copied from a sibling catalog and required Zizmor, Actionlint, Poutine,
+  CodeQL and others that no workflow of a new catalog runs: applied as is, it
+  blocked every pull request. A test now checks each required check against the
+  job names of `ci.yml`.
+- **One version of `harden-runner` in the skeleton**: `ci.yml`, `release.yml`
+  and `attester.yml` move to v2.22.3, the pin of the two new workflows. A test
+  refuses an action pinned to two versions.
 
 ## [0.9.3] - 2026-11-14
 

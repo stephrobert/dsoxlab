@@ -19,6 +19,7 @@ fonctionne, et c'est la règle du dépôt.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -531,3 +532,56 @@ def test_le_verrou_est_controle_au_commit(catalogue: Path) -> None:
         "le hook ne dit pas quoi faire : un catalogue neuf n'a pas de `uv.lock`, "
         "et le hook échouera jusqu'à ce que son auteur le crée."
     )
+
+
+def _controles_du_ruleset(releasing: Path) -> list[str]:
+    """Les contrôles obligatoires du ruleset que RELEASING propose d'appliquer."""
+    texte = releasing.read_text(encoding="utf-8")
+    trouve = re.search(r"<<'JSON'\n(.*?)\nJSON\n", texte, re.DOTALL)
+    assert trouve is not None, f"{releasing.name} ne porte plus la charge du ruleset"
+    charge = json.loads(trouve.group(1))
+    return [
+        controle["context"]
+        for regle in charge["rules"]
+        if regle["type"] == "required_status_checks"
+        for controle in regle["parameters"]["required_status_checks"]
+    ]
+
+
+def test_le_ruleset_n_exige_que_les_jobs_que_la_ci_lance(catalogue: Path) -> None:
+    """Un contrôle exigé qu'aucun job ne lance bloque toutes les pull requests.
+
+    Le ruleset de RELEASING avait été repris d'un catalogue frère : il exigeait
+    Zizmor, Actionlint, Poutine, CodeQL… que le `ci.yml` du squelette ne lance
+    pas. Appliqué sur un catalogue neuf, il a bloqué toutes ses PR : GitHub
+    attend pour toujours un contrôle qui ne viendra jamais.
+    """
+    ci = yaml.safe_load(
+        (catalogue / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    jobs = {job.get("name", cle) for cle, job in ci["jobs"].items()}
+
+    for nom in ("RELEASING.md", "RELEASING.fr.md"):
+        controles = _controles_du_ruleset(catalogue / nom)
+        assert controles, f"{nom} : le ruleset n'exige aucun contrôle"
+        orphelins = sorted(set(controles) - jobs)
+        assert not orphelins, (
+            f"{nom} exige {orphelins}, qu'aucun job de ci.yml ne lance "
+            f"(jobs : {sorted(jobs)})"
+        )
+
+
+def test_une_action_n_a_qu_une_version_dans_le_socle(catalogue: Path) -> None:
+    """Deux SHA pour la même action, c'est deux versions à suivre et à auditer.
+
+    Les workflows Scorecard et Plumber sont arrivés avec harden-runner v2.22.3
+    quand ci.yml, release.yml et attester.yml portaient encore v2.22.0.
+    """
+    versions: dict[str, set[str]] = {}
+    for workflow in (catalogue / ".github" / "workflows").glob("*.yml"):
+        for action in re.findall(r"uses: +(\S+)", workflow.read_text(encoding="utf-8")):
+            if "@" in action:
+                nom, reference = action.split("@", 1)
+                versions.setdefault(nom, set()).add(reference)
+    doublons = {nom: sorted(refs) for nom, refs in versions.items() if len(refs) > 1}
+    assert not doublons, f"actions épinglées sur plusieurs versions : {doublons}"
