@@ -7,6 +7,35 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.4] - 2026-11-15
+
+### Ajouté
+
+- **`dsoxlab new catalog` écrit les cinq badges du README de la collection.**
+  Juste sous la ligne de langue de `README.md` et `README.fr.md` : CI, OpenSSF
+  Scorecard, conformité Plumber, SLSA 3 et licence, dans la forme qu'emploient
+  déjà les catalogues, avec les libellés Plumber et licence traduits en
+  français. Le badge de licence suit la licence que pose le squelette
+  (CC BY 4.0).
+- **`new catalog --github <propriétaire>`** : le compte ou l'organisation GitHub
+  du dépôt `<propriétaire>/<id>`. Il entre dans les badges et dans les commandes
+  de vérification de `RELEASING.md`, `RELEASING.fr.md` et `attester.yml`. Sans
+  lui, elles portent `<owner>`, et la commande dit de le remplacer. Un nom qui ne
+  peut pas être un nom GitHub est refusé avant toute écriture.
+- **Deux workflows de plus dans le squelette : `scorecard.yml` et
+  `plumber.yml`**, repris du catalogue cloud avec leurs épinglages par SHA et
+  leurs permissions minimales, plus le `.plumber.yaml` sans lequel l'action
+  Plumber refuse de tourner. Sans eux, les badges Scorecard et Plumber restaient
+  vides. Les deux se sautent tant que le dépôt est privé. `RELEASING` les décrit.
+
+### Corrigé
+
+- **Le `RELEASING` du squelette ne nomme plus un propriétaire GitHub réel.** Ses
+  commandes `gh attestation verify`, `cosign verify-blob` et de ruleset visaient
+  un compte fixe : un catalogue créé par quelqu'un d'autre aurait vérifié ses
+  releases contre le dépôt d'un tiers. Elles prennent désormais le propriétaire
+  de `--github`, ou `<owner>`.
+
 ## [0.9.3] - 2026-11-14
 
 ### Ajouté

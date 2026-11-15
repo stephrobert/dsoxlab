@@ -427,13 +427,17 @@ STRINGS: dict[str, str] = {
         "Crée un lab conforme, découvert dès le prochain list-labs.",
     "arg_new_id": "Identifiant, en minuscules, sans espace.",
     "opt_new_dans": "Répertoire où créer le catalogue. Défaut : le répertoire courant.",
+    "opt_new_github":
+        "Propriétaire GitHub (compte ou organisation) du dépôt <propriétaire>/<id>. "
+        "Sert aux badges du README et aux commandes de RELEASING.",
     "opt_new_runtime":
         "Runtime du lab : shell (atelier local) ou vm (machine dédiée).",
     "scaffold_catalogue_cree": "Catalogue « {name} » créé dans {path}",
     "scaffold_socle_pose":
         "{count} fichiers écrits : le README de référence dans les deux "
         "langues, les documents de gouvernance, un conftest.py avec le helper "
-        "bilingue message(), un workflow de CI et les garde-fous du dépôt.",
+        "bilingue message(), les workflows de CI, de release, Scorecard et "
+        "Plumber qui alimentent les badges du README, et les garde-fous du dépôt.",
     "scaffold_licence_posee":
         "LICENSE porte CC BY 4.0, la licence de la collection. Remplace le "
         "fichier si ton catalogue en emploie une autre : GitHub ne reconnaît "
@@ -461,6 +465,15 @@ STRINGS: dict[str, str] = {
     "scaffold_id_invalide":
         "« {name} » ne peut pas servir d'identifiant : minuscules, chiffres, "
         "point, tiret et souligné seulement.",
+    "scaffold_github_invalide":
+        "« {name} » ne peut pas être un propriétaire GitHub : lettres, "
+        "chiffres et tirets isolés seulement, 39 caractères au plus, sans "
+        "tiret en tête ni en queue.",
+    "scaffold_github_a_remplacer":
+        "Pas de --github : les badges du README et les commandes de RELEASING "
+        "portent l'emplacement <owner>. Remplace-le par le compte ou "
+        "l'organisation GitHub qui hébergera {name}, ou recrée le catalogue "
+        "avec --github <propriétaire>.",
     "scaffold_existe_deja":
         "{path} existe déjà. Choisis un autre identifiant, ou retire ce "
         "répertoire : un squelette n'écrase jamais du travail.",
@@ -975,6 +988,10 @@ Chaque lab déclare :
                        pre-commit, gouvernance et ses propres tests. Il passe
                        [cyan]validate-structure[/cyan] sans retouche.
     [dim]--in <dir>[/dim]           Où le créer. Défaut : le répertoire courant.
+    [dim]--github <owner>[/dim]     Propriétaire GitHub du dépôt <owner>/<id>, écrit dans
+                       les cinq badges du README (CI, Scorecard, Plumber,
+                       SLSA 3, licence) et les commandes de RELEASING. Sans
+                       elle, ils portent [bold]<owner>[/bold], à remplacer.
   [cyan]new lab <id>[/cyan]         Crée un lab conforme, découvert dès le prochain
                        [cyan]list-labs[/cyan]. Son test [bold]échoue[/bold] tant qu'il n'est pas
                        écrit : un squelette vert d'emblée apprendrait à noter

@@ -26,7 +26,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..i18n import _
-from .scaffold_socle import fichiers_du_socle
+from .scaffold_socle import (
+    PROPRIETAIRE_PAR_DEFAUT,
+    fichiers_du_socle,
+    proprietaire_valide,
+)
 
 #: Un identifiant sert de nom de répertoire et de clé CLI : on le borne pour
 #: qu'il ne puisse ni remonter l'arborescence, ni porter d'espace.
@@ -286,9 +290,21 @@ def _ecrire(chemin: Path, contenu: str) -> Path:
     return chemin
 
 
-def creer_catalogue(identifiant: str, destination: Path) -> Creation:
-    """Écrit un catalogue vide mais conforme, prêt à recevoir des labs."""
+def creer_catalogue(
+    identifiant: str, destination: Path, *, proprietaire: str | None = None
+) -> Creation:
+    """Écrit un catalogue vide mais conforme, prêt à recevoir des labs.
+
+    `proprietaire` est le compte ou l'organisation GitHub qui portera le dépôt.
+    Absent, les badges et les commandes de RELEASING portent l'emplacement
+    `<owner>`, et c'est à l'appelant de dire qu'il reste à remplacer.
+    """
     _valider_identifiant(identifiant)
+    if proprietaire is not None and not proprietaire_valide(proprietaire):
+        # Refusé AVANT d'écrire quoi que ce soit : le nom entre dans des URL,
+        # du Markdown et des commandes, et un squelette à moitié écrit
+        # bloquerait la relance (« le répertoire existe déjà »).
+        raise ScaffoldError(_("scaffold_github_invalide", name=proprietaire))
     racine = destination / identifiant
     if racine.exists():
         # Ne jamais écrire par-dessus : ce répertoire porte peut-être déjà du
@@ -306,7 +322,9 @@ def creer_catalogue(identifiant: str, destination: Path) -> Creation:
     # et tous les nouveaux catalogues l'ont.
     fichiers += [
         _ecrire(racine / relatif, contenu)
-        for relatif, contenu in fichiers_du_socle(identifiant).items()
+        for relatif, contenu in fichiers_du_socle(
+            identifiant, proprietaire or PROPRIETAIRE_PAR_DEFAUT
+        ).items()
     ]
     (racine / "labs").mkdir(parents=True, exist_ok=True)
     # `ssh/` ne sert qu'aux labs `vm`, mais le créer vide ne coûte rien et

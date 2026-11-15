@@ -136,12 +136,15 @@ def new_catalog(
     dans: Annotated[
         Path | None, typer.Option("--in", help=_("opt_new_dans"))
     ] = None,
+    github: Annotated[
+        str | None, typer.Option("--github", help=_("opt_new_github"))
+    ] = None,
 ) -> None:
     """Crée un catalogue vide mais conforme."""
     from ..services.scaffold import ScaffoldError, creer_catalogue
 
     try:
-        creation = creer_catalogue(identifiant, dans or Path.cwd())
+        creation = creer_catalogue(identifiant, dans or Path.cwd(), proprietaire=github)
     except ScaffoldError as exc:
         error(str(exc))
         raise typer.Exit(1) from None
@@ -155,6 +158,11 @@ def new_catalog(
     # qu'un catalogue public sans licence n'est pas réutilisable, mais il le
     # dit pour que l'auteur la remplace si la sienne diffère.
     info(_("scaffold_licence_posee"))
+    if github is None:
+        # Les badges sont écrits quand même, sur un emplacement : un README
+        # sans badges serait à compléter de mémoire, un emplacement se
+        # remplace d'un rechercher-remplacer. Encore faut-il le dire.
+        warn(_("scaffold_github_a_remplacer", name=identifiant))
     info(_("scaffold_catalogue_suite", path=str(creation.racine)))
 
 

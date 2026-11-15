@@ -7,6 +7,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-11-15
+
+### Added
+
+- **`dsoxlab new catalog` writes the five README badges of the collection.**
+  Right under the language line of `README.md` and `README.fr.md`: CI, OpenSSF
+  Scorecard, Plumber compliance, SLSA 3 and licence, in the form the catalogs
+  already use, with the Plumber and licence labels translated in French. The
+  licence badge follows the licence the skeleton writes (CC BY 4.0).
+- **`new catalog --github <owner>`**: the GitHub account or organization of the
+  repository `<owner>/<id>`. It goes into the badges and into the verification
+  commands of `RELEASING.md`, `RELEASING.fr.md` and `attester.yml`. Without it,
+  they read `<owner>`, and the command says to replace it. An owner that cannot
+  be a GitHub name is refused before anything is written.
+- **Two more workflows in the skeleton: `scorecard.yml` and `plumber.yml`**,
+  taken from the cloud catalog with their SHA pins and minimal permissions, plus
+  the `.plumber.yaml` the Plumber action refuses to run without. Without them the
+  Scorecard and Plumber badges stayed empty. Both skip while the repository is
+  private. `RELEASING` describes them.
+
+### Fixed
+
+- **The skeleton's `RELEASING` no longer names a real GitHub owner.** Its
+  `gh attestation verify`, `cosign verify-blob` and ruleset commands pointed at
+  a fixed account: a catalog created by anyone else would have checked its
+  releases against someone else's repository. They now use the `--github`
+  owner, or `<owner>`.
+
 ## [0.9.3] - 2026-11-14
 
 ### Added

@@ -33,6 +33,9 @@ pour ce qu'il exécute.
 
 from __future__ import annotations
 
+import re
+from urllib.parse import quote
+
 #: Le plancher commun aux douze catalogues établis, posé le 2026-10-17. Il ne
 #: sert que de repli quand la version du moteur est introuvable.
 from dsoxlab import __version__
@@ -59,6 +62,8 @@ README_EN = """\
 # {id}
 
 **Language:** [English](./README.md) · [Français](./README.fr.md)
+
+{badges}
 
 TO FILL IN: one paragraph. What this catalog teaches, and to whom.
 
@@ -198,6 +203,8 @@ README_FR = """\
 # {id}
 
 **Langue :** [English](./README.md) · [Français](./README.fr.md)
+
+{badges}
 
 À REMPLIR : un paragraphe. Ce que ce catalogue apprend, et à qui.
 
@@ -1365,8 +1372,8 @@ ATTESTER = r"""# Atteste la provenance d'un artefact, et rien d'autre.
 # contrôle avec :
 #
 #   gh attestation verify <archive> \
-#     --repo <owner>/<repo> \
-#     --signer-workflow <owner>/<repo>/.github/workflows/attester.yml
+#     --repo {proprietaire}/{id} \
+#     --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 #
 # Une archive attestée depuis le job de build échouerait à ce contrôle.
 name: Attester la provenance
@@ -1438,6 +1445,224 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 """
+
+
+#: Le workflow OpenSSF Scorecard : c'est lui qui remplit le badge Scorecard du
+#: README. Sans lui, le badge reste vide, et rien ne le dit.
+#
+# Repris du catalogue cloud, le plus récent de la collection, avec ses SHA. Une
+# seule différence : la condition `if` qui le saute tant que le dépôt est
+# privé, reprise du catalogue python. Un catalogue neuf naît souvent privé, et
+# Scorecard ne sait ni lire ni publier un dépôt privé : sans elle, le premier
+# push sur `main` serait rouge pour une raison qui n'est pas une faute.
+SCORECARD = """\
+# OpenSSF Scorecard: measures the repository's supply-chain security posture
+# (branch protection, pinned dependencies, token permissions, code review, ...)
+# and publishes the result to the public Scorecard viewer and the README badge.
+name: OpenSSF Scorecard
+
+on:
+  push:
+    branches: [main]
+
+  branch_protection_rule:
+
+  schedule:
+    - cron: '31 5 * * 3'
+
+  workflow_dispatch:
+
+permissions: {{}}
+
+concurrency:
+  group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    # Scorecard needs a public repository (commit-graph API + result
+    # publication). Skips while private; activates once public.
+    if: ${{{{ !github.event.repository.private }}}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to Code Scanning
+      id-token: write          # publish results to the OpenSSF Scorecard API
+      actions: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true # publish to the OpenSSF viewer (drives the README badge)
+
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: results.sarif
+"""
+
+
+#: Le workflow Plumber : c'est lui qui publie le score du badge Plumber.
+#
+# Repris tel quel du catalogue cloud. Il lit `.plumber.yaml`, que le socle pose
+# aussi : l'action refuse de tourner sans ce fichier.
+PLUMBER = """\
+# Validates this catalogue's own CI/CD with Plumber (getplumber.io): it analyzes the
+# repo's GitHub Actions workflows and repository settings against .plumber.yaml,
+# uploads findings to Code Scanning, publishes the compliance score to the
+# README badge, and fails below the threshold. The action verifies the
+# downloaded Plumber binary's SLSA build-provenance attestation before running.
+#
+# This workflow runs ONLY in trusted contexts (push to main, schedule, manual):
+# it needs a privileged token (Administration:read) to verify branch protection,
+# and that secret must never be exposed to pull_request runs - especially from
+# forks. Pull requests run ci.yml, which uses no secrets.
+name: Plumber compliance
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 2 * * 1'
+  workflow_dispatch:
+
+permissions: {{}}
+
+concurrency:
+  group: ${{{{ github.workflow }}}}-${{{{ github.ref }}}}
+  cancel-in-progress: true
+
+jobs:
+  plumber:
+    name: Plumber analyze
+    # Skips while private (SARIF upload needs Advanced Security, free on public
+    # repos); activates automatically once the repo is public.
+    if: ${{{{ !github.event.repository.private }}}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The privileged token lives in this protected environment, which is
+    # restricted to the main branch - it is unreachable from pull_request runs.
+    environment: security
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to Code Scanning
+      actions: read            # read the workflow run for Plumber status
+      id-token: write          # OIDC to publish the score to score.getplumber.io
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Plumber compliance scan
+        # No `version:` input: the action installs the binary of its own release
+        # (the default in its action.yml), so Dependabot moves both together.
+        uses: getplumber/plumber@ec8cb3a7edd6a324b33e85109b627b2df6023d94 # v0.7.23
+        with:
+          verify-attestation: "true"   # check the binary's SLSA provenance before running
+          # Gate on the Plumber Score itself. `threshold` is DEPRECATED and its
+          # value 100 is explicitly "treated as unset" by the action - it gated
+          # nothing. min-points + soft-fail:false is the real gate: the job only
+          # passes at a full 100/100, and any finding fails it.
+          min-points: "100"
+          soft-fail: "false"
+          upload-sarif: "true"          # findings to the Security tab (internal)
+          upload-artifacts: "false"     # no downloadable artifact published
+          score-push: "true"           # publish the score (drives the README badge)
+          # Fine-grained PAT (Administration + Contents + Metadata = Read),
+          # stored as an environment secret in the protected `security`
+          # environment, so branchMustBeProtected is verified for real.
+          #
+          # The token does TWO things: besides the branch-protection check, the
+          # action uses it to verify the provenance attestation of the binary it
+          # has just downloaded, through `gh attestation verify`. An empty token
+          # fails that step with `exit 4` on "set the GH_TOKEN environment
+          # variable", and the whole job falls over before analysing anything.
+          # Hence the fallback to the job token: with no PAT, provenance is
+          # still verified and only the branch-protection check abstains.
+          github-token: ${{{{ secrets.PLUMBER_ADMIN_TOKEN || github.token }}}}
+"""
+
+
+# ── Les badges du README ────────────────────────────────────────────────────
+#
+# Les catalogues de la collection portent cinq badges sous la ligne de langue :
+# CI, OpenSSF Scorecard, Plumber, SLSA 3 et licence. Leur forme est reprise du
+# catalogue cloud. Le badge SLSA 3 tient parce que le socle pose `attester.yml`
+# (voir ATTESTER) ; Scorecard et Plumber parce qu'il pose leurs workflows.
+
+#: Le propriétaire GitHub écrit quand l'auteur n'en donne pas. C'est un
+#: emplacement, pas un nom : aucun propriétaire réel n'est codé dans le moteur,
+#: et la CLI dit de le remplacer.
+PROPRIETAIRE_PAR_DEFAUT = "<owner>"
+
+#: Un nom de compte ou d'organisation GitHub : lettres, chiffres et tirets
+#: isolés, 39 caractères au plus, sans tiret en tête ni en queue. Il entre dans
+#: des URL, du Markdown et des commandes : on le borne avant de l'écrire.
+_PROPRIETAIRE_VALIDE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
+
+#: La licence posée par défaut, et son libellé sur le badge.
+_LICENCE_PAR_DEFAUT = "cc-by-4.0"
+_LIBELLES_LICENCE = {"cc-by-4.0": "CC BY 4.0"}
+
+
+def proprietaire_valide(proprietaire: str) -> bool:
+    """Le nom donné à `--github` peut-il être celui d'un compte GitHub ?"""
+    return bool(_PROPRIETAIRE_VALIDE.match(proprietaire))
+
+
+def badges(identifiant: str, proprietaire: str, langue: str) -> str:
+    """Les cinq lignes de badges du README, dans la langue demandée.
+
+    Seuls deux libellés se traduisent, comme dans les catalogues : celui de
+    Plumber et celui de la licence. Le badge de licence suit la licence que le
+    socle pose, pour ne jamais annoncer une licence que `LICENSE` ne porte pas.
+    """
+    depot = f"{proprietaire}/{identifiant}"
+    licence = _LIBELLES_LICENCE[_LICENCE_PAR_DEFAUT]
+    francais = langue == "fr"
+    mot_licence = "Licence" if francais else "License"
+    sep_licence = " : " if francais else ": "
+    plumber = "Conformité Plumber" if francais else "Plumber compliance"
+    ci = (
+        f"[![CI](https://github.com/{depot}/actions/workflows/ci.yml/badge.svg)]"
+        f"(https://github.com/{depot}/actions/workflows/ci.yml)"
+    )
+    scorecard = (
+        f"[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/{depot}"
+        f"?label=OpenSSF%20Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/{depot})"
+    )
+    conformite = (
+        f"[![{plumber}](https://score.getplumber.io/github.com/{depot}.svg)]"
+        f"(https://score.getplumber.io/github.com/{depot})"
+    )
+    slsa = "[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)"
+    badge_licence = (
+        f"[![{mot_licence}{sep_licence}{licence}](https://img.shields.io/badge/"
+        f"{mot_licence}-{quote(licence)}-lightgrey.svg)](./LICENSE)"
+    )
+    return "\n".join((ci, scorecard, conformite, slsa, badge_licence))
 
 
 #: La marche à suivre pour publier, en anglais.
@@ -1576,7 +1801,7 @@ workflow, and not rebuilt by someone else:
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id}
+  --repo {proprietaire}/{id}
 ```
 
 **The check that establishes Build Level 3** names the signing workflow. It
@@ -1586,8 +1811,8 @@ holds:
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id} \
-  --signer-workflow stephrobert/{id}/.github/workflows/attester.yml
+  --repo {proprietaire}/{id} \
+  --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 ```
 
 Keyless Cosign signature. **Both** certificate flags are mandatory: without
@@ -1597,7 +1822,7 @@ of its meaning.
 ```bash
 cosign verify-blob \
   --bundle {id}-<version>.tar.gz.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/stephrobert/{id}/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/{proprietaire}/{id}/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   {id}-<version>.tar.gz
 ```
@@ -1610,7 +1835,17 @@ cosign verify-blob \
 
 ## GitHub settings to do once
 
-Two workflows need configuration that does not live in the repository:
+Two workflows feed the README badges, and both skip while the repository is
+private: Scorecard cannot read a private repository, and Plumber's SARIF upload
+needs Advanced Security, free on public repositories.
+
+- **`scorecard.yml`** runs OpenSSF Scorecard on every push to `main`, weekly and
+  on branch protection changes, and publishes the result to the public viewer
+  that the Scorecard badge reads. It needs no secret.
+- **`plumber.yml`** checks the CI against `.plumber.yaml` and publishes the score
+  that the Plumber badge reads. The action refuses to run without that file.
+
+Two settings do not live in the repository:
 
 - **`plumber.yml`** expects a `security` environment, restricted to the `main`
   branch, holding the `PLUMBER_ADMIN_TOKEN` secret: a fine-grained PAT with
@@ -1636,7 +1871,7 @@ has a single maintainer, who cannot approve their own pull request. Going
 through a pull request, resolving threads and a green CI stay mandatory.
 
 ```bash
-gh api --method POST repos/stephrobert/{id}/rulesets \
+gh api --method POST repos/{proprietaire}/{id}/rulesets \
   --input - <<'JSON'
 {{
   "name": "Protection de main",
@@ -1811,7 +2046,7 @@ ce dépôt, et non reconstruite par quelqu'un d'autre :
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id}
+  --repo {proprietaire}/{id}
 ```
 
 **La vérification qui atteste le niveau 3** nomme le workflow signataire. Elle
@@ -1821,8 +2056,8 @@ confirmer que la chaîne tient :
 
 ```bash
 gh attestation verify {id}-<version>.tar.gz \
-  --repo stephrobert/{id} \
-  --signer-workflow stephrobert/{id}/.github/workflows/attester.yml
+  --repo {proprietaire}/{id} \
+  --signer-workflow {proprietaire}/{id}/.github/workflows/attester.yml
 ```
 
 Signature Cosign keyless. Les **deux** options de certificat sont obligatoires :
@@ -1832,7 +2067,7 @@ la vérification de son sens.
 ```bash
 cosign verify-blob \
   --bundle {id}-<version>.tar.gz.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/stephrobert/{id}/.github/workflows/release.yml@.*" \
+  --certificate-identity-regexp "https://github.com/{proprietaire}/{id}/.github/workflows/release.yml@.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   {id}-<version>.tar.gz
 ```
@@ -1845,7 +2080,18 @@ cosign verify-blob \
 
 ## Réglages GitHub à faire une fois
 
-Deux workflows ont besoin d'une configuration qui ne vit pas dans le dépôt :
+Deux workflows alimentent les badges du README, et tous deux se sautent tant
+que le dépôt est privé : Scorecard ne sait pas lire un dépôt privé, et l'envoi
+SARIF de Plumber demande Advanced Security, gratuit sur un dépôt public.
+
+- **`scorecard.yml`** joue OpenSSF Scorecard à chaque push sur `main`, chaque
+  semaine et à chaque changement de protection de branche, et publie le
+  résultat sur le site public que lit le badge Scorecard. Il ne demande aucun
+  secret.
+- **`plumber.yml`** contrôle la CI d'après `.plumber.yaml` et publie le score que
+  lit le badge Plumber. L'action refuse de tourner sans ce fichier.
+
+Deux réglages ne vivent pas dans le dépôt :
 
 - **`plumber.yml`** attend un environnement `security`, restreint à la branche
   `main`, portant le secret `PLUMBER_ADMIN_TOKEN` : un PAT à portée fine avec
@@ -1872,7 +2118,7 @@ Le passage par pull request, la résolution des fils et la CI verte restent
 obligatoires.
 
 ```bash
-gh api --method POST repos/stephrobert/{id}/rulesets \
+gh api --method POST repos/{proprietaire}/{id}/rulesets \
   --input - <<'JSON'
 {{
   "name": "Protection de main",
@@ -1919,7 +2165,7 @@ def licence_par_defaut() -> str:
     """
     from ..templates import licence
 
-    return licence().read_text(encoding="utf-8")
+    return licence(_LICENCE_PAR_DEFAUT).read_text(encoding="utf-8")
 
 
 def version_du_moteur() -> str:
@@ -1944,17 +2190,35 @@ def version_du_moteur() -> str:
     return brute if brute and brute != "0.0.0" else _PLANCHER_COMMUN
 
 
-def fichiers_du_socle(identifiant: str) -> dict[str, str]:
+def config_plumber() -> str:
+    """Le `.plumber.yaml` du socle, lu dans les gabarits packagés."""
+    from ..templates import plumber_config
+
+    return plumber_config().read_text(encoding="utf-8")
+
+
+def fichiers_du_socle(
+    identifiant: str, proprietaire: str = PROPRIETAIRE_PAR_DEFAUT
+) -> dict[str, str]:
     """Les fichiers du socle, par chemin relatif à la racine du catalogue.
 
     Un seul endroit décide de ce qu'un catalogue porte : ce dictionnaire. Le
     jour où la collection en ajoute un, il s'ajoute ici et tous les nouveaux
     catalogues l'ont, sans qu'on ait à s'en souvenir.
+
+    `proprietaire` est le compte ou l'organisation GitHub du dépôt
+    `<proprietaire>/<identifiant>`. Il sert aux badges du README et aux
+    commandes de vérification de RELEASING. Absent, c'est l'emplacement
+    `<owner>`, que l'auteur remplace.
     """
     return {
         "LICENSE": licence_par_defaut(),
-        "README.md": README_EN.format(id=identifiant),
-        "README.fr.md": README_FR.format(id=identifiant),
+        "README.md": README_EN.format(
+            id=identifiant, badges=badges(identifiant, proprietaire, "en")
+        ),
+        "README.fr.md": README_FR.format(
+            id=identifiant, badges=badges(identifiant, proprietaire, "fr")
+        ),
         "meta.fr.yml": META_FR.format(id=identifiant),
         "conftest.py": CONFTEST,
         "pyproject.toml": PYPROJECT.format(id=identifiant),
@@ -1971,9 +2235,14 @@ def fichiers_du_socle(identifiant: str) -> dict[str, str]:
             moteur=version_du_moteur(),
         ),
         ".github/workflows/release.yml": RELEASE.format(id=identifiant),
-        ".github/workflows/attester.yml": ATTESTER.format(id=identifiant),
-        "RELEASING.md": RELEASING_EN.format(id=identifiant),
-        "RELEASING.fr.md": RELEASING_FR.format(id=identifiant),
+        ".github/workflows/attester.yml": ATTESTER.format(
+            id=identifiant, proprietaire=proprietaire
+        ),
+        ".github/workflows/scorecard.yml": SCORECARD.format(),
+        ".github/workflows/plumber.yml": PLUMBER.format(),
+        ".plumber.yaml": config_plumber(),
+        "RELEASING.md": RELEASING_EN.format(id=identifiant, proprietaire=proprietaire),
+        "RELEASING.fr.md": RELEASING_FR.format(id=identifiant, proprietaire=proprietaire),
         ".pre-commit-config.yaml": PRE_COMMIT.format(moteur=version_du_moteur()),
         "tests/test_contrat_du_catalogue.py": TEST_CONTRAT,
         "tests/outils/pas_de_tiret_cadratin.py": TEST_TIRET,

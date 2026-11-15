@@ -167,8 +167,9 @@ def test_la_licence_est_le_texte_nu(catalogue: Path) -> None:
 
 def test_le_workflow_et_les_hooks_sont_bien_formes(catalogue: Path) -> None:
     """Un YAML produit cassé serait découvert au premier push, pas avant."""
-    for relatif in (".github/workflows/ci.yml", ".pre-commit-config.yaml",
-                    "meta.yml", "meta.fr.yml"):
+    for relatif in (".github/workflows/ci.yml", ".github/workflows/scorecard.yml",
+                    ".github/workflows/plumber.yml", ".plumber.yaml",
+                    ".pre-commit-config.yaml", "meta.yml", "meta.fr.yml"):
         chemin = catalogue / relatif
         assert chemin.is_file(), f"{relatif} manque"
         yaml.safe_load(chemin.read_text(encoding="utf-8"))
@@ -180,11 +181,12 @@ def test_les_actions_du_workflow_sont_epinglees_par_sha(catalogue: Path) -> None
     C'est la règle de ce projet, et un catalogue produit par l'outil ne doit
     pas démarrer en la violant.
     """
-    source = (catalogue / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8")
-    utilisations = re.findall(r"uses: +(\S+)", source)
+    utilisations = []
+    for workflow in sorted((catalogue / ".github" / "workflows").glob("*.yml")):
+        trouvees = re.findall(r"uses: +(\S+)", workflow.read_text(encoding="utf-8"))
+        assert trouvees, f"{workflow.name} n'utilise aucune action"
+        utilisations += [a for a in trouvees if not a.startswith("./")]
 
-    assert utilisations, "le workflow produit n'utilise aucune action"
     for action in utilisations:
         reference = action.split("@", 1)[-1]
         assert re.fullmatch(r"[0-9a-f]{40}", reference), (
