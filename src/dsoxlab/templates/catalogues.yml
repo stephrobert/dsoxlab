@@ -144,3 +144,8 @@ catalogues:
     depot: https://github.com/stephrobert/mlops-dsoxlab-training
     description_en: "MLOps: reproduce, ship and operate a model"
     description_fr: "MLOps : reproduire, livrer et exploiter un modèle"
+
+  - id: applications-ia
+    depot: https://github.com/stephrobert/applications-ia-dsoxlab-training
+    description_en: "Governing and securing AI-generated applications: classify, frame, vibe code with a method"
+    description_fr: "Sécuriser et gouverner les applications générées par IA : classer, cadrer, vibe coder avec méthode"
