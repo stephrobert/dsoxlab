@@ -34,15 +34,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a fixed account: a catalog created by anyone else would have checked its
   releases against someone else's repository. They now use the `--github`
   owner, or `<owner>`.
-- **The ruleset proposed by the skeleton's `RELEASING` only requires the check
-  the skeleton runs**, the `Contract, guardrails and lint` job of `ci.yml`. It
-  was copied from a sibling catalog and required Zizmor, Actionlint, Poutine,
-  CodeQL and others that no workflow of a new catalog runs: applied as is, it
-  blocked every pull request. A test now checks each required check against the
-  job names of `ci.yml`.
+- **The ruleset proposed by the skeleton's `RELEASING` requires exactly the
+  checks the skeleton runs.** It was copied from a sibling catalog and required
+  Zizmor, Actionlint, Poutine, CodeQL and others that the skeleton's `ci.yml`
+  did not run: applied as is, it blocked every pull request. The skeleton now
+  runs those jobs (see Added), and a test checks the required checks against
+  the job names of `ci.yml`, both ways.
 - **One version of `harden-runner` in the skeleton**: `ci.yml`, `release.yml`
   and `attester.yml` move to v2.22.3, the pin of the two new workflows. A test
   refuses an action pinned to two versions.
+- **The skeleton carries the security chain of its sibling catalogs**, taken
+  from `applications-ia-dsoxlab-training` (e7db2da), where every job is green.
+  `ci.yml` gains the Zizmor, Actionlint, Poutine, Pre-commit parity and CodeQL
+  (python and actions) jobs next to `Contract, guardrails and lint`, and the
+  ruleset of `RELEASING` requires those seven checks by their exact names. A
+  test expands the CodeQL matrix and checks the agreement both ways. The
+  skeleton also gets `.github/dependabot.yml` (the common model, `uv` and
+  `github-actions`), `.github/codeql/config.yml` (fixtures and solutions left
+  out), `.github/CODEOWNERS` (the `--github` owner, or `<owner>`), two issue
+  templates and `.poutine.yml`. `SECURITY.md` and `SECURITY.fr.md` follow the
+  reference: supported versions, private report through a GitHub advisory of
+  `<owner>/<id>`, disclosure timelines, a scope written for any lab catalog,
+  and what the repository will never ask. `setup-uv` moves to v10.3.3 in every
+  workflow, so each action keeps a single version.
 
 ## [0.9.3] - 2026-11-14
 

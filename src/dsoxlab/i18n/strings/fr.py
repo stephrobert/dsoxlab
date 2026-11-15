@@ -436,8 +436,10 @@ STRINGS: dict[str, str] = {
     "scaffold_socle_pose":
         "{count} fichiers écrits : le README de référence dans les deux "
         "langues, les documents de gouvernance, un conftest.py avec le helper "
-        "bilingue message(), les workflows de CI, de release, Scorecard et "
-        "Plumber qui alimentent les badges du README, et les garde-fous du dépôt.",
+        "bilingue message(), la CI avec la chaîne de sécurité (zizmor, "
+        "actionlint, poutine, parité pre-commit, CodeQL), les workflows de "
+        "release, Scorecard et Plumber qui alimentent les badges du README, "
+        "Dependabot, CODEOWNERS, les gabarits d'issue et les garde-fous du dépôt.",
     "scaffold_licence_posee":
         "LICENSE porte CC BY 4.0, la licence de la collection. Remplace le "
         "fichier si ton catalogue en emploie une autre : GitHub ne reconnaît "

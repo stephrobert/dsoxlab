@@ -430,8 +430,10 @@ STRINGS: dict[str, str] = {
     "scaffold_socle_pose":
         "{count} files written: the reference README in both languages, the "
         "governance documents, a conftest.py with the bilingual message() "
-        "helper, the CI, release, Scorecard and Plumber workflows behind the "
-        "README badges, and the repository guardrails.",
+        "helper, the CI with the security chain (zizmor, actionlint, poutine, "
+        "pre-commit parity, CodeQL), the release, Scorecard and Plumber "
+        "workflows behind the README badges, Dependabot, CODEOWNERS, issue "
+        "templates and the repository guardrails.",
     "scaffold_licence_posee":
         "LICENSE is CC BY 4.0, the licence of the collection. Replace the file "
         "if your catalog uses another one: GitHub only recognises a licence "

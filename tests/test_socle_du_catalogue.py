@@ -176,6 +176,11 @@ def test_le_workflow_et_les_hooks_sont_bien_formes(catalogue: Path) -> None:
         yaml.safe_load(chemin.read_text(encoding="utf-8"))
 
 
+#: Une clé `uses:` de YAML, en début de ligne. Un commentaire qui CITE une forme
+#: de `uses:` pour expliquer pourquoi on ne l'emploie pas n'en est pas une.
+_USES = re.compile(r"^\s*(?:-\s+)?uses:\s+(\S+)", re.MULTILINE)
+
+
 def test_les_actions_du_workflow_sont_epinglees_par_sha(catalogue: Path) -> None:
     """Un tag est déplaçable, un SHA non.
 
@@ -184,7 +189,7 @@ def test_les_actions_du_workflow_sont_epinglees_par_sha(catalogue: Path) -> None
     """
     utilisations = []
     for workflow in sorted((catalogue / ".github" / "workflows").glob("*.yml")):
-        trouvees = re.findall(r"uses: +(\S+)", workflow.read_text(encoding="utf-8"))
+        trouvees = _USES.findall(workflow.read_text(encoding="utf-8"))
         assert trouvees, f"{workflow.name} n'utilise aucune action"
         utilisations += [a for a in trouvees if not a.startswith("./")]
 
@@ -548,18 +553,41 @@ def _controles_du_ruleset(releasing: Path) -> list[str]:
     ]
 
 
+def _noms_des_controles(ci: dict) -> set[str]:
+    """Les noms que GitHub donne aux contrôles d'un workflow, matrices développées.
+
+    Un job à matrice produit un contrôle par valeur : `CodeQL (${{ matrix.language }})`
+    sur `[python, actions]` donne `CodeQL (python)` et `CodeQL (actions)`, et
+    c'est sous ces noms-là que le ruleset doit les exiger.
+    """
+    noms: set[str] = set()
+    for cle, job in ci["jobs"].items():
+        nom = str(job.get("name", cle))
+        matrice = (job.get("strategy") or {}).get("matrix") or {}
+        variables = re.findall(r"\$\{\{\s*matrix\.(\w+)\s*\}\}", nom)
+        if not variables:
+            noms.add(nom)
+            continue
+        assert len(variables) == 1, f"{nom} : une seule variable de matrice gérée"
+        variable = variables[0]
+        for valeur in matrice[variable]:
+            noms.add(re.sub(r"\$\{\{\s*matrix\.\w+\s*\}\}", str(valeur), nom))
+    return noms
+
+
 def test_le_ruleset_n_exige_que_les_jobs_que_la_ci_lance(catalogue: Path) -> None:
     """Un contrôle exigé qu'aucun job ne lance bloque toutes les pull requests.
 
     Le ruleset de RELEASING avait été repris d'un catalogue frère : il exigeait
-    Zizmor, Actionlint, Poutine, CodeQL… que le `ci.yml` du squelette ne lance
-    pas. Appliqué sur un catalogue neuf, il a bloqué toutes ses PR : GitHub
-    attend pour toujours un contrôle qui ne viendra jamais.
+    Zizmor, Actionlint, Poutine, CodeQL… que le `ci.yml` du squelette ne lançait
+    pas encore. Appliqué sur un catalogue neuf, il a bloqué toutes ses PR :
+    GitHub attend pour toujours un contrôle qui ne viendra jamais. Le squelette
+    lance désormais ces jobs ; le test tient l'accord dans les deux sens.
     """
     ci = yaml.safe_load(
         (catalogue / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     )
-    jobs = {job.get("name", cle) for cle, job in ci["jobs"].items()}
+    jobs = _noms_des_controles(ci)
 
     for nom in ("RELEASING.md", "RELEASING.fr.md"):
         controles = _controles_du_ruleset(catalogue / nom)
@@ -569,6 +597,10 @@ def test_le_ruleset_n_exige_que_les_jobs_que_la_ci_lance(catalogue: Path) -> Non
             f"{nom} exige {orphelins}, qu'aucun job de ci.yml ne lance "
             f"(jobs : {sorted(jobs)})"
         )
+        # Et l'inverse : un job de la CI que le ruleset n'exige pas peut
+        # rougir sans bloquer la fusion.
+        oublies = sorted(jobs - set(controles))
+        assert not oublies, f"{nom} n'exige pas {oublies}"
 
 
 def test_une_action_n_a_qu_une_version_dans_le_socle(catalogue: Path) -> None:
@@ -579,7 +611,7 @@ def test_une_action_n_a_qu_une_version_dans_le_socle(catalogue: Path) -> None:
     """
     versions: dict[str, set[str]] = {}
     for workflow in (catalogue / ".github" / "workflows").glob("*.yml"):
-        for action in re.findall(r"uses: +(\S+)", workflow.read_text(encoding="utf-8")):
+        for action in _USES.findall(workflow.read_text(encoding="utf-8")):
             if "@" in action:
                 nom, reference = action.split("@", 1)
                 versions.setdefault(nom, set()).add(reference)

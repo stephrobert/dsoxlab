@@ -35,15 +35,30 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   un compte fixe : un catalogue créé par quelqu'un d'autre aurait vérifié ses
   releases contre le dépôt d'un tiers. Elles prennent désormais le propriétaire
   de `--github`, ou `<owner>`.
-- **Le ruleset proposé par le `RELEASING` du squelette n'exige plus que le
-  contrôle que le squelette lance**, le job `Contract, guardrails and lint` de
-  `ci.yml`. Repris d'un catalogue frère, il exigeait Zizmor, Actionlint,
-  Poutine, CodeQL et d'autres, qu'aucun workflow d'un catalogue neuf ne lance :
-  appliqué tel quel, il bloquait toutes les pull requests. Un test confronte
-  désormais chaque contrôle exigé aux noms des jobs de `ci.yml`.
+- **Le ruleset proposé par le `RELEASING` du squelette exige exactement les
+  contrôles que le squelette lance.** Repris d'un catalogue frère, il exigeait
+  Zizmor, Actionlint, Poutine, CodeQL et d'autres, que le `ci.yml` du squelette
+  ne lançait pas : appliqué tel quel, il bloquait toutes les pull requests. Le
+  squelette lance désormais ces jobs (voir Ajouté), et un test confronte les
+  contrôles exigés aux noms des jobs de `ci.yml`, dans les deux sens.
 - **Une seule version de `harden-runner` dans le squelette** : `ci.yml`,
   `release.yml` et `attester.yml` passent en v2.22.3, l'épinglage des deux
   nouveaux workflows. Un test refuse une action épinglée sur deux versions.
+- **Le squelette porte la chaîne de sécurité des catalogues frères**, reprise
+  de `applications-ia-dsoxlab-training` (e7db2da), où tous les jobs sont verts.
+  `ci.yml` gagne les jobs Zizmor, Actionlint, Poutine, Pre-commit parity et
+  CodeQL (python et actions) à côté de `Contract, guardrails and lint`, et le
+  ruleset de `RELEASING` exige ces sept contrôles sous leurs noms exacts. Un
+  test développe la matrice CodeQL et vérifie l'accord dans les deux sens. Le
+  squelette reçoit aussi `.github/dependabot.yml` (le modèle commun, `uv` et
+  `github-actions`), `.github/codeql/config.yml` (fixtures et solutions
+  exclues), `.github/CODEOWNERS` (le propriétaire de `--github`, ou `<owner>`),
+  deux gabarits d'issue et `.poutine.yml`. `SECURITY.md` et `SECURITY.fr.md`
+  suivent la référence : versions supportées, signalement privé par un avis de
+  sécurité GitHub de `<owner>/<id>`, délais de divulgation, un périmètre écrit
+  pour tout catalogue de labs, et ce que le dépôt ne demandera jamais.
+  `setup-uv` passe en v10.3.3 dans tous les workflows : chaque action garde une
+  seule version.
 
 ## [0.9.3] - 2026-11-14
 
