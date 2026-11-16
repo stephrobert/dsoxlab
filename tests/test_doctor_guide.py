@@ -240,6 +240,22 @@ def test_un_dev_kvm_ferme_ajoute_le_groupe_kvm(
     assert check.remede.lignes == ("sudo usermod -aG kvm,libvirt $USER",)
 
 
+def test_dev_kvm_ferme_mais_compte_deja_inscrit_n_attend_qu_une_reconnexion(
+    groupes: dict[str, object], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Juste après `usermod`, /dev/kvm reste fermé dans la session : `--fix`
+    jugeait sa propre étape en échec (réévaluation sur Ubuntu 24.04)."""
+    monkeypatch.setattr(kvm_controles.os, "access", lambda p, m: False)
+    monkeypatch.setattr(doctor.os, "access", lambda p, m: False)
+    groupes["gids"] = {"libvirt": 106, "kvm": 993}
+    groupes["inscrits"] = {"kvm", "libvirt"}
+
+    for check in (doctor._check_hw_virt(), doctor._check_groupes(kvm_ok=True)):
+        assert check.state == doctor.STATE_FAILED, check.key
+        assert check.remede is not None and check.remede.lignes == (), check.key
+        assert check.remede.reconnexion, check.key
+
+
 # ── le firmware EFI ───────────────────────────────────────────────────────────
 
 def test_le_firmware_attend_libvirt() -> None:

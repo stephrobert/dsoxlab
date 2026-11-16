@@ -265,6 +265,8 @@ def test_dev_kvm_inaccessible_est_reparable(
     device.touch()
     monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
     monkeypatch.setattr(doctor.os, "access", lambda p, mode: False)
+    # Un compte hors du groupe kvm, quel que soit le poste qui joue le test.
+    monkeypatch.setattr("dsoxlab.services.doctor_controles.kvm._gid", lambda nom: None)
 
     check = doctor._check_hw_virt()
 

@@ -219,6 +219,17 @@ def _check_hw_virt() -> Check:
             detail = _("detail_hw_virt_missing", device=_doctor()._KVM_DEVICE)
         return _check("hw_virt", False, detail)
     if not os.access(_doctor()._KVM_DEVICE, os.R_OK | os.W_OK):
+        gid = _gid("kvm")
+        if gid is not None and _inscrit("kvm", gid):
+            # Déjà dans le groupe, mais pas dans cette session : rejouer
+            # usermod ne changerait rien, seule la reconnexion compte. Sans ce
+            # cas, `--fix` jugeait son propre usermod en échec, juste après
+            # l'avoir réussi (réévaluation du 2026-11-16 sur Ubuntu 24.04).
+            return _check(
+                "hw_virt", False,
+                _("detail_groupes_reconnexion", groups="kvm"),
+                remede=Remede("groupes", (), root=False, reconnexion=True),
+            )
         return _check(
             "hw_virt", False, _("detail_hw_virt_denied", device=_doctor()._KVM_DEVICE),
             fix=_fix(
