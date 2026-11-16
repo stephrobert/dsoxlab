@@ -670,6 +670,12 @@ STRINGS: dict[str, str] = {
         "prêt(s). Les autres n'ont pas été montés, donc pas vérifiés.",
     "provision_done":      "Provisionnement terminé : {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
+    "push_invite_saved": "Votre tentative est enregistrée sur cette machine.",
+    "push_invite_where": "Pour la retrouver dans Mon apprentissage, sur le site :",
+    "push_invite_cmd_login": "  dsoxlab login     # une fois, si nécessaire",
+    "push_invite_cmd_push": "  dsoxlab push",
+    "push_invite_dry_run": "Pour voir d'abord ce qui serait envoyé : dsoxlab push --dry-run",
+    "push_invite_nothing_sent": "Aucun résultat n'est envoyé sans votre action.",
     "provision_autostart_refused":
         "Le démarrage avec l'hôte de {host} n'a pas pu être réglé : {error}\n"
         "La machine risque de redémarrer seule au prochain redémarrage de "
