@@ -295,6 +295,44 @@ def test_sans_ansible_fix_l_installe_avant_le_playbook(
     assert "done, checked again" in _texte(resultat)
 
 
+def test_un_controle_qui_attendait_le_playbook_est_reverifie_apres(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le firmware EFI attend libvirt : ni « à faire vous-même », ni oublié."""
+    binaire = tmp_path / "ansible-playbook"
+    binaire.write_text("#!/bin/sh\n", encoding="utf-8")
+    binaire.chmod(0o755)
+    appels = {"n": 0}
+
+    def diagnostics(root: Path, meta: object) -> DoctorReport:
+        appels["n"] += 1
+        report = DoctorReport()
+        fait = appels["n"] > 1
+        report.required.append(service_doctor._check(
+            "composant_0", fait, "x", remede=None if fait else _ROOT))
+        report.required.append(service_doctor._check(
+            "efi", fait, "OVMF" if fait else "attend libvirt",
+            forced_state=None if fait else service_doctor.STATE_UNKNOWN,
+            apres=None if fait else "composant_0"))
+        return report
+
+    class Fini:
+        returncode = 0
+
+    monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
+    monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
+    monkeypatch.setattr(diagnostic, "_commande_playbook",
+                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
+    monkeypatch.setattr(diagnostic.subprocess, "run", lambda cmd, **kw: Fini())
+    monkeypatch.setattr(diagnostic, "collect_checks", diagnostics)
+
+    sortie = _texte(runner.invoke(app, ["doctor", "--fix", "--yes"]))
+
+    assert "Checked again after the playbook" in sortie
+    assert "To do yourself" not in sortie
+    assert "checked after the playbook, ready" in sortie
+
+
 def test_plus_aucun_shell_true_dans_les_sources() -> None:
     """Le contrat de l'issue #89 : zéro ``shell=True`` dans ``src/dsoxlab/``."""
     racine = Path(__file__).resolve().parent.parent / "src" / "dsoxlab"

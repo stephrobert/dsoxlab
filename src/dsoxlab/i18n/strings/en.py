@@ -1798,6 +1798,9 @@ silent.
     "fix_reconnexion_finale": 'Log out and back in before running doctor again: the kvm and libvirt groups only apply to a new session.',
     "fix_plan_ansible_d_abord": 'Ansible is installed first, without sudo: uv tool install ansible-core',
     "fix_installe_ansible": 'Installing Ansible first (uv tool install ansible-core): the workstation playbook needs it.',
+    "fix_plan_reverifiees": 'Checked again after the playbook (they were waiting for it):',
+    "fix_attendue_ok": '{step}. {label}: checked after the playbook, ready.',
+    "fix_attendue_ko": '{step}. {label}: still missing after the playbook: run dsoxlab doctor to see what to do.',
     "fix_needs_relogin":
         "{label}: fixed, but the change only takes effect after you log out "
         "and back in. This line will stay red until then; it is not a failure.",

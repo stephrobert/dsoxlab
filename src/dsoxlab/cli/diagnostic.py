@@ -334,12 +334,18 @@ def _afficher_plan(plan: PlanCorrection, report: DoctorReport, ansible: list[str
         console.print(Text("      " + shlex.join(ansible), style="dim"), soft_wrap=True)
         if not _playbook_jouable(ansible[0]) and shutil.which("uv"):
             console.print(Text("  " + _("fix_plan_ansible_d_abord")), soft_wrap=True)
-    if plan.manuelles:
-        console.print(Text("  " + _("fix_plan_manuelles")))
-        for etape in plan.manuelles:
-            console.print(Text(f"  {etape.numero:>2}. {titre_etape(etape)}"), soft_wrap=True)
+    _liste_du_plan("fix_plan_reverifiees", [e for e in plan.manuelles if _attend_une_etape(e)])
+    _liste_du_plan("fix_plan_manuelles", [e for e in plan.manuelles if not _attend_une_etape(e)])
     for check in report.a_savoir:
         console.print(Text("  " + _("fix_plan_a_savoir", label=check.label)))
+
+
+def _liste_du_plan(cle: str, etapes: list[Etape]) -> None:
+    if not etapes:
+        return
+    console.print(Text("  " + _(cle)))
+    for etape in etapes:
+        console.print(Text(f"  {etape.numero:>2}. {titre_etape(etape)}"), soft_wrap=True)
 
 
 def _commande_playbook(chemin: Path) -> list[str]:
@@ -394,9 +400,27 @@ def _reparer(report: DoctorReport, root: Path, *, oui: bool, clients: bool) -> b
         return collect_checks(root, _relire(root))
 
     restantes = [*plan.sans_sudo, *plan.root]
-    if _jouer_sans_sudo(plan.sans_sudo, actions, remesurer, restantes) and plan.root:
-        _jouer_root(plan.root, ansible, chemin, remesurer, restantes)
+    if (
+        _jouer_sans_sudo(plan.sans_sudo, actions, remesurer, restantes)
+        and plan.root
+        and _jouer_root(plan.root, ansible, chemin, remesurer, restantes)
+    ):
+        _dire_les_attendues([e for e in plan.manuelles if _attend_une_etape(e)], remesurer())
     return True
+
+
+def _attend_une_etape(etape: Etape) -> bool:
+    """Un contrôle sans commande qui ne faisait qu'attendre une autre étape (le
+    firmware EFI attend libvirt) : il se revérifie, il n'est pas « à faire »."""
+    return all(c.apres is not None for c in etape.controles)
+
+
+def _dire_les_attendues(etapes: list[Etape], apres: DoctorReport) -> None:
+    for etape in etapes:
+        if etape_verifiee(etape, apres):
+            success(_("fix_attendue_ok", step=etape.numero, label=titre_etape(etape)))
+        else:
+            warn(_("fix_attendue_ko", step=etape.numero, label=titre_etape(etape)))
 
 
 def _jouer_sans_sudo(
@@ -420,17 +444,17 @@ def _jouer_sans_sudo(
 def _jouer_root(
     etapes: list[Etape], ansible: list[str], chemin: Path,
     remesurer: Callable[[], DoctorReport], restantes: list[Etape],
-) -> None:
+) -> bool:
     """Les étapes root, toutes par le playbook du poste, puis revérifiées une à une."""
     if not _interactif() and "--ask-become-pass" in ansible:
         # Sans terminal, personne ne peut taper le mot de passe : les étapes
         # root s'affichent en bloc à coller (décision 2).
         _bloc_root(etapes)
-        return
+        return False
     if not _playbook_jouable(ansible[0]) and not _installer_ansible():
         warn(_("fix_pas_d_ansible"))
         _bloc_root(etapes)
-        return
+        return False
     chemin.parent.mkdir(parents=True, exist_ok=True)
     chemin.write_text(playbook_du_poste(etapes, _current_user()), encoding="utf-8")
     info(_("fix_playbook", path=str(chemin)))
@@ -441,10 +465,11 @@ def _jouer_root(
         _dire_le_resultat(application)
         if not application.ok:
             _arreter(restantes[restantes.index(etape):])
-            return
+            return False
     if any(e.remede is not None and e.remede.reconnexion for e in etapes):
         warn(_("fix_reconnexion_finale"))
     info(_("fix_rerun"))
+    return True
 
 
 def _playbook_jouable(binaire: str) -> bool:

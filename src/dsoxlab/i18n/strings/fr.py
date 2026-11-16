@@ -1846,6 +1846,9 @@ hors ligne, elle se tait.
     "fix_reconnexion_finale": "Reconnectez-vous avant de relancer doctor : les groupes kvm et libvirt ne valent qu'après une nouvelle session.",
     "fix_plan_ansible_d_abord": "Ansible est installé d'abord, sans sudo : uv tool install ansible-core",
     "fix_installe_ansible": "Installation d'Ansible d'abord (uv tool install ansible-core) : le playbook du poste en a besoin.",
+    "fix_plan_reverifiees": "Revérifiés après le playbook (ils l'attendaient) :",
+    "fix_attendue_ok": '{step}. {label} : contrôlé après le playbook, prêt.',
+    "fix_attendue_ko": '{step}. {label} : manque encore après le playbook : lancez dsoxlab doctor pour savoir quoi faire.',
     "fix_needs_relogin":
         "{label} : corrigé, mais le changement ne prend effet qu'après une "
         "déconnexion puis une reconnexion. Cette ligne restera rouge d'ici "

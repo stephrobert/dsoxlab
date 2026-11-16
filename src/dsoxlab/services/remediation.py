@@ -158,6 +158,10 @@ def playbook_du_poste(etapes: list[Etape], utilisateur: str) -> str:
         "hosts": "localhost",
         "gather_facts": False,
         "become": True,
+        # Sans cette variable, Ansible avertit qu'il a « découvert » python3 :
+        # vrai, sans objet ici, et c'est la seule ligne jaune que l'apprenant
+        # voyait (réévaluation du 2026-11-16 sur AlmaLinux 10).
+        "vars": {"ansible_python_interpreter": "auto_silent"},
         "tasks": taches,
     }]
     return yaml.safe_dump(jeu, sort_keys=False, allow_unicode=True, width=1000)
