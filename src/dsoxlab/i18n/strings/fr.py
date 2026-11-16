@@ -1596,6 +1596,7 @@ hors ligne, elle se tait.
     "doctor_mises_en_garde": '{count} mises en garde sur des lignes vertes : dsoxlab doctor -v',
     "doctor_mises_en_garde_1": '1 mise en garde sur une ligne verte : dsoxlab doctor -v',
     "doctor_tout_corriger": "Tout corriger d'un coup :",
+    "detail_docker_groupe": "votre compte n'est pas dans le groupe docker, et le démon le refuse ({detail})",
     "check_groupes": 'Groupes kvm et libvirt',
     "check_efi": 'Firmware EFI',
     "check_cle_ssh": 'Clé SSH du catalogue',

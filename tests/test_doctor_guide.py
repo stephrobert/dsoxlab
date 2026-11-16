@@ -494,3 +494,55 @@ def test_les_etapes_facultatives_se_numerotent_a_la_suite() -> None:
     plan = construire(report)
     assert [e.numero for e in plan.etapes] == [1]
     assert [e.numero for e in plan.facultatives] == [2]
+
+
+# ── Docker : le groupe docker, que la doc officielle demande ──────────────────
+
+def _docker_refuse(monkeypatch: pytest.MonkeyPatch, inscrit: bool) -> None:
+    class Reponse:
+        returncode = 1
+        stdout = ""
+        stderr = ("permission denied while trying to connect to the docker API at "
+                  "unix:///var/run/docker.sock")
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(doctor, "_sonder", lambda cmd, delai=5, env=None: Reponse())
+    monkeypatch.setattr(kvm_controles, "_gid", lambda n: 990 if n == "docker" else None)
+    monkeypatch.setattr(kvm_controles, "_inscrit", lambda n, g: inscrit)
+
+
+def test_docker_refuse_fait_proposer_le_groupe_docker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pop!_OS 24.04 : Docker installé, `docker ps` refusé, et le contrôle ne
+    donnait qu'un lien : Docker disparaissait du diagnostic."""
+    _os_release(monkeypatch, tmp_path, UBUNTU)
+    _docker_refuse(monkeypatch, inscrit=False)
+    check = doctor._check_docker()
+
+    assert check.state == doctor.STATE_FAILED
+    assert check.remede is not None and check.remede.cle == "docker"
+    assert check.remede.lignes == ("sudo usermod -aG docker $USER",)
+    assert check.remede.reconnexion
+
+
+def test_docker_refuse_mais_compte_inscrit_attend_la_reconnexion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _os_release(monkeypatch, tmp_path, UBUNTU)
+    _docker_refuse(monkeypatch, inscrit=True)
+    check = doctor._check_docker()
+
+    assert check.remede is not None and check.remede.lignes == ()
+    assert check.remede.reconnexion
+
+
+@pytest.mark.parametrize("contenu", [UBUNTU, ALMA])
+def test_installer_docker_ajoute_le_compte_au_groupe(tmp_path: Path, contenu: str) -> None:
+    """Sinon --fix installe Docker et juge aussitôt sa propre étape en échec."""
+    fichier = tmp_path / "os-release"
+    fichier.write_text(contenu, encoding="utf-8")
+    remede = remedes.remede("docker", remedes.systeme(fichier))
+    assert remede is not None
+    assert remede.lignes[-1] == "sudo usermod -aG docker $USER"
+    assert remede.reconnexion

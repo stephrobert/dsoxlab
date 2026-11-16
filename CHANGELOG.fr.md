@@ -7,6 +7,22 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.7] - 2026-11-16
+
+### Corrigé
+
+- **Installer Docker ajoute votre compte au groupe `docker`, et un démon qui
+  refuse reçoit une commande.** Sur Pop!_OS 24.04, `doctor --fix --clients`
+  installait Docker puis jugeait sa propre étape en échec : le démon répondait
+  « permission denied » à un compte hors du groupe `docker`, et le contrôle ne
+  proposait qu'un lien, si bien que Docker disparaissait ensuite du diagnostic
+  (ni installé, ni à installer). L'étape Docker finit désormais par
+  `sudo usermod -aG docker $USER`, comme le demande la page de
+  post-installation de Docker, et demande de se reconnecter. Un Docker déjà
+  installé qui refuse le compte reçoit la même commande, ou seulement
+  « déconnectez-vous puis reconnectez-vous » quand le compte est déjà dans le
+  groupe.
+
 ## [0.9.6] - 2026-11-16
 
 ### Corrigé

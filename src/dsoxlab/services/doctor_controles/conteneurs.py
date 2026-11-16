@@ -11,7 +11,7 @@ import shutil
 from ...i18n import _
 from ...models import LabDefinition
 from .modele import STATE_UNKNOWN, Check, _check, _doctor
-from .remedes import remede
+from .remedes import Remede, remede
 
 
 def uses_services(labs: list[LabDefinition]) -> bool:
@@ -43,9 +43,32 @@ def _check_docker() -> Check:
         # Le cas courant : le client répond, le démon non. Le message doit
         # nommer le démon, sinon on cherche un paquet déjà installé.
         detail = (result.stderr or result.stdout).strip().splitlines()
+        if "permission denied" in (result.stderr or "").lower():
+            return _check_groupe_docker(detail[-1] if detail else "permission denied")
         return _check(
             "docker", False,
             detail[-1] if detail else _("detail_docker_daemon"),
             hint="https://docs.docker.com/engine/install/linux-postinstall/",
         )
     return _check("docker", True, result.stdout.strip() or "ok")
+
+
+def _check_groupe_docker(detail: str) -> Check:
+    """Le démon répond, mais refuse ce compte : le groupe docker manque.
+
+    Avant, ce cas ne donnait qu'un lien, et Docker disparaissait du
+    diagnostic : ni « installé », ni « à installer » (Pop!_OS 24.04,
+    2026-11-16). Inscrit mais pas reconnecté : seule la reconnexion compte.
+    """
+    from .kvm import _gid, _inscrit
+
+    gid = _gid("docker")
+    if gid is not None and _inscrit("docker", gid):
+        return _check(
+            "docker", False, _("detail_groupes_reconnexion", groups="docker"),
+            remede=Remede("docker", (), root=False, reconnexion=True),
+        )
+    return _check(
+        "docker", False, _("detail_docker_groupe", detail=detail),
+        remede=remede("docker_groupe", _doctor()._systeme()),
+    )

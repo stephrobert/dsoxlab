@@ -1563,6 +1563,7 @@ silent.
     "doctor_mises_en_garde": '{count} warnings on green lines: dsoxlab doctor -v',
     "doctor_mises_en_garde_1": '1 warning on a green line: dsoxlab doctor -v',
     "doctor_tout_corriger": 'Fix everything at once:',
+    "detail_docker_groupe": 'your account is not in the docker group, so the daemon refuses it ({detail})',
     "check_groupes": 'kvm and libvirt groups',
     "check_efi": 'EFI firmware',
     "check_cle_ssh": 'Catalogue SSH key',

@@ -126,6 +126,13 @@ _TERRAFORM_FEDORA = (
 )
 
 
+#: L'étape de la doc officielle « Linux post-installation » : sans le groupe
+#: docker, le démon répond « permission denied » au compte de l'apprenant, et
+#: dsoxlab lance ses conteneurs avec ce compte (mesuré sur Pop!_OS 24.04 le
+#: 2026-11-16 : Docker installé par --fix, contrôle toujours rouge).
+_GROUPE_DOCKER = "sudo usermod -aG docker $USER"
+
+
 def _docker_debian(identifiant: str) -> tuple[str, ...]:
     distribution = "debian" if identifiant == "debian" else "ubuntu"
     return (
@@ -146,6 +153,7 @@ def _docker_debian(identifiant: str) -> tuple[str, ...]:
         "sudo apt update",
         ("sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin "
         "docker-compose-plugin"),
+        _GROUPE_DOCKER,
     )
 
 
@@ -155,6 +163,7 @@ _DOCKER_RHEL = (
     ("sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin "
     "docker-compose-plugin"),
     "sudo systemctl enable --now docker",
+    _GROUPE_DOCKER,
 )
 
 #: L'ajout de la ligne Include en tête de ~/.ssh/config. Un ``sed -i '1i …'``
@@ -212,7 +221,7 @@ def _cle_ssh(s: Systeme, v: dict[str, str]) -> Remede:
 
 def _docker(s: Systeme, v: dict[str, str]) -> Remede:
     lignes = _DOCKER_RHEL if s.famille is Famille.RHEL else _docker_debian(s.identifiant)
-    return Remede("docker", lignes, root=True, tag="docker")
+    return Remede("docker", lignes, root=True, tag="docker", reconnexion=True)
 
 
 def _incus(s: Systeme, v: dict[str, str]) -> Remede | None:
@@ -251,6 +260,10 @@ TABLE: dict[str, _Fabrique] = {
     "ssh_include": lambda s, v: Remede("ssh_include", (_INCLUDE_SSH,), root=False),
     "incus": _incus,
     "docker": _docker,
+    # Docker installé, compte hors du groupe : la même étape « docker », sans
+    # réinstaller.
+    "docker_groupe": lambda s, v: Remede(
+        "docker", (_GROUPE_DOCKER,), root=True, tag="docker", reconnexion=True),
 }
 
 
