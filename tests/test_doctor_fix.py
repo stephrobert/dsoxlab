@@ -351,3 +351,28 @@ def test_le_display_requote_ce_qui_doit_l_etre() -> None:
     assert correctif.display == "echo 'deux mots' && touch fichier"
     assert not correctif.requires_sudo
     assert Fix((("sudo", "apt", "install", "x"),)).requires_sudo
+
+
+@pytest.mark.parametrize(("code_sudo", "demande"), [(0, False), (1, True)])
+def test_le_mot_de_passe_se_demande_sauf_vrai_nopasswd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code_sudo: int, demande: bool,
+) -> None:
+    """La sonde ignore le mot de passe gardé en mémoire (`sudo -k`).
+
+    Sans `-k`, `sudo -n true` réussissait grâce au cache du terminal : dsoxlab
+    omettait `--ask-become-pass`, et le sudo d'Ansible échouait sur « il est
+    nécessaire de saisir un mot de passe » (Pop!_OS 24.04, 2026-11-16).
+    """
+    sondes: list[list[str]] = []
+
+    class Resultat:
+        returncode = code_sudo
+
+    monkeypatch.setattr(diagnostic.shutil, "which", lambda nom: f"/usr/bin/{nom}")
+    monkeypatch.setattr(diagnostic.subprocess, "run",
+                        lambda cmd, **kw: (sondes.append(cmd), Resultat())[1])
+
+    commande = diagnostic._commande_playbook(tmp_path / "poste.yml")
+
+    assert sondes == [["sudo", "-n", "-k", "true"]]
+    assert ("--ask-become-pass" in commande) is demande

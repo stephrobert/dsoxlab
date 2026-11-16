@@ -7,6 +7,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.6] - 2026-11-16
+
+### Fixed
+
+- **`doctor --fix` asks for the sudo password when sudo needs one, even right
+  after a sudo typed in the same terminal.** To decide whether to pass
+  `--ask-become-pass` to `ansible-playbook`, dsoxlab ran `sudo -n true`, which
+  also succeeds thanks to the password sudo keeps for a few minutes. The
+  playbook then started without asking, and the sudo Ansible runs, which does
+  not see that cache, failed: "sudo: a password is required" (reported on
+  Pop!_OS 24.04). The probe is now `sudo -n -k true`: `-k` ignores the cached
+  password, so only a real passwordless sudo skips the question.
+- **Optional steps are numbered after the required ones.** `doctor --fix
+  --clients` showed "0. Install Docker".
+
 ## [0.9.5] - 2026-11-16
 
 ### Added

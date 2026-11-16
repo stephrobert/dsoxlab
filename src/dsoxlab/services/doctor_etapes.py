@@ -134,4 +134,8 @@ def construire(report: DoctorReport) -> Plan:
         if not c.ok and c.remede is not None and c.key in _CLIENTS
     ]
     plan.facultatives = _regrouper(facultatifs, facultative=True)
+    # Numérotées à la suite des étapes requises : `--fix --clients` les montrait
+    # en « 0. Installer Docker » (Pop!_OS 24.04, 2026-11-16).
+    for numero, etape in enumerate(plan.facultatives, start=len(plan.etapes) + 1):
+        etape.numero = numero
     return plan

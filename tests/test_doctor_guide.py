@@ -479,3 +479,18 @@ def test_clients_n_installe_que_docker_et_incus() -> None:
         doctor._check("docker", False, "absent", remede=Remede("docker", ("sudo apt install y",), root=True)),
     ])
     assert [e.cle for e in construire(report).facultatives] == ["docker"]
+
+
+def test_les_etapes_facultatives_se_numerotent_a_la_suite() -> None:
+    """`--fix --clients` montrait « 0. Installer Docker » (Pop!_OS 24.04)."""
+    from dsoxlab.services.doctor_controles.modele import DoctorReport
+    from dsoxlab.services.doctor_controles.remedes import Remede
+
+    report = DoctorReport()
+    report.required.append(doctor._check("git", False, "absent",
+                                         remede=Remede("git", ("sudo apt install git",), root=True)))
+    report.optional.append(doctor._check("docker", False, "absent",
+                                         remede=Remede("docker", ("sudo apt install y",), root=True)))
+    plan = construire(report)
+    assert [e.numero for e in plan.etapes] == [1]
+    assert [e.numero for e in plan.facultatives] == [2]
