@@ -185,7 +185,7 @@ def print_doctor(report: DoctorReport, *, verbose: bool = False) -> None:
         if mises_en_garde:
             _ligne(_compte("doctor_mises_en_garde", mises_en_garde), style="dim")
 
-    if any(not e.manuelle for e in plan.etapes):
+    if any(e.lancable for e in plan.etapes):
         console.print()
         _ligne(_("doctor_tout_corriger"), style="bold")
         _commande("dsoxlab doctor --fix")
