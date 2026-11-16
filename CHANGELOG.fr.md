@@ -24,6 +24,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   sortie. Un marqueur sous `XDG_STATE_HOME`
   (`dsoxlab/invitation-push-affichee`) l'empêche de revenir.
 
+### Corrigé
+
+- **kvm provisionne de nouveau sur la famille RHEL 10 (AlmaLinux 10)**
+  (issue #381). Là, `virsh domcapabilities` ne cite que le firmware Secure Boot
+  (`OVMF_CODE.secboot.fd`), alors que `edk2-ovmf` installe aussi
+  `/usr/share/edk2/ovmf/OVMF_CODE.fd` sans lui. dsoxlab ne lisait que cette
+  liste : `provision` échouait sur « aucun firmware EFI utilisable » et
+  conseillait d'installer un paquet déjà présent. Quand la liste ne contient
+  aucun firmware sans Secure Boot, dsoxlab lit désormais les descripteurs de
+  firmware QEMU (`/etc/qemu/firmware`, puis `/usr/share/qemu/firmware`), le
+  format que libvirt lit lui-même, et retient le premier firmware UEFI x86_64
+  q35 sans Secure Boot ni SMM, en mode `split` avec un modèle de NVRAM, dont le
+  fichier existe. Mesuré sur AlmaLinux 10.2 : `provision` sort désormais en 0.
+
 ### Modifié
 
 - **Les machines provisionnées ne démarrent plus avec l'hôte, sauf si le

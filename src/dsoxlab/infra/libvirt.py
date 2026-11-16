@@ -31,12 +31,15 @@ une absence**. ``virsh`` absent, ``sudo`` refusé ou démon éteint lèvent
 
 from __future__ import annotations
 
+import fnmatch
+import json
 import logging
 import os
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from ..i18n import _
 from ..utils.shell import CommandError, CommandResult, run_command
@@ -393,6 +396,72 @@ def remove_domain(domain: str) -> None:
 _SECURE_BOOT = (".ms.fd", ".secboot.fd")
 
 
+#: Où QEMU et libvirt cherchent les descripteurs de firmware, par priorité : un
+#: fichier de /etc masque celui de même nom sous /usr/share (format
+#: docs/interop/firmware.json de QEMU).
+DOSSIERS_FIRMWARE = (Path("/etc/qemu/firmware"), Path("/usr/share/qemu/firmware"))
+
+#: Fonctions qui écartent un firmware : le template kvm ne pose ni clés Secure
+#: Boot ni mode SMM.
+_FONCTIONS_ECARTEES = frozenset({"secure-boot", "enrolled-keys", "requires-smm"})
+
+
+def firmware_des_descripteurs(dossiers: tuple[Path, ...] | None = None) -> str | None:
+    """Le premier firmware UEFI x86_64 sans Secure Boot que déclarent les descripteurs QEMU.
+
+    Un descripteur est retenu s'il réunit tout : interface ``uefi``, cible
+    ``x86_64`` pour des machines ``pc-q35-*``, aucune fonction de
+    :data:`_FONCTIONS_ECARTEES`, un mapping ``flash`` en mode ``split`` avec un
+    modèle de NVRAM (le template pose une NVRAM ; un firmware ``stateless``,
+    comme les variantes AMD SEV ou Intel TDX, n'en accepte pas), et un
+    exécutable présent sur le disque. L'ordre est celui des noms de fichiers,
+    comme pour QEMU. Rend ``None`` quand rien ne convient ou que rien ne se lit.
+    """
+    for chemin in _descripteurs(dossiers if dossiers is not None else DOSSIERS_FIRMWARE):
+        executable = _firmware_convenable(chemin)
+        if executable is not None:
+            return executable
+    return None
+
+
+def _descripteurs(dossiers: tuple[Path, ...]) -> list[Path]:
+    """Les descripteurs par ordre de nom, un fichier de /etc masquant son homonyme."""
+    fichiers: dict[str, Path] = {}
+    for dossier in dossiers:
+        try:
+            for chemin in sorted(dossier.glob("*.json")):
+                fichiers.setdefault(chemin.name, chemin)
+        except OSError:
+            continue
+    return [fichiers[nom] for nom in sorted(fichiers)]
+
+
+def _cible_q35_x86_64(cible: object) -> bool:
+    if not isinstance(cible, dict) or cible.get("architecture") != "x86_64":
+        return False
+    return any(fnmatch.fnmatch("pc-q35-10.0", m) for m in cible.get("machines") or [])
+
+
+def _firmware_convenable(chemin: Path) -> str | None:
+    """L'exécutable que déclare ce descripteur s'il convient au template kvm, sinon ``None``."""
+    try:
+        donnees = json.loads(chemin.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(donnees, dict) or "uefi" not in (donnees.get("interface-types") or []):
+        return None
+    if _FONCTIONS_ECARTEES & set(donnees.get("features") or []):
+        return None
+    if not any(_cible_q35_x86_64(c) for c in donnees.get("targets") or []):
+        return None
+    mapping = donnees.get("mapping") or {}
+    split = mapping.get("device") == "flash" and mapping.get("mode", "split") == "split"
+    if not split or not isinstance(mapping.get("nvram-template"), dict):
+        return None
+    executable = str((mapping.get("executable") or {}).get("filename") or "")
+    return executable if executable and Path(executable).is_file() else None
+
+
 def efi_loader() -> str | None:
     """Le firmware EFI que CETTE machine expose, ou ``None`` si indéterminable.
 
@@ -430,6 +499,15 @@ def efi_loader() -> str | None:
     ]
     sans_secure_boot = [c for c in candidats if not c.endswith(_SECURE_BOOT)]
     if not sans_secure_boot:
+        # Mesuré le 2026-11-16 sur AlmaLinux 10.2 (issue #381) : edk2-ovmf y
+        # installe /usr/share/edk2/ovmf/OVMF_CODE.fd, sans Secure Boot, mais
+        # `domcapabilities` ne cite que OVMF_CODE.secboot.fd. Les descripteurs
+        # QEMU, que libvirt lit lui-même, le déclarent : on les consulte avant
+        # de conclure qu'il n'y a rien.
+        descripteur = firmware_des_descripteurs()
+        if descripteur is not None:
+            logger.info("EFI loader taken from the QEMU firmware descriptors: %s", descripteur)
+            return descripteur
         logger.warning(
             "libvirt exposes %d EFI loader(s), all with Secure Boot: %s",
             len(candidats), ", ".join(candidats) or "none",
