@@ -11,7 +11,8 @@ import os
 import shutil
 
 from ...i18n import _
-from .modele import STATE_UNKNOWN, Check, FixKind, _check, _doctor, _fix, _installer
+from .modele import STATE_UNKNOWN, Check, FixKind, _check, _doctor, _fix
+from .remedes import remede
 
 
 def _current_user() -> str:
@@ -32,9 +33,14 @@ def _check_incus() -> Check:
     (« permissions to talk to the incus daemon »).
     """
     if not shutil.which("incus"):
+        # Sur la famille RHEL, incus n'est dans aucun dépôt de base (AlmaLinux
+        # 10, mesuré le 2026-11-16) : la table ne donne pas de remède, et le
+        # détail le dit, plutôt qu'un `dnf install incus` qui échoue.
+        trouve = remede("incus", _doctor()._systeme())
         return _check(
-            "incus", False, _("detail_incus_missing"),
-            fix=_fix(_installer(["incus"], ["incus"])),
+            "incus", False,
+            _("detail_incus_missing") if trouve else _("detail_incus_sans_paquet"),
+            remede=trouve,
         )
 
     # Le numéro de version n'est qu'un ornement du diagnostic. Le verdict vient

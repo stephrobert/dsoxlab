@@ -79,26 +79,110 @@ be repaired safely.
 Two kinds of labs, and only the first is free. A **`shell`** lab runs in a
 directory on your own machine: the demonstration lab is one, and so is every
 lab of the Terraform catalog. A **`vm`** lab starts real virtual machines next
-to you — 66 of the Linux catalog's 86 labs do — and for that your machine has
-to be able to run them:
+to you, and for that your machine has to be able to run them. It needs
+**Linux with KVM**: the packaged hypervisors are KVM/libvirt and Incus, and
+neither exists on Windows or macOS, where `vm` labs mean
+[the appliance](./appliance.md). Inside a virtual machine, they also need
+nested virtualization, enabled on the host and not in the guest.
 
-- **Linux, with KVM.** The packaged hypervisors are KVM/libvirt and Incus, and
-  neither exists on Windows or macOS: there, `vm` labs mean
-  [the appliance](./appliance.md). Inside a virtual machine they also need
-  nested virtualization, which is enabled on the host and not in the guest.
-- **libvirt and QEMU.** `dsoxlab doctor --fix` installs them where the remedy
-  is an `apt install`, the only package manager the remedies know today, and
-  adds you to the `kvm` group — which takes effect at your next login.
-- **Terraform.** `doctor` names it and links its install page but cannot
-  install it: HashiCorp ships it through its own repository. Ansible needs
-  nothing, it comes with dsoxlab.
-- **An SSH key pair for the catalog**, from `dsoxlab instructor bootstrap`. The
-  name says instructor; run it anyway. A catalog you clone carries no key — its
-  `.gitignore` excludes the whole `ssh/` directory, since a private key has no
-  business in a repository — and `provision` refuses to start without one.
+The short way: run `dsoxlab doctor`. It lists every missing step at once,
+numbered in the order to do them, each command on its own line, for your
+distribution (read from `/etc/os-release`). Then `dsoxlab doctor --fix` shows
+the plan and runs it once you confirm: the steps without sudo by dsoxlab
+itself, the sudo steps through a single `ansible-playbook` run that asks for
+your password once. Each step is checked again right after, and the first
+failure stops everything.
 
-None of this is guesswork: `dsoxlab doctor` sorts it into what this catalog
-requires and what is merely informational, and says what to do about each.
+The same steps by hand. On **Debian or Ubuntu**:
+
+```bash
+sudo apt install git
+sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm
+sudo usermod -aG kvm,libvirt $USER
+sudo virsh pool-define-as default dir --target /var/lib/libvirt/images
+sudo virsh pool-build default
+sudo virsh pool-start default
+sudo virsh pool-autostart default
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+```
+
+On **AlmaLinux, Rocky or RHEL** (libvirt does not start on its own there):
+
+```bash
+sudo dnf install git
+sudo dnf install libvirt qemu-kvm
+sudo systemctl enable --now libvirtd
+sudo usermod -aG kvm,libvirt $USER
+sudo virsh pool-define-as default dir --target /var/lib/libvirt/images
+sudo virsh pool-build default
+sudo virsh pool-start default
+sudo virsh pool-autostart default
+sudo dnf install -y yum-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+sudo dnf -y install terraform
+```
+
+Then log out and back in: the `kvm` and `libvirt` groups only apply to a new
+session. Then, on every distribution, from inside the catalog:
+
+```bash
+uv tool install ansible-core
+dsoxlab use --provider kvm
+ansible-galaxy collection install -r requirements.yml
+dsoxlab instructor bootstrap
+mkdir -p ~/.ssh && t=$(mktemp) && { echo 'Include ~/.ssh/config.d/*.conf'; cat ~/.ssh/config 2>/dev/null || true; } > "$t" && mv "$t" ~/.ssh/config && chmod 600 ~/.ssh/config
+```
+
+These install Ansible (with `uv`, no sudo), choose the provider, install the
+Ansible collections the catalog's playbooks call, create the catalog's SSH key
+(the name says instructor; run it anyway: a catalog you clone carries no key,
+and `provision` refuses to start without one), and make `ssh` read the files
+dsoxlab writes in `~/.ssh/config.d/`. The last command works on an empty or
+missing `~/.ssh/config`, which a `sed -i '1i …'` does not.
+
+If `doctor` reports the EFI firmware missing: `sudo apt install ovmf` on Debian or
+Ubuntu, `sudo dnf install edk2-ovmf` on the RHEL family. It usually comes with QEMU.
+
+A memory too small for the whole catalog does not block anything: `doctor`
+says it under « Good to know », and `dsoxlab provision --host <machine>` brings
+up only the machine of the lab you play.
+
+Docker is needed only by catalogs whose labs declare containers;
+`dsoxlab doctor --fix --clients` installs it, from Docker's own repository. By
+hand, on Debian or Ubuntu (replace `ubuntu` by `debian` in the two URLs on
+Debian):
+
+```bash
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+On the RHEL family:
+
+```bash
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+```
+
+Incus is packaged on Debian and Ubuntu (`sudo apt install incus`), and in no
+base repository of the RHEL family.
 
 ---
 

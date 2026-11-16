@@ -350,6 +350,32 @@ def ssh_config_include_present() -> bool:
     )
 
 
+#: La ligne que ``doctor --fix`` pose en tête de ``~/.ssh/config``.
+LIGNE_INCLUDE = "Include ~/.ssh/config.d/*.conf"
+
+
+def ajouter_include_ssh() -> None:
+    """Pose la ligne ``Include`` en TÊTE de ``~/.ssh/config``, fichier vide ou absent compris.
+
+    En tête, parce qu'un ``Include`` placé après un bloc ``Host`` ne vaut que
+    pour ce bloc. Et sans ``sed -i '1i …'``, qui n'écrit rien dans un fichier
+    vide, le cas d'un poste neuf (mesuré le 2026-11-16 sur AlmaLinux 10). Le
+    fichier est réécrit d'un coup (fichier voisin puis ``replace``), en 0600 :
+    ssh refuse un ``config`` lisible par les autres.
+    """
+    dossier = Path.home() / ".ssh"
+    dossier.mkdir(mode=0o700, exist_ok=True)
+    principal = dossier / "config"
+    try:
+        actuel = principal.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        actuel = ""
+    provisoire = dossier / "config.dsoxlab"
+    provisoire.write_text(f"{LIGNE_INCLUDE}\n{actuel}", encoding="utf-8")
+    provisoire.chmod(0o600)
+    provisoire.replace(principal)
+
+
 def write_user_ssh_config(
     inventory: dict[str, Any], repo_meta: RepoMetadata
 ) -> Path:

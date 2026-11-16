@@ -22,7 +22,6 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 from typing import Annotated
 
@@ -83,25 +82,13 @@ def instructor_bootstrap(
         info(_("bootstrap_key_exists", path=private_key))
     else:
         info(_("bootstrap_generating_key", path=private_key))
-        ssh_dir.mkdir(parents=True, exist_ok=True)
-        ssh_dir.chmod(0o700)
-        # check=False : l'échec est traduit en message + Exit(2) juste en
-        # dessous. Une CalledProcessError sortirait la trace Python de
-        # ssh-keygen au visage du formateur, sans lui dire quoi faire.
-        result = subprocess.run(
-            [
-                "ssh-keygen",
-                "-t", "ed25519",
-                "-N", "",  # pas de passphrase
-                "-C", "dsoxlab-lab",
-                "-f", str(private_key),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            error(_("bootstrap_keygen_failed", stderr=result.stderr.strip()))
+        # La même fonction que `doctor --fix` : un échec de ssh-keygen revient
+        # en message, traduit ici en Exit(2), jamais en trace Python.
+        from ..services.doctor_controles.catalogue import creer_cle_ssh
+
+        echec = creer_cle_ssh(root)
+        if echec is not None:
+            error(_("bootstrap_keygen_failed", stderr=echec))
             raise typer.Exit(2)
         success(_("bootstrap_key_created", path=private_key))
 

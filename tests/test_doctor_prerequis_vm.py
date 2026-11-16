@@ -27,6 +27,7 @@ from dsoxlab.models.repo import HostDefinition, InfraDefinition, RepoMetadata
 from dsoxlab.models.runtime import RuntimeConfig, RuntimeType, Target
 from dsoxlab.reporting import machine
 from dsoxlab.services import doctor
+from dsoxlab.services.doctor_controles import remedes
 
 
 def _lab(lab_id: str, runtime_type: RuntimeType) -> LabDefinition:
@@ -264,6 +265,8 @@ def test_dev_kvm_inaccessible_est_reparable(
     device.touch()
     monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
     monkeypatch.setattr(doctor.os, "access", lambda p, mode: False)
+    # Un compte hors du groupe kvm, quel que soit le poste qui joue le test.
+    monkeypatch.setattr("dsoxlab.services.doctor_controles.kvm._gid", lambda nom: None)
 
     check = doctor._check_hw_virt()
 
@@ -565,19 +568,30 @@ def _poste(monkeypatch: pytest.MonkeyPatch, *presents: str) -> None:
     )
 
 
+def _os_release(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, contenu: str) -> None:
+    """Simule la distribution du poste par son /etc/os-release."""
+    fichier = tmp_path / "os-release"
+    fichier.write_text(contenu, encoding="utf-8")
+    monkeypatch.setattr(remedes, "OS_RELEASE", fichier)
+
+
 def test_fedora_recoit_dnf_et_ses_noms_de_paquets(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     """Issue blog-roadmap #41 : sur Fedora, `--fix` proposait `apt install`.
 
     Les noms viennent de `dnf repoquery` sur Fedora 43 et AlmaLinux 10 :
-    `libvirt-clients` et `libvirt-daemon-system` n'y existent pas.
+    `libvirt-clients` et `libvirt-daemon-system` n'y existent pas. Sur cette
+    famille, libvirt ne démarre pas seul : le remède l'active dans la même étape.
     """
     _poste(monkeypatch, "dnf")
+    _os_release(monkeypatch, tmp_path, 'ID=fedora\nPRETTY_NAME="Fedora Linux 43"\n')
 
     kvm = doctor._check_kvm()
-    assert kvm.fix is not None
-    assert kvm.fix.commands == (("sudo", "dnf", "install", "libvirt", "qemu-kvm"),)
+    assert kvm.remede is not None
+    assert kvm.remede.lignes == (
+        "sudo dnf install libvirt qemu-kvm", "sudo systemctl enable --now libvirtd",
+    )
 
     iso = doctor._check_iso_tool()
     assert iso.fix is not None
@@ -590,14 +604,41 @@ def test_fedora_recoit_dnf_et_ses_noms_de_paquets(
     assert connu[1] == "sudo dnf install qemu-img"
 
 
-def test_debian_garde_apt(monkeypatch: pytest.MonkeyPatch) -> None:
-    """apt gagne dès qu'il est là, et reste le défaut quand rien n'est trouvé."""
-    for presents in (("apt-get", "dnf"), ("apt-get",), ()):
+def test_debian_garde_apt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """La famille Debian reçoit apt, et apt reste le défaut quand rien ne se lit.
+
+    os-release décide d'abord ; à défaut (fichier vide), apt gagne dès qu'il est
+    dans le PATH, et reste le défaut quand rien n'est trouvé.
+    """
+    cas = (
+        ("ID=ubuntu\nID_LIKE=debian\n", ("dnf",)),
+        ("ID=debian\n", ()),
+        ("", ("apt-get", "dnf")),
+        ("", ("apt-get",)),
+        ("", ()),
+    )
+    for contenu, presents in cas:
         _poste(monkeypatch, *presents)
+        _os_release(monkeypatch, tmp_path, contenu)
         kvm = doctor._check_kvm()
-        assert kvm.fix is not None
-        assert kvm.fix.commands[0][:3] == ("sudo", "apt", "install")
-        assert "libvirt-daemon-system" in kvm.fix.commands[0]
+        assert kvm.remede is not None, (contenu, presents)
+        assert kvm.remede.lignes == (
+            "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
+        ), (contenu, presents)
+
+
+def test_almalinux_est_de_la_famille_rhel(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """AlmaLinux se reconnaît à son ID_LIKE, et le dépôt Terraform est celui de RHEL."""
+    _poste(monkeypatch, "dnf")
+    _os_release(monkeypatch, tmp_path, 'ID="almalinux"\nID_LIKE="rhel centos fedora"\n')
+
+    terraform = remedes.remede("terraform", remedes.systeme())
+    assert terraform is not None
+    assert "https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo" in terraform.lignes[1]
+    incus = doctor._check_incus()
+    assert incus.remede is None, "incus n'est dans aucun dépôt de base d'AlmaLinux 10"
 
 
 def test_un_qemu_img_absent_est_nomme(

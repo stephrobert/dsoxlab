@@ -6,12 +6,14 @@ comportement. Voir ce module pour les principes du diagnostic.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from ...i18n import _
 from ...models import LabDefinition
 from ...models.runtime import RuntimeType
-from .modele import Check, _check
+from .modele import Check, _check, _doctor
+from .remedes import remede
 
 #: Types de runtime qui exigent une VM provisionnée. Les deux alias
 #: historiques comptent autant que la valeur cible.
@@ -74,3 +76,64 @@ def _check_lab_home(root: Path) -> Check:
 def uses_vm(labs: list[LabDefinition]) -> bool:
     """Ce dépôt a-t-il au moins un lab qui exige une VM provisionnée ?"""
     return any(lab.runtime.type in _VM_RUNTIMES for lab in labs)
+
+
+# ── accès SSH aux machines ────────────────────────────────────────────────────
+
+def _check_cle_ssh(root: Path) -> Check:
+    """La clé que ``provision`` pose sur les machines, et sans laquelle il échoue.
+
+    Jamais contrôlée jusqu'ici : sur les deux postes neufs du 2026-11-16,
+    ``doctor`` était vert et ``provision`` s'arrêtait sur la clé publique
+    absente. ``instructor bootstrap`` la crée dans ``<catalogue>/ssh/``.
+    """
+    privee = root / "ssh" / "id_ed25519"
+    publique = root / "ssh" / "id_ed25519.pub"
+    if privee.is_file() and publique.is_file():
+        return _check("cle_ssh", True, str(publique))
+    return _check(
+        "cle_ssh", False, _("detail_cle_ssh_absente", path=str(publique)),
+        remede=remede("cle_ssh", _doctor()._systeme()),
+    )
+
+
+def _check_ssh_include() -> Check:
+    """``~/.ssh/config`` lit-il les fragments que ``provision`` écrit ?
+
+    Sans la ligne ``Include``, le fragment est écrit mais jamais lu, et
+    ``ssh <machine>`` échoue alors que les énoncés le demandent. ``provision``
+    le disait après coup ; le diagnostic le dit avant. Le remède marche sur un
+    fichier vide ou absent, ce qu'un ``sed -i '1i …'`` ne fait pas (il n'écrit
+    rien dans un fichier vide, mesuré le 2026-11-16).
+    """
+    from ...infra.inventory import ssh_config_include_present
+
+    if ssh_config_include_present():
+        return _check("ssh_include", True, "~/.ssh/config")
+    return _check(
+        "ssh_include", False, _("detail_ssh_include_absent"),
+        remede=remede("ssh_include", _doctor()._systeme()),
+    )
+
+
+def creer_cle_ssh(root: Path) -> str | None:
+    """Crée ``<catalogue>/ssh/id_ed25519`` (et sa clé publique) si elle manque.
+
+    Partagée par ``instructor bootstrap`` et ``doctor --fix`` : deux commandes
+    qui créent la même clé doivent la créer de la même façon. Rend ``None`` en
+    cas de succès (ou si la clé existe déjà), la sortie de ssh-keygen sinon.
+    """
+    ssh_dir = root / "ssh"
+    privee = ssh_dir / "id_ed25519"
+    if privee.is_file() and (ssh_dir / "id_ed25519.pub").is_file():
+        return None
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    ssh_dir.chmod(0o700)
+    # check=False : l'échec est rendu en message, pas en trace Python.
+    resultat = subprocess.run(
+        ["ssh-keygen", "-t", "ed25519", "-N", "", "-C", "dsoxlab-lab", "-f", str(privee)],
+        capture_output=True, text=True, check=False,
+    )
+    if resultat.returncode != 0:
+        return resultat.stderr.strip() or f"ssh-keygen: code {resultat.returncode}"
+    return None

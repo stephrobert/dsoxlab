@@ -6,8 +6,10 @@ comportement. Voir ce module pour les principes du diagnostic.
 
 from __future__ import annotations
 
+import grp
 import os
 import platform
+import pwd
 import re
 import shutil
 from dataclasses import dataclass
@@ -17,7 +19,8 @@ from ...i18n import _
 from ...infra import libvirt as libvirt_infra
 from ...utils.shell import CommandError, CommandResult
 from .incus import _current_user
-from .modele import STATE_UNKNOWN, Check, FixKind, _check, _doctor, _fix, _installer
+from .modele import STATE_UNKNOWN, Check, FixKind, _check, _doctor, _fix
+from .remedes import Remede, remede
 
 
 def _sonde_virsh(args: list[str], *, delai: int = 5) -> CommandResult | None:
@@ -80,10 +83,7 @@ def _check_kvm() -> Check:
     if not shutil.which("virsh"):
         return _check(
             "kvm", False, _("detail_kvm_missing"),
-            fix=_fix(_installer(
-                ["libvirt-clients", "libvirt-daemon-system", "qemu-kvm"],
-                ["libvirt", "qemu-kvm"],
-            )),
+            remede=remede("kvm", _doctor()._systeme()),
         )
     # Un virsh qui sort en erreur est justement ce que ce contrôle cherche à
     # rapporter ; un virsh qui ne répond pas dit la même chose plus fort.
@@ -98,7 +98,9 @@ def _check_kvm() -> Check:
     if probe is None or not probe.ok:
         return _check(
             "kvm", False, _("detail_kvm_daemon_err"),
-            fix=_fix(["sudo", "systemctl", "start", "libvirtd"]),
+            # `enable --now` et non `start` : un démon seulement démarré
+            # s'arrête au prochain redémarrage, et le même rouge revient.
+            fix=_fix(["sudo", "systemctl", "enable", "--now", "libvirtd"]),
         )
     first_line = probe.stdout.splitlines()[0] if probe.stdout else "ok"
 
@@ -217,12 +219,28 @@ def _check_hw_virt() -> Check:
             detail = _("detail_hw_virt_missing", device=_doctor()._KVM_DEVICE)
         return _check("hw_virt", False, detail)
     if not os.access(_doctor()._KVM_DEVICE, os.R_OK | os.W_OK):
+        gid = _gid("kvm")
+        if gid is not None and _inscrit("kvm", gid):
+            # Déjà dans le groupe, mais pas dans cette session : rejouer
+            # usermod ne changerait rien, seule la reconnexion compte. Sans ce
+            # cas, `--fix` jugeait son propre usermod en échec, juste après
+            # l'avoir réussi (réévaluation du 2026-11-16 sur Ubuntu 24.04).
+            return _check(
+                "hw_virt", False,
+                _("detail_groupes_reconnexion", groups="kvm"),
+                remede=Remede("groupes", (), root=False, reconnexion=True),
+            )
         return _check(
             "hw_virt", False, _("detail_hw_virt_denied", device=_doctor()._KVM_DEVICE),
             fix=_fix(
                 ["sudo", "usermod", "-aG", "kvm", _current_user()],
                 kind=FixKind.NEEDS_RELOGIN,
             ),
+            # La même clé de remède que le contrôle des groupes : sur kvm, les
+            # deux lignes rouges deviennent une seule étape, portée par le
+            # contrôle des groupes, qui ajoute libvirt. Sur incus, celle-ci
+            # reste seule, et kvm suffit.
+            remede=remede_groupes(["kvm"]),
         )
     return _check("hw_virt", True, str(_doctor()._KVM_DEVICE))
 
@@ -262,4 +280,115 @@ def _check_cpu_arch(provider: str) -> Check:
             machine=machine, provider=provider,
             archs="/".join(sorted(archs, reverse=True)),
         ),
+    )
+
+
+# ── groupes kvm et libvirt ────────────────────────────────────────────────────
+
+def _gid(nom: str) -> int | None:
+    try:
+        return grp.getgrnam(nom).gr_gid
+    except KeyError:
+        return None
+
+
+def _dans_la_session(gid: int) -> bool:
+    """Le groupe vaut pour CE processus, donc pour cette session."""
+    return gid == os.getgid() or gid in os.getgroups()
+
+
+def _inscrit(nom: str, gid: int) -> bool:
+    """Le compte est membre du groupe dans /etc/group, session ouverte ou non."""
+    utilisateur = _current_user()
+    try:
+        primaire = pwd.getpwnam(utilisateur).pw_gid
+    except KeyError:
+        primaire = None
+    return primaire == gid or utilisateur in grp.getgrgid(gid).gr_mem
+
+
+def groupes_a_rejoindre(*, kvm_ok: bool) -> list[str]:
+    """Les groupes dont ce compte a besoin pour piloter l'hyperviseur sans sudo.
+
+    ``kvm`` seulement si ``/dev/kvm`` existe et reste fermé à ce compte : sur
+    AlmaLinux 10 il est ouvert à tous (0666), sur Ubuntu 24.04 il appartient au
+    groupe kvm (0660), mesuré le 2026-11-16. ``libvirt`` dès que libvirt est là,
+    ou attendu : avant l'installation, le groupe n'existe pas encore, mais il
+    sera créé par le paquet.
+    """
+    groupes: list[str] = []
+    device = _doctor()._KVM_DEVICE
+    if device.exists() and not os.access(device, os.R_OK | os.W_OK):
+        groupes.append("kvm")
+    gid = _gid("libvirt")
+    if (gid is None and not kvm_ok) or (gid is not None and not _dans_la_session(gid)):
+        groupes.append("libvirt")
+    return groupes
+
+
+def remede_groupes(groupes: list[str]) -> Remede | None:
+    return remede("groupes", _doctor()._systeme(), groupes=",".join(groupes))
+
+
+def _check_groupes(kvm_ok: bool) -> Check:
+    """Le compte peut-il parler à libvirt et ouvrir ``/dev/kvm`` sans sudo ?
+
+    Le groupe libvirt n'était jamais proposé : ``virsh`` sur l'URI système
+    restait alors refusé à l'utilisateur, et le parcours mesuré le 2026-11-16 a
+    dû le deviner. Trois cas, que la reconnexion distingue :
+
+    - groupe absent parce que libvirt n'est pas installé : contrôle en attente
+      de l'étape libvirt, avec la commande, pour qu'une passe suffise ;
+    - compte inscrit dans ``/etc/group`` mais session ouverte avant : rien à
+      relancer, seulement se reconnecter, et le dire évite de rejouer
+      ``usermod`` en boucle ;
+    - compte absent du groupe : ``usermod -aG``, puis reconnexion.
+    """
+    manquants = groupes_a_rejoindre(kvm_ok=kvm_ok)
+    if not manquants:
+        return _check("groupes", True, _("detail_groupes_ok"))
+    if _gid("libvirt") is None and not kvm_ok:
+        return _check(
+            "groupes", False, _("detail_groupes_apres_kvm", groups=", ".join(manquants)),
+            forced_state=STATE_UNKNOWN, apres="kvm", remede=remede_groupes(manquants),
+        )
+    a_inscrire = [
+        nom for nom in manquants
+        if (gid := _gid(nom)) is None or not _inscrit(nom, gid)
+    ]
+    if not a_inscrire:
+        return _check(
+            "groupes", False, _("detail_groupes_reconnexion", groups=", ".join(manquants)),
+            remede=Remede("groupes", (), root=False, reconnexion=True),
+        )
+    return _check(
+        "groupes", False, _("detail_groupes_manquants", groups=", ".join(a_inscrire)),
+        remede=remede_groupes(a_inscrire),
+    )
+
+
+# ── firmware EFI ──────────────────────────────────────────────────────────────
+
+def _check_efi(kvm_ok: bool) -> Check:
+    """Le firmware EFI sans Secure Boot que le template kvm désigne.
+
+    Jamais contrôlé jusqu'ici : ``provision`` échouait sur AlmaLinux 10 après
+    un ``doctor`` vert (issue #381). La découverte est celle que ``provision``
+    utilise, :func:`~dsoxlab.infra.libvirt.efi_loader`, pour que le diagnostic
+    mesure ce que la commande fera.
+    """
+    if not kvm_ok:
+        return _check(
+            "efi", False, _("detail_efi_apres_kvm"),
+            forced_state=STATE_UNKNOWN, apres="kvm",
+        )
+    try:
+        chargeur = libvirt_infra.efi_loader()
+    except Exception:  # noqa: BLE001 : un diagnostic ne casse pas la commande
+        chargeur = None
+    if chargeur:
+        return _check("efi", True, Path(chargeur).name)
+    return _check(
+        "efi", False, _("detail_efi_absent"),
+        remede=remede("efi", _doctor()._systeme()),
     )

@@ -234,8 +234,10 @@ def test_ansible_est_reparable_automatiquement(
 ) -> None:
     """`uv tool install ansible-core` est sûr et sans ambiguïté : --fix le joue.
 
-    Terraform, lui, ne porte qu'un `hint` : son installation passe par un dépôt
-    tiers, ce n'est pas à l'outil de la décider.
+    Terraform, lui, n'a pas de correctif sans shell : son installation passe
+    par le dépôt d'HashiCorp, et ses commandes viennent de la table des remèdes
+    (plus jamais un lien, refonte du 2026-11-16). `--fix` les confie au
+    playbook du poste, comme toute étape root.
     """
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     report = doctor.collect_checks(tmp_path, _repo(provider="kvm"))
@@ -245,33 +247,42 @@ def test_ansible_est_reparable_automatiquement(
     assert correctif is not None
     assert correctif.display == "uv tool install ansible-core"
     assert correctif.kind is doctor.FixKind.AUTOMATIC
-    assert par_label[_("check_terraform")].fix is None
-    assert "terraform" in (par_label[_("check_terraform")].hint or "")
+    terraform = par_label[_("check_terraform")]
+    assert terraform.fix is None
+    assert terraform.remede is not None and terraform.remede.root
+    assert any("install terraform" in ligne for ligne in terraform.remede.lignes)
 
 
-# ── les contrôles de configuration ne parlent qu'après l'installation ─────────
+# ── les contrôles de configuration attendent l'installation, sans disparaître ──
 
-def test_les_controles_kvm_se_taisent_si_virsh_manque(
+def test_les_controles_kvm_attendent_virsh_sans_disparaitre(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Trois lignes rouges pour une seule cause noient celle qui compte.
+    """Sans libvirt, le pool, le groupe et le firmware ne se mesurent pas.
 
-    Le contrôle du pool porte sur la CONFIGURATION d'un libvirt déjà installé :
-    l'afficher quand libvirt lui-même manque n'apprend rien.
+    Avant la refonte du 2026-11-16, ils disparaissaient, et chaque passage de
+    `doctor` en révélait un de plus. Ils restent listés, en `unknown`, liés à
+    l'étape kvm : ni rouge (rien n'est prouvé), ni caché. Le pool garde sa
+    commande, pour qu'une seule passe de `--fix` fasse tout.
     """
     monkeypatch.setattr(
         doctor, "_hypervisor_checks",
         lambda: {
-            "kvm": doctor._check("kvm", False, "not found", fix="apt install"),
+            "kvm": doctor._check("kvm", False, "not found"),
             "incus": doctor._check("incus", True, "ok"),
         },
     )
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     report = doctor.collect_checks(tmp_path, _repo(provider="kvm"))
 
-    requis = _labels(report.required)
-    assert _("check_kvm") in requis
-    assert _("check_libvirt_pool") not in requis
+    par_cle = {c.key: c for c in report.required}
+    assert not par_cle["kvm"].ok
+    for cle in ("libvirt_pool", "efi"):
+        assert par_cle[cle].state == doctor.STATE_UNKNOWN, cle
+        assert par_cle[cle].apres == "kvm", cle
+    assert par_cle["libvirt_pool"].remede is not None
+    # Rien de ce qui attend ne compte comme un échec : seul kvm est rouge.
+    assert "libvirt_pool" not in {c.key for c in report.failing()}
 
 
 def test_les_controles_kvm_apparaissent_une_fois_virsh_present(
@@ -350,12 +361,14 @@ def test_sans_provider_choisi_le_tableau_ne_dit_plus_non_requis(
     ne bloquent rien », au-dessus des deux hyperviseurs dont l'un est
     indispensable pour jouer 64 labs sur 84.
 
-    Les checks restent hors du requis, sans quoi `--fix` proposerait
-    d'installer kvm ET incus pour un choix qui n'est pas fait : c'est le
-    libellé qui devait changer.
+    Le cas vaut encore quand aucun hyperviseur local n'est candidat au
+    diagnostic (ici, deux candidats distants) : les
+    checks restent hors du requis, sans quoi `--fix` proposerait d'installer
+    kvm ET incus pour un choix qui n'est pas fait.
     """
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", tmp_path / "absent")
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
-    report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
+    report = doctor.collect_checks(tmp_path, _repo(candidates=["outscale", "none"]))
 
     assert report.optional_title_key == "doctor_choose_title"
     assert report.optional_hint_key == "doctor_choose_hint"

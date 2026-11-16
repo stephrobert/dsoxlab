@@ -12,7 +12,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from rich import box
 from rich.console import Console
 from rich.errors import MarkupError
 from rich.padding import Padding
@@ -30,9 +29,6 @@ from ..security.urls import URLRefusee, url_sure
 from ..services.audit_pedagogique import RapportPedagogique
 from ..services.catalog import CatalogueConnu, CatalogueInstalle
 from ..services.doctor import (
-    STATE_CHOICE_REQUIRED,
-    STATE_UNKNOWN,
-    Check,
     DoctorReport,
 )
 from ..services.infra_state_service import EtatHote, EtatInfra
@@ -612,65 +608,6 @@ def print_structure_reports(reports: list[StructureReport]) -> None:
 
 # ── doctor ────────────────────────────────────────────────────────────────────
 
-def _libelle_statut(check: Check, *, blocking: bool) -> str:
-    """Le mot qui rend l'état d'un contrôle, dans la langue du lecteur.
-
-    L'état, lui, est un jeton stable porté par le contrôle. Un composant
-    informatif absent n'est pas un échec, et le vocabulaire change donc de
-    tableau ; ce qu'une intégration lit, elle, ne change jamais.
-    """
-    if check.state == STATE_CHOICE_REQUIRED:
-        return _("status_choose")
-    if check.state == STATE_UNKNOWN:
-        # Rien mesuré : ni le vert qui rassure à tort, ni le rouge qui accuse
-        # sans preuve. Le mot le dit dans les deux tableaux.
-        return _("status_unknown")
-    if blocking:
-        return _("status_ok") if check.ok else _("status_ko")
-    return _("status_present") if check.ok else _("status_absent")
-
-
-def _doctor_table(title: str, checks: list[Check], *, blocking: bool) -> Table:
-    """Un tableau de checks.
-
-    ``blocking=False`` change le vocabulaire du statut : un composant
-    informatif absent n'est pas un échec, et l'afficher en rouge est
-    précisément ce qui décourageait au premier lancement.
-    """
-    # La colonne de remédiation n'existe que s'il y a quelque chose à remédier.
-    # Sur un poste sain, elle était vide de haut en bas et prenait pourtant sa
-    # part de largeur : à 80 colonnes, le détail était alors tronqué, et c'est
-    # lui qui porte la version trouvée et le chemin du composant. Une colonne
-    # entièrement vide ne dit rien, et elle coûtait la seule information utile.
-    avec_remediation = any(not check.ok and check.remediation for check in checks)
-
-    # `SIMPLE_HEAD` plutôt que le cadre plein : vingt lignes de filets verticaux
-    # pour un diagnostic qui est vert de haut en bas, c'est du bruit qui occupe
-    # six colonnes et attire l'œil là où il n'y a rien à voir. Un trait sous
-    # l'en-tête suffit à dire « tableau ».
-    table = Table(title=title, show_header=True, box=box.SIMPLE_HEAD, pad_edge=False)
-    table.add_column(_('col_component'))
-    # Le statut tient en un signe. « ✔ OK » disait deux fois la même chose, et
-    # prenait cinq colonnes au détail, qui porte la version et le chemin.
-    table.add_column(_('col_status'), justify="center", no_wrap=True)
-    table.add_column(_('col_detail'), overflow="fold")
-    if avec_remediation:
-        # `fold` plutôt que le repli par mots : une remédiation est une
-        # commande, et une commande porte des chemins. Rich ne coupe pas un
-        # mot plus long que la colonne, il le tronque par un « … » — et une
-        # commande tronquée ne se copie pas, donc ne répare rien. Mesuré sur
-        # `ansible-galaxy collection install -r <chemin absolu>`.
-        table.add_column(_('col_remediation'), overflow="fold")
-
-    for check in checks:
-        status = _libelle_statut(check, blocking=blocking)
-        cellules = [check.label, status, check.detail]
-        if avec_remediation:
-            cellules.append("" if check.ok else f"[dim]{check.remediation}[/dim]")
-        table.add_row(*cellules)
-    return table
-
-
 def print_infra_status(etat: EtatInfra) -> None:
     """Qui répond, qui ne répond pas, et pourquoi.
 
@@ -968,27 +905,11 @@ def print_lab_state(etat: LabState) -> None:
                         border_style=teinte, expand=False))
 
 
-def print_doctor(report: DoctorReport) -> None:
-    """Affiche le diagnostic : ce qui bloque, puis ce qui informe."""
-    console.print(_doctor_table(
-        _('doctor_table_title'), report.required, blocking=True,
-    ))
+def print_doctor(report: DoctorReport, *, verbose: bool = False) -> None:
+    """Affiche le diagnostic en étapes numérotées (voir ``doctor_rendu``)."""
+    from .doctor_rendu import print_doctor as rendre
 
-    if report.optional:
-        # Titre et pied viennent du rapport : « non requis ici » est faux quand
-        # le dépôt a des labs vm et qu'aucun provider n'est encore choisi.
-        console.print(_doctor_table(
-            _(report.optional_title_key), report.optional, blocking=False,
-        ))
-        console.print(f"[dim]{_(report.optional_hint_key)}[/dim]")
-
-    for note in report.notes:
-        console.print(f"[cyan]ℹ[/cyan] {note}")
-
-    if report.fixable():
-        console.print(f"[yellow]{_('doctor_fix_hint')}[/yellow]")
-    elif report.failing():
-        console.print(f"[yellow]{_('doctor_manual_hint')}[/yellow]")
+    rendre(report, verbose=verbose)
 
 
 # ── messages simples ──────────────────────────────────────────────────────────

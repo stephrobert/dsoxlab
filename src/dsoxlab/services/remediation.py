@@ -1,129 +1,222 @@
-"""Ce que ``doctor --fix`` va jouer, et ce qui l'en empêche.
+"""Ce que ``doctor --fix`` va jouer, dans quel ordre, et par quel moyen.
 
-La décision et l'exécution vivaient dans la commande, qui pesait 56 de
-complexité cognitive pour 121 lignes : elle partageait les correctifs en deux
-familles, vérifiait les préconditions de sudo, lançait la cascade, classait
-chaque sortie, puis rejugeait le tout pour ``--strict``. Rien de cela n'est du
-câblage, et rien n'était joignable par un test sans passer par la CLI.
+Refondu le 2026-11-16 avec le diagnostic en étapes (maquettes validées). Quatre
+règles portent le module, et chacune vient d'un défaut mesuré :
 
-Trois règles portent tout le module, et chacune vient d'un défaut constaté :
+1. **Le plan se lit en entier avant toute action**, et rien ne part sans
+   ``[y/N]`` ou ``--yes``. Sans terminal et sans ``--yes``, rien n'est lancé.
+2. **Une étape root n'est jamais lancée en silence.** Elles passent toutes par
+   un playbook généré depuis la table des remèdes, joué par ``ansible-playbook
+   --ask-become-pass -c local`` : une seule demande de mot de passe, faite par
+   Ansible. Sans terminal, elles s'affichent en bloc à coller (décision 2).
+3. **Chaque étape est revérifiée juste après, et la première qui échoue
+   arrête tout.** L'ancienne règle (« un échec n'arrête pas la cascade »)
+   lançait des étapes qui dépendaient de celle qui venait d'échouer : un pool
+   créé sans libvirt, des collections sans Ansible.
+4. **Un succès à effet différé le dit.** Un ``usermod -aG`` réussi ne vaut
+   qu'après une reconnexion : sans ce message, le ``doctor`` suivant ressemble
+   à un échec.
 
-1. **Un correctif ``MANUAL`` n'est jamais exécuté.** Le geste appartient à
-   l'humain ; ``--fix`` se contente de le nommer.
-2. **Un échec n'arrête pas la cascade.** ``--fix`` répare plusieurs choses
-   indépendantes : lever sur la première qui rate abandonnerait les autres.
-3. **Un succès à effet différé le dit.** Un ``usermod -aG`` réussi laisse la
-   ligne rouge jusqu'à la reconnexion. Sans ce message, l'utilisateur relance
-   ``doctor``, revoit le même rouge, et conclut que le correctif a échoué.
+Docker et Incus, quand le catalogue ne les exige pas, n'entrent dans le plan
+qu'avec ``--clients`` (décision 1).
 """
 
 from __future__ import annotations
 
-import shutil
-import sys
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+import os
+import re
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
 
 from .doctor import DoctorReport, Fix, FixKind
+from .doctor_controles.modele import STATE_OK, Check
+from .doctor_etapes import Etape, construire
 
-#: Signature d'un exécuteur de correctif : il rend le code de retour. Elle est
-#: injectable pour que les tests décrivent une cascade sans toucher la machine,
-#: ce que l'ancienne forme interdisait.
+#: Signature d'un exécuteur de correctif sans shell : il rend le code de retour.
+#: Injectable, pour que les tests décrivent une cascade sans toucher la machine.
 Executeur = Callable[[Fix], int]
 
+#: Une étape que dsoxlab fait lui-même, sans commande externe : choisir le
+#: provider, créer la clé du catalogue, ajouter la ligne Include. Rend ``None``
+#: en cas de succès, le message d'échec sinon.
+Action = Callable[[], str | None]
 
-@dataclass(frozen=True)
+
+@dataclass
 class PlanCorrection:
-    """Les correctifs disponibles, rangés par ce qu'on a le droit d'en faire."""
+    """Les étapes de ``--fix``, rangées par ce qu'on a le droit d'en faire."""
 
-    manuels: tuple[tuple[str, Fix], ...] = ()
-    executables: tuple[tuple[str, Fix], ...] = ()
+    sans_sudo: list[Etape] = field(default_factory=list)
+    """Lancées par dsoxlab, sans privilège."""
+
+    root: list[Etape] = field(default_factory=list)
+    """Confiées au playbook du poste."""
+
+    manuelles: list[Etape] = field(default_factory=list)
+    """Jamais lancées : dsoxlab les nomme, l'humain les fait."""
 
     @property
     def vide(self) -> bool:
-        return not self.manuels and not self.executables
+        return not (self.sans_sudo or self.root or self.manuelles)
 
     @property
-    def correctifs_sudo(self) -> int:
-        return sum(1 for _label, fix in self.executables if fix.requires_sudo)
+    def executables(self) -> int:
+        return len(self.sans_sudo) + len(self.root)
+
+
+def _correctif(etape: Etape) -> Fix | None:
+    """Le correctif sans shell d'une étape, s'il en existe un."""
+    return next((c.fix for c in etape.controles if c.fix is not None), None)
+
+
+def _est_manuelle(etape: Etape, actions: dict[str, Action]) -> bool:
+    if etape.manuelle:
+        return True
+    correctif = _correctif(etape)
+    if correctif is not None and correctif.kind is FixKind.MANUAL:
+        return True
+    if etape.remede is not None and etape.remede.root:
+        return False
+    return etape.cle not in actions and correctif is None
+
+
+def planifier(
+    report: DoctorReport, *, clients: bool = False, actions: dict[str, Action] | None = None,
+) -> PlanCorrection:
+    """Partage les étapes du diagnostic entre « à lancer », « au playbook », « à dire »."""
+    actions = actions or {}
+    etapes = construire(report)
+    plan = PlanCorrection()
+    toutes = etapes.etapes + (etapes.facultatives if clients else [])
+    for etape in toutes:
+        if _est_manuelle(etape, actions):
+            plan.manuelles.append(etape)
+        elif etape.remede is not None and etape.remede.root:
+            plan.root.append(etape)
+        else:
+            plan.sans_sudo.append(etape)
+    return plan
+
+
+# ── le playbook du poste ──────────────────────────────────────────────────────
+
+#: ``sudo`` en tête de commande, ou après un tube ou un ``&&`` : le playbook
+#: tourne déjà en root (``become``), le préfixe n'a plus d'objet.
+_SUDO = re.compile(r"(^|[|&;]\s*|\s)sudo\s+")
+
+#: ``apt install`` ou ``dnf install`` sans ``-y`` attend une réponse qu'aucun
+#: playbook ne donnera : le paquet n'est jamais installé.
+_INSTALL = re.compile(r"\b(apt|apt-get|dnf|yum)\s+install\b(?!\s+-y)")
+
+#: Un nom de compte, tel que ``useradd`` l'accepte : rien d'autre n'entre
+#: dans une commande jouée en root.
+_COMPTE = re.compile(r"^[a-z_][a-z0-9_-]*[$]?$")
+
+
+def lignes_root(lignes: tuple[str, ...], utilisateur: str) -> str:
+    """Les lignes d'un remède, telles que le playbook les joue en root.
+
+    Trois transformations, et aucune autre : ``sudo`` retiré (le playbook est
+    déjà root), ``-y`` ajouté aux installations, et ``$USER`` remplacé par le
+    compte de l'apprenant. Sous ``become``, ``$USER`` vaudrait ``root`` :
+    ``usermod -aG libvirt $USER`` ajouterait root au groupe, et rien ne
+    changerait pour l'apprenant.
+    """
+    if not _COMPTE.match(utilisateur):
+        msg = f"refusing an unusual account name in a root command: {utilisateur!r}"
+        raise ValueError(msg)
+    jouees = []
+    for ligne in lignes:
+        sans_sudo = _SUDO.sub(lambda m: m.group(1), ligne)
+        sans_question = _INSTALL.sub(lambda m: f"{m.group(0)} -y", sans_sudo)
+        jouees.append(sans_question.replace("$USER", utilisateur))
+    return "\n".join(["set -e", *jouees]) + "\n"
+
+
+def playbook_du_poste(etapes: list[Etape], utilisateur: str) -> str:
+    """Le playbook qui joue les étapes root, une tâche par étape, dans l'ordre.
+
+    Généré depuis la table des remèdes, jamais écrit à la main : ce qu'il joue
+    est exactement ce que ``doctor`` affiche, aux trois transformations près de
+    :func:`lignes_root`.
+    """
+    taches = []
+    for etape in etapes:
+        assert etape.remede is not None
+        taches.append({
+            "name": f"{etape.numero}. {etape.cle}",
+            "ansible.builtin.shell": lignes_root(etape.remede.lignes, utilisateur),
+            "args": {"executable": "/bin/bash"},
+            "environment": {"DEBIAN_FRONTEND": "noninteractive"},
+            "tags": [etape.remede.tag or etape.cle],
+        })
+    jeu = [{
+        "name": "dsoxlab doctor --fix",
+        "hosts": "localhost",
+        "gather_facts": False,
+        "become": True,
+        # Sans cette variable, Ansible avertit qu'il a « découvert » python3 :
+        # vrai, sans objet ici, et c'est la seule ligne jaune que l'apprenant
+        # voyait (réévaluation du 2026-11-16 sur AlmaLinux 10).
+        "vars": {"ansible_python_interpreter": "auto_silent"},
+        "tasks": taches,
+    }]
+    return yaml.safe_dump(jeu, sort_keys=False, allow_unicode=True, width=1000)
+
+
+def chemin_du_playbook() -> Path:
+    base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    return base / "dsoxlab" / "poste.yml"
+
+
+# ── revérification ────────────────────────────────────────────────────────────
+
+def _reussi(check: Check) -> bool:
+    """Un contrôle revenu au vert, ou qui n'attend plus qu'une reconnexion."""
+    if check.state == STATE_OK:
+        return True
+    remede = check.remede
+    return remede is not None and remede.reconnexion and not remede.lignes
+
+
+def etape_verifiee(etape: Etape, apres: DoctorReport) -> bool:
+    """L'étape a-t-elle produit son effet ? On le lit dans un diagnostic refait.
+
+    Un code de retour nul ne suffit pas : ``apt install`` sort en 0 sur un
+    paquet déjà présent qui ne règle rien, et un ``uv tool install`` peut
+    poser un binaire hors du PATH. C'est le contrôle qui fait foi.
+    """
+    cles = {c.key for c in etape.controles}
+    nouveaux = [c for c in [*apres.required, *apres.optional] if c.key in cles]
+    return bool(nouveaux) and all(_reussi(c) for c in nouveaux)
 
 
 @dataclass(frozen=True)
 class Application:
-    """Un correctif joué, et ce qu'il faut en dire."""
+    """Une étape jouée, et ce qu'il faut en dire."""
 
-    label: str
+    etape: Etape
     code: int
-    kind: FixKind
+    verifiee: bool
+    message: str | None = None
 
     @property
     def ok(self) -> bool:
-        return self.code == 0
+        return self.code == 0 and self.verifiee
 
     @property
     def avis_differe(self) -> str | None:
         """La clé du message à afficher quand l'effet n'est pas immédiat."""
         if not self.ok:
             return None
-        if self.kind is FixKind.NEEDS_RELOGIN:
+        if self.etape.remede is not None and self.etape.remede.reconnexion:
             return "fix_needs_relogin"
-        if self.kind is FixKind.NEEDS_REBOOT:
+        correctif = _correctif(self.etape)
+        if correctif is not None and correctif.kind is FixKind.NEEDS_RELOGIN:
+            return "fix_needs_relogin"
+        if correctif is not None and correctif.kind is FixKind.NEEDS_REBOOT:
             return "fix_needs_reboot"
         return None
-
-
-def planifier(report: DoctorReport) -> PlanCorrection:
-    """Partage les correctifs du rapport entre « à dire » et « à jouer »."""
-    manuels: list[tuple[str, Fix]] = []
-    executables: list[tuple[str, Fix]] = []
-    for controle in report.fixable():
-        if controle.fix is None:
-            continue
-        cible = manuels if controle.fix.kind is FixKind.MANUAL else executables
-        cible.append((controle.label, controle.fix))
-    return PlanCorrection(tuple(manuels), tuple(executables))
-
-
-def obstacle(plan: PlanCorrection, *, interactif: bool | None = None) -> str | None:
-    """La clé du message qui empêche la cascade, ou ``None`` si la voie est libre.
-
-    Un correctif par sudo a besoin d'un terminal pour demander le mot de passe,
-    et de ``sudo`` lui-même. Les deux se vérifient **avant** d'en jouer un seul :
-    échouer au milieu d'une cascade laisse la machine dans un état que personne
-    n'a décrit.
-    """
-    if not plan.correctifs_sudo:
-        return None
-    if interactif is None:
-        interactif = sys.stdin.isatty()
-    if not interactif:
-        return "fix_needs_tty"
-    if shutil.which("sudo") is None:
-        return "fix_no_sudo"
-    return None
-
-
-def appliquer(
-    executables: Iterable[tuple[str, Fix]],
-    executer: Executeur,
-    *,
-    sur_debut: Callable[[str, Fix], None] | None = None,
-    sur_resultat: Callable[[Application], None] | None = None,
-) -> list[Application]:
-    """Joue la cascade entière, sans jamais s'arrêter sur un échec.
-
-    Les deux rappels encadrent chaque correctif, pour que l'appelant rende au
-    fil de l'eau : ``sur_debut`` nomme la commande avant qu'elle parte, puisque
-    sa sortie va arriver sur le terminal sans rien pour l'annoncer, et
-    ``sur_resultat`` dit ce qu'elle a donné. Une cascade de dix correctifs qui
-    n'afficherait rien avant la fin donnerait l'impression d'avoir gelé.
-    """
-    resultats: list[Application] = []
-    for label, fix in executables:
-        if sur_debut is not None:
-            sur_debut(label, fix)
-        application = Application(label=label, code=executer(fix), kind=fix.kind)
-        resultats.append(application)
-        if sur_resultat is not None:
-            sur_resultat(application)
-    return resultats

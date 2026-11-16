@@ -50,6 +50,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`dsoxlab doctor` guides you to the end: every missing step at once, in
+  order, each command ready to paste.** Two empty machines measured on
+  2026-11-16 (Ubuntu 24.04 and AlmaLinux 10) needed `doctor` to be run again
+  after each gesture to discover the next one, and `provision` still failed
+  after a green `doctor`. The diagnosis now:
+  - prints **numbered steps** in dependency order (git, provider, libvirt,
+    groups, pool, EFI firmware, Terraform, Ansible, collections, catalogue
+    SSH key, `~/.ssh/config` Include), each command alone on its line instead
+    of cut inside a table cell, then « Good to know », what is ready, and the
+    single command `dsoxlab doctor --fix`;
+  - **hides no check**: without libvirt, the pool, the groups and the firmware
+    stay listed, "do step N first"; with no provider chosen, it diagnoses
+    with the recommended one (kvm on a Linux exposing `/dev/kvm`) without
+    recording it;
+  - **checks four new things** that made `provision` or `ssh` fail: the
+    catalogue SSH key, the `Include` line of `~/.ssh/config`, the EFI firmware
+    (issue #381), and the `kvm`/`libvirt` groups, telling "log in again" apart
+    from "join the group";
+  - **gives commands, not links**, read from one table per distribution family
+    (`/etc/os-release`): git, Terraform and Docker from their official
+    repositories, `systemctl enable --now libvirtd` instead of `start`, which
+    did not survive a reboot, and no `dnf install incus` on the RHEL family,
+    where no base repository has it;
+  - with `-v`, shows every check and the warnings on green lines (a Terraform
+    older than the latest release).
+- **`doctor --fix` shows its plan and asks first.** Nothing runs without
+  `[y/N]` or `--yes`; without a terminal and without `--yes`, nothing runs
+  (exit 1). Steps without sudo are run by dsoxlab; sudo steps all go through
+  one `ansible-playbook --ask-become-pass -c local` run, generated from the
+  same table as the display, which asks for the password once; without a
+  terminal they are printed to paste. Ansible is installed first
+  (`uv tool install ansible-core`). Each step is checked again by a fresh
+  diagnosis, and **the first failure stops everything**, naming the remaining
+  steps: the old cascade went on, creating a pool without libvirt. Docker and
+  Incus, when the catalogue does not need them, only come with `--clients`.
+- **A memory too small for the whole catalogue no longer blocks.** It moves
+  to « Good to know » with `dsoxlab provision --host <machine>`, and to
+  `informational` in `--json`: `doctor --strict` no longer exits 9 for it.
+  `start <lab>` still blocks on the memory its own lab needs.
+- `doctor --json` gains three fields per check, nothing removed: `commands`
+  (the lines to paste), `after` (the check to repair first) and `warning`.
+  `fix` no longer carries the commands that need a shell (Terraform, Docker):
+  read `commands`. Exit codes are unchanged.
+- The installation section of `docs/learner.md` gives the same commands as
+  the diagnosis, with `sudo`, for Debian/Ubuntu and the RHEL family; a test
+  keeps it word for word in line with the table.
+
 - **Provisioned machines no longer start with the host, unless the catalogue
   asks** (issue #377). The kvm and incus templates set autostart on every
   machine, with no way out: when a training machine rebooted on 2026-11-16,

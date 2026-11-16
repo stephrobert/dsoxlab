@@ -985,11 +985,18 @@ Chaque lab déclare :
     [dim]--json[/dim]               Chaque anomalie avec la clé de sa règle, en document.
                        Même code de retour : 1 dès qu'un lab échoue.
 
-  [cyan]doctor[/cyan]               Diagnostique l'environnement. Le tableau [bold]Requis[/bold] liste ce qui
-                       bloque ce dépôt-ci ; un hyperviseur inutile ici reste
-                       [bold]Informatif[/bold] et ne s'affiche jamais en erreur.
-    [dim]--fix[/dim]                Applique la remédiation des composants requis manquants.
-                       Les composants informatifs ne sont pas touchés.
+  [cyan]doctor[/cyan]               Diagnostique l'environnement : toutes les étapes qui
+                       manquent d'un coup, numérotées dans l'ordre où les faire,
+                       chaque commande seule sur sa ligne, prête à coller. Un
+                       composant dont ce dépôt n'a pas besoin reste facultatif
+                       et ne s'affiche jamais en erreur.
+    [dim]--fix[/dim]                Affiche le plan, puis le lance une fois confirmé : les
+                       étapes sans sudo par dsoxlab, celles avec sudo par un seul
+                       ansible-playbook qui demande votre mot de passe une fois.
+                       Chaque étape est revérifiée ; le premier échec arrête tout.
+    [dim]--yes[/dim]                Lance le plan sans demander (nécessaire sans terminal).
+    [dim]--clients[/dim]            Avec --fix, installe aussi Docker et Incus facultatifs.
+    [dim]-v[/dim]                   Chaque contrôle, et les mises en garde des lignes vertes.
     [dim]--json[/dim]               Le diagnostic en document, chaque contrôle portant
                        une clé et un état stables. Pas avec [bold]--fix[/bold].
     [dim]--strict[/dim]             Traduit le diagnostic en code de sortie, pour un script :
@@ -1552,6 +1559,59 @@ hors ligne, elle se tait.
     "check_tf_providers": "Providers Terraform",
     "check_ansible":      "ansible-playbook",
     "check_collections":  "Collections Ansible",
+    "etape_git": 'Installer git',
+    "etape_provider": 'Choisir le provider des machines',
+    "etape_kvm": 'Installer libvirt et QEMU',
+    "etape_libvirtd": 'Démarrer libvirt, maintenant et à chaque démarrage',
+    "etape_groupes": "Donner à votre compte l'accès à l'hyperviseur, puis vous reconnecter",
+    "etape_libvirt_pool": 'Créer le pool de disques de libvirt',
+    "etape_efi": 'Installer le firmware EFI des machines',
+    "etape_terraform": "Installer Terraform, depuis le dépôt officiel d'HashiCorp",
+    "etape_ansible": 'Installer Ansible',
+    "etape_collections": 'Installer les collections Ansible du catalogue',
+    "etape_cle_ssh": 'Créer la clé SSH du catalogue',
+    "etape_ssh_include": 'Faire lire à ssh les fragments de dsoxlab',
+    "etape_incus": 'Installer Incus',
+    "etape_docker": 'Installer Docker, depuis le dépôt officiel de Docker',
+    "etape_labs": 'Récupérer un catalogue',
+    "etape_reparer": 'Réparer : {label}',
+    "doctor_entete_catalogue": 'catalogue {id}',
+    "doctor_entete_labs": '{count} labs',
+    "doctor_entete_labs_1": '1 lab',
+    "doctor_entete_sans_catalogue": 'aucun catalogue ici',
+    "doctor_entete_provider": 'provider {provider}',
+    "doctor_entete_provider_a_confirmer": 'provider {provider} (à confirmer, étape {step})',
+    "doctor_n_etapes": '{count} étapes manquent. Faites-les dans cet ordre.',
+    "doctor_n_etapes_1": '1 étape manque.',
+    "doctor_etape_apres": "(faire l'étape {step} d'abord)",
+    "doctor_etape_reconnexion": 'Puis fermez votre session et rouvrez-la.',
+    "doctor_a_savoir_titre": 'À savoir (aucune commande ne le corrige)',
+    "doctor_a_savoir_une_machine": 'Montez seulement la machine du lab que vous jouez :',
+    "doctor_non_mesure": '? Non mesuré : {label} ({detail}). Relancez dsoxlab doctor.',
+    "doctor_deja_pret": 'Déjà prêt : {items}',
+    "doctor_tout_pret": 'Tout est prêt. {count} contrôles requis passent.',
+    "doctor_tout_pret_1": 'Tout est prêt. 1 contrôle requis passe.',
+    "doctor_facultatif_installe": 'Facultatif ici, installé : {items}',
+    "doctor_facultatif_absent": 'Facultatif ici : {items}. Les installer aussi : dsoxlab doctor --fix --clients',
+    "doctor_mises_en_garde": '{count} mises en garde sur des lignes vertes : dsoxlab doctor -v',
+    "doctor_mises_en_garde_1": '1 mise en garde sur une ligne verte : dsoxlab doctor -v',
+    "doctor_tout_corriger": "Tout corriger d'un coup :",
+    "check_groupes": 'Groupes kvm et libvirt',
+    "check_efi": 'Firmware EFI',
+    "check_cle_ssh": 'Clé SSH du catalogue',
+    "check_ssh_include": 'Include de ~/.ssh/config',
+    "detail_terraform_depasse": "Une version plus récente existe ({latest}). Elle n'est pas exigée.",
+    "detail_collections_apres_ansible": '{count} collection(s) exigée(s) : contrôlées une fois Ansible installé',
+    "detail_groupes_ok": 'votre compte peut parler à libvirt et ouvrir /dev/kvm',
+    "detail_groupes_apres_kvm": 'groupes à rejoindre une fois libvirt installé : {groups}',
+    "detail_groupes_reconnexion": 'vous êtes dans {groups}, mais cette session a été ouverte avant : déconnectez-vous puis reconnectez-vous',
+    "detail_groupes_manquants": "votre compte n'est pas dans {groups} : libvirt le refuse sans sudo",
+    "detail_efi_apres_kvm": 'contrôlé une fois libvirt installé',
+    "detail_efi_absent": 'aucun firmware EFI sans Secure Boot trouvé : provision ne peut démarrer aucune machine',
+    "detail_incus_sans_paquet": 'introuvable, et absent des dépôts de base de cette distribution',
+    "detail_cle_ssh_absente": '{path} manque : provision ne peut poser aucune clé sur les machines',
+    "detail_ssh_include_absent": '~/.ssh/config ne lit pas ~/.ssh/config.d/ : `ssh <machine>` échouera',
+    "detail_pool_apres_kvm": 'pool « {pool} » contrôlé une fois libvirt installé',
     "check_libvirt_pool": "Pool libvirt",
     "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs détectés",
@@ -1598,7 +1658,7 @@ hors ligne, elle se tait.
         "{providers} (épinglés par terraform init)",
     "detail_tf_providers_absents":
         "aucun provider épinglé : provision n'a pas encore tourné pour ce dépôt.",
-    "detail_kvm_missing":    "introuvable",
+    "detail_kvm_missing":    "virsh introuvable : provision ne peut créer aucune machine",
     "detail_pytest_missing": "introuvable",
     "detail_pytest_bundled": "embarqué avec dsoxlab",
     "detail_pytest_via":     "via {cmd}",
@@ -1763,20 +1823,32 @@ hors ligne, elle se tait.
         "écrivent sur la sortie standard, et le document en deviendrait "
         "illisible. Lancez `dsoxlab doctor --json` pour lire le diagnostic, "
         "puis `dsoxlab doctor --fix` pour agir dessus.",
-    "fix_count":   "{count} composant(s) à corriger…",
-    "fix_needs_tty":
-        "Au moins une remédiation exige sudo, mais ce shell n'est pas "
-        "interactif (pas de TTY). Lancez dsoxlab depuis un terminal, ou "
-        "appliquez les commandes à la main.",
-    "fix_no_sudo": "sudo introuvable dans le PATH : remédiation impossible.",
-    "fix_sudo_preauth":
-        "[bold]{count}[/bold] commande(s) nécessitent sudo. "
-        "Pré-authentification ci-dessous (un seul prompt pour toute la cascade) :",
-    "fix_sudo_failed": "Pré-authentification sudo échouée : remédiations abandonnées.",
-    "fix_success": "{label} : remédiation réussie.",
-    "fix_manual":
-        "{label} : geste manuel, affiché mais jamais exécuté automatiquement "
-        "→ {command}",
+    "opt_doctor_yes": 'Avec --fix : lancer le plan sans demander de confirmation',
+    "opt_doctor_clients": 'Avec --fix : installer aussi les composants facultatifs (Docker, Incus)',
+    "opt_doctor_verbose": 'Montrer chaque contrôle, et les mises en garde des lignes vertes',
+    "fix_plan_titre": 'Plan : {count} étape(s). Chacune est revérifiée juste après ; arrêt au premier échec.',
+    "fix_plan_sans_sudo": 'Sans sudo, lancées par dsoxlab :',
+    "fix_plan_root": 'Avec sudo, par le playbook du poste (ansible-playbook vous demandera votre mot de passe sudo une fois) :',
+    "fix_plan_reconnexion": '(reconnexion nécessaire ensuite)',
+    "fix_plan_manuelles": 'À faire vous-même (jamais lancé automatiquement) :',
+    "fix_plan_a_savoir": 'Non traité : {label} (voir « À savoir »).',
+    "fix_rien_a_lancer": 'Rien que --fix puisse lancer : les étapes restantes sont à faire vous-même (voir plus haut).',
+    "fix_needs_yes": "Rien n'a été lancé : ce shell n'a pas de terminal pour confirmer le plan. Ajoutez --yes pour le lancer.",
+    "fix_confirmer": 'Lancer ces {count} étape(s) ?',
+    "fix_annule": "Rien n'a été lancé.",
+    "fix_pas_d_ansible": "ansible-playbook n'est pas disponible : les étapes avec sudo sont affichées ci-dessous, à coller dans un terminal.",
+    "fix_playbook": 'Playbook du poste écrit dans {path}',
+    "fix_etape_ok": '{step}. {label} : fait, revérifié.',
+    "fix_etape_ko": '{step}. {label} : échec (code {code}).',
+    "fix_etape_non_verifiee": "{step}. {label} : la commande a réussi, mais le contrôle n'est toujours pas vert.",
+    "fix_arret": 'Arrêt. Restent les étapes : {steps}. Corrigez la cause, puis relancez : dsoxlab doctor --fix',
+    "fix_bloc_root": 'Collez ces étapes avec sudo dans un terminal, dans cet ordre :',
+    "fix_reconnexion_finale": "Reconnectez-vous avant de relancer doctor : les groupes kvm et libvirt ne valent qu'après une nouvelle session.",
+    "fix_plan_ansible_d_abord": "Ansible est installé d'abord, sans sudo : uv tool install ansible-core",
+    "fix_installe_ansible": "Installation d'Ansible d'abord (uv tool install ansible-core) : le playbook du poste en a besoin.",
+    "fix_plan_reverifiees": "Revérifiés après le playbook (ils l'attendaient) :",
+    "fix_attendue_ok": '{step}. {label} : contrôlé après le playbook, prêt.',
+    "fix_attendue_ko": '{step}. {label} : manque encore après le playbook : lancez dsoxlab doctor pour savoir quoi faire.',
     "fix_needs_relogin":
         "{label} : corrigé, mais le changement ne prend effet qu'après une "
         "déconnexion puis une reconnexion. Cette ligne restera rouge d'ici "
@@ -1785,7 +1857,6 @@ hors ligne, elle se tait.
         "{label} : corrigé, mais le changement ne prend effet qu'après un "
         "redémarrage. Cette ligne restera rouge d'ici là ; ce n'est pas un "
         "échec.",
-    "fix_failure": "{label} : échec de la remédiation (code {code}).",
     "fix_rerun":   "Relancez [bold]dsoxlab doctor[/bold] pour vérifier.",
 
     # ── console — tableau des labs ────────────────────────────────────────────

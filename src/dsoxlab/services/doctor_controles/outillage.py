@@ -15,6 +15,7 @@ from ...i18n import _
 from ...infra import ansible as ansible_infra
 from ...models import RepoMetadata
 from .modele import STATE_UNKNOWN, Check, _check, _doctor, _fix, _installer
+from .remedes import remede
 
 # ── checks unitaires ──────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ def _check_terraform() -> Check:
     if shutil.which("terraform") is None:
         return _check(
             "terraform", False, _("detail_terraform_missing"),
-            hint="https://developer.hashicorp.com/terraform/install",
+            remede=remede("terraform", _doctor()._systeme()),
         )
     # Le binaire peut être dans le PATH sans être exécutable, ou disparaître
     # entre les deux appels. Un diagnostic qui plante en cherchant à
@@ -82,7 +83,7 @@ def _check_terraform() -> Check:
     if result is None:
         return _check(
             "terraform", False, _("detail_terraform_missing"),
-            hint="https://developer.hashicorp.com/terraform/install",
+            remede=remede("terraform", _doctor()._systeme()),
         )
     # Un terraform présent mais qui sort en erreur passait pour vert : le code
     # retour n'était pas lu, et « ok » s'affichait faute de stdout. `provision`
@@ -92,10 +93,27 @@ def _check_terraform() -> Check:
         return _check(
             "terraform", False,
             detail[-1] if detail else _("detail_terraform_broken"),
-            hint="https://developer.hashicorp.com/terraform/install",
+            remede=remede("terraform", _doctor()._systeme()),
         )
     first = result.stdout.splitlines()[0] if result.stdout else "ok"
-    return _check("terraform", True, first)
+    return _check("terraform", True, first, mise_en_garde=_terraform_depasse(result.stdout))
+
+
+def _terraform_depasse(sortie: str) -> str | None:
+    """La version plus récente que ``terraform version`` annonce, mise en forme.
+
+    ``terraform version`` interroge lui-même le service de versions d'HashiCorp
+    et écrit « Your version of Terraform is out of date! The latest version is
+    1.17.2. » : on lit cette phrase au lieu de refaire la requête. Une
+    mise en garde seulement, sous ``-v`` (décision 7 du 2026-11-16) : une
+    version plus ancienne n'empêche rien.
+    """
+    texte = " ".join(sortie.split())
+    marque = "The latest version is "
+    if "out of date" not in texte or marque not in texte:
+        return None
+    derniere = texte.split(marque, 1)[1].split()[0].rstrip(".")
+    return _("detail_terraform_depasse", latest=derniere)
 
 
 def _check_collections(root: Path) -> Check:
@@ -120,6 +138,21 @@ def _check_collections(root: Path) -> Check:
     if not besoins.mesurable:
         # `ansible-galaxy` n'a pas répondu : on ne peint pas en rouge ce qu'on
         # n'a pas pu regarder, et `--strict` a son propre code pour cela.
+        #
+        # Sans Ansible, la cause est connue : l'étape « installer Ansible »
+        # vient d'abord. Le « ? » d'avant cachait cette cause (parcours mesuré
+        # le 2026-11-16), et le remède reste affiché pour qu'une seule passe
+        # de `--fix` fasse les deux.
+        if not ansible_infra.has_ansible_playbook():
+            return _check(
+                "collections", False,
+                _("detail_collections_apres_ansible", count=len(besoins.exigees)),
+                forced_state=STATE_UNKNOWN, apres="ansible",
+                # `manquantes` est vide quand rien n'est mesuré : on installe
+                # alors tout ce que le catalogue exige, ou son requirements.yml.
+                fix=_fix(geste_d_installation(besoins) if besoins.declaration else
+                         ["ansible-galaxy", "collection", "install", *sorted(besoins.exigees)]),
+            )
         return _check(
             "collections", False, _("detail_collections_non_mesure"),
             forced_state=STATE_UNKNOWN,
@@ -189,7 +222,7 @@ def _check_git() -> Check:
     if shutil.which("git") is None:
         return _check(
             "git", False, _("detail_git_missing"),
-            hint="https://git-scm.com/downloads",
+            remede=remede("git", _doctor()._systeme()),
         )
     result = _doctor()._sonder(["git", "--version"])
     if result is None:
@@ -198,7 +231,7 @@ def _check_git() -> Check:
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip().splitlines()
         return _check("git", False, detail[-1] if detail else _("detail_git_muet"),
-                      hint="https://git-scm.com/downloads")
+                      remede=remede("git", _doctor()._systeme()))
     return _check("git", True, result.stdout.strip() or "ok")
 
 
