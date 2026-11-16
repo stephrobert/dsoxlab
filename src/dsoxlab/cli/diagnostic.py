@@ -352,8 +352,13 @@ def _commande_playbook(chemin: Path) -> list[str]:
     """L'appel d'ansible-playbook, avec la demande de mot de passe si sudo en exige un."""
     binaire = shutil.which("ansible-playbook") or str(Path.home() / ".local/bin/ansible-playbook")
     commande = [binaire, "-i", "localhost,", "-c", "local", str(chemin)]
+    # `-k` : sudo ignore le mot de passe tapé récemment dans ce terminal. Sans
+    # lui, `sudo -n true` réussissait grâce à ce cache, dsoxlab omettait
+    # `--ask-become-pass`, et le sudo d'Ansible, qui ne voit pas ce cache,
+    # échouait sur « il est nécessaire de saisir un mot de passe » (Pop!_OS
+    # 24.04, 2026-11-16). Avec `-k`, seul un vrai NOPASSWD passe.
     sans_mot_de_passe = subprocess.run(
-        ["sudo", "-n", "true"], capture_output=True, check=False,
+        ["sudo", "-n", "-k", "true"], capture_output=True, check=False,
     ).returncode == 0 if shutil.which("sudo") else False
     if not sans_mot_de_passe:
         commande.insert(1, "--ask-become-pass")

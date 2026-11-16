@@ -7,6 +7,22 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.6] - 2026-11-16
+
+### Corrigé
+
+- **`doctor --fix` demande le mot de passe sudo quand sudo en exige un, même
+  juste après un sudo tapé dans le même terminal.** Pour décider s'il passe
+  `--ask-become-pass` à `ansible-playbook`, dsoxlab lançait `sudo -n true`, qui
+  réussit aussi grâce au mot de passe que sudo garde quelques minutes. Le
+  playbook partait alors sans rien demander, et le sudo lancé par Ansible, qui
+  ne voit pas ce cache, échouait : « sudo: il est nécessaire de saisir un mot de
+  passe » (signalé sur Pop!_OS 24.04). La sonde est désormais
+  `sudo -n -k true` : `-k` ignore le mot de passe gardé en mémoire, et seul un
+  vrai sudo sans mot de passe évite la question.
+- **Les étapes facultatives se numérotent à la suite des étapes requises.**
+  `doctor --fix --clients` affichait « 0. Installer Docker ».
+
 ## [0.9.5] - 2026-11-16
 
 ### Ajouté
