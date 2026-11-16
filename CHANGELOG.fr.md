@@ -51,6 +51,55 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **`dsoxlab doctor` guide jusqu'au bout : toutes les étapes qui manquent
+  d'un coup, dans l'ordre, chaque commande prête à coller.** Deux machines
+  vides mesurées le 2026-11-16 (Ubuntu 24.04 et AlmaLinux 10) obligeaient à
+  relancer `doctor` après chaque geste pour découvrir le suivant, et
+  `provision` échouait encore après un `doctor` vert. Le diagnostic :
+  - affiche des **étapes numérotées** dans l'ordre des dépendances (git,
+    provider, libvirt, groupes, pool, firmware EFI, Terraform, Ansible,
+    collections, clé SSH du catalogue, Include de `~/.ssh/config`), chaque
+    commande seule sur sa ligne au lieu d'être coupée dans une cellule de
+    tableau, puis « À savoir », ce qui est prêt, et la commande unique
+    `dsoxlab doctor --fix` ;
+  - **ne cache plus aucun contrôle** : sans libvirt, le pool, les groupes et
+    le firmware restent listés, « faire l'étape N d'abord » ; sans provider
+    choisi, il diagnostique avec celui qu'il recommande (kvm sur un Linux qui
+    expose `/dev/kvm`), sans l'enregistrer ;
+  - **contrôle quatre choses de plus**, qui faisaient échouer `provision` ou
+    `ssh` : la clé SSH du catalogue, la ligne `Include` de `~/.ssh/config`, le
+    firmware EFI (issue #381), et les groupes `kvm`/`libvirt`, en distinguant
+    « reconnectez-vous » de « rejoignez le groupe » ;
+  - **donne des commandes, plus des liens**, lues dans une table par famille
+    de distribution (`/etc/os-release`) : git, Terraform et Docker depuis leurs
+    dépôts officiels, `systemctl enable --now libvirtd` au lieu de `start`, qui
+    ne survivait pas au redémarrage, et plus de `dnf install incus` sur la
+    famille RHEL, dont aucun dépôt de base ne l'a ;
+  - avec `-v`, montre chaque contrôle et les mises en garde des lignes vertes
+    (un Terraform plus ancien que la dernière version).
+- **`doctor --fix` affiche son plan et demande d'abord.** Rien ne part sans
+  `[y/N]` ou `--yes` ; sans terminal et sans `--yes`, rien ne part (code 1).
+  Les étapes sans sudo sont lancées par dsoxlab ; celles avec sudo passent
+  toutes par un seul `ansible-playbook --ask-become-pass -c local`, généré
+  depuis la même table que l'affichage, qui demande le mot de passe une fois ;
+  sans terminal, elles s'affichent à coller. Ansible est installé d'abord
+  (`uv tool install ansible-core`). Chaque étape est revérifiée par un
+  diagnostic refait, et **le premier échec arrête tout**, en nommant les
+  étapes restantes : l'ancienne cascade continuait, et créait un pool sans
+  libvirt. Docker et Incus, quand le catalogue n'en a pas besoin, ne viennent
+  qu'avec `--clients`.
+- **Une mémoire trop petite pour tout le catalogue ne bloque plus.** Elle
+  passe sous « À savoir » avec `dsoxlab provision --host <machine>`, et dans
+  `informational` en `--json` : `doctor --strict` ne sort plus en 9 pour elle.
+  `start <lab>` reste bloquant sur la mémoire qu'exige son propre lab.
+- `doctor --json` gagne trois champs par contrôle, sans rien retirer :
+  `commands` (les lignes à coller), `after` (le contrôle à réparer d'abord) et
+  `warning`. `fix` ne porte plus les commandes qui exigent un shell
+  (Terraform, Docker) : lire `commands`. Les codes de sortie ne changent pas.
+- La section d'installation de `docs/learner.fr.md` donne les mêmes commandes
+  que le diagnostic, avec `sudo`, pour Debian/Ubuntu et la famille RHEL ; un
+  test la tient mot pour mot alignée sur la table.
+
 - **Les machines provisionnées ne démarrent plus avec l'hôte, sauf si le
   catalogue le demande** (issue #377). Les templates kvm et incus posaient le
   démarrage automatique sur chaque machine, sans moyen d'y échapper : au

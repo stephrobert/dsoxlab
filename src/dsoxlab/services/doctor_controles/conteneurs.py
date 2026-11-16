@@ -11,6 +11,7 @@ import shutil
 from ...i18n import _
 from ...models import LabDefinition
 from .modele import STATE_UNKNOWN, Check, _check, _doctor
+from .remedes import remede
 
 
 def uses_services(labs: list[LabDefinition]) -> bool:
@@ -33,7 +34,7 @@ def _check_docker() -> Check:
     if shutil.which("docker") is None:
         return _check(
             "docker", False, _("detail_docker_missing"),
-            hint="https://docs.docker.com/engine/install/",
+            remede=remede("docker", _doctor()._systeme()),
         )
     result = _doctor()._sonder(["docker", "version", "--format", "{{.Server.Version}}"], delai=15)
     if result is None:

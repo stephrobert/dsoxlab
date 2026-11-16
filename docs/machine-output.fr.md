@@ -668,7 +668,10 @@ Un catalogue sans bloc `infra:` est un cas normal, pas une erreur : il rend
       "detail": "embarqué avec dsoxlab (celui qu'utilise « check »)",
       "fix": null,
       "fix_kind": null,
-      "hint": null
+      "hint": null,
+      "commands": [],
+      "after": null,
+      "warning": null
     }
   ],
   "informational": [
@@ -678,9 +681,12 @@ Un catalogue sans bloc `infra:` est un cas normal, pas une erreur : il rend
       "ok": false,
       "label": "virsh/KVM",
       "detail": "virsh introuvable",
-      "fix": "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
-      "fix_kind": "automatic",
-      "hint": null
+      "fix": null,
+      "fix_kind": null,
+      "hint": null,
+      "commands": ["sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm"],
+      "after": null,
+      "warning": null
     }
   ],
   "notes": ["Aucun lab de ce dépôt n'utilise de VM : les hyperviseurs ci-dessus sont informatifs."]
@@ -698,7 +704,7 @@ Chaque contrôle :
 
 | Champ | Type | Sens |
 | --- | --- | --- |
-| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, et, sur un catalogue à labs `vm`, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `libvirt_pool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
+| `key` | chaîne | **l'identité stable** : `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, et, sur un catalogue à labs `vm`, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `collections`, `libvirt_pool`, `groupes`, `efi`, `cle_ssh`, `ssh_include`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
 | `state` | chaîne | `ok`, `failed`, `choice_required` ou `unknown` |
 | `ok` | booléen | la même chose que `state == "ok"`, gardé pour une lecture vert/rouge immédiate |
 | `label` | chaîne | le nom du composant, traduit : pour l'affichage seulement |
@@ -706,6 +712,14 @@ Chaque contrôle :
 | `fix` | chaîne ou null | la remédiation sous sa forme lisible ; `dsoxlab doctor --fix` joue les mêmes commandes token par token, sans shell |
 | `fix_kind` | chaîne ou null | la catégorie de la remédiation : `automatic`, `manual` (affichée, jamais exécutée), `needs_relogin` ou `needs_reboot` (exécutée, mais le contrôle reste rouge jusqu'à la reconnexion ou au redémarrage) |
 | `hint` | chaîne ou null | un geste que seul un humain doit poser : une page d'installation, une décision |
+| `commands` | tableau de chaînes | les commandes que `doctor` affiche pour ce contrôle, une par ligne, prêtes à coller, `sudo` compris ; vide quand il n'y a rien à lancer. Sur la famille RHEL elles passent par `dnf`, sur Debian et Ubuntu par `apt` (lu dans `/etc/os-release`) |
+| `after` | chaîne ou null | la `key` du contrôle à réparer d'abord : celui-ci n'a pas pu mesurer sans lui (le pool sans libvirt), d'où son `state` à `unknown` |
+| `warning` | chaîne ou null | une remarque sur un contrôle vert (un Terraform plus ancien que la dernière version) ; jamais un échec |
+
+Depuis la 0.9.5, `resources` passe dans `informational` quand la machine est
+trop petite pour **tout** le catalogue : un lab ne monte souvent qu'une machine,
+et `provision --host` le permet. `start <lab>` reste bloquant sur la mémoire
+qu'exige son propre lab.
 
 `state: choice_required` existe parce qu'une décision n'est pas une panne : un
 catalogue qui déclare plusieurs providers sans qu'aucun soit choisi bloque bien

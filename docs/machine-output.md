@@ -650,7 +650,10 @@ A catalog with no `infra:` block is a normal case, not an error: it yields
       "detail": "bundled with dsoxlab (used by 'check')",
       "fix": null,
       "fix_kind": null,
-      "hint": null
+      "hint": null,
+      "commands": [],
+      "after": null,
+      "warning": null
     }
   ],
   "informational": [
@@ -660,9 +663,12 @@ A catalog with no `infra:` block is a normal case, not an error: it yields
       "ok": false,
       "label": "virsh/KVM",
       "detail": "virsh not found",
-      "fix": "sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm",
-      "fix_kind": "automatic",
-      "hint": null
+      "fix": null,
+      "fix_kind": null,
+      "hint": null,
+      "commands": ["sudo apt install libvirt-clients libvirt-daemon-system qemu-kvm"],
+      "after": null,
+      "warning": null
     }
   ],
   "notes": ["No lab in this catalog uses a VM: the hypervisors above are informational."]
@@ -680,7 +686,7 @@ Each check:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, and, on a catalog with `vm` labs, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `libvirt_pool`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
+| `key` | string | **the stable identity**: `python`, `pytest`, `shell`, `git`, `docker`, `egress`, `labs`, `lab_home`, and, on a catalog with `vm` labs, `provider`, `kvm`, `incus`, `terraform`, `tf_providers`, `ansible`, `collections`, `libvirt_pool`, `groupes`, `efi`, `cle_ssh`, `ssh_include`, `hw_virt`, `cpu_arch`, `resources`, `bridge_name` |
 | `state` | string | `ok`, `failed`, `choice_required`, or `unknown` |
 | `ok` | bool | the same thing as `state == "ok"`, kept for a plain green/red reading |
 | `label` | string | the component's name, translated — for display only |
@@ -688,6 +694,14 @@ Each check:
 | `fix` | string or null | the remediation in its readable form; `dsoxlab doctor --fix` plays the same commands token by token, without a shell |
 | `fix_kind` | string or null | the remediation category: `automatic`, `manual` (shown, never run), `needs_relogin` or `needs_reboot` (run, but the check stays red until the session or the machine restarts) |
 | `hint` | string or null | a step only a human should take — an install page, a decision |
+| `commands` | array of strings | the commands `doctor` prints for this check, one per line, ready to paste, `sudo` included; empty when there is nothing to run. On the RHEL family they use `dnf`, on Debian and Ubuntu `apt` (read from `/etc/os-release`) |
+| `after` | string or null | the `key` of the check to repair first: this one could not be measured without it (the pool without libvirt), so its `state` is `unknown` |
+| `warning` | string or null | a remark on a green check (a Terraform older than the latest release); never a failure |
+
+Since 0.9.5, `resources` sits in `informational` when the machine is too small
+for the **whole** catalog: a lab often brings up a single machine, and
+`provision --host` does that. `start <lab>` still blocks on the memory its own
+lab needs.
 
 `state: choice_required` exists because a decision is not a failure: a catalog
 that declares several providers and has none selected blocks provisioning, but

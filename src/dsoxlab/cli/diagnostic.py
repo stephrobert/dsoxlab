@@ -23,13 +23,17 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
+import shutil
 import subprocess
 import sys
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
+from rich.text import Text
 
 from ..i18n import _
 from ..reporting import (
@@ -43,6 +47,7 @@ from ..reporting import (
     success,
     warn,
 )
+from ..reporting.doctor_rendu import titre_etape
 from ..security.terminal import texte_affichable
 from ..services import (
     Fix,
@@ -53,7 +58,17 @@ from ..services.doctor import (
     EXIT_DOCTOR_REQUIS_KO,
     DoctorReport,
 )
-from ..services.remediation import Application, appliquer, obstacle, planifier
+from ..services.doctor_controles.incus import _current_user
+from ..services.doctor_etapes import Etape
+from ..services.remediation import (
+    Action,
+    Application,
+    PlanCorrection,
+    chemin_du_playbook,
+    etape_verifiee,
+    planifier,
+    playbook_du_poste,
+)
 from ..utils.shell import CommandError, run_command
 from ._commun import (
     LabHomeOption,
@@ -220,6 +235,9 @@ def doctor(
     fix: Annotated[bool, typer.Option("--fix", help=_("opt_fix"))] = False,
     as_json: Annotated[bool, typer.Option("--json", help=_("opt_json"))] = False,
     strict: Annotated[bool, typer.Option("--strict", help=_("opt_doctor_strict"))] = False,
+    oui: Annotated[bool, typer.Option("--yes", "-y", help=_("opt_doctor_yes"))] = False,
+    clients: Annotated[bool, typer.Option("--clients", help=_("opt_doctor_clients"))] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help=_("opt_doctor_verbose"))] = False,
 ) -> None:
     root = _root(lab_home)
 
@@ -232,18 +250,7 @@ def doctor(
         error(_("doctor_json_sans_fix"))
         raise typer.Exit(1)
 
-    # Le meta.yml décide de ce qui est bloquant ici : un dépôt sans lab `vm`
-    # n'a besoin d'aucun hyperviseur, et un dépôt qui a choisi son provider
-    # n'a pas besoin des autres. Son absence n'est pas une erreur : on
-    # diagnostique alors le strict socle commun.
-    try:
-        repo_meta = _read_repo(root)
-    except typer.Exit:
-        # Un meta.yml illisible est justement ce qu'un diagnostic doit
-        # pouvoir rapporter : l'erreur est déjà affichée, on poursuit sur
-        # le socle commun plutôt que de sortir sans rien dire d'autre.
-        repo_meta = None
-    report = collect_checks(root, repo_meta)
+    report = collect_checks(root, _relire(root))
 
     if as_json:
         # Le code de retour ne change pas : `doctor` sort en 0 même quand un
@@ -257,82 +264,243 @@ def doctor(
             _verdict_strict(report)
         return
 
-    print_doctor(report)
-    joue = _reparer(report) if fix else False
+    print_doctor(report, verbose=verbose)
+    joue = _reparer(report, root, oui=oui, clients=clients) if fix else False
 
     if strict:
         # Après des correctifs, l'état de la machine a changé : juger sur le
         # rapport d'avant dirait faux, et dans le mauvais sens : un `--fix`
         # réussi sortirait quand même en échec. On remesure.
-        _verdict_strict(collect_checks(root, repo_meta) if joue else report)
+        _verdict_strict(collect_checks(root, _relire(root)) if joue else report)
 
 
-def _reparer(report: DoctorReport) -> bool:
-    """Joue ce que `--fix` peut jouer, et dit si la machine a changé.
+def _relire(root: Path) -> RepoMetadata | None:
+    """Le meta.yml du catalogue, relu : `--fix` peut avoir choisi le provider.
 
-    Le booléen rendu décide de la remesure : sans correctif joué, remesurer
-    coûterait un diagnostic complet pour un rapport identique.
+    Son absence n'est pas une erreur : on diagnostique alors le strict socle
+    commun. Un meta.yml illisible non plus : l'erreur est affichée, et c'est
+    justement ce qu'un diagnostic doit pouvoir rapporter.
     """
-    plan = planifier(report)
-    if plan.vide:
-        info(_("fix_nothing"))
-        return False
+    try:
+        return _read_repo(root)
+    except typer.Exit:
+        return None
 
-    for label, correctif in plan.manuels:
-        info(_("fix_manual", label=label, command=correctif.display))
-    if not plan.executables:
-        return False
 
-    empechement = obstacle(plan)
-    if empechement is not None:
-        error(_(empechement))
+def _actions(root: Path, report: DoctorReport) -> dict[str, Action]:
+    """Les étapes que dsoxlab fait lui-même, sans commande externe ni sudo."""
+    from ..config import set_active_provider
+    from ..infra.inventory import ajouter_include_ssh
+    from ..services.doctor_controles.catalogue import creer_cle_ssh
+
+    def provider() -> str | None:
+        set_active_provider(root, report.provider)
+        return None
+
+    def include() -> str | None:
+        try:
+            ajouter_include_ssh()
+        except OSError as exc:
+            return str(exc)
+        return None
+
+    return {
+        "provider": provider,
+        "cle_ssh": lambda: creer_cle_ssh(root),
+        "ssh_include": include,
+    }
+
+
+def _commande_de(etape: Etape) -> str:
+    if etape.remede is not None and etape.remede.lignes:
+        return etape.remede.lignes[0] + (" …" if len(etape.remede.lignes) > 1 else "")
+    return titre_etape(etape)
+
+
+def _afficher_plan(plan: PlanCorrection, report: DoctorReport, ansible: list[str]) -> None:
+    console.print()
+    info(_("fix_plan_titre", count=plan.executables))
+    if plan.sans_sudo:
+        console.print(Text("  " + _("fix_plan_sans_sudo")))
+        for etape in plan.sans_sudo:
+            console.print(Text(f"  {etape.numero:>2}. {_commande_de(etape)}"), soft_wrap=True)
+    if plan.root:
+        console.print(Text("  " + _("fix_plan_root")))
+        for etape in plan.root:
+            ligne = f"  {etape.numero:>2}. {titre_etape(etape)}"
+            if etape.remede is not None and etape.remede.reconnexion:
+                ligne += "   " + _("fix_plan_reconnexion")
+            console.print(Text(ligne), soft_wrap=True)
+        console.print(Text("      " + shlex.join(ansible), style="dim"), soft_wrap=True)
+    if plan.manuelles:
+        console.print(Text("  " + _("fix_plan_manuelles")))
+        for etape in plan.manuelles:
+            console.print(Text(f"  {etape.numero:>2}. {titre_etape(etape)}"), soft_wrap=True)
+    for check in report.a_savoir:
+        console.print(Text("  " + _("fix_plan_a_savoir", label=check.label)))
+
+
+def _commande_playbook(chemin: Path) -> list[str]:
+    """L'appel d'ansible-playbook, avec la demande de mot de passe si sudo en exige un."""
+    binaire = shutil.which("ansible-playbook") or str(Path.home() / ".local/bin/ansible-playbook")
+    commande = [binaire, "-i", "localhost,", "-c", "local", str(chemin)]
+    sans_mot_de_passe = subprocess.run(
+        ["sudo", "-n", "true"], capture_output=True, check=False,
+    ).returncode == 0 if shutil.which("sudo") else False
+    if not sans_mot_de_passe:
+        commande.insert(1, "--ask-become-pass")
+    return commande
+
+
+def _interactif() -> bool:
+    """Un humain peut-il répondre ? Isolé pour que les tests le simulent."""
+    return sys.stdin.isatty()
+
+
+def _confirmer(plan: PlanCorrection, *, oui: bool) -> bool:
+    """Rien ne part sans `[y/N]` ou `--yes`, et sans terminal rien ne part sans `--yes`."""
+    if oui:
+        return True
+    if not _interactif():
+        error(_("fix_needs_yes"))
         raise typer.Exit(1)
-    if plan.correctifs_sudo:
-        _preauthentifier(plan.correctifs_sudo)
+    if typer.confirm(_("fix_confirmer", count=plan.executables), default=False):
+        return True
+    info(_("fix_annule"))
+    return False
 
-    info(_("fix_count", count=len(plan.executables)))
-    appliquer(
-        plan.executables,
-        _executer_correctif,
-        sur_debut=_dire_la_commande,
-        sur_resultat=_dire_le_resultat,
-    )
-    info(_("fix_rerun"))
+
+def _reparer(report: DoctorReport, root: Path, *, oui: bool, clients: bool) -> bool:
+    """Joue le plan de `--fix`, et dit si la machine a changé.
+
+    Le booléen rendu décide de la remesure de `--strict` : sans étape jouée,
+    remesurer coûterait un diagnostic complet pour un rapport identique.
+    """
+    actions = _actions(root, report)
+    plan = planifier(report, clients=clients, actions=actions)
+    if not plan.executables:
+        info(_("fix_rien_a_lancer") if plan.manuelles else _("fix_nothing"))
+        return False
+
+    chemin = chemin_du_playbook()
+    ansible = _commande_playbook(chemin) if plan.root else []
+    _afficher_plan(plan, report, ansible)
+    if not _confirmer(plan, oui=oui):
+        return False
+
+    def remesurer() -> DoctorReport:
+        return collect_checks(root, _relire(root))
+
+    restantes = [*plan.sans_sudo, *plan.root]
+    if _jouer_sans_sudo(plan.sans_sudo, actions, remesurer, restantes) and plan.root:
+        _jouer_root(plan.root, ansible, chemin, remesurer, restantes)
     return True
 
 
-def _dire_la_commande(label: str, correctif: Fix) -> None:
+def _jouer_sans_sudo(
+    etapes: list[Etape], actions: dict[str, Action],
+    remesurer: Callable[[], DoctorReport], restantes: list[Etape],
+) -> bool:
+    """Les étapes sans privilège, une à une, revérifiées ; rend False au premier échec."""
+    for etape in etapes:
+        code, message = _jouer(etape, actions)
+        verifiee = code == 0 and etape_verifiee(etape, remesurer())
+        application = Application(etape, code, verifiee, message)
+        _dire_le_resultat(application)
+        if not application.ok:
+            _arreter(restantes[restantes.index(etape):])
+            return False
+    if not any(e.remede is not None and e.remede.root for e in restantes):
+        info(_("fix_rerun"))
+    return True
+
+
+def _jouer_root(
+    etapes: list[Etape], ansible: list[str], chemin: Path,
+    remesurer: Callable[[], DoctorReport], restantes: list[Etape],
+) -> None:
+    """Les étapes root, toutes par le playbook du poste, puis revérifiées une à une."""
+    if not _interactif() and "--ask-become-pass" in ansible:
+        # Sans terminal, personne ne peut taper le mot de passe : les étapes
+        # root s'affichent en bloc à coller (décision 2).
+        _bloc_root(etapes)
+        return
+    if not _playbook_jouable(ansible[0]):
+        warn(_("fix_pas_d_ansible"))
+        _bloc_root(etapes)
+        return
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    chemin.write_text(playbook_du_poste(etapes, _current_user()), encoding="utf-8")
+    info(_("fix_playbook", path=str(chemin)))
+    code = subprocess.run(ansible, check=False).returncode
+    apres = remesurer()
+    for etape in etapes:
+        application = Application(etape, code, code == 0 and etape_verifiee(etape, apres))
+        _dire_le_resultat(application)
+        if not application.ok:
+            _arreter(restantes[restantes.index(etape):])
+            return
+    if any(e.remede is not None and e.remede.reconnexion for e in etapes):
+        warn(_("fix_reconnexion_finale"))
+    info(_("fix_rerun"))
+
+
+def _playbook_jouable(binaire: str) -> bool:
+    return Path(binaire).is_file() and os.access(binaire, os.X_OK)
+
+
+def _jouer(etape: Etape, actions: dict[str, Action]) -> tuple[int, str | None]:
+    """Joue une étape sans sudo : une action de dsoxlab, ou un correctif sans shell."""
+    _dire_la_commande(etape)
+    action = actions.get(etape.cle)
+    if action is not None:
+        message = action()
+        return (0, None) if message is None else (1, message)
+    correctif = next((c.fix for c in etape.controles if c.fix is not None), None)
+    if correctif is None:
+        return 1, None
+    return _executer_correctif(correctif), None
+
+
+def _dire_la_commande(etape: Etape) -> None:
     """La commande est nommée avant de partir : sa sortie arrive sur le même
     terminal, et sans cette ligne rien ne dit à qui elle appartient."""
-    info(f"[bold]{label}[/bold] → {correctif.display}")
-
-
-def _preauthentifier(combien: int) -> None:
-    """Un seul mot de passe pour toute la cascade.
-
-    Sans ce `sudo -v`, l'utilisateur peut avoir à le retaper à chaque commande,
-    si `timestamp_timeout` vaut 0 ou si la cascade dépasse cinq minutes.
-    """
-    info(_("fix_sudo_preauth", count=combien))
-    # check=False : un mot de passe refusé ou un Ctrl-C sur le prompt sudo est
-    # une réponse de l'utilisateur, pas une panne. On la traduit en message et
-    # en code de sortie, pas en trace Python.
-    if subprocess.run(["sudo", "-v"], check=False).returncode != 0:
-        error(_("fix_sudo_failed"))
-        raise typer.Exit(1)
+    console.print(Text(f"  → {etape.numero}. {_commande_de(etape)}", style="bold"), soft_wrap=True)
 
 
 def _dire_le_resultat(application: Application) -> None:
-    if not application.ok:
-        error(_("fix_failure", label=application.label, code=application.code))
+    etape = application.etape
+    titre = titre_etape(etape)
+    if application.code != 0:
+        error(_("fix_etape_ko", step=etape.numero, label=titre, code=application.code))
+        if application.message:
+            console.print(Text("    " + application.message), soft_wrap=True)
         return
-    success(_("fix_success", label=application.label))
+    if not application.verifiee:
+        error(_("fix_etape_non_verifiee", step=etape.numero, label=titre))
+        return
+    success(_("fix_etape_ok", step=etape.numero, label=titre))
     # L'effet différé se dit au moment du succès, sans quoi le prochain
     # `doctor` remontre la même ligne rouge et l'utilisateur conclut, à tort,
     # que le correctif a échoué.
     avis = application.avis_differe
     if avis is not None:
-        warn(_(avis, label=application.label))
+        warn(_(avis, label=titre))
+
+
+def _arreter(restantes: list[Etape]) -> None:
+    numeros = ", ".join(str(e.numero) for e in restantes)
+    error(_("fix_arret", steps=numeros))
+
+
+def _bloc_root(etapes: list[Etape]) -> None:
+    """Le repli : les étapes root à coller, puisque dsoxlab ne les lance pas."""
+    warn(_("fix_bloc_root"))
+    for etape in etapes:
+        console.print(Text(f"  {etape.numero:>2}. {titre_etape(etape)}", style="bold"))
+        assert etape.remede is not None
+        for ligne in etape.remede.lignes:
+            console.print(Text("      " + ligne), soft_wrap=True)
 
 
 def _executer_correctif(correctif: Fix) -> int:
@@ -340,10 +508,7 @@ def _executer_correctif(correctif: Fix) -> int:
 
     Chaque argv part tel quel à ``run_command`` : aucun token n'est redécoupé
     en route, un argument portant une espace arrive entier à la commande. La
-    séquence s'arrête au premier échec, dont le code est rendu. ``check=False``
-    parce que `--fix` joue une CASCADE : un correctif en échec doit être
-    signalé puis laisser tourner les suivants ; lever ici abandonnerait les
-    réparations restantes sur la première qui rate.
+    séquence s'arrête au premier échec, dont le code est rendu.
 
     La sortie capturée est rejouée sur les flux d'origine : l'utilisateur
     voit ce qu'apt ou systemctl ont dit, en particulier quand ça a raté.

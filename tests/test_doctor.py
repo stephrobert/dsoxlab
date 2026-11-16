@@ -111,6 +111,12 @@ def _outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
         doctor, "_check_resources",
         lambda infra, provider: doctor._check("resources", True, "ok"),
     )
+    # Les contrôles de la refonte du 2026-11-16 lisent eux aussi la machine
+    # (groupes du compte, firmware, ~/.ssh/config, clé du catalogue).
+    monkeypatch.setattr(doctor, "_check_groupes", lambda kvm_ok: doctor._check("groupes", True, "ok"))
+    monkeypatch.setattr(doctor, "_check_efi", lambda kvm_ok: doctor._check("efi", True, "OVMF"))
+    monkeypatch.setattr(doctor, "_check_cle_ssh", lambda root: doctor._check("cle_ssh", True, "ok"))
+    monkeypatch.setattr(doctor, "_check_ssh_include", lambda: doctor._check("ssh_include", True, "ok"))
 
 
 def _labs(monkeypatch: pytest.MonkeyPatch, labs: list[LabDefinition]) -> None:
@@ -208,10 +214,12 @@ def test_unresolved_provider_is_a_decision_not_a_failure(
     """Several candidates and no choice: name the choice, do not make it.
 
     The check is blocking, since `provision` cannot run without it, but it
-    carries its own status so a pending decision is not painted red. It
-    stays a hint too: choosing a provider for the learner would silently
-    decide how their labs run.
+    carries its own status so a pending decision is not painted red. Nothing
+    is recorded: the choice stays a step that the learner confirms.
     """
+    device = tmp_path / "kvm"
+    device.touch()
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
     report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
 
@@ -220,7 +228,34 @@ def test_unresolved_provider_is_a_decision_not_a_failure(
     assert provider.state == doctor.STATE_CHOICE_REQUIRED
     assert provider.fix is None
     assert "use --provider kvm" in (provider.hint or "")
-    assert not report.fixable()
+    assert report.provider == "kvm"
+    assert report.provider_a_confirmer
+
+
+def test_unresolved_provider_checks_the_recommended_path_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stub_hypervisors: None
+) -> None:
+    """No choice made: the diagnosis follows the recommended provider (kvm on a
+    Linux with /dev/kvm) and hides none of its checks, so one pass shows every
+    missing step (2026-11-16 rework). Only that hypervisor becomes required:
+    `--fix` must never install kvm AND incus for an undecided choice.
+    """
+    device = tmp_path / "kvm"
+    device.touch()
+    monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
+    _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
+    report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
+
+    requis = {c.key for c in report.required}
+    assert {"kvm", "groupes", "libvirt_pool", "efi", "cle_ssh", "ssh_include"} <= requis
+    assert "incus" not in requis
+    assert "incus" in {c.key for c in report.optional}
+    # virsh is missing in this stub: the pool cannot be measured, it waits for
+    # the kvm step instead of disappearing.
+    pool = next(c for c in report.required if c.key == "libvirt_pool")
+    assert pool.state == doctor.STATE_UNKNOWN
+    assert pool.apres == "kvm"
+    assert pool.remede is not None and "pool-define-as" in pool.remede.lignes[0]
 
 
 def test_legacy_runtime_aliases_still_count_as_vm() -> None:

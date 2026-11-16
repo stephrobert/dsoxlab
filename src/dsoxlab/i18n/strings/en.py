@@ -966,11 +966,17 @@ Each lab declares:
     [dim]--json[/dim]               Every issue with its rule key, as a document.
                        Same exit code: 1 as soon as one lab fails.
 
-  [cyan]doctor[/cyan]               Diagnose the environment. The [bold]Required[/bold] table lists what
-                       blocks this very repo; a hypervisor useless here stays
-                       [bold]Informational[/bold] and never shows up as an error.
-    [dim]--fix[/dim]                Remediate the missing required components.
-                       Informational components are left alone.
+  [cyan]doctor[/cyan]               Diagnose the environment: every missing step at once,
+                       numbered in the order to do them, each command on its
+                       own line, ready to paste. A component this repo does not
+                       need stays optional and never shows up as an error.
+    [dim]--fix[/dim]                Show the plan, then run it once confirmed: steps
+                       without sudo by dsoxlab, sudo steps through one
+                       ansible-playbook run that asks for your password once.
+                       Each step is checked again; the first failure stops.
+    [dim]--yes[/dim]                Run the plan without asking (needed without a terminal).
+    [dim]--clients[/dim]            With --fix, also install the optional Docker and Incus.
+    [dim]-v[/dim]                   Every check, and the warnings on green lines.
     [dim]--json[/dim]               The diagnosis as a document, each check carrying a
                        stable key and state. Not with [bold]--fix[/bold].
     [dim]--strict[/dim]             Turn the diagnosis into an exit code, for a script:
@@ -1520,6 +1526,59 @@ silent.
     "check_tf_providers": "Terraform providers",
     "check_ansible":      "ansible-playbook",
     "check_collections":  "Ansible collections",
+    "etape_git": 'Install git',
+    "etape_provider": 'Choose the provider for the machines',
+    "etape_kvm": 'Install libvirt and QEMU',
+    "etape_libvirtd": 'Start libvirt, now and at every boot',
+    "etape_groupes": "Give your account access to the hypervisor, then log in again",
+    "etape_libvirt_pool": 'Create the libvirt disk pool',
+    "etape_efi": 'Install the EFI firmware for the machines',
+    "etape_terraform": "Install Terraform, from HashiCorp's official repository",
+    "etape_ansible": 'Install Ansible',
+    "etape_collections": "Install the catalogue's Ansible collections",
+    "etape_cle_ssh": "Create the catalogue's SSH key",
+    "etape_ssh_include": "Make ssh read dsoxlab's fragments",
+    "etape_incus": 'Install Incus',
+    "etape_docker": "Install Docker, from Docker's official repository",
+    "etape_labs": 'Get a catalogue',
+    "etape_reparer": 'Fix: {label}',
+    "doctor_entete_catalogue": 'catalogue {id}',
+    "doctor_entete_labs": '{count} labs',
+    "doctor_entete_labs_1": '1 lab',
+    "doctor_entete_sans_catalogue": 'no catalogue here',
+    "doctor_entete_provider": 'provider {provider}',
+    "doctor_entete_provider_a_confirmer": 'provider {provider} (to confirm, step {step})',
+    "doctor_n_etapes": '{count} steps are missing. Do them in this order.',
+    "doctor_n_etapes_1": '1 step is missing.',
+    "doctor_etape_apres": '(do step {step} first)',
+    "doctor_etape_reconnexion": 'Then log out and log back in.',
+    "doctor_a_savoir_titre": 'Good to know (no command fixes it)',
+    "doctor_a_savoir_une_machine": 'Bring up only the machine of the lab you play:',
+    "doctor_non_mesure": '? Not measured: {label} ({detail}). Run dsoxlab doctor again.',
+    "doctor_deja_pret": 'Already ready: {items}',
+    "doctor_tout_pret": 'Everything is ready. {count} required checks pass.',
+    "doctor_tout_pret_1": 'Everything is ready. 1 required check passes.',
+    "doctor_facultatif_installe": 'Optional here, installed: {items}',
+    "doctor_facultatif_absent": 'Optional here: {items}. Install them too: dsoxlab doctor --fix --clients',
+    "doctor_mises_en_garde": '{count} warnings on green lines: dsoxlab doctor -v',
+    "doctor_mises_en_garde_1": '1 warning on a green line: dsoxlab doctor -v',
+    "doctor_tout_corriger": 'Fix everything at once:',
+    "check_groupes": 'kvm and libvirt groups',
+    "check_efi": 'EFI firmware',
+    "check_cle_ssh": 'Catalogue SSH key',
+    "check_ssh_include": '~/.ssh/config Include',
+    "detail_terraform_depasse": 'A newer version exists ({latest}). It is not required.',
+    "detail_collections_apres_ansible": '{count} collection(s) required: checked once Ansible is installed',
+    "detail_groupes_ok": 'your account can reach libvirt and /dev/kvm',
+    "detail_groupes_apres_kvm": 'groups to join once libvirt is installed: {groups}',
+    "detail_groupes_reconnexion": 'you are in {groups}, but this session was opened before: log out and back in',
+    "detail_groupes_manquants": 'your account is not in {groups}: libvirt refuses it without sudo',
+    "detail_efi_apres_kvm": 'checked once libvirt is installed',
+    "detail_efi_absent": 'no EFI firmware without Secure Boot found: provision cannot start a machine',
+    "detail_incus_sans_paquet": "not found, and not packaged in this distribution's base repositories",
+    "detail_cle_ssh_absente": '{path} is missing: provision cannot put a key on the machines',
+    "detail_ssh_include_absent": '~/.ssh/config does not read ~/.ssh/config.d/: `ssh <machine>` will fail',
+    "detail_pool_apres_kvm": "pool '{pool}' checked once libvirt is installed",
     "check_libvirt_pool": "libvirt pool",
     "check_iso_tool":     "genisoimage",
     "check_labs":     "Labs detected",
@@ -1566,7 +1625,7 @@ silent.
         "{providers} (pinned by terraform init)",
     "detail_tf_providers_absents":
         "no provider pinned yet: provision has not run for this repository.",
-    "detail_kvm_missing":    "not found",
+    "detail_kvm_missing":    "virsh not found: provision cannot create any machine",
     "detail_pytest_missing": "not found",
     "detail_pytest_bundled": "bundled with dsoxlab",
     "detail_pytest_via":     "via {cmd}",
@@ -1716,26 +1775,33 @@ silent.
         "standard output, which would leave the document unreadable. Run "
         "`dsoxlab doctor --json` to read the diagnosis, then `dsoxlab doctor "
         "--fix` to act on it.",
-    "fix_count":   "{count} component(s) to fix…",
-    "fix_needs_tty":
-        "At least one remediation requires sudo, but this shell is not "
-        "interactive (no TTY). Run dsoxlab from a terminal, or apply the "
-        "commands by hand.",
-    "fix_no_sudo": "sudo not found in PATH: remediation is impossible.",
-    "fix_sudo_preauth":
-        "[bold]{count}[/bold] command(s) require sudo. Pre-authentication "
-        "below (a single prompt for the whole run):",
-    "fix_sudo_failed": "sudo pre-authentication failed: remediations aborted.",
-    "fix_success": "{label}: remediation successful.",
-    "fix_manual":
-        "{label}: manual step, shown but never run automatically → {command}",
+    "opt_doctor_yes": 'With --fix: run the plan without asking for confirmation',
+    "opt_doctor_clients": 'With --fix: also install the optional components (Docker, Incus)',
+    "opt_doctor_verbose": 'Show every check, and the warnings on green lines',
+    "fix_plan_titre": 'Plan: {count} step(s). Each one is checked again right after; the first failure stops everything.',
+    "fix_plan_sans_sudo": 'Without sudo, run by dsoxlab:',
+    "fix_plan_root": 'With sudo, by the workstation playbook (ansible-playbook asks for your sudo password once):',
+    "fix_plan_reconnexion": '(log in again afterwards)',
+    "fix_plan_manuelles": 'To do yourself (never run automatically):',
+    "fix_plan_a_savoir": 'Not handled: {label} (see "Good to know").',
+    "fix_rien_a_lancer": 'Nothing --fix can run: the remaining steps are yours to do (see above).',
+    "fix_needs_yes": 'Nothing was run: this shell has no terminal to confirm the plan. Add --yes to run it.',
+    "fix_confirmer": 'Run these {count} step(s)?',
+    "fix_annule": 'Nothing was run.',
+    "fix_pas_d_ansible": 'ansible-playbook is not available: the sudo steps are shown below, to paste in a terminal.',
+    "fix_playbook": 'Workstation playbook written to {path}',
+    "fix_etape_ok": '{step}. {label}: done, checked again.',
+    "fix_etape_ko": '{step}. {label}: failed (code {code}).',
+    "fix_etape_non_verifiee": '{step}. {label}: the command succeeded, but the check is still not green.',
+    "fix_arret": 'Stopped. Remaining steps: {steps}. Fix the cause, then run again: dsoxlab doctor --fix',
+    "fix_bloc_root": 'Paste these sudo steps in a terminal, in this order:',
+    "fix_reconnexion_finale": 'Log out and back in before running doctor again: the kvm and libvirt groups only apply to a new session.',
     "fix_needs_relogin":
         "{label}: fixed, but the change only takes effect after you log out "
         "and back in. This line will stay red until then; it is not a failure.",
     "fix_needs_reboot":
         "{label}: fixed, but the change only takes effect after a reboot. "
         "This line will stay red until then; it is not a failure.",
-    "fix_failure": "{label}: remediation failed (code {code}).",
     "fix_rerun":   "Run [bold]dsoxlab doctor[/bold] again to verify.",
 
     # ── console — labs table ──────────────────────────────────────────────────

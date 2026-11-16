@@ -133,6 +133,12 @@ def check_dict(check: Check) -> dict[str, Any]:
         "fix": None if check.fix is None else check.fix.display,
         "fix_kind": None if check.fix is None else check.fix.kind.value,
         "hint": check.hint,
+        # Ajouts compatibles de la refonte du 2026-11-16 : les commandes à
+        # coller (celles que `doctor` affiche, sudo compris), la clé du contrôle
+        # à réparer d'abord, et la mise en garde d'une ligne verte.
+        "commands": list(check.remede.lignes) if check.remede is not None else [],
+        "after": check.apres,
+        "warning": check.mise_en_garde,
     }
 
 
@@ -146,7 +152,9 @@ def doctor_dict(report: DoctorReport) -> dict[str, Any]:
     return {
         "ok": not report.failing(),
         "required": [check_dict(c) for c in report.required],
-        "informational": [check_dict(c) for c in report.optional],
+        # « À savoir » (la mémoire qui ne suffit pas pour tout le catalogue)
+        # informe sans bloquer : elle rejoint les contrôles informatifs.
+        "informational": [check_dict(c) for c in [*report.optional, *report.a_savoir]],
         # Traduites, et c'est assumé : une note explique *pourquoi* un composant
         # est informatif ici. Rien ne s'y décide, donc rien n'a à s'y comparer.
         "notes": list(report.notes),

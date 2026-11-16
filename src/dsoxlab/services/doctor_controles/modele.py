@@ -7,7 +7,6 @@ comportement. Voir ce module pour les principes du diagnostic.
 from __future__ import annotations
 
 import shlex
-import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -15,6 +14,7 @@ from types import ModuleType
 
 from ...exit_codes import ExitCode
 from ...i18n import _
+from .remedes import Remede
 
 #: Les trois états d'un contrôle, en **jetons stables**. Ce sont eux que lit un
 #: programme : un tableau de bord qui devrait comparer « ok » à « présent » puis
@@ -117,10 +117,13 @@ def _installer(apt: Sequence[str], dnf: Sequence[str]) -> list[str]:
     ``qemu-utils`` s'appelle ``qemu-img`` ; ``genisoimage`` n'existe plus sur
     Fedora 43, ``xorriso`` fournit ``xorrisofs``, que le contrôle accepte.
 
-    apt reste le choix par défaut quand aucun des deux n'est trouvé : c'est le
-    comportement d'avant, et la famille Debian celle que dsoxlab éprouve.
+    La famille vient de ``/etc/os-release`` (:func:`.remedes.systeme`), la même
+    lecture que la table des remèdes : deux détections pouvaient se contredire
+    sur un même poste. apt reste le choix par défaut quand rien ne se lit.
     """
-    if shutil.which("apt-get") is None and shutil.which("dnf") is not None:
+    from .remedes import Famille
+
+    if _doctor()._systeme().famille is Famille.RHEL:
         return ["sudo", "dnf", "install", *dnf]
     return ["sudo", "apt", "install", *apt]
 
@@ -153,6 +156,23 @@ class Check:
     à choisir bloque bien le provisionnement, mais rien n'est cassé : le
     dire en rouge revient à traiter une décision comme une panne."""
 
+    remede: Remede | None = None
+    """Les commandes à coller, une par ligne, tirées de la table unique
+    (:mod:`.remedes`). C'est ce que ``doctor`` affiche et ce que le playbook de
+    ``--fix`` joue pour les étapes root. Dérivé de ``fix`` ou de ``hint``
+    quand le contrôle n'en donne pas : voir :func:`_check`."""
+
+    apres: str | None = None
+    """La clé du contrôle qu'il faut réparer d'abord. Le contrôle n'a pas pu
+    mesurer sans lui (le pool sans libvirt, les collections sans Ansible) :
+    il reste listé, en ``unknown``, au lieu de disparaître jusqu'au passage
+    suivant. C'était le défaut principal du parcours mesuré le 2026-11-16 :
+    il fallait relancer ``doctor`` après chaque geste pour voir le suivant."""
+
+    mise_en_garde: str | None = None
+    """Une remarque sur une ligne verte (Terraform plus ancien que la dernière
+    version). Affichée sous ``-v`` seulement, et jamais un échec."""
+
     @property
     def state(self) -> str:
         """L'état du contrôle, en jeton stable."""
@@ -174,13 +194,22 @@ def _check(
     fix: Fix | None = None,
     hint: str | None = None,
     forced_state: str | None = None,
+    remede: Remede | None = None,
+    apres: str | None = None,
+    mise_en_garde: str | None = None,
 ) -> Check:
     """Un contrôle, dont l'identité stable engendre le libellé traduit.
 
     Le libellé n'est pas passé : il se déduit de ``key``. Les deux étaient
     écrits côte à côte à chaque appel, et rien n'aurait empêché un contrôle
     d'annoncer ``kvm`` à un programme et « Terraform » à un humain.
+
+    Sans ``remede`` explicite, il se déduit du correctif (une ligne par argv)
+    ou d'une consigne qui est une commande. Une URL n'est jamais un remède :
+    c'était le défaut de git, Terraform et Docker, qui renvoyaient lire une page.
     """
+    if remede is None and not ok:
+        remede = remede_derive(key, fix, hint)
     return Check(
         key=key,
         label=_(f"check_{key}"),
@@ -189,7 +218,25 @@ def _check(
         fix=fix,
         hint=hint,
         forced_state=forced_state,
+        remede=remede,
+        apres=apres,
+        mise_en_garde=mise_en_garde,
     )
+
+
+def remede_derive(key: str, fix: Fix | None, hint: str | None) -> Remede | None:
+    """Le remède d'un contrôle qui n'en donne pas : son correctif, ou sa consigne."""
+    if fix is not None:
+        return Remede(
+            cle=key,
+            lignes=tuple(shlex.join(cmd) for cmd in fix.commands),
+            root=fix.requires_sudo,
+            tag=key,
+            reconnexion=fix.kind is FixKind.NEEDS_RELOGIN,
+        )
+    if hint and not hint.startswith(("http://", "https://")):
+        return Remede(cle=key, lignes=(hint,), root=hint.startswith("sudo "))
+    return None
 
 
 @dataclass
@@ -211,6 +258,27 @@ class DoctorReport:
     84. Les checks restent hors du requis, sans quoi ``--fix`` proposerait
     d'installer kvm **et** incus pour un choix qui n'est pas fait ; c'est le
     libellé qui devait dire la vérité, pas le classement."""
+
+    a_savoir: list[Check] = field(default_factory=list)
+    """Ce qui mérite d'être lu sans bloquer : la mémoire qui ne suffit pas pour
+    monter tout le catalogue d'un coup (décision du 2026-11-16). Un lab ne monte
+    souvent qu'une machine, et ``provision --host`` le permet : peindre ce cas
+    en rouge requis refusait des postes qui jouent parfaitement leurs labs.
+    Hors de ``failing()``, donc hors du verdict de ``--strict``."""
+
+    catalogue: str | None = None
+    """L'``id`` du catalogue diagnostiqué, ou ``None`` hors de tout catalogue."""
+
+    nb_labs: int = 0
+    systeme: str = ""
+    """Le nom du système (``PRETTY_NAME``), pour l'en-tête."""
+
+    provider: str = ""
+    """Le provider avec lequel le diagnostic a été fait."""
+
+    provider_a_confirmer: bool = False
+    """Le provider n'est pas choisi : le diagnostic a pris celui qu'il
+    recommande, pour ne cacher aucun contrôle, sans l'enregistrer."""
 
     def failing(self) -> list[Check]:
         # Un contrôle ``unknown`` n'a rien prouvé : il ne peut pas peindre le

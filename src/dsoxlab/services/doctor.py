@@ -38,10 +38,10 @@ from __future__ import annotations
 # lui-même et atteint donc les familles. Le découpage de l'issue #199 ne devait
 # réécrire aucun test.
 import os  # noqa: F401
-import platform  # noqa: F401
+import platform
 import shutil  # noqa: F401
 import subprocess  # noqa: F401
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from ..discovery.scanner import compter_fichiers_labs
@@ -50,8 +50,10 @@ from ..infra import ansible as ansible_infra  # noqa: F401 — voir plus haut
 from ..models import LabDefinition, RepoMetadata
 from .doctor_controles.catalogue import (
     _VM_RUNTIMES,
+    _check_cle_ssh,
     _check_lab_home,
     _check_labs,
+    _check_ssh_include,
     uses_vm,
 )
 from .doctor_controles.conteneurs import (
@@ -74,6 +76,8 @@ from .doctor_controles.kvm import (
     _VERSION_UTILISEE,
     Hebergement,
     _check_cpu_arch,
+    _check_efi,
+    _check_groupes,
     _check_hw_virt,
     _check_kvm,
     _hebergement,
@@ -122,6 +126,7 @@ from .doctor_controles.pools import (
     demarrer_pool_fix,
     explique_echec_provision,
 )
+from .doctor_controles.remedes import systeme as _systeme
 from .doctor_controles.reseau import (
     _DELAI_EGRESS,
     _URL_IMAGE,
@@ -142,23 +147,83 @@ from .lab_service import get_all_labs, resolve_pytest_cmd  # noqa: F401 — voir
 #: Ce que les appelants importent d'ici : cli/, tests/, et les familles
 #: elles-mêmes par ``_doctor()``. Rien ne change pour eux (issue #199).
 __all__ = [
-    "EXIT_DOCTOR_INDETERMINE", "EXIT_DOCTOR_REQUIS_KO", "STATE_CHOICE_REQUIRED",
-    "STATE_FAILED", "STATE_OK", "STATE_UNKNOWN", "_APPARMOR_OVERRIDE", "_CPUINFO",
-    "_DELAI_EGRESS", "_KVM_DEVICE", "_LIBVIRT_MINIMUM", "_POOL_ABSENT", "_POOL_INACTIF",
-    "_POOL_INCUS", "_PROVIDER_IMAGE_ARCHS", "_SANS_VM", "_URL_IMAGE",
-    "_VERSION_COMPILEE", "_VERSION_UTILISEE", "_VM_RUNTIMES", "Check", "DoctorReport",
-    "Fix", "FixKind", "Hebergement", "_check", "_check_ansible", "_check_bridge_name",
-    "_check_collections", "_check_cpu_arch", "_check_docker", "_check_egress",
-    "_check_git", "_check_hw_virt", "_check_incus", "_check_incus_pool",
-    "_check_iso_tool", "_check_kvm", "_check_lab_home", "_check_labs",
-    "_check_libvirt_pool", "_check_pytest", "_check_python", "_check_resources",
-    "_check_shell", "_check_terraform", "_check_tf_providers", "_current_user", "_fix",
-    "_hebergement", "_hotes_a_compter", "_hotes_images", "_installer", "_joignable",
-    "_mem_available_mb", "_pool_available_gb", "_pool_cite", "_pools_libvirt",
-    "_sonde_virsh", "_sonder", "_version_libvirt", "apparmor_fix_command",
-    "apparmor_override_absent", "creer_pool_command", "creer_pool_fix",
-    "demarrer_pool_command", "demarrer_pool_fix", "explique_echec_provision",
-    "nom_du_pool", "uses_services", "uses_vm",
+    "EXIT_DOCTOR_INDETERMINE",
+    "EXIT_DOCTOR_REQUIS_KO",
+    "STATE_CHOICE_REQUIRED",
+    "STATE_FAILED",
+    "STATE_OK",
+    "STATE_UNKNOWN",
+    "_APPARMOR_OVERRIDE",
+    "_CPUINFO",
+    "_DELAI_EGRESS",
+    "_KVM_DEVICE",
+    "_LIBVIRT_MINIMUM",
+    "_POOL_ABSENT",
+    "_POOL_INACTIF",
+    "_POOL_INCUS",
+    "_PROVIDER_IMAGE_ARCHS",
+    "_SANS_VM",
+    "_URL_IMAGE",
+    "_VERSION_COMPILEE",
+    "_VERSION_UTILISEE",
+    "_VM_RUNTIMES",
+    "Check",
+    "DoctorReport",
+    "Fix",
+    "FixKind",
+    "Hebergement",
+    "_check",
+    "_check_ansible",
+    "_check_bridge_name",
+    "_check_cle_ssh",
+    "_check_collections",
+    "_check_cpu_arch",
+    "_check_docker",
+    "_check_efi",
+    "_check_egress",
+    "_check_git",
+    "_check_groupes",
+    "_check_hw_virt",
+    "_check_incus",
+    "_check_incus_pool",
+    "_check_iso_tool",
+    "_check_kvm",
+    "_check_lab_home",
+    "_check_labs",
+    "_check_libvirt_pool",
+    "_check_pytest",
+    "_check_python",
+    "_check_resources",
+    "_check_shell",
+    "_check_ssh_include",
+    "_check_terraform",
+    "_check_tf_providers",
+    "_current_user",
+    "_fix",
+    "_hebergement",
+    "_hotes_a_compter",
+    "_hotes_images",
+    "_installer",
+    "_joignable",
+    "_mem_available_mb",
+    "_pool_available_gb",
+    "_pool_cite",
+    "_pools_libvirt",
+    "_sonde_virsh",
+    "_sonder",
+    "_systeme",
+    "_version_libvirt",
+    "apparmor_fix_command",
+    "apparmor_override_absent",
+    "creer_pool_command",
+    "creer_pool_fix",
+    "demarrer_pool_command",
+    "demarrer_pool_fix",
+    "explique_echec_provision",
+    "nom_du_pool",
+    "provider_recommande",
+    "uses_services",
+    "uses_vm",
 ]
 
 #: Providers packagés qui reposent sur un hyperviseur **local**, donc
@@ -234,6 +299,28 @@ def _ranger_sortie_reseau(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> No
     report.optional.append(_check_tf_providers(ctx.repo_meta))
 
 
+def provider_recommande(candidates: list[str]) -> str:
+    """Le provider que le diagnostic prend quand le catalogue en laisse plusieurs.
+
+    kvm sur un Linux qui expose ``/dev/kvm`` : c'est le provider que les
+    catalogues éprouvent. Sinon le premier hyperviseur local déclaré, puis le
+    premier candidat. Rien n'est enregistré : le choix reste une étape du plan,
+    confirmée par l'utilisateur (décision 4 du 2026-11-16).
+    """
+    if "kvm" in candidates and platform.system() == "Linux" and _kvm_present():
+        return "kvm"
+    for nom in candidates:
+        if nom in _LOCAL_HYPERVISORS:
+            return nom
+    return candidates[0] if candidates else "kvm"
+
+
+def _kvm_present() -> bool:
+    from .doctor_controles.modele import _doctor
+
+    return bool(_doctor()._KVM_DEVICE.exists())
+
+
 def _ranger_hyperviseurs(
     report: DoctorReport,
     ctx: _CeQueLeDepotDemande,
@@ -272,13 +359,27 @@ def _ranger_hyperviseurs(
     # choix que l'apprenant n'a pas encore fait. C'est le libellé du tableau
     # qui mentait, en annonçant « non requis ici » et « ces composants ne
     # bloquent rien » au-dessus du composant qui bloque 64 labs sur 84.
-    premier = ctx.candidates[0] if ctx.candidates else "kvm"
+    #
+    # Depuis la refonte du 2026-11-16, le diagnostic ne s'arrête plus là : il
+    # prend le provider qu'il recommande, et contrôle tout ce que ce choix
+    # demande. Avant, tous les contrôles kvm restaient cachés jusqu'au choix,
+    # et l'apprenant découvrait le chemin une commande à la fois. Seul
+    # l'hyperviseur recommandé passe en requis : `--fix` n'installe donc pas
+    # kvm ET incus.
+    recommande = provider_recommande(ctx.candidates)
     report.required.append(_check(
         "provider", False,
         _("detail_provider_unresolved", candidates=", ".join(ctx.candidates) or "?"),
-        hint=f"dsoxlab use --provider {premier}",
+        hint=f"dsoxlab use --provider {recommande}",
         forced_state=STATE_CHOICE_REQUIRED,
     ))
+    report.provider_a_confirmer = True
+    if recommande in hypervisors:
+        report.required.append(hypervisors[recommande])
+        report.optional.extend(
+            _sort_hypervisors([n for n in _LOCAL_HYPERVISORS if n != recommande])
+        )
+        return
     report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
     report.optional_title_key = "doctor_choose_title"
     report.optional_hint_key = "doctor_choose_hint"
@@ -299,9 +400,19 @@ def _ranger_materiel_local(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> N
     if ctx.repo_meta is None:
         return
     if ctx.repo_meta.infra.hosts:
-        report.required.append(
-            _check_resources(ctx.repo_meta.infra, ctx.active, ctx.hotes_demandes)
-        )
+        ressources = _check_resources(ctx.repo_meta.infra, ctx.active, ctx.hotes_demandes)
+        if ctx.hotes_demandes is None and ressources.state == STATE_FAILED:
+            # Tout le catalogue ne tient pas en mémoire : « À savoir », non
+            # bloquant (décision 6 du 2026-11-16). Un lab ne monte souvent
+            # qu'une machine, et `provision --host` le permet. `start <lab>`,
+            # qui passe les hôtes de son lab, garde le contrôle bloquant : là,
+            # la mémoire manque pour CE lab.
+            premier = ctx.repo_meta.infra.hosts[0].name
+            report.a_savoir.append(replace(
+                ressources, hint=f"dsoxlab provision --host {premier}", remede=None,
+            ))
+        else:
+            report.required.append(ressources)
     # Le nom du pont ne dépend que du contrat : aucune sonde, donc aucune
     # raison de le taire quand l'hyperviseur manque. Il vaut mieux ici qu'au
     # premier `provision`, où l'échec arrive après le téléchargement de
@@ -327,20 +438,33 @@ def _ranger_outillage_vm(
     if ctx.active in _LOCAL_HYPERVISORS:
         _ranger_materiel_local(report, ctx)
 
-    # Ces contrôles-ci portent sur la CONFIGURATION d'un hyperviseur déjà
-    # installé. Les jouer quand l'hyperviseur lui-même manque empilerait trois
-    # lignes rouges pour une seule cause, et noierait celle qui compte : c'est
-    # exactement ce qui décourageait au premier lancement.
-    if ctx.active == "kvm" and hypervisors["kvm"].ok:
+    # Ces contrôles-ci portent sur la CONFIGURATION d'un hyperviseur. Quand
+    # l'hyperviseur manque, ils ne peuvent pas mesurer : ils restent listés,
+    # en attente de l'étape qui l'installe, avec leur commande (refonte du
+    # 2026-11-16). Avant, ils disparaissaient, et chaque passage de `doctor`
+    # en révélait un de plus.
+    if ctx.active == "kvm":
+        kvm_ok = hypervisors["kvm"].ok
+        report.required.append(_check_groupes(kvm_ok))
         # Même lecture que `_check_resources` et que le template Terraform :
         # une seule fonction la porte, sinon les trois divergent un jour.
         pool = nom_du_pool(ctx.repo_meta.infra) if ctx.repo_meta else "default"
-        report.required.append(_check_libvirt_pool(pool))
+        if kvm_ok:
+            report.required.append(_check_libvirt_pool(pool))
+        else:
+            report.required.append(_check(
+                "libvirt_pool", False, _("detail_pool_apres_kvm", pool=pool),
+                forced_state=STATE_UNKNOWN, apres="kvm", fix=creer_pool_fix(pool),
+            ))
+        report.required.append(_check_efi(kvm_ok))
     elif ctx.active == "incus" and hypervisors["incus"].ok:
         # Symétrie avec la branche kvm : elle contrôle son pool de stockage,
         # celle-ci ne contrôlait que l'outil ISO.
         report.required.append(_check_incus_pool())
         report.required.append(_check_iso_tool())
+    if ctx.repo_meta is not None and ctx.active in _LOCAL_HYPERVISORS:
+        report.required.append(_check_cle_ssh(ctx.root))
+        report.required.append(_check_ssh_include())
 
 
 def collect_checks(
@@ -378,7 +502,11 @@ def collect_checks(
     )
     hypervisors = _hypervisor_checks()
 
-    report = DoctorReport()
+    report = DoctorReport(
+        catalogue=repo_meta.id if repo_meta else None,
+        nb_labs=len(labs),
+        systeme=_systeme().nom,
+    )
     report.required.extend([_check_python(), _check_pytest(root), _check_shell()])
     # git sert au parcours d'accueil (`catalog add` clone), quel que soit le
     # domaine du dépôt : il est requis partout.
@@ -386,6 +514,10 @@ def collect_checks(
     _ranger_docker(report, labs)
     _ranger_sortie_reseau(report, ctx)
     _ranger_hyperviseurs(report, ctx, hypervisors)
+    if ctx.needs_vm and not ctx.active and report.provider_a_confirmer:
+        ctx = replace(ctx, active=provider_recommande(ctx.candidates))
+    # Un catalogue sans machine n'a pas de provider à annoncer.
+    report.provider = ctx.active if ctx.needs_vm else ""
     if ctx.needs_vm:
         _ranger_outillage_vm(report, ctx, hypervisors)
 
