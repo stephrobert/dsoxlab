@@ -127,6 +127,7 @@ STRINGS: dict[str, str] = {
     "opt_run_target":    "Execution target for this run (overrides --target from 'use'). Must match a runtime.targets[].name.",
     "opt_check_target":  "Target to validate against (overrides the session target). Must match a runtime.targets[].name: the tests run on that host.",
     "unknown_target":    "Unknown target '{target}' for this lab. Declared targets: {declared}.",
+    "run_cible_non_montee": "This lab targets {hosts}, which is not running: it was not brought up (a provision limited with --host, or not enough memory for the whole catalogue). Nothing was played.\nBring it up, then run the lab again:\n  {command}",
     "infra_not_provisioned": "This lab needs a VM, and none is running: the lab infrastructure is not provisioned.\nBring it up first:\n  dsoxlab provision",
     "cmd_list_labs_help":"List all available labs (filtered by active context if set).",
     "cmd_progress_help": "Show progression by bloc (labs completed, average score, challenges and capstones).",
