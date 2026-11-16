@@ -7,6 +7,37 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.7] - 2026-11-16
+
+### Corrigé
+
+- **Installer Docker ajoute votre compte au groupe `docker`, et un démon qui
+  refuse reçoit une commande.** Sur Pop!_OS 24.04, `doctor --fix --clients`
+  installait Docker puis jugeait sa propre étape en échec : le démon répondait
+  « permission denied » à un compte hors du groupe `docker`, et le contrôle ne
+  proposait qu'un lien, si bien que Docker disparaissait ensuite du diagnostic
+  (ni installé, ni à installer). L'étape Docker finit désormais par
+  `sudo usermod -aG docker $USER`, comme le demande la page de
+  post-installation de Docker, et demande de se reconnecter. Un Docker déjà
+  installé qui refuse le compte reçoit la même commande, ou seulement
+  « déconnectez-vous puis reconnectez-vous » quand le compte est déjà dans le
+  groupe.
+- **Installer Incus fait de même : groupe `incus-admin`, puis
+  `incus admin init --auto`.** Installé seul, Incus refusait le compte et
+  n'avait aucun pool ; `--fix` jugeait alors sa propre étape en échec et
+  s'arrêtait avant Docker. Un Incus qui refuse un compte déjà dans le groupe
+  demande seulement de se reconnecter.
+- Le message final de `--fix` ne nomme plus « les groupes kvm et libvirt »
+  quel que soit le groupe ajouté, et `doctor` ne propose plus
+  `dsoxlab doctor --fix` quand la seule étape restante est une étape que
+  `--fix` ne lance pas (récupérer un catalogue).
+
+Testé sur une VM Ubuntu 24.04 neuve, avec un compte dont le sudo exige un mot
+de passe, un sudo tapé juste avant dans le même terminal, puis
+`doctor --fix --clients` : une seule demande de mot de passe, Incus et Docker
+installés et revérifiés ; après reconnexion, `docker ps` et `incus list`
+répondent.
+
 ## [0.9.6] - 2026-11-16
 
 ### Corrigé

@@ -22,6 +22,10 @@ from dataclasses import dataclass, field
 from .doctor_controles.modele import STATE_OK, STATE_UNKNOWN, Check, DoctorReport
 from .doctor_controles.remedes import Remede, rang
 
+#: Les étapes que dsoxlab fait lui-même, sans commande externe (voir
+#: ``cli/diagnostic.py:_actions``).
+ACTIONS_INTERNES = frozenset({"provider", "cle_ssh", "ssh_include"})
+
 #: Les composants que `doctor --fix --clients` installe quand ils sont facultatifs.
 _CLIENTS = frozenset({"docker", "incus"})
 
@@ -46,6 +50,20 @@ class Etape:
     @property
     def detail(self) -> str:
         return self.controles[0].detail
+
+    @property
+    def lancable(self) -> bool:
+        """`--fix` sait-il la jouer ? Par le playbook (root), par un correctif
+        sans shell, ou par une action de dsoxlab. Une consigne affichée, comme
+        « récupérer un catalogue », ne l'est pas : `doctor` proposait pourtant
+        « dsoxlab doctor --fix » pour elle seule (réévaluation du 2026-11-16)."""
+        if self.manuelle:
+            return False
+        if self.remede is not None and self.remede.root:
+            return True
+        if self.cle in ACTIONS_INTERNES:
+            return True
+        return any(c.fix is not None and c.fix.kind.value != "manual" for c in self.controles)
 
     @property
     def manuelle(self) -> bool:

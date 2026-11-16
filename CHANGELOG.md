@@ -7,6 +7,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-11-16
+
+### Fixed
+
+- **Installing Docker adds your account to the `docker` group, and a refused
+  daemon gets a command.** On Pop!_OS 24.04, `doctor --fix --clients`
+  installed Docker, then judged its own step failed: the daemon answered
+  "permission denied" to an account outside the `docker` group, and the check
+  only offered a link, so Docker then vanished from the diagnosis (neither
+  installed nor to install). The Docker step now ends with
+  `sudo usermod -aG docker $USER`, as Docker's post-installation page says,
+  and asks to log in again. A Docker already installed that refuses the
+  account gets the same command, or only "log out and back in" when the
+  account is already in the group.
+- **Installing Incus does the same: `incus-admin` group, then
+  `incus admin init --auto`.** Installed alone, Incus refused the account and
+  had no storage pool; `--fix` then judged its own step failed and stopped
+  before Docker. An Incus that refuses an account already in the group only
+  asks to log in again.
+- The final `--fix` message no longer names "the kvm and libvirt groups"
+  whatever group was added, and `doctor` no longer offers
+  `dsoxlab doctor --fix` when the only remaining step is one `--fix` cannot run
+  (getting a catalogue).
+
+Tested on a fresh Ubuntu 24.04 VM with an account whose sudo needs a
+password, a sudo typed just before in the same terminal, then
+`doctor --fix --clients`: one password prompt, Incus and Docker installed and
+checked again; after logging in again, `docker ps` and `incus list` answer.
+
 ## [0.9.6] - 2026-11-16
 
 ### Fixed

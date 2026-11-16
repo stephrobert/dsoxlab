@@ -494,3 +494,108 @@ def test_les_etapes_facultatives_se_numerotent_a_la_suite() -> None:
     plan = construire(report)
     assert [e.numero for e in plan.etapes] == [1]
     assert [e.numero for e in plan.facultatives] == [2]
+
+
+# ── Docker : le groupe docker, que la doc officielle demande ──────────────────
+
+def _docker_refuse(monkeypatch: pytest.MonkeyPatch, inscrit: bool) -> None:
+    class Reponse:
+        returncode = 1
+        stdout = ""
+        stderr = ("permission denied while trying to connect to the docker API at "
+                  "unix:///var/run/docker.sock")
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(doctor, "_sonder", lambda cmd, delai=5, env=None: Reponse())
+    monkeypatch.setattr(kvm_controles, "_gid", lambda n: 990 if n == "docker" else None)
+    monkeypatch.setattr(kvm_controles, "_inscrit", lambda n, g: inscrit)
+
+
+def test_docker_refuse_fait_proposer_le_groupe_docker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pop!_OS 24.04 : Docker installé, `docker ps` refusé, et le contrôle ne
+    donnait qu'un lien : Docker disparaissait du diagnostic."""
+    _os_release(monkeypatch, tmp_path, UBUNTU)
+    _docker_refuse(monkeypatch, inscrit=False)
+    check = doctor._check_docker()
+
+    assert check.state == doctor.STATE_FAILED
+    assert check.remede is not None and check.remede.cle == "docker"
+    assert check.remede.lignes == ("sudo usermod -aG docker $USER",)
+    assert check.remede.reconnexion
+
+
+def test_docker_refuse_mais_compte_inscrit_attend_la_reconnexion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _os_release(monkeypatch, tmp_path, UBUNTU)
+    _docker_refuse(monkeypatch, inscrit=True)
+    check = doctor._check_docker()
+
+    assert check.remede is not None and check.remede.lignes == ()
+    assert check.remede.reconnexion
+
+
+@pytest.mark.parametrize("contenu", [UBUNTU, ALMA])
+def test_installer_docker_ajoute_le_compte_au_groupe(tmp_path: Path, contenu: str) -> None:
+    """Sinon --fix installe Docker et juge aussitôt sa propre étape en échec."""
+    fichier = tmp_path / "os-release"
+    fichier.write_text(contenu, encoding="utf-8")
+    remede = remedes.remede("docker", remedes.systeme(fichier))
+    assert remede is not None
+    assert remede.lignes[-1] == "sudo usermod -aG docker $USER"
+    assert remede.reconnexion
+
+
+# ── Incus : même cas que Docker (réévaluation du 2026-11-16) ──────────────────
+
+def test_installer_incus_pose_le_groupe_et_l_initialisation(tmp_path: Path) -> None:
+    fichier = tmp_path / "os-release"
+    fichier.write_text(UBUNTU, encoding="utf-8")
+    remede = remedes.remede("incus", remedes.systeme(fichier))
+    assert remede is not None
+    assert remede.lignes == ("sudo apt install incus", "sudo usermod -aG incus-admin $USER",
+                             "sudo incus admin init --auto")
+    assert remede.reconnexion
+
+
+@pytest.mark.parametrize(("inscrit", "lignes"), [
+    (False, ("sudo usermod -aG incus-admin $USER",)),
+    (True, ()),
+])
+def test_incus_refuse_le_compte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inscrit: bool, lignes: tuple[str, ...],
+) -> None:
+    class Reponse:
+        def __init__(self, code: int, err: str = "") -> None:
+            self.returncode, self.stdout, self.stderr = code, "6.0.0", err
+
+    def sonder(cmd: list[str], delai: float = 5, env: object = None) -> Reponse:
+        if cmd[:2] == ["incus", "list"]:
+            return Reponse(1, "Error: You don't have the needed permissions to talk to the incus daemon")
+        return Reponse(0)
+
+    _os_release(monkeypatch, tmp_path, UBUNTU)
+    monkeypatch.setattr(doctor.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(doctor, "_sonder", sonder)
+    monkeypatch.setattr(kvm_controles, "_gid", lambda n: 987)
+    monkeypatch.setattr(kvm_controles, "_inscrit", lambda n, g: inscrit)
+    check = doctor._check_incus()
+
+    assert check.remede is not None
+    assert check.remede.lignes == lignes
+    assert check.remede.reconnexion
+
+
+def test_doctor_ne_propose_pas_fix_pour_une_simple_consigne() -> None:
+    """Hors catalogue, « récupérer un catalogue » ne se lance pas par `--fix`."""
+    from dsoxlab.services.doctor_controles.modele import DoctorReport
+
+    report = DoctorReport()
+    report.required.append(doctor._check("labs", False, "0 labs",
+                                         hint="dsoxlab demo, or dsoxlab catalog add linux"))
+    assert not any(e.lancable for e in construire(report).etapes)
+    report.required.append(doctor._check("ansible", False, "absent",
+                                         fix=doctor.Fix((("uv", "tool", "install", "ansible-core"),))))
+    assert any(e.lancable for e in construire(report).etapes)
