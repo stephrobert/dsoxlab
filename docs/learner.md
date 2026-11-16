@@ -183,7 +183,7 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
 
-Incus is packaged on Debian and Ubuntu (`sudo apt install incus`), and in no
+Incus is packaged on Debian and Ubuntu (`sudo apt install incus`, then `sudo usermod -aG incus-admin $USER` and `sudo incus admin init --auto`, and a new login), and in no
 base repository of the RHEL family.
 
 ---

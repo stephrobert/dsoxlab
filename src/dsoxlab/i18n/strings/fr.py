@@ -1844,7 +1844,7 @@ hors ligne, elle se tait.
     "fix_etape_non_verifiee": "{step}. {label} : la commande a réussi, mais le contrôle n'est toujours pas vert.",
     "fix_arret": 'Arrêt. Restent les étapes : {steps}. Corrigez la cause, puis relancez : dsoxlab doctor --fix',
     "fix_bloc_root": 'Collez ces étapes avec sudo dans un terminal, dans cet ordre :',
-    "fix_reconnexion_finale": "Reconnectez-vous avant de relancer doctor : les groupes kvm et libvirt ne valent qu'après une nouvelle session.",
+    "fix_reconnexion_finale": "Reconnectez-vous avant de relancer doctor : les groupes que vous venez de rejoindre ne valent qu'après une nouvelle session.",
     "fix_plan_ansible_d_abord": "Ansible est installé d'abord, sans sudo : uv tool install ansible-core",
     "fix_installe_ansible": "Installation d'Ansible d'abord (uv tool install ansible-core) : le playbook du poste en a besoin.",
     "fix_plan_reverifiees": "Revérifiés après le playbook (ils l'attendaient) :",

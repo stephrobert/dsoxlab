@@ -133,6 +133,10 @@ _TERRAFORM_FEDORA = (
 _GROUPE_DOCKER = "sudo usermod -aG docker $USER"
 
 
+#: Le groupe qui donne à un compte le contrôle complet d'incus.
+_GROUPE_INCUS = "sudo usermod -aG incus-admin $USER"
+
+
 def _docker_debian(identifiant: str) -> tuple[str, ...]:
     distribution = "debian" if identifiant == "debian" else "ubuntu"
     return (
@@ -230,7 +234,11 @@ def _incus(s: Systeme, v: dict[str, str]) -> Remede | None:
     # plutôt qu'une commande qui échoue.
     if s.famille is Famille.RHEL:
         return None
-    return Remede("incus", ("sudo apt install incus",), root=True, tag="incus")
+    # Installé seul, incus refuse le compte (« needed permissions to talk to
+    # the incus daemon ») et n'a ni pool ni réseau : la même étape pose le
+    # groupe et l'initialisation (réévaluation du 2026-11-16, Ubuntu 24.04).
+    return Remede("incus", ("sudo apt install incus", _GROUPE_INCUS, "sudo incus admin init --auto"),
+                  root=True, tag="incus", reconnexion=True)
 
 
 _Fabrique = Callable[[Systeme, dict[str, str]], "Remede | None"]
@@ -262,6 +270,8 @@ TABLE: dict[str, _Fabrique] = {
     "docker": _docker,
     # Docker installé, compte hors du groupe : la même étape « docker », sans
     # réinstaller.
+    "incus_groupe": lambda s, v: Remede(
+        "incus", (_GROUPE_INCUS,), root=True, tag="incus", reconnexion=True),
     "docker_groupe": lambda s, v: Remede(
         "docker", (_GROUPE_DOCKER,), root=True, tag="docker", reconnexion=True),
 }

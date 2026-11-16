@@ -12,7 +12,7 @@ import shutil
 
 from ...i18n import _
 from .modele import STATE_UNKNOWN, Check, FixKind, _check, _doctor, _fix
-from .remedes import remede
+from .remedes import Remede, remede
 
 
 def _current_user() -> str:
@@ -75,14 +75,7 @@ def _check_incus() -> Check:
         # NEEDS_RELOGIN : l'appartenance à un groupe ne prend effet qu'à la
         # session suivante. Sans cette catégorie, l'utilisateur relançait
         # `doctor`, revoyait le rouge, et croyait le correctif en échec.
-        return _check(
-            "incus", False,
-            _("detail_incus_no_group", version=version),
-            fix=_fix(
-                ["sudo", "usermod", "-aG", "incus,incus-admin", _current_user()],
-                kind=FixKind.NEEDS_RELOGIN,
-            ),
-        )
+        return _check_groupe_incus(version)
     if "no storage pools" in err or "init" in err:
         return _check(
             "incus", False,
@@ -92,6 +85,29 @@ def _check_incus() -> Check:
 
     tail = (probe.stderr or probe.stdout).strip().splitlines()
     return _check("incus", False, tail[-1] if tail else _("detail_unknown_error"))
+
+
+def _check_groupe_incus(version: str) -> Check:
+    """Le démon tourne mais refuse ce compte : le groupe incus-admin manque.
+
+    Inscrit mais pas reconnecté : seule la reconnexion compte. Sans ce cas,
+    `--fix` installait incus et jugeait aussitôt sa propre étape en échec
+    (réévaluation du 2026-11-16 sur Ubuntu 24.04).
+    """
+    from .kvm import _gid, _inscrit
+
+    gid = _gid("incus-admin")
+    if gid is not None and _inscrit("incus-admin", gid):
+        return _check(
+            "incus", False, _("detail_groupes_reconnexion", groups="incus-admin"),
+            remede=Remede("incus", (), root=False, reconnexion=True),
+        )
+    return _check(
+        "incus", False, _("detail_incus_no_group", version=version),
+        fix=_fix(["sudo", "usermod", "-aG", "incus-admin", _current_user()],
+                 kind=FixKind.NEEDS_RELOGIN),
+        remede=remede("incus_groupe", _doctor()._systeme()),
+    )
 
 
 #: Le pool que le template Incus écrit en dur dans ses volumes. Il n'est

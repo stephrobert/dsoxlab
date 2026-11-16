@@ -21,6 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and asks to log in again. A Docker already installed that refuses the
   account gets the same command, or only "log out and back in" when the
   account is already in the group.
+- **Installing Incus does the same: `incus-admin` group, then
+  `incus admin init --auto`.** Installed alone, Incus refused the account and
+  had no storage pool; `--fix` then judged its own step failed and stopped
+  before Docker. An Incus that refuses an account already in the group only
+  asks to log in again.
+- The final `--fix` message no longer names "the kvm and libvirt groups"
+  whatever group was added, and `doctor` no longer offers
+  `dsoxlab doctor --fix` when the only remaining step is one `--fix` cannot run
+  (getting a catalogue).
+
+Tested on a fresh Ubuntu 24.04 VM with an account whose sudo needs a
+password, a sudo typed just before in the same terminal, then
+`doctor --fix --clients`: one password prompt, Incus and Docker installed and
+checked again; after logging in again, `docker ps` and `incus list` answer.
 
 ## [0.9.6] - 2026-11-16
 
