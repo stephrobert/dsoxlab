@@ -264,7 +264,10 @@ dsoxlab logout    # forget the session on this machine
 ```
 
 Nothing is sent until you type `push`. `check` and `submit` record locally and
-send nothing, as before.
+send nothing, as before. The first time a `check` or a `submit` records an
+attempt on your machine, in a terminal, dsoxlab reminds you of these commands,
+once, with `dsoxlab push --dry-run` to see first what would be sent. It does not
+show it again, and it sends nothing.
 
 `push` merges: it reads what the account already holds, adds what it does not,
 and **writes nothing at all** when the account is already exactly up to date —

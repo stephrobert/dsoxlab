@@ -271,7 +271,10 @@ dsoxlab logout    # oublier la session sur cette machine
 ```
 
 Rien ne part avant que vous tapiez `push`. `check` et `submit` enregistrent en
-local et n'envoient rien, comme avant.
+local et n'envoient rien, comme avant. La première fois qu'un `check` ou un
+`submit` enregistre une tentative sur votre machine, dans un terminal, dsoxlab
+vous rappelle ces commandes, une seule fois, avec `dsoxlab push --dry-run` pour
+voir d'abord ce qui serait envoyé. Il ne le répète pas, et n'envoie rien.
 
 `push` fusionne : il lit ce que le compte porte déjà, ajoute ce qui lui manque,
 et **n'écrit rien du tout** quand le compte est déjà exactement à jour. Il le

@@ -659,6 +659,12 @@ STRINGS: dict[str, str] = {
         "ready. The others were not brought up, so they were not checked.",
     "provision_done":      "Provisioning complete: {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
+    "push_invite_saved": "Your attempt is saved on this machine.",
+    "push_invite_where": "To find it in My learning, on the site:",
+    "push_invite_cmd_login": "  dsoxlab login     # once, if needed",
+    "push_invite_cmd_push": "  dsoxlab push",
+    "push_invite_dry_run": "To see first what would be sent: dsoxlab push --dry-run",
+    "push_invite_nothing_sent": "No result is sent without your action.",
     "provision_autostart_refused":
         "Could not set the start with the host of {host}: {error}\n"
         "The machine may start on its own at the next reboot of the host. "

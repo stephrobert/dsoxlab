@@ -9,6 +9,21 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.9.5] - 2026-11-16
 
+### Ajouté
+
+- **Une invitation au premier `push`, affichée une fois par machine.** Après
+  la première tentative qu'un `check` ou un `submit` enregistre, dans un
+  terminal, sur un catalogue qui déclare un compte (`learning.sync`), dsoxlab
+  dit comment retrouver le résultat dans Mon apprentissage sur le site :
+  `dsoxlab login` (seulement quand aucune session de ce portail n'est
+  enregistrée), `dsoxlab push`, `dsoxlab push --dry-run` pour voir d'abord ce
+  qui serait envoyé, et « Aucun résultat n'est envoyé sans votre action ». Sur
+  `submit`, elle vient après le lien de remise. Elle n'envoie rien, n'ouvre
+  aucune connexion, ne rafraîchit aucun jeton, ne s'affiche jamais avec
+  `--json` ni hors d'un terminal, et ne change ni le verdict ni le code de
+  sortie. Un marqueur sous `XDG_STATE_HOME`
+  (`dsoxlab/invitation-push-affichee`) l'empêche de revenir.
+
 ### Modifié
 
 - **Les machines provisionnées ne démarrent plus avec l'hôte, sauf si le

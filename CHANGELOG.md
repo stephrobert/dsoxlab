@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.5] - 2026-11-16
 
+### Added
+
+- **An invitation to the first `push`, shown once per machine.** After the
+  first attempt that a `check` or a `submit` records, in a terminal, on a
+  catalogue that declares an account (`learning.sync`), dsoxlab says how to
+  find the result in My learning on the site: `dsoxlab login` (only when no
+  session of that portal is stored), `dsoxlab push`, `dsoxlab push --dry-run`
+  to see first what would be sent, and "No result is sent without your
+  action". On `submit`, it comes after the submission link. It sends nothing,
+  opens no connection, refreshes no token, never shows with `--json` nor
+  outside a terminal, and changes neither the verdict nor the exit code. A
+  marker under `XDG_STATE_HOME` (`dsoxlab/invitation-push-affichee`) keeps it
+  from showing again.
+
 ### Changed
 
 - **Provisioned machines no longer start with the host, unless the catalogue

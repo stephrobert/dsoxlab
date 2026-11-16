@@ -157,9 +157,37 @@ def check(
     if result.ok:
         success(_("all_tests_passed"))
         info(_("check_tip_submit"))
+        _inviter_au_premier_push(root, result)
     else:
         error(_("tests_failed"))
+        _inviter_au_premier_push(root, result)
         raise typer.Exit(1)
+
+
+def _inviter_au_premier_push(root: Path, result: Any) -> None:
+    """L'invitation unique au premier ``push`` (services/invitation_push.py).
+
+    Après le verdict, jamais avant ; jamais sur le chemin ``--json``, qui ne
+    passe pas par ici. Elle ne change ni le verdict ni le code de sortie, et
+    n'envoie rien.
+    """
+    from .. import __version__
+    from ..services import invitation_push
+
+    invitation = invitation_push.a_proposer(
+        root, mesuree=a_mesure(result), terminal=invitation_push.terminal()
+    )
+    if invitation is None:
+        return
+    console.print()
+    console.print(_("push_invite_saved"))
+    console.print(_("push_invite_where"))
+    if invitation.avec_login:
+        console.print(_("push_invite_cmd_login"))
+    console.print(_("push_invite_cmd_push"))
+    console.print(_("push_invite_dry_run"))
+    console.print(_("push_invite_nothing_sent"))
+    invitation_push.marquer_comme_affichee(__version__)
 
 
 # ── submit ────────────────────────────────────────────────────────────────────
@@ -302,6 +330,9 @@ def submit(
                          "\n".join(f"  {nom}" for nom in bloques))
 
     _proposer_la_remise(root, lab)
+    # Après le lien de remise, sans le remplacer : une fois par machine, au
+    # premier de check ou submit qui enregistre une tentative.
+    _inviter_au_premier_push(root, result)
 
     set_active_lab(root, None)
     console.print()
