@@ -93,7 +93,10 @@ locals {
 }
 
 resource "libvirt_network" "lab" {
-  name      = var.network_name
+  name = var.network_name
+  # Le RÉSEAU démarre avec l'hôte, contrairement aux machines (var.autostart,
+  # issue #377) : il ne coûte pas de mémoire, et sans lui une VM relancée à la
+  # main après un redémarrage refuse de démarrer sur un réseau inactif.
   autostart = true
 
   forward = {
@@ -314,9 +317,11 @@ resource "libvirt_domain" "host" {
 
   name = each.value.name
   # 0.9.x : memory est en KiB (pas MiB). 2048 MB → 2 097 152 KiB.
-  memory    = each.value.ram_mb * 1024
-  vcpu      = each.value.vcpu
-  autostart = true
+  memory = each.value.ram_mb * 1024
+  vcpu   = each.value.vcpu
+  # Sur demande seulement (issue #377) : `infra.autostart: true` du meta.yml.
+  # Posé à la CRÉATION seulement : voir le lifecycle en fin de ressource.
+  autostart = var.autostart
   running   = true
   type      = "kvm"
 
@@ -501,5 +506,15 @@ resource "libvirt_domain" "host" {
     # - les logs dnsmasq + journalctl pour le debug si cloud-init plante
     # À reprendre dans une PR future quand un exemple fonctionnel
     # sera disponible côté upstream.
+  }
+
+  # `autostart` n'est jamais MIS À JOUR par Terraform (issue #377). Mesuré le
+  # 2026-11-16 : le passer de true à false sur un domaine EN MARCHE fait
+  # échouer l'apply (« Provider produced inconsistent result », `.id` 8 -> 9,
+  # dmacvicar/libvirt 0.9.7). Terraform le pose à la création ; dsoxlab
+  # l'aligne ensuite par `virsh autostart` (terraform._aligner_autostart_kvm),
+  # comme il le fait déjà pour les baux DHCP du réseau.
+  lifecycle {
+    ignore_changes = [autostart]
   }
 }

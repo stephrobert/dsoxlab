@@ -133,6 +133,7 @@ leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
 | [`gitlab-ci-dsoxlab-training`](https://github.com/stephrobert/gitlab-ci-dsoxlab-training) | 29 | GitLab CI/CD, sur une forge hébergée par vos soins |
 | [`bdd-dsoxlab-training`](https://github.com/stephrobert/bdd-dsoxlab-training) | 17 | Bases relationnelles : installer, sécuriser, protéger et répliquer PostgreSQL et MySQL |
 | [`iam-dsoxlab-training`](https://github.com/stephrobert/iam-dsoxlab-training) | 16 | Gestion des identités et des accès, avec Keycloak et un annuaire |
+| [`applications-ia-dsoxlab-training`](https://github.com/stephrobert/applications-ia-dsoxlab-training) | 14 | Sécuriser et gouverner les applications générées par IA : classer, cadrer, vibe coder avec méthode |
 | [`dev-pour-ops-dsoxlab-training`](https://github.com/stephrobert/dev-pour-ops-dsoxlab-training) | 14 | Le développement pour les Ops, autour d'un outil hérité |
 | [`cloud-dsoxlab-training`](https://github.com/stephrobert/cloud-dsoxlab-training) | 13 | Le cloud, pratiqué contre un émulateur local |
 | [`devsecops-dsoxlab-training`](https://github.com/stephrobert/devsecops-dsoxlab-training) | 13 | DevSecOps, une application durcie version après version |
@@ -141,10 +142,9 @@ leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
 | [`python-dsoxlab-training`](https://github.com/stephrobert/python-dsoxlab-training) | 7 | Python, la construction pas à pas d'un outil de sécurité |
 | [`proxmox-dsoxlab-training`](https://github.com/stephrobert/proxmox-dsoxlab-training) | 6 | Proxmox VE : installer, exploiter, sécuriser et automatiser un hyperviseur |
 | [`cicd-dsoxlab-training`](https://github.com/stephrobert/cicd-dsoxlab-training) | 5 | Les pipelines CI/CD, sur une forge locale et sans compte en ligne |
-| [`applications-ia-dsoxlab-training`](https://github.com/stephrobert/applications-ia-dsoxlab-training) | 3 | Sécuriser et gouverner les applications générées par IA : classer, cadrer, vibe coder avec méthode |
 | [`github-actions-training`](https://github.com/stephrobert/github-actions-training) | 1 | GitHub Actions, des workflows rejoués en local |
 
-_722 labs dans 19 catalogues, comptés sur les dépôts publiés (`labs/**/lab.yaml` de leur branche par défaut). Cette table est générée par `scripts/gen-catalogues.py` depuis `src/dsoxlab/templates/catalogues.yml`, le manifeste que lit `dsoxlab catalog list` ; aucun chiffre n'y est écrit à la main._
+_733 labs dans 19 catalogues, comptés sur les dépôts publiés (`labs/**/lab.yaml` de leur branche par défaut). Cette table est générée par `scripts/gen-catalogues.py` depuis `src/dsoxlab/templates/catalogues.yml`, le manifeste que lit `dsoxlab catalog list` ; aucun chiffre n'y est écrit à la main._
 
 <!-- CATALOGUES:END -->
 

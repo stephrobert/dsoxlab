@@ -670,6 +670,14 @@ STRINGS: dict[str, str] = {
         "prêt(s). Les autres n'ont pas été montés, donc pas vérifiés.",
     "provision_done":      "Provisionnement terminé : {count} hôte(s) prêt(s).",
     "provision_failed":    "Provisionnement échoué : {error}",
+    "provision_autostart_refused":
+        "Le démarrage avec l'hôte de {host} n'a pas pu être réglé : {error}\n"
+        "La machine risque de redémarrer seule au prochain redémarrage de "
+        "l'hôte. Vérifiez avec : virsh dominfo {host}",
+    "provision_autostart_virsh_unreachable":
+        "Le démarrage avec l'hôte des machines n'a pas pu être réglé, virsh n'a "
+        "pas répondu : {error}\nElles risquent de redémarrer seules au prochain "
+        "redémarrage de l'hôte. Vérifiez avec : virsh list --autostart",
     "provision_lease_refused":
         "Bail DHCP refusé pour {host} ({mac}) : {error}\n"
         "Sans lui, l'hôte n'obtiendra pas son IP et paraîtra plus tard "

@@ -142,6 +142,7 @@ pas d'ordres au moteur.
 | --- | --- | --- | --- | --- |
 | `provider` | non | chaîne **ou** liste de chaînes | `kvm` | Providers empaquetés dans l'outil : `kvm`, `incus`, `outscale`. Une liste signifie que l'apprenant choisit. |
 | `bootstrap` | non | chaîne | | Playbook du **socle du catalogue**, joué une fois à la fin de `provision`, avant tout lab. Voir plus bas. |
+| `autostart` | non | booléen | `false` | Démarre les machines (domaines kvm, instances incus) avec l'hôte. Seul le booléen YAML `true` l'active. Coupé par défaut depuis 0.9.5 : avant, toutes les VM de tous les catalogues remontaient à chaque redémarrage de l'hôte. Le réseau libvirt, lui, démarre toujours avec l'hôte. |
 | `network` | non | chaîne | | Réseau que rejoignent les VM, dédié à ce dépôt. **Sa longueur est bornée**, voir plus bas. |
 | `cidr` | non | chaîne | | Sous-réseau de ce réseau. |
 | `hosts` | non | liste de mappings | `[]` | Les VM. Voir ci-dessous. |

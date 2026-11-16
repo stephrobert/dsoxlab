@@ -137,6 +137,11 @@
           "minLength": 1,
           "description": "Playbook of the CATALOGUE's foundation, played once at the end of `provision`, before any lab. Path relative to the repository root. Optional: for a catalogue whose labs share an expensive base (a kubeadm cluster, a populated database, a directory), it replaces the include that every setup.yaml had to carry. It is played on the hosts of the generated inventory, so it targets `all` or `labenv`; it must be replayable without harm, and it is replayed when its content changes."
         },
+        "autostart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start the machines (kvm domains, incus instances) when the host boots. Off by default since 0.9.5: a training machine that reboots would otherwise bring back every VM of every catalogue, including the ones stopped on purpose. Only the YAML boolean `true` turns it on. The libvirt network always starts with the host: it costs no memory, and without it a VM started by hand refuses an inactive network."
+        },
         "network": {
           "type": "string",
           "description": "Name of the network the VMs join, dedicated to this repository so several catalogs can coexist."

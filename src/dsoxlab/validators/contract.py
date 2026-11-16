@@ -304,6 +304,8 @@ KNOWN_META_KEYS: frozenset[str] = frozenset({
     "repo.issues_url", "repo.solutions",
     "infra.provider", "infra.network", "infra.cidr", "infra.hosts", "infra.providers",
     "infra.bootstrap", "infra.optional_hosts",
+    # 0.9.5 (issue #377) : démarrage des machines avec l'hôte, false par défaut.
+    "infra.autostart",
     "infra.hosts[].name", "infra.hosts[].distro", "infra.hosts[].role",
     "infra.hosts[].ram_mb", "infra.hosts[].vcpu", "infra.hosts[].disk_gb",
     "infra.hosts[].extra_disk_gb", "infra.hosts[].ip",

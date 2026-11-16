@@ -7,6 +7,29 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.5] - 2026-11-16
+
+### Modifié
+
+- **Les machines provisionnées ne démarrent plus avec l'hôte, sauf si le
+  catalogue le demande** (issue #377). Les templates kvm et incus posaient le
+  démarrage automatique sur chaque machine, sans moyen d'y échapper : au
+  redémarrage d'un poste de formation, le 2026-11-16, les sept VM d'un
+  catalogue sont remontées seules, dont cinq arrêtées exprès, et ont pris
+  12 Go avant toute demande. La nouvelle clé `infra.autostart` du `meta.yml`
+  (booléen, `false` par défaut) pilote `autostart` des domaines kvm et
+  `boot.autostart` des instances incus. Seul le booléen YAML `true` l'active :
+  une chaîne `"true"` le laisse coupé. Le réseau libvirt démarre toujours avec
+  l'hôte : il ne coûte pas de mémoire, et sans lui une VM relancée à la main
+  refuse un réseau inactif. Une stack déjà provisionnée prend la nouvelle
+  valeur à son prochain `provision` : sur kvm, Terraform pose `autostart` à la
+  création seulement (`lifecycle { ignore_changes }`) et dsoxlab l'aligne par
+  `virsh autostart` après chaque apply, parce que `dmacvicar/libvirt` 0.9.7
+  échoue sur cette mise à jour quand le domaine tourne (mesuré : « Provider
+  produced inconsistent result », `.id` 8 -> 9). Un refus de `virsh` s'affiche,
+  il n'est pas avalé. Sur incus, la mise à jour passe sans redémarrer
+  l'instance (mesuré, même PID).
+
 ## [0.9.4] - 2026-11-15
 
 ### Ajouté

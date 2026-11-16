@@ -129,9 +129,10 @@ resource "incus_instance" "host" {
   # s'écrit SUR la machine, et aucune clé du lab ne peut l'effacer par
   # inadvertance (dsoxlab issue #345). Vide, `merge` ne change rien.
   config = merge({
-    "limits.cpu"     = tostring(each.value.vcpu)
-    "limits.memory"  = "${each.value.ram_mb}MiB"
-    "boot.autostart" = "true"
+    "limits.cpu"    = tostring(each.value.vcpu)
+    "limits.memory" = "${each.value.ram_mb}MiB"
+    # Sur demande seulement (issue #377) : `infra.autostart: true` du meta.yml.
+    "boot.autostart" = tostring(var.autostart)
     # Cloud-init NoCloud-style : Incus pose le seed via virtio-fs ou
     # config drive selon la version. user-data = full YAML cloud-config.
     "cloud-init.user-data" = templatefile(
