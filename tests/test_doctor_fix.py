@@ -254,6 +254,47 @@ def test_les_etapes_root_passent_par_le_playbook_du_poste(
     assert "done, checked again" in _texte(resultat)
 
 
+def test_sans_ansible_fix_l_installe_avant_le_playbook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Décision 3 : le playbook du poste a besoin d'Ansible, installé sans sudo.
+
+    Le cas réel : une AlmaLinux 10 sans git ni catalogue, où la seule étape est
+    root et où aucune étape « installer Ansible » n'est au plan.
+    """
+    binaire = tmp_path / "bin" / "ansible-playbook"
+    lancements: list[list[str]] = []
+
+    class Fini:
+        returncode = 0
+
+    def faux_run_command(cmd: list[str], **kwargs: object) -> CommandResult:
+        appels.append(list(cmd))
+        binaire.parent.mkdir(exist_ok=True)
+        binaire.write_text("#!/bin/sh\n", encoding="utf-8")
+        binaire.chmod(0o755)
+        return CommandResult(returncode=0, stdout="", stderr="")
+
+    appels: list[list[str]] = []
+    monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
+    monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
+    monkeypatch.setattr(diagnostic, "_commande_playbook",
+                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
+    monkeypatch.setattr(diagnostic.shutil, "which",
+                        lambda nom: "/usr/bin/uv" if nom == "uv" else (
+                            str(binaire) if nom == "ansible-playbook" and binaire.exists() else None))
+    monkeypatch.setattr(diagnostic.subprocess, "run",
+                        lambda cmd, **kw: (lancements.append(cmd), Fini())[1])
+    monkeypatch.setattr(diagnostic, "run_command", faux_run_command)
+    monkeypatch.setattr(diagnostic, "collect_checks", Diagnostics([None], [_ROOT]))
+
+    resultat = runner.invoke(app, ["doctor", "--fix", "--yes"])
+
+    assert appels == [["uv", "tool", "install", "ansible-core"]]
+    assert len(lancements) == 1 and lancements[0][0] == str(binaire)
+    assert "done, checked again" in _texte(resultat)
+
+
 def test_plus_aucun_shell_true_dans_les_sources() -> None:
     """Le contrat de l'issue #89 : zéro ``shell=True`` dans ``src/dsoxlab/``."""
     racine = Path(__file__).resolve().parent.parent / "src" / "dsoxlab"

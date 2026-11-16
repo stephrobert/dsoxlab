@@ -1796,6 +1796,8 @@ silent.
     "fix_arret": 'Stopped. Remaining steps: {steps}. Fix the cause, then run again: dsoxlab doctor --fix',
     "fix_bloc_root": 'Paste these sudo steps in a terminal, in this order:',
     "fix_reconnexion_finale": 'Log out and back in before running doctor again: the kvm and libvirt groups only apply to a new session.',
+    "fix_plan_ansible_d_abord": 'Ansible is installed first, without sudo: uv tool install ansible-core',
+    "fix_installe_ansible": 'Installing Ansible first (uv tool install ansible-core): the workstation playbook needs it.',
     "fix_needs_relogin":
         "{label}: fixed, but the change only takes effect after you log out "
         "and back in. This line will stay red until then; it is not a failure.",

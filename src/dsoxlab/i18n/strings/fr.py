@@ -1844,6 +1844,8 @@ hors ligne, elle se tait.
     "fix_arret": 'Arrêt. Restent les étapes : {steps}. Corrigez la cause, puis relancez : dsoxlab doctor --fix',
     "fix_bloc_root": 'Collez ces étapes avec sudo dans un terminal, dans cet ordre :',
     "fix_reconnexion_finale": "Reconnectez-vous avant de relancer doctor : les groupes kvm et libvirt ne valent qu'après une nouvelle session.",
+    "fix_plan_ansible_d_abord": "Ansible est installé d'abord, sans sudo : uv tool install ansible-core",
+    "fix_installe_ansible": "Installation d'Ansible d'abord (uv tool install ansible-core) : le playbook du poste en a besoin.",
     "fix_needs_relogin":
         "{label} : corrigé, mais le changement ne prend effet qu'après une "
         "déconnexion puis une reconnexion. Cette ligne restera rouge d'ici "

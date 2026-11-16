@@ -466,3 +466,16 @@ def test_le_json_porte_les_commandes_l_attente_et_la_mise_en_garde(
     # La mémoire de tout le catalogue informe : elle n'est plus dans `required`.
     assert "resources" not in {c["key"] for c in document["required"]}
     assert "resources" in {c["key"] for c in document["informational"]}
+
+
+def test_clients_n_installe_que_docker_et_incus() -> None:
+    """Hors catalogue, KVM est facultatif : `--clients` ne doit pas l'installer."""
+    from dsoxlab.services.doctor_controles.modele import DoctorReport
+    from dsoxlab.services.doctor_controles.remedes import Remede
+
+    report = DoctorReport()
+    report.optional.extend([
+        doctor._check("kvm", False, "absent", remede=Remede("kvm", ("sudo apt install x",), root=True)),
+        doctor._check("docker", False, "absent", remede=Remede("docker", ("sudo apt install y",), root=True)),
+    ])
+    assert [e.cle for e in construire(report).facultatives] == ["docker"]

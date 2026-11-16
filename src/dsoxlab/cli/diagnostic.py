@@ -332,6 +332,8 @@ def _afficher_plan(plan: PlanCorrection, report: DoctorReport, ansible: list[str
                 ligne += "   " + _("fix_plan_reconnexion")
             console.print(Text(ligne), soft_wrap=True)
         console.print(Text("      " + shlex.join(ansible), style="dim"), soft_wrap=True)
+        if not _playbook_jouable(ansible[0]) and shutil.which("uv"):
+            console.print(Text("  " + _("fix_plan_ansible_d_abord")), soft_wrap=True)
     if plan.manuelles:
         console.print(Text("  " + _("fix_plan_manuelles")))
         for etape in plan.manuelles:
@@ -425,7 +427,7 @@ def _jouer_root(
         # root s'affichent en bloc à coller (décision 2).
         _bloc_root(etapes)
         return
-    if not _playbook_jouable(ansible[0]):
+    if not _playbook_jouable(ansible[0]) and not _installer_ansible():
         warn(_("fix_pas_d_ansible"))
         _bloc_root(etapes)
         return
@@ -447,6 +449,22 @@ def _jouer_root(
 
 def _playbook_jouable(binaire: str) -> bool:
     return Path(binaire).is_file() and os.access(binaire, os.X_OK)
+
+
+def _installer_ansible() -> bool:
+    """Le playbook du poste a besoin d'Ansible : `--fix` l'installe d'abord, sans sudo.
+
+    Décision 3 du 2026-11-16. Le cas réel : une AlmaLinux 10 sans git ni
+    catalogue, où la seule étape est root (installer git) et où aucune étape
+    « installer Ansible » n'est au plan, faute de lab `vm`.
+    """
+    if shutil.which("uv") is None:
+        return False
+    info(_("fix_installe_ansible"))
+    if _executer_correctif(Fix((("uv", "tool", "install", "ansible-core"),))) != 0:
+        return False
+    return _playbook_jouable(shutil.which("ansible-playbook")
+                             or str(Path.home() / ".local/bin/ansible-playbook"))
 
 
 def _jouer(etape: Etape, actions: dict[str, Action]) -> tuple[int, str | None]:

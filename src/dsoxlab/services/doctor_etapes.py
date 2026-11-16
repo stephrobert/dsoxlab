@@ -22,6 +22,9 @@ from dataclasses import dataclass, field
 from .doctor_controles.modele import STATE_OK, STATE_UNKNOWN, Check, DoctorReport
 from .doctor_controles.remedes import Remede, rang
 
+#: Les composants que `doctor --fix --clients` installe quand ils sont facultatifs.
+_CLIENTS = frozenset({"docker", "incus"})
+
 
 @dataclass
 class Etape:
@@ -123,6 +126,12 @@ def construire(report: DoctorReport) -> Plan:
         c for c in report.required if c.state == STATE_UNKNOWN and c.apres is None
     ]
     plan.prets = [c for c in report.required if c.state == STATE_OK]
-    facultatifs = [c for c in report.optional if not c.ok and c.remede is not None]
+    # `--clients` ne vise que les clients facultatifs, Docker et Incus
+    # (décision 1 du 2026-11-16) : un hyperviseur que ce catalogue n'utilise
+    # pas, ou qu'aucun catalogue ne demande encore, ne s'installe pas en passant.
+    facultatifs = [
+        c for c in report.optional
+        if not c.ok and c.remede is not None and c.key in _CLIENTS
+    ]
     plan.facultatives = _regrouper(facultatifs, facultative=True)
     return plan
