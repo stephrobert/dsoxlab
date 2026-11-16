@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marker under `XDG_STATE_HOME` (`dsoxlab/invitation-push-affichee`) keeps it
   from showing again.
 
+### Fixed
+
+- **kvm provisions again on the RHEL 10 family (AlmaLinux 10)** (issue #381).
+  There, `virsh domcapabilities` only lists the Secure Boot firmware
+  (`OVMF_CODE.secboot.fd`), although `edk2-ovmf` also installs
+  `/usr/share/edk2/ovmf/OVMF_CODE.fd` without it. dsoxlab read only that list,
+  so `provision` failed on "no usable EFI firmware" and advised installing a
+  package that was already there. When the list holds no firmware without
+  Secure Boot, dsoxlab now reads the QEMU firmware descriptors
+  (`/etc/qemu/firmware`, then `/usr/share/qemu/firmware`), the format libvirt
+  itself reads, and takes the first UEFI x86_64 q35 firmware without Secure
+  Boot nor SMM, in `split` mode with an NVRAM template, whose file exists.
+  Measured on AlmaLinux 10.2: `provision` now ends in 0.
+
 ### Changed
 
 - **Provisioned machines no longer start with the host, unless the catalogue
