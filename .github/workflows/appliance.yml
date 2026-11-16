@@ -1,6 +1,9 @@
 # Construit l'appliance dsoxlab et l'attache à une Release.
 #
-# Workflow SÉPARÉ de `release.yml`, pour deux raisons :
+# Appelé par `release.yml` (`workflow_call`) en DERNIER job, une fois la
+# version sur PyPI et la Release GitHub créée. Avant, les deux workflows
+# partaient en parallèle sur le tag, et rien n'imposait l'ordre que ce fichier
+# promettait. Il reste un fichier à part, pour deux raisons :
 #
 #   1. `workflow_dispatch` permet de l'éprouver sans poser de tag. Greffé à la
 #      release, ce job n'aurait tourné qu'au prochain tag mineur, c'est-à-dire
@@ -24,8 +27,12 @@
 name: Appliance
 
 on:
-  push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release à laquelle attacher les images"
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:

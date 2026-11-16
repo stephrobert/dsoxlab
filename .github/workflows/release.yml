@@ -222,3 +222,17 @@ jobs:
             --title "$TAG" \
             --notes-file release-notes.md \
             dist/* provenance.intoto.jsonl
+
+  appliance:
+    name: Appliance
+    # LAST, once the version is on PyPI and the GitHub Release exists: the image
+    # attaches to that Release, and a 20-minute build must never delay nor fail
+    # a publication. Before, the appliance ran in parallel on the same tag.
+    needs: [github_release]
+    permissions:
+      contents: write     # attach the images to the Release
+      id-token: write     # provenance attestation
+      attestations: write
+    uses: ./.github/workflows/appliance.yml
+    with:
+      tag: ${{ github.ref_name }}
