@@ -26,6 +26,17 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **`run` refuse une cible jamais montée, et nomme la commande qui la monte**
+  (issue #380, blog-roadmap#186). Après un `provision` limité par `--host`, ou
+  qui a laissé des machines éteintes faute de mémoire, `provision` affichait
+  quand même l'adresse de chaque machine déclarée, et `run` envoyait Ansible
+  vers l'adresse vide d'une machine commune que le lab vise : l'apprenant
+  lisait une erreur SSH dans une tâche du lab (« UNREACHABLE … port 22 »).
+  `run` s'arrête désormais avant tout playbook, en code 2 : « Ce lab vise
+  ubuntu-lfcs-1.lab, qui ne tourne pas … Rien n'a été joué », suivi de
+  `dsoxlab provision --host ubuntu-lfcs-1.lab`. Reproduit le 2026-11-16 sur
+  une Ubuntu 24.04 préparée de zéro.
+
 - **kvm provisionne de nouveau sur la famille RHEL 10 (AlmaLinux 10)**
   (issue #381). Là, `virsh domcapabilities` ne cite que le firmware Secure Boot
   (`OVMF_CODE.secboot.fd`), alors que `edk2-ovmf` installe aussi

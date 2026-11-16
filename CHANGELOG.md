@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`run` refuses a target that was never brought up, and names the command
+  that brings it up** (issue #380, blog-roadmap#186). After a `provision`
+  limited with `--host`, or one that left machines down for lack of memory,
+  `provision` still printed the address of every declared machine, and `run`
+  sent Ansible to the empty address of a common machine the lab targets: the
+  learner read an SSH error in a task of the lab ("UNREACHABLE … port 22").
+  `run` now stops before any playbook, with exit code 2:
+  "This lab targets ubuntu-lfcs-1.lab, which is not running … Nothing was
+  played", followed by `dsoxlab provision --host ubuntu-lfcs-1.lab`.
+  Reproduced on 2026-11-16 on an Ubuntu 24.04 prepared from scratch.
+
 - **kvm provisions again on the RHEL 10 family (AlmaLinux 10)** (issue #381).
   There, `virsh domcapabilities` only lists the Secure Boot firmware
   (`OVMF_CODE.secboot.fd`), although `edk2-ovmf` also installs

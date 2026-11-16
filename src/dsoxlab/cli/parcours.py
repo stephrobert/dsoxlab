@@ -130,6 +130,46 @@ def _monter_les_hotes_optionnels(
     provisionner(root, host=hotes)
 
 
+def _refuser_les_cibles_non_montees(
+    root: Path, lab: LabDefinition, target: str | None
+) -> None:
+    """Arrête ``run`` avant tout playbook si une machine que le lab vise n'est pas montée (issue #380).
+
+    Un catalogue peut être monté en partie : ``provision --host`` d'une seule
+    machine, ou une RAM qui ne suffit pas pour toutes. ``provision`` affiche
+    pourtant l'adresse de chaque machine déclarée, et ``run`` envoyait alors
+    Ansible vers une adresse vide : l'apprenant lisait une erreur SSH dans une
+    tâche du lab, que rien ne reliait à une machine absente (blog-roadmap#186,
+    reproduit le 2026-11-16).
+
+    Seules les machines COMMUNES sont en cause : les optionnelles ont déjà été
+    montées par :func:`_monter_les_hotes_optionnels`. Un state illisible ne
+    refuse rien (on ne sait pas), et un state vide est le cas de
+    ``infra_not_provisioned``, que ``run_lab`` dit déjà.
+    """
+    from ..infra.terraform import hotes_au_state
+    from ..runtimes.vm import TargetNotResolved, resoudre_target
+
+    if lab.runtime.type.value not in ("vm", "kvm", "incus"):
+        return
+    repo_meta = _read_repo(root)
+    if repo_meta is None:
+        return
+    try:
+        hotes = resoudre_target(lab, target).hosts()
+    except TargetNotResolved:
+        return
+    presents = hotes_au_state(repo_meta)
+    if not presents:
+        return
+    absents = sorted(h for h in hotes if h not in presents)
+    if not absents:
+        return
+    commande = "dsoxlab provision " + " ".join(f"--host {h}" for h in absents)
+    error(_("run_cible_non_montee", hosts=", ".join(absents), command=commande))
+    raise typer.Exit(2)
+
+
 @app.command("run", help=_("cmd_run_help"))
 def run(
     lab_id: Annotated[str, typer.Argument(help=_("cmd_run_arg"), autocompletion=_complete_lab_id)],
@@ -151,6 +191,7 @@ def run(
     with _verrou(root, "run"):
         _ensure_services(lab, root)
         _monter_les_hotes_optionnels(root, lab, target)
+        _refuser_les_cibles_non_montees(root, lab, target)
         try:
             if lab.runtime.type.value in ("vm", "kvm", "incus"):
                 _run_ansible_with_progress(
