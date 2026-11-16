@@ -642,10 +642,10 @@ def print_infra_status(etat: EtatInfra) -> None:
     for hote in etat.hotes:
         if not hote.joignable:
             console.print("[cyan]ℹ[/cyan]   " + _(
-                "status_hote_muet", fqdn=hote.fqdn, cause=_cause_de(hote)))
+                "status_hote_muet", fqdn=hote.fqdn, cause=_cause_de(hote, etat.autostart)))
 
 
-def _cause_de(hote: EtatHote) -> str:
+def _cause_de(hote: EtatHote, autostart: bool = False) -> str:
     """La phrase qui nomme la cause d'un hôte muet, et le geste qui la corrige.
 
     Une cause, un message, une action. L'ancien texte en proposait deux à la
@@ -660,8 +660,11 @@ def _cause_de(hote: EtatHote) -> str:
         host_diagnosis.CAUSE_DOMAIN_ABSENT: lambda: _(
             "status_cause_domain_absent", host=hote.fqdn
         ),
+        # Une machine arrêtée ne dit pas la même chose selon infra.autostart :
+        # sans démarrage avec l'hôte, c'est l'état normal après un redémarrage,
+        # et la piste du crash n'a de sens que si elle aurait dû démarrer.
         host_diagnosis.CAUSE_DOMAIN_NOT_RUNNING: lambda: _(
-            "status_cause_domain_not_running",
+            "status_cause_domain_not_running" if autostart else "status_cause_domain_stopped",
             domain=domaine,
             state=hote.etat_domaine or "?",
         ),

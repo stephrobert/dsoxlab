@@ -73,6 +73,12 @@ class EtatInfra:
     #: Le fragment SSH n'a pas pu être écrit, et la cause. Ce n'est pas un échec
     #: de la commande : l'état reste mesurable sans lui.
     fragment_ssh_erreur: str | None = None
+    #: ``infra.autostart`` du catalogue. Il décide de ce que veut dire une
+    #: machine arrêtée : avec ``true``, elle aurait dû démarrer avec l'hôte, donc
+    #: quelque chose l'a arrêtée après coup ; avec ``false`` (le défaut depuis
+    #: 0.9.5), un simple redémarrage de l'hôte la laisse arrêtée, et y chercher
+    #: un crash égare.
+    autostart: bool = False
 
     @property
     def joignables(self) -> int:
@@ -223,6 +229,7 @@ def mesurer(
         provider=provider,
         bastion=bastion,
         hyperviseur_interrogeable=hyperviseur.interrogeable,
+        autostart=repo_meta.infra.autostart,
     )
 
     for fqdn, variables in sorted(hotes.items()):

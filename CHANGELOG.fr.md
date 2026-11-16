@@ -7,6 +7,22 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.8] - 2026-11-16
+
+### Corrigé
+
+- **`infra status` ne prend plus une machine arrêtée pour un crash quand elle
+  n'est pas censée démarrer avec l'hôte.** Pour tout domaine arrêté, il disait
+  « le template le démarre au boot, il a donc été arrêté après coup (tueur de
+  mémoire, crash qemu, arrêt manuel) ». C'était vrai avant la 0.9.5. Depuis, une
+  machine ne démarre avec l'hôte que si `meta.yml` pose
+  `infra.autostart: true` ; sans ce réglage, une machine arrêtée après un
+  redémarrage de l'hôte est dans son état normal, et le message faisait
+  chercher un crash qui n'avait pas eu lieu. Le message suit désormais
+  `infra.autostart` : sans lui, il dit que la machine ne démarre pas avec l'hôte
+  et donne la commande qui la démarre ; la piste du crash ne reste que quand la
+  machine aurait dû démarrer.
+
 ## [0.9.7] - 2026-11-16
 
 ### Corrigé

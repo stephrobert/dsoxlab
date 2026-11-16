@@ -784,6 +784,11 @@ STRINGS: dict[str, str] = {
         "le domaine « {domain} » existe et vaut « {state} » : le template le "
         "démarre au boot, il a donc été arrêté après coup (tueur de mémoire, "
         "crash qemu, arrêt manuel). Lance : sudo virsh start {domain}",
+    "status_cause_domain_stopped":
+        "le domaine « {domain} » existe et vaut « {state} » : il ne démarre pas "
+        "avec l'hôte (infra.autostart n'est pas à true dans meta.yml), un "
+        "redémarrage de l'hôte suffit donc à le laisser arrêté. Pour le "
+        "démarrer : sudo virsh start {domain}",
     "status_cause_domain_no_lease":
         "le domaine « {domain} » tourne mais ne détient aucun bail DHCP : il "
         "boote encore, ou son réseau n'a pas abouti. Regarde-le démarrer : "
