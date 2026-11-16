@@ -7,6 +7,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-11-16
+
+### Fixed
+
+- **`infra status` no longer reads a stopped machine as a crash when it is not
+  meant to start with the host.** For any stopped domain, it said "the
+  template starts it at boot, so it was stopped afterwards (out-of-memory
+  killer, qemu crash, manual stop)". That was true before 0.9.5. Since then, a
+  machine only starts with the host when `meta.yml` sets
+  `infra.autostart: true`; without it, a stopped machine after a host reboot is
+  the normal state, and the message sent you looking for a crash that never
+  happened. The message now follows `infra.autostart`: without it, it says the
+  machine does not start with the host and gives the command that starts it;
+  the crash hypothesis stays only when the machine should have started.
+
 ## [0.9.7] - 2026-11-16
 
 ### Fixed

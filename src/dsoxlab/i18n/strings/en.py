@@ -771,6 +771,10 @@ STRINGS: dict[str, str] = {
         "domain '{domain}' exists and is '{state}': the template starts it at "
         "boot, so it was stopped afterwards (out-of-memory killer, qemu crash, "
         "manual stop). Run: sudo virsh start {domain}",
+    "status_cause_domain_stopped":
+        "domain '{domain}' exists and is '{state}': it does not start with the "
+        "host (infra.autostart is not true in meta.yml), so a host reboot is "
+        "enough to leave it stopped. To start it: sudo virsh start {domain}",
     "status_cause_domain_no_lease":
         "domain '{domain}' is running but holds no DHCP lease: it is still "
         "booting, or its network did not come up. Watch it boot: "
