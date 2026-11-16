@@ -106,3 +106,70 @@ def test_les_machines_lisent_la_variable_au_lieu_d_une_valeur_en_dur() -> None:
 
 def test_le_lint_de_contrat_connait_la_cle() -> None:
     assert "infra.autostart" in KNOWN_META_KEYS
+
+
+# ── L'alignement par virsh d'une stack déjà montée ─────────────────────────
+#
+# Mesuré le 2026-11-16 : passer `autostart` de true à false sur un domaine EN
+# MARCHE fait échouer l'apply (dmacvicar/libvirt 0.9.7). Le template le fige,
+# et dsoxlab l'aligne après l'apply.
+
+
+class _Res:
+    def __init__(self, ok: bool, stderr: str = "") -> None:
+        self.ok, self.stderr, self.stdout = ok, stderr, ""
+
+
+def test_le_template_fige_autostart_dans_terraform() -> None:
+    kvm = (GABARITS / "kvm" / "main.tf").read_text(encoding="utf-8")
+    domaine = kvm[kvm.index('resource "libvirt_domain" "host"'):]
+    domaine = domaine[:domaine.index("\n}\n")]
+    assert re.search(r"lifecycle\s*\{\s*ignore_changes\s*=\s*\[autostart\]\s*\}", domaine)
+
+
+@pytest.mark.parametrize(("valeur", "attendu"), [
+    (None, ["autostart", "--disable", "vm.lab"]),
+    ("true", ["autostart", "vm.lab"]),
+])
+def test_l_alignement_suit_le_meta_yml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valeur: str | None, attendu: list[str]
+) -> None:
+    meta = _meta(tmp_path, monkeypatch, autostart=valeur)
+    appels: list[list[str]] = []
+    monkeypatch.setattr(terraform.libvirt, "list_domains", lambda: ["vm.lab", "autre.lab"])
+    monkeypatch.setattr(terraform.libvirt, "run_virsh",
+                        lambda args, check=True: appels.append(args) or _Res(True))
+    assert terraform._aligner_autostart_kvm(meta) == []
+    assert appels == [attendu]
+
+
+def test_un_domaine_absent_n_est_pas_vise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    meta = _meta(tmp_path, monkeypatch)
+    appels: list[list[str]] = []
+    monkeypatch.setattr(terraform.libvirt, "list_domains", lambda: ["autre.lab"])
+    monkeypatch.setattr(terraform.libvirt, "run_virsh",
+                        lambda args, check=True: appels.append(args) or _Res(True))
+    assert terraform._aligner_autostart_kvm(meta) == []
+    assert appels == []
+
+
+def test_un_refus_de_virsh_se_dit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    meta = _meta(tmp_path, monkeypatch)
+    monkeypatch.setattr(terraform.libvirt, "list_domains", lambda: ["vm.lab"])
+    monkeypatch.setattr(terraform.libvirt, "run_virsh",
+                        lambda args, check=True: _Res(False, "permission denied"))
+    avertissements = terraform._aligner_autostart_kvm(meta)
+    assert len(avertissements) == 1
+    assert "vm.lab" in avertissements[0] and "permission denied" in avertissements[0]
+
+
+def test_hors_kvm_rien_n_est_aligne(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    meta = _meta(tmp_path, monkeypatch, provider="incus")
+
+    def interdit(*_a: object, **_k: object) -> None:
+        raise AssertionError("virsh ne doit pas être appelé hors kvm")
+
+    monkeypatch.setattr(terraform.libvirt, "list_domains", interdit)
+    assert terraform._aligner_autostart_kvm(meta) == []

@@ -21,7 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `true` turns it on: a string `"true"` leaves it off. The libvirt network
   still starts with the host: it costs no memory, and without it a VM started
   by hand refuses an inactive network. A stack already provisioned takes the
-  new value at its next `provision`.
+  new value at its next `provision`: on kvm, Terraform sets `autostart` at
+  creation only (`lifecycle { ignore_changes }`) and dsoxlab aligns it with
+  `virsh autostart` after each apply, because `dmacvicar/libvirt` 0.9.7 fails
+  on that update when the domain is running (measured: "Provider produced
+  inconsistent result", `.id` 8 -> 9). A `virsh` refusal is shown, not
+  swallowed. On incus, the update goes through without restarting the
+  instance (measured, same PID).
 
 ## [0.9.4] - 2026-11-15
 

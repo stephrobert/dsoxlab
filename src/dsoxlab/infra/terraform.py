@@ -609,6 +609,47 @@ def other_active_providers(repo_meta: RepoMetadata) -> list[str]:
     ]
 
 
+def _aligner_autostart_kvm(
+    repo_meta: RepoMetadata, target_hosts: list[str] | None = None
+) -> list[str]:
+    """Aligne le démarrage avec l'hôte des domaines KVM sur ``infra.autostart``.
+
+    Le template fige ``autostart`` (``lifecycle { ignore_changes }``) : le
+    provider ``dmacvicar/libvirt`` 0.9.7 échoue sur cette mise à jour quand le
+    domaine tourne (mesuré le 2026-11-16, issue #377). Terraform le pose donc à
+    la création, et c'est ici qu'une stack déjà montée prend la valeur du
+    ``meta.yml`` : avant 0.9.5, toutes ses machines démarraient avec l'hôte.
+
+    Rejoué à chaque ``provision``, idempotent : ``virsh autostart`` sur un
+    domaine déjà dans l'état voulu ne change rien. Seuls les domaines qui
+    existent sont visés, un hôte optionnel absent n'en a pas. Hors kvm, rien :
+    incus applique ``boot.autostart`` lui-même. Un refus ne casse pas le
+    provision, mais il se dit, à l'écran : une machine qui redémarrera seule
+    est exactement ce que l'utilisateur croit avoir écarté.
+    """
+    if repo_meta.infra.provider != "kvm":
+        return []
+    try:
+        definis = set(libvirt.list_domains())
+    except CommandError as exc:
+        logger.warning("autostart not aligned, virsh unreachable: %s", exc)
+        return [_("provision_autostart_refused", host="*", error=str(exc))]
+    voulu = repo_meta.infra.autostart
+    avertissements: list[str] = []
+    for _index, host in hotes_actifs(repo_meta, demandes=target_hosts):
+        if host.name not in definis:
+            continue
+        args = ["autostart", host.name] if voulu else ["autostart", "--disable", host.name]
+        res = libvirt.run_virsh(args, check=False)
+        if res.ok:
+            logger.info("autostart %s on %s", "enabled" if voulu else "disabled", host.name)
+            continue
+        erreur = (res.stderr or res.stdout).strip()
+        logger.warning("autostart refused for %s: %s", host.name, erreur)
+        avertissements.append(_("provision_autostart_refused", host=host.name, error=erreur))
+    return avertissements
+
+
 def _ensure_kvm_dhcp_leases(
     repo_meta: RepoMetadata, target_hosts: list[str] | None = None
 ) -> list[str]:
@@ -805,7 +846,7 @@ def apply(
         )
 
     result = _read_outputs(tf_dir, env=_provider_env(repo_meta))
-    result.warnings.extend(avertissements)
+    result.warnings.extend(avertissements + _aligner_autostart_kvm(repo_meta, target_hosts))
     return result
 
 

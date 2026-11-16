@@ -22,7 +22,13 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   une chaîne `"true"` le laisse coupé. Le réseau libvirt démarre toujours avec
   l'hôte : il ne coûte pas de mémoire, et sans lui une VM relancée à la main
   refuse un réseau inactif. Une stack déjà provisionnée prend la nouvelle
-  valeur à son prochain `provision`.
+  valeur à son prochain `provision` : sur kvm, Terraform pose `autostart` à la
+  création seulement (`lifecycle { ignore_changes }`) et dsoxlab l'aligne par
+  `virsh autostart` après chaque apply, parce que `dmacvicar/libvirt` 0.9.7
+  échoue sur cette mise à jour quand le domaine tourne (mesuré : « Provider
+  produced inconsistent result », `.id` 8 -> 9). Un refus de `virsh` s'affiche,
+  il n'est pas avalé. Sur incus, la mise à jour passe sans redémarrer
+  l'instance (mesuré, même PID).
 
 ## [0.9.4] - 2026-11-15
 

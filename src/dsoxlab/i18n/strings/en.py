@@ -659,6 +659,10 @@ STRINGS: dict[str, str] = {
         "ready. The others were not brought up, so they were not checked.",
     "provision_done":      "Provisioning complete: {count} host(s) ready.",
     "provision_failed":    "Provisioning failed: {error}",
+    "provision_autostart_refused":
+        "Could not set the start with the host of {host}: {error}\n"
+        "The machine may start on its own at the next reboot of the host. "
+        "Check with: virsh dominfo {host}",
     "provision_lease_refused":
         "DHCP lease refused for {host} ({mac}): {error}\n"
         "Without it, the host will get no IP and will later show up as "

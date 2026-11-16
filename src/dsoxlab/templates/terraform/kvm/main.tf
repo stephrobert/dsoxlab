@@ -320,6 +320,7 @@ resource "libvirt_domain" "host" {
   memory = each.value.ram_mb * 1024
   vcpu   = each.value.vcpu
   # Sur demande seulement (issue #377) : `infra.autostart: true` du meta.yml.
+  # Posé à la CRÉATION seulement : voir le lifecycle en fin de ressource.
   autostart = var.autostart
   running   = true
   type      = "kvm"
@@ -505,5 +506,15 @@ resource "libvirt_domain" "host" {
     # - les logs dnsmasq + journalctl pour le debug si cloud-init plante
     # À reprendre dans une PR future quand un exemple fonctionnel
     # sera disponible côté upstream.
+  }
+
+  # `autostart` n'est jamais MIS À JOUR par Terraform (issue #377). Mesuré le
+  # 2026-11-16 : le passer de true à false sur un domaine EN MARCHE fait
+  # échouer l'apply (« Provider produced inconsistent result », `.id` 8 -> 9,
+  # dmacvicar/libvirt 0.9.7). Terraform le pose à la création ; dsoxlab
+  # l'aligne ensuite par `virsh autostart` (terraform._aligner_autostart_kvm),
+  # comme il le fait déjà pour les baux DHCP du réseau.
+  lifecycle {
+    ignore_changes = [autostart]
   }
 }
