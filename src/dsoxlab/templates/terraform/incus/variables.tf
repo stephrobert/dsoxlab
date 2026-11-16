@@ -64,3 +64,9 @@ variable "provenance_config" {
   type        = map(map(string))
   default     = {}
 }
+
+variable "autostart" {
+  description = "Les machines démarrent-elles avec l'hôte ? false par défaut : seul `infra.autostart: true` dans le meta.yml l'active (dsoxlab issue #377)."
+  type        = bool
+  default     = false
+}

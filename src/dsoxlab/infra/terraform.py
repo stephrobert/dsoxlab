@@ -305,6 +305,33 @@ def _hotes_pour_terraform(actifs: list[tuple[int, HostDefinition]]) -> list[dict
     ]
 
 
+def _variables_du_provider(repo_meta: RepoMetadata) -> dict[str, Any]:
+    """Les variables qu'un seul provider déclare.
+
+    Chacune n'est passée qu'au provider qui la déclare : la passer aux autres
+    ferait échouer leur plan sur une variable inconnue.
+    """
+    provider = repo_meta.infra.provider
+    variables: dict[str, Any] = {}
+    # Le firmware EFI n'est pas écrit dans le template : il est demandé à la
+    # machine (issue #234). Seul kvm en a besoin.
+    #
+    # write_tfvars ÉCRIT UN FICHIER : elle ne lève pas parce qu'une sonde
+    # système n'a rien rendu. La faire dépendre de libvirt la rendait
+    # inappelable sans hyperviseur, ce qui a cassé les contrôles de
+    # documentation, qui l'invoquent pour chaque provider afin de relever les
+    # chemins. La chaîne vide est écrite, et c'est `apply()` qui refuse de
+    # partir — au moment où l'absence de firmware compte vraiment.
+    if provider == "kvm":
+        variables["efi_loader"] = libvirt.efi_loader() or ""
+    # Le démarrage des machines avec l'hôte, sur demande seulement (issue #377).
+    # outscale ne le déclare pas : une machine cloud n'a pas d'hôte qu'on
+    # redémarre.
+    if provider in ("kvm", "incus"):
+        variables["autostart"] = repo_meta.infra.autostart
+    return variables
+
+
 def write_tfvars(
     repo_meta: RepoMetadata, *,
     demandes: Iterable[str] | None = None, retires: Iterable[str] = (),
@@ -370,20 +397,8 @@ def write_tfvars(
         "network_cidr": network_cidr,
         "hosts": _hotes_pour_terraform(actifs),
         "provider_config": provider_cfg,
+        **_variables_du_provider(repo_meta),
     }
-
-    # Le firmware EFI n'est pas écrit dans le template : il est demandé à la
-    # machine (issue #234). Seul kvm en a besoin ; incus et outscale ne
-    # déclarent pas cette variable, et la leur passer ferait échouer leur plan.
-    #
-    # Cette fonction ÉCRIT UN FICHIER : elle ne lève pas parce qu'une sonde
-    # système n'a rien rendu. La faire dépendre de libvirt la rendait
-    # inappelable sans hyperviseur, ce qui a cassé les contrôles de
-    # documentation, qui l'invoquent pour chaque provider afin de relever les
-    # chemins. La chaîne vide est écrite, et c'est `apply()` qui refuse de
-    # partir — au moment où l'absence de firmware compte vraiment.
-    if repo_meta.infra.provider == "kvm":
-        payload["efi_loader"] = libvirt.efi_loader() or ""
 
     # D'OÙ VIENT CHAQUE MACHINE, écrit sur la machine (issue #345). Rien n'est
     # ajouté pour un provider qui ne déclare pas ces variables, pour la raison

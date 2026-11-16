@@ -354,6 +354,20 @@ class InfraDefinition:
     catalogue doit continuer de charger. ``validate-structure`` le réclame, et
     ``provision`` refuse de conclure sans lui."""
 
+    autostart: bool = False
+    """Les machines démarrent-elles avec l'hôte ? **Non, sauf demande** (issue #377).
+
+    Jusqu'à 0.9.4, les templates kvm et incus posaient le démarrage automatique
+    sans condition : au redémarrage d'un poste de formation, toutes les VM de
+    tous les catalogues remontaient seules, y compris celles qu'on avait
+    arrêtées exprès (sept VM et 12 Go le 2026-11-16).
+
+    Seul le booléen YAML ``true`` l'active. Toute autre valeur, la chaîne
+    ``"true"`` comprise, le laisse coupé : se tromper dans ce sens coûte un
+    ``virsh start``, se tromper dans l'autre tient des machines en mémoire.
+    Le réseau libvirt, lui, garde son démarrage automatique : il ne coûte rien,
+    et sans lui une VM relancée à la main refuse un réseau inactif."""
+
     hosts: list[HostDefinition] = field(default_factory=list)
     providers: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Overrides spécifiques par provider — lus par le module Terraform
@@ -701,6 +715,7 @@ class RepoMetadata:
             network=infra_data.get("network", ""),
             cidr=infra_data.get("cidr", ""),
             bootstrap=str(infra_data.get("bootstrap") or ""),
+            autostart=infra_data.get("autostart") is True,
             # Les hôtes optionnels APRÈS les communs : l'adresse d'un hôte dérive
             # de sa position, et cet ordre garantit qu'en déclarer un ne déplace
             # aucune machine commune (issue #365).

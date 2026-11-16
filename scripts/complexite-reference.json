@@ -66,15 +66,10 @@
       "profondeur": 2,
       "lignes": 102
     },
-    "src/dsoxlab/infra/terraform.py::write_tfvars": {
-      "cognitive": 9,
-      "profondeur": 2,
-      "lignes": 92
-    },
     "src/dsoxlab/models/repo.py::RepoMetadata.from_yaml": {
       "cognitive": 12,
       "profondeur": 1,
-      "lignes": 135
+      "lignes": 136
     },
     "src/dsoxlab/models/repo.py::_resolve_provider": {
       "cognitive": 26,

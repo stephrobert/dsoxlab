@@ -141,6 +141,7 @@ for a secret, and a catalogue gives the engine no orders.
 | --- | --- | --- | --- | --- |
 | `provider` | no | string **or** list of strings | `kvm` | Providers packaged with the tool: `kvm`, `incus`, `outscale`. A list means the learner chooses. |
 | `bootstrap` | no | string | | Playbook of the **catalogue's foundation**, played once at the end of `provision`, before any lab. See below. |
+| `autostart` | no | boolean | `false` | Start the machines (kvm domains, incus instances) when the host boots. Only the YAML boolean `true` turns it on. Off by default since 0.9.5: before, every VM of every catalogue came back on each reboot of the host. The libvirt network always starts with the host. |
 | `network` | no | string | — | Network the VMs join, dedicated to this repository. **Its length is bounded**, see below. |
 | `cidr` | no | string | — | Subnet of that network. |
 | `hosts` | no | list of mappings | `[]` | The VMs. See below. |

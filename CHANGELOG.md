@@ -7,6 +7,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-11-16
+
+### Changed
+
+- **Provisioned machines no longer start with the host, unless the catalogue
+  asks** (issue #377). The kvm and incus templates set autostart on every
+  machine, with no way out: when a training machine rebooted on 2026-11-16,
+  the seven VMs of a catalogue came back on their own, five of them stopped on
+  purpose, and took 12 GB before anything was asked. The new `infra.autostart`
+  key of `meta.yml` (boolean, `false` by default) drives `autostart` of the kvm
+  domains and `boot.autostart` of the incus instances. Only the YAML boolean
+  `true` turns it on: a string `"true"` leaves it off. The libvirt network
+  still starts with the host: it costs no memory, and without it a VM started
+  by hand refuses an inactive network. A stack already provisioned takes the
+  new value at its next `provision`.
+
 ## [0.9.4] - 2026-11-15
 
 ### Added
