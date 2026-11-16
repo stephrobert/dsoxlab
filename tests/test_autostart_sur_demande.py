@@ -173,3 +173,20 @@ def test_hors_kvm_rien_n_est_aligne(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(terraform.libvirt, "list_domains", interdit)
     assert terraform._aligner_autostart_kvm(meta) == []
+
+
+def test_virsh_injoignable_se_dit_sans_nommer_de_machine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dsoxlab.utils.shell import CommandError, CommandResult
+
+    meta = _meta(tmp_path, monkeypatch)
+
+    def injoignable() -> list[str]:
+        raise CommandError(["virsh"], CommandResult(returncode=1, stdout="", stderr="introuvable"))
+
+    monkeypatch.setattr(terraform.libvirt, "list_domains", injoignable)
+    avertissements = terraform._aligner_autostart_kvm(meta)
+    assert len(avertissements) == 1
+    assert "virsh list --autostart" in avertissements[0]
+    assert "*" not in avertissements[0]

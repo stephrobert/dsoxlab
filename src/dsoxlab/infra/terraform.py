@@ -633,7 +633,7 @@ def _aligner_autostart_kvm(
         definis = set(libvirt.list_domains())
     except CommandError as exc:
         logger.warning("autostart not aligned, virsh unreachable: %s", exc)
-        return [_("provision_autostart_refused", host="*", error=str(exc))]
+        return [_("provision_autostart_virsh_unreachable", error=str(exc))]
     voulu = repo_meta.infra.autostart
     avertissements: list[str] = []
     for _index, host in hotes_actifs(repo_meta, demandes=target_hosts):

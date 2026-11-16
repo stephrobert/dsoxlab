@@ -332,6 +332,9 @@ def test_apply_porte_les_avertissements_de_bail(
     monkeypatch.setattr(
         terraform, "_ensure_kvm_dhcp_leases", lambda meta, hosts=None: ["refusé"]
     )
+    # L'alignement de l'autostart (issue #377) a ses propres tests : ici, il
+    # appellerait le vrai virsh, absent de la CI.
+    monkeypatch.setattr(terraform, "_aligner_autostart_kvm", lambda meta, hosts=None: [])
     monkeypatch.setattr(
         terraform, "run_command",
         lambda *a, **k: CommandResult(returncode=0, stdout="", stderr=""),
