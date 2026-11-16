@@ -379,9 +379,16 @@ jobs:
           )
           porteuses=0
           for tag in "${tags[@]}"; do
-            images=$(gh release view "$tag" --repo "$REPO" --json assets \
+            # A release that cannot be read is skipped with a warning: this
+            # step only tidies up, after the images are already attached. On
+            # v0.9.6 one `gh release view` answered "release not found" and
+            # failed the whole build, although every release reads fine since.
+            if ! images=$(gh release view "$tag" --repo "$REPO" --json assets \
               --jq '.assets[].name
-                    | select(endswith(".ova") or endswith(".qcow2"))')
+                    | select(endswith(".ova") or endswith(".qcow2"))'); then
+              echo "::warning::$tag : release illisible, ignorée par le ménage"
+              continue
+            fi
             [ -n "$images" ] || continue
             porteuses=$((porteuses + 1))
             if [ "$porteuses" -le "$GARDEES" ]; then
