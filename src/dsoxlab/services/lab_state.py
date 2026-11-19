@@ -120,6 +120,9 @@ def enregistrer_depart(root: Path, lab: LabDefinition) -> None:
     fichier = _empreintes_dir(root) / f"{lab.id}.sha256"
     fichier.parent.mkdir(parents=True, exist_ok=True)
     fichier.write_text(contenu + "\n", encoding="utf-8")
+    # Un lab relancé n'est plus un lab nettoyé : `check` peut de nouveau le
+    # noter.
+    (_empreintes_dir(root) / f"{lab.id}{_NETTOYE}").unlink(missing_ok=True)
 
 
 def repertoire_etat(root: Path, lab_id: str) -> Path:
@@ -152,6 +155,36 @@ def oublier_depart(root: Path, lab_id: str) -> None:
         fichier.unlink()
     except OSError:
         return
+
+
+#: Suffixe de la marque posée par `clean`, à côté de l'empreinte de départ.
+_NETTOYE = ".nettoye"
+
+
+def marquer_nettoye(root: Path, lab_id: str) -> None:
+    """Retient que `clean` a défait ce lab, jusqu'au prochain `run`.
+
+    `clean` remet la machine dans l'état dont les AUTRES labs ont besoin. Cet
+    état peut ressembler à la solution : le nettoyage de `k8s-installer-kubectl`
+    réinstalle le kubectl du socle, en 1.37, dans `/usr/local/bin`, avec sa
+    complétion, soit cinq des six exigences du challenge. Un `check` joué juste
+    après notait 83/100 un travail que personne n'avait fait (relevé par
+    Stéphane le 2026-11-19). Les tests lisent l'état de la machine et ne peuvent
+    pas savoir qui l'a posé : c'est donc au moteur de dire qu'après `clean`, il
+    n'y a plus rien à noter.
+
+    Une marque explicite, et non l'absence d'empreinte de départ : un lab lancé
+    avant cette version n'a pas d'empreinte, et il doit rester notable.
+    """
+    oublier_depart(root, lab_id)
+    marque = _empreintes_dir(root) / f"{lab_id}{_NETTOYE}"
+    marque.parent.mkdir(parents=True, exist_ok=True)
+    marque.write_text("clean\n", encoding="utf-8")
+
+
+def est_nettoye(root: Path, lab_id: str) -> bool:
+    """Vrai si `clean` a défait ce lab et qu'aucun `run` ne l'a relancé depuis."""
+    return (_empreintes_dir(root) / f"{lab_id}{_NETTOYE}").is_file()
 
 
 #: Docker n'est pas installé sur cette machine.
