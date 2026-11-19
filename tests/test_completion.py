@@ -80,7 +80,7 @@ def catalogue(tmp_path: Path) -> Path:
             LAB.format(id=lab_id, titre=titre), encoding="utf-8"
         )
         (dossier / "README.md").write_text("# Demo\n", encoding="utf-8")
-        (dossier / "scenario.md").write_text("# Scenario\n", encoding="utf-8")
+        (dossier / "challenge" / "README.md").write_text("# Challenge\n", encoding="utf-8")
     return tmp_path
 
 

@@ -177,7 +177,7 @@ STRINGS: dict[str, str] = {
     "cmd_course_help":    "Display a course section, or the table of contents if no section is given.",
     "cmd_course_arg":    "Lab identifier (optional if a lab is active in session)",
     "cmd_course_opt_section": "Section to display: number (1, 2 …) or id (navigation, permissions …).",
-    "cmd_course_list":   "List all labs and show whether a course (scenario.md) is available.",
+    "cmd_course_list":   "List all labs and show whether a course (README.md) is available.",
     "course_toc_title":  "Course: {title}",
     "course_toc_col_n":  "#",
     "course_toc_col_id": "Section ID",
@@ -201,7 +201,7 @@ STRINGS: dict[str, str] = {
         "The test file is not valid Python, so nothing could be counted and "
         "pytest will not load it either: {raison}",
     "audit_cours_absent":
-        "No course (scenario.md or README.md): the mission arrives with nothing to prepare it.",
+        "No course (README.md): the mission arrives with nothing to prepare it.",
     "audit_cours_indivisible":
         "{lignes} lines of course that even automatic splitting cannot open: "
         "add headings, or a course.yaml.",
@@ -253,7 +253,7 @@ STRINGS: dict[str, str] = {
     "course_end_body":     "You have read all [bold]{total}[/bold] sections.\n\nTime to test your skills: run [bold cyan]dsoxlab challenge {id}[/bold cyan] to tackle the challenge.",
     "course_section_not_found": "Section '{name}' not found. Use [bold]dsoxlab course {id}[/bold] to list available sections.",
     "course_section_file_missing": "Section file not found: {file}",
-    "cmd_challenge_help": "Display the challenge mission for this lab (challenge/README.md, else scenario.md).",
+    "cmd_challenge_help": "Display the challenge mission for this lab (challenge/README.md).",
     "cmd_challenge_arg":  "Lab identifier (optional if a lab is active in session)",
     "cmd_hint_help":     "Show the next challenge hint (deducts points from final score).",
     "cmd_hint_arg":      "Lab identifier (optional if a lab is active in session)",
@@ -458,7 +458,7 @@ STRINGS: dict[str, str] = {
         "written:\n"
         "  dsoxlab list-labs\n"
         "  dsoxlab validate-structure\n"
-        "Then fill scenario.md, and challenge/tests/test_functional.py.",
+        "Then fill challenge/README.md, and challenge/tests/test_functional.py.",
     "scaffold_id_invalide":
         "'{name}' cannot be used as an id: lowercase letters, digits, dot, "
         "dash and underscore only.",
@@ -888,7 +888,7 @@ Each lab declares:
                        saying it is a draft. Same for check, submit and show.
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
-                       declares them (course.yaml), otherwise scenario + README.
+                       declares them (course.yaml), otherwise brief + README.
     [dim]--section / -s[/dim]       Section to display: number or id.
     [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
     [dim]--drafts[/dim]             Show the course of a draft lab. Refused otherwise.
@@ -905,7 +905,7 @@ Each lab declares:
                        command does by default.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
-  [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md, else scenario.md).
+  [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md).
     [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
@@ -1219,13 +1219,13 @@ silent.
     "lab_session_ended":  "Session ended for [bold]{lab_id}[/bold]. Back to your original directory.",
     "lab_session_ended_local": "Session ended for [bold]{lab_id}[/bold]. Your work is kept: run [bold]dsoxlab check[/bold] again whenever you want.",
     "no_active_lab":      "No active lab in session. Run [bold]dsoxlab run <id>[/bold] first, or pass the lab identifier explicitly.",
-    "course_missing":      "No scenario.md file found for this lab.",
+    "course_missing":      "No course for this lab: neither challenge/README.md nor README.md.",
     "course_tip":          "Challenge ready: dsoxlab challenge {id}",
     "course_list_title":   "Available courses",
     "course_list_col_id":  "Lab ID",
     "course_list_col_title": "Title",
     "course_list_col_status": "Course",
-    "challenge_missing":   "This lab has no brief: neither challenge/README.md nor scenario.md.",
+    "challenge_missing":   "This lab has no brief: challenge/README.md is missing.",
     "challenge_workdir":   "Working directory: {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────
@@ -1334,6 +1334,9 @@ silent.
     "struct_forbidden_shell_sh":
         "runtime/shell.sh is not allowed. Preparation is declared through "
         "runtime.workdir and runtime.fixtures.",
+    "struct_forbidden_scenario":
+        "scenario.md is no longer part of a lab: the situation and the mission "
+        "both go in challenge/README.md (and README.fr.md).",
     "struct_forbidden_makefile":
         "A Makefile is not allowed in a lab: dsoxlab drives everything.",
 

@@ -23,7 +23,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab catalog remove` | Retire un catalogue installé. |
 | `dsoxlab catalog update` | Met à jour un catalogue installé (tous, si aucun n'est nommé). |
 | `dsoxlab catalog use` | Choisit le catalogue actif, celui qu'on utilise hors de son répertoire. |
-| `dsoxlab challenge` | Affiche la mission du challenge (challenge/README.md, sinon scenario.md). |
+| `dsoxlab challenge` | Affiche la mission du challenge (challenge/README.md). |
 | `dsoxlab check` | Exécute les tests, calcule le score (hints déduits) et enregistre le résultat. |
 | `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
 | `dsoxlab completion install` | Installe l'auto-complétion pour le shell courant (zsh, bash). |

@@ -48,19 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first (`docker.io`, `containerd`, `runc`…, without purging, so images in
   `/var/lib/docker` stay), then restarts the socket and the service.
 
-- **`dsoxlab challenge` shows a brief for every lab.** It only read
-  `challenge/README.md`, which 229 labs of six catalogs do not have, among
-  them all 156 Kubernetes labs: for them, the command printed a warning and
-  nothing else. Without that file, it now prints the lab's `scenario.md`,
-  which says what the learner must obtain and is required by
-  `validate-structure`. `run` gets the same fallback for `vm` labs, where it
-  prints the brief before the SSH session opens. Reported by a reader
-  (blog-roadmap#198).
-- **`validate-structure` now requires `challenge/README.md`**, and
-  `dsoxlab new lab` writes it, in English and French, with one graded task
-  matching the generated test. Nothing required it so far, which is how 229
-  labs shipped without one. A catalog that lacks it fails its validation from
-  this version on; the fallback above keeps it playable meanwhile.
+- **One brief per lab, in `challenge/README.md`, and `scenario.md` leaves the
+  contract.** `dsoxlab challenge` only read `challenge/README.md`, which 229
+  labs of six catalogs did not have (all 156 Kubernetes labs among them): for
+  them, the command printed a warning and nothing else. Reported by a reader
+  (blog-roadmap#198). A lab now has a single brief: `challenge/README.md` and
+  `README.fr.md` hold the situation, the mission and how to check it, and
+  `scenario.md`, which held the situation next to them, is gone.
+  `validate-structure` requires `challenge/README.md` and **refuses
+  `scenario.md`**; `dsoxlab course` shows the brief, then the lesson
+  (`README.md`); `dsoxlab new lab` writes the brief in English and French, with
+  one graded task matching the generated test. The demonstration lab follows
+  the same layout. **Catalogs must migrate**: a lab that still has
+  `scenario.md` fails `validate-structure` from this version on.
 
 Tested on Incus VMs, from several starting states: Ubuntu 24.04 (fresh image,
 fresh machine, set up with the 0.9.8 commands, with `docker.io` and Incus from

@@ -1463,7 +1463,7 @@ def _verdict_cell(
 # ── fullhelp ──────────────────────────────────────────────────────────────────
 
 def print_course_list(labs: list[LabDefinition]) -> None:
-    """Display a table of all labs with course (scenario.md) availability."""
+    """Display a table of all labs with course (README.md) availability."""
     table = Table(title=_("course_list_title"), show_lines=True)
     table.add_column(_("course_list_col_id"), style="bold cyan", no_wrap=True)
     table.add_column(_("course_list_col_title"))
@@ -1471,7 +1471,7 @@ def print_course_list(labs: list[LabDefinition]) -> None:
     table.add_column(_("course_list_col_status"), justify="center")
 
     for lab in labs:
-        has_course = (lab.path / "scenario.md").exists()
+        has_course = (lab.path / "README.md").exists()
         status = Text("✔", style="green") if has_course else Text("✗", style="dim red")
         table.add_row(
             texte_affichable(lab.id),
@@ -1590,9 +1590,11 @@ def _localised(base: Path, nom: str, lang: str) -> Path | None:
 
 
 def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
-    """Affiche le cours du lab : le contexte, puis la partie qui enseigne.
+    """Affiche le cours du lab : l'énoncé, puis la partie qui enseigne.
 
-    Les deux fichiers sont complémentaires et étaient jusqu'ici traités comme
+    L'énoncé (``challenge/README``) pose la situation et la mission ; il a
+    remplacé ``scenario``, qui jouait ce rôle jusqu'au 2026-11-19. Les deux
+    fichiers sont complémentaires et étaient jusqu'ici traités comme
     des concurrents : ``scenario`` pose la situation en quelques lignes,
     ``README`` explique les commandes et déroule les exercices. Seul le premier
     était affiché, si bien que la partie la plus riche n'était atteignable par
@@ -1605,7 +1607,7 @@ def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
 
     console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)}[/bold cyan]"))
     parties = [
-        f for f in (_localised(lab.path, "scenario", lang),
+        f for f in (enonce_du_challenge(lab, lang),
                     _localised(lab.path, "README", lang))
         if f is not None
     ]
@@ -1702,21 +1704,16 @@ def print_lab_welcome(lab: LabDefinition) -> None:
 
 
 def enonce_du_challenge(lab: LabDefinition, lang: str = "en") -> Path | None:
-    """Le fichier qui porte l'énoncé du challenge, ou rien.
+    """L'énoncé du lab : ``challenge/README.<lang>.md``, sinon ``README.md``.
 
-    ``challenge/README.<lang>.md`` puis ``challenge/README.md`` d'abord. À
-    défaut, le ``scenario`` du lab : c'est lui qui dit ce qu'il faut obtenir.
-    Sans ce repli, 229 labs de six catalogues n'affichaient qu'un avertissement,
-    dont les 156 du catalogue Kubernetes, aucun n'ayant de
-    ``challenge/README.md`` (blog-roadmap#198, mesuré le 2026-11-19).
+    C'est le seul fichier qui porte la situation et la mission depuis que
+    ``scenario.md`` a quitté le contrat (blog-roadmap#198, 2026-11-19).
     """
-    return _localised(lab.path / "challenge", "README", lang) or _localised(
-        lab.path, "scenario", lang
-    )
+    return _localised(lab.path / "challenge", "README", lang)
 
 
 def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
-    """Display the challenge brief (challenge/README.md, else scenario.md)."""
+    """Display the challenge brief (challenge/README.md or README.<lang>.md)."""
     from rich.markdown import Markdown
     from rich.rule import Rule
 

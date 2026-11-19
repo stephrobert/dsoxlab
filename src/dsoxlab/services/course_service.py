@@ -58,7 +58,8 @@ NIVEAUX = (2, 3)
 
 #: Les documents de cours, dans l'ordre où ils se lisent. Le même que celui de
 #: l'affichage d'un bloc, pour que le découpage ne change pas l'ordre du propos.
-DOCUMENTS = ("scenario.md", "README.md")
+#: L'énoncé a pris la place de ``scenario.md`` le 2026-11-19 (blog-roadmap#198).
+DOCUMENTS = ("challenge/README.md", "README.md")
 
 _CLOTURE_CODE = re.compile(r"^\s*```")
 

@@ -69,7 +69,7 @@ def _catalogue(racine: Path, *, runtime: str, services: bool = False) -> Path:
     lab = racine / "labs" / "demo" / "lab-a"
     (lab / "lab.yaml").write_text(bloc, encoding="utf-8")
     (lab / "README.md").write_text("# lab-a\n", encoding="utf-8")
-    (lab / "scenario.md").write_text("scenario\n", encoding="utf-8")
+    (lab / "challenge" / "README.md").write_text("challenge\n", encoding="utf-8")
     (lab / "challenge" / "tests" / "test_functional.py").write_text(
         "def test_ok():\n    assert True\n", encoding="utf-8"
     )

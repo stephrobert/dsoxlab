@@ -59,7 +59,7 @@ def test_le_lab_porte_les_fichiers_exiges_par_le_contrat() -> None:
     lab = next((demo_catalog() / "labs").rglob("lab.yaml")).parent
 
     for exige in (
-        "lab.yaml", "README.md", "scenario.md",
+        "lab.yaml", "README.md", "challenge/README.md",
         "challenge/tests/test_functional.py",
     ):
         assert (lab / exige).is_file(), f"{exige} manquant"
@@ -77,7 +77,8 @@ def test_la_parite_de_langue_est_tenue() -> None:
     """Un document traduit d'un seul côté est signalé par le validator."""
     lab = next((demo_catalog() / "labs").rglob("lab.yaml")).parent
 
-    for base in ("README", "scenario", "challenge/README"):
+    assert not list(lab.glob("scenario*.md")), "scenario.md a quitté le contrat"
+    for base in ("README", "challenge/README"):
         assert (lab / f"{base}.md").is_file()
         assert (lab / f"{base}.fr.md").is_file(), f"{base}.fr.md manquant"
 

@@ -28,7 +28,6 @@ ma-formation/
     └── mon-domaine/l1/premier-lab/
         ├── lab.yaml            ← obligatoire
         ├── README.md           ← obligatoire
-        ├── scenario.md         ← obligatoire
         ├── setup.yaml          ← obligatoire pour runtime vm, optionnel pour shell (Ansible)
         ├── cleanup.yaml        ← obligatoire pour runtime vm, optionnel pour shell (Ansible)
         ├── fixtures/           ← optionnel, pour runtime shell
@@ -47,20 +46,20 @@ répertoire.
 
 ## Ce que contient chaque fichier
 
-Trois fichiers Markdown, et le moteur lit chacun à un moment différent :
+Deux fichiers Markdown, et le moteur lit chacun à un moment différent :
 
 | Fichier | Lu par | Contient |
 | --- | --- | --- |
-| `README.md` | `dsoxlab course`, d'un bloc avec `scenario.md` sauf si un `course.yaml` le découpe | le cours : ce que le lab enseigne, et ce qu'il suppose connu |
-| `scenario.md` | `dsoxlab course` | la situation : où se trouve l'apprenant et ce qui ne va pas — pas les gestes qui le corrigent |
-| `challenge/README.md` | `dsoxlab challenge` ; affiché par `run` avant l'ouverture de la session SSH d'un lab `vm`, l'hôte n'ayant pas dsoxlab ; lu par `validate-structure` pour le barème | la mission, sous forme de tâches notées |
+| `README.md` | `dsoxlab course`, après l'énoncé, sauf si un `course.yaml` le découpe | le cours : ce que le lab enseigne, et ce qu'il suppose connu |
+| `challenge/README.md` | `dsoxlab challenge` ; `dsoxlab course`, avant le cours ; affiché par `run` avant l'ouverture de la session SSH d'un lab `vm`, l'hôte n'ayant pas dsoxlab ; lu par `validate-structure` pour le barème | l'énoncé : la situation (où se trouve l'apprenant et ce qui ne va pas, pas les gestes qui le corrigent), puis la mission, sous forme de tâches notées, et la façon de la valider |
 
-Les trois sont exigés par le validator de structure (`challenge/README.md`
-depuis la 0.9.9). `dsoxlab new lab` écrit les trois, en anglais et en
-français, avec `lab.yaml`, `test_functional.py` et, pour un lab `vm`,
-`setup.yaml` et `cleanup.yaml`. Un catalogue validé par une version plus
-ancienne peut encore manquer de `challenge/README.md` : `dsoxlab challenge`
-affiche alors `scenario.md`, qui dit ce que l'apprenant doit obtenir.
+Les deux sont exigés par le validator de structure, en anglais et en français
+(`README.fr.md`, `challenge/README.fr.md`). **`scenario.md` ne fait plus partie
+d'un lab** (0.9.9) : il portait la situation à côté d'un énoncé qui portait la
+mission, deux fichiers pour un même propos, et le validator le refuse
+désormais. Son contenu va en tête de `challenge/README.md`. `dsoxlab new lab`
+écrit les deux fichiers, avec `lab.yaml`, `test_functional.py` et, pour un lab
+`vm`, `setup.yaml` et `cleanup.yaml`.
 
 **Le barème.** dsoxlab note **par test** : cinq `def test_` dans
 `test_functional.py`, c'est vingt points chacun, les indices déduits ensuite.
@@ -173,7 +172,7 @@ On reste dans le déclaratif : un playbook, jamais un script. Le refus de
 
 Trois familles, toutes locales et hors ligne par défaut.
 
-**Structure.** `lab.yaml`, `README.md`, `scenario.md`, `challenge/README.md`, `challenge/tests/` et
+**Structure.** `lab.yaml`, `README.md`, `challenge/README.md`, `challenge/tests/` et
 `challenge/tests/test_functional.py`. Un lab `vm` exige en plus `setup.yaml` et
 `cleanup.yaml`, un `runtime.targets[]` non vide, et un `runtime.default` qui
 corresponde à l'une de ces cibles. Un lab `shell` exige un `runtime.workdir` non
@@ -395,7 +394,8 @@ sections:
     file: course/01-navigation.md
 ```
 
-Sans lui, `course` retombe sur `scenario.md` + `README.md` affichés d'un bloc,
+Sans lui, `course` découpe l'énoncé et `README.md` selon leurs titres, ou les
+affiche d'un bloc,
 ce qui explique la longueur des cours longs.
 
 ---

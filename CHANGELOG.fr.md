@@ -51,19 +51,19 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `runc`…, sans purge : les images de `/var/lib/docker` restent), puis relance
   le socket et le service.
 
-- **`dsoxlab challenge` affiche un énoncé pour chaque lab.** La commande ne
-  lisait que `challenge/README.md`, absent de 229 labs de six catalogues, dont
-  les 156 labs Kubernetes : pour eux, elle n'affichait qu'un avertissement.
-  Sans ce fichier, elle affiche désormais le `scenario.md` du lab, qui dit ce
-  que l'apprenant doit obtenir et que `validate-structure` exige. `run` profite
-  du même repli pour les labs `vm`, où il affiche l'énoncé avant d'ouvrir la
-  session SSH. Signalé par un lecteur (blog-roadmap#198).
-- **`validate-structure` exige désormais `challenge/README.md`**, et
-  `dsoxlab new lab` l'écrit, en anglais et en français, avec une tâche notée
-  qui correspond au test généré. Rien ne l'exigeait jusqu'ici, et c'est ainsi
-  que 229 labs sont sortis sans lui. Un catalogue qui ne l'a pas échoue à sa
-  validation à partir de cette version ; le repli ci-dessus le garde jouable
-  en attendant.
+- **Un seul énoncé par lab, dans `challenge/README.md`, et `scenario.md` quitte
+  le contrat.** `dsoxlab challenge` ne lisait que `challenge/README.md`, absent
+  de 229 labs de six catalogues (dont les 156 labs Kubernetes) : pour eux, la
+  commande n'affichait qu'un avertissement. Signalé par un lecteur
+  (blog-roadmap#198). Un lab n'a plus qu'un énoncé : `challenge/README.md` et
+  `README.fr.md` portent la situation, la mission et la façon de la valider, et
+  `scenario.md`, qui portait la situation à côté, disparaît.
+  `validate-structure` exige `challenge/README.md` et **refuse `scenario.md`** ;
+  `dsoxlab course` affiche l'énoncé, puis le cours (`README.md`) ;
+  `dsoxlab new lab` écrit l'énoncé en anglais et en français, avec une tâche
+  notée qui correspond au test généré. Le lab de démonstration suit la même
+  disposition. **Les catalogues doivent migrer** : un lab qui garde
+  `scenario.md` échoue à `validate-structure` à partir de cette version.
 
 Testé sur des VM Incus, depuis plusieurs états de départ : Ubuntu 24.04 (image
 telle quelle, machine neuve, machine préparée avec les commandes de la 0.9.8,
