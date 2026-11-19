@@ -50,8 +50,8 @@ Deux fichiers Markdown, et le moteur lit chacun à un moment différent :
 
 | Fichier | Lu par | Contient |
 | --- | --- | --- |
-| `README.md` | `dsoxlab course`, après l'énoncé, sauf si un `course.yaml` le découpe | le cours : ce que le lab enseigne, et ce qu'il suppose connu |
-| `challenge/README.md` | `dsoxlab challenge` ; `dsoxlab course`, avant le cours ; affiché par `run` avant l'ouverture de la session SSH d'un lab `vm`, l'hôte n'ayant pas dsoxlab ; lu par `validate-structure` pour le barème | l'énoncé : la situation (où se trouve l'apprenant et ce qui ne va pas, pas les gestes qui le corrigent), puis la mission, sous forme de tâches notées, et la façon de la valider |
+| `README.md` | `dsoxlab course`, découpé par un `course.yaml` ou par ses propres titres | le cours : ce que le lab enseigne, et ce qu'il suppose connu |
+| `challenge/README.md` | `dsoxlab challenge` ; affiché par `run` avant l'ouverture de la session SSH d'un lab `vm`, l'hôte n'ayant pas dsoxlab ; lu par `validate-structure` pour le barème | l'énoncé : la situation (où se trouve l'apprenant et ce qui ne va pas, pas les gestes qui le corrigent), puis la mission, sous forme de tâches notées, et la façon de la valider |
 
 Les deux sont exigés par le validator de structure, en anglais et en français
 (`README.fr.md`, `challenge/README.fr.md`). **`scenario.md` ne fait plus partie
@@ -394,8 +394,8 @@ sections:
     file: course/01-navigation.md
 ```
 
-Sans lui, `course` découpe l'énoncé et `README.md` selon leurs titres, ou les
-affiche d'un bloc,
+Sans lui, `course` découpe `README.md` selon ses titres, ou l'affiche d'un
+bloc,
 ce qui explique la longueur des cours longs.
 
 ---

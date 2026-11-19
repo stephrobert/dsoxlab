@@ -1241,7 +1241,7 @@ hors ligne, elle se tait.
     "lab_session_ended":  "Session terminée pour [bold]{lab_id}[/bold]. Retour à votre répertoire d'origine.",
     "lab_session_ended_local": "Session terminée pour [bold]{lab_id}[/bold]. Votre travail est conservé : relancez [bold]dsoxlab check[/bold] quand vous voulez.",
     "no_active_lab":      "Aucun lab actif en session. Exécutez [bold]dsoxlab run <id>[/bold] d'abord, ou passez l'identifiant explicitement.",
-    "course_missing":      "Aucun cours pour ce lab : ni challenge/README.md ni README.md.",
+    "course_missing":      "Aucun cours pour ce lab : README.md manque.",
     "course_tip":          "Challenge prêt : dsoxlab challenge {id}",
     "course_list_title":   "Cours disponibles",
     "course_list_col_id":  "Lab ID",

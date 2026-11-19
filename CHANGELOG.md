@@ -56,8 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `README.fr.md` hold the situation, the mission and how to check it, and
   `scenario.md`, which held the situation next to them, is gone.
   `validate-structure` requires `challenge/README.md` and **refuses
-  `scenario.md`**; `dsoxlab course` shows the brief, then the lesson
-  (`README.md`); `dsoxlab new lab` writes the brief in English and French, with
+  `scenario.md`**; `dsoxlab course` shows the lesson (`README.md`) and
+  `dsoxlab challenge` the brief, never both; `dsoxlab new lab` writes the brief in English and French, with
   one graded task matching the generated test. The demonstration lab follows
   the same layout. **Catalogs must migrate**: a lab that still has
   `scenario.md` fails `validate-structure` from this version on.

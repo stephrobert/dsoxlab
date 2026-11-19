@@ -50,8 +50,8 @@ Two Markdown files, and the engine reads each at a different moment:
 
 | File | Read by | Holds |
 | --- | --- | --- |
-| `README.md` | `dsoxlab course`, after the brief, unless a `course.yaml` splits it | the lesson: what the lab teaches, and what it assumes known |
-| `challenge/README.md` | `dsoxlab challenge`; `dsoxlab course`, before the lesson; printed by `run` before the SSH session of a `vm` lab opens, since the host has no dsoxlab; read by `validate-structure` for the scale | the brief: the situation (where the learner is and what is wrong, not the steps that fix it), then the mission, as a list of graded tasks, and how to check it |
+| `README.md` | `dsoxlab course`, split by a `course.yaml` or by its own headings | the lesson: what the lab teaches, and what it assumes known |
+| `challenge/README.md` | `dsoxlab challenge`; printed by `run` before the SSH session of a `vm` lab opens, since the host has no dsoxlab; read by `validate-structure` for the scale | the brief: the situation (where the learner is and what is wrong, not the steps that fix it), then the mission, as a list of graded tasks, and how to check it |
 
 Both are required by the structure validator, in English and French
 (`README.fr.md`, `challenge/README.fr.md`). **`scenario.md` is no longer part of
@@ -384,8 +384,8 @@ sections:
     file: course/01-navigation.md
 ```
 
-Without it, `course` splits the brief and `README.md` on their own headings,
-or shows them in one block — which is why long courses are long.
+Without it, `course` splits `README.md` on its own headings, or shows it in
+one block — which is why long courses are long.
 
 ---
 

@@ -1590,12 +1590,15 @@ def _localised(base: Path, nom: str, lang: str) -> Path | None:
 
 
 def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
-    """Affiche le cours du lab : l'énoncé, puis la partie qui enseigne.
+    """Affiche le cours du lab : ``README``, la partie qui enseigne.
 
-    L'énoncé (``challenge/README``) pose la situation et la mission ; il a
-    remplacé ``scenario``, qui jouait ce rôle jusqu'au 2026-11-19. Les deux
-    fichiers sont complémentaires et étaient jusqu'ici traités comme
-    des concurrents : ``scenario`` pose la situation en quelques lignes,
+    L'énoncé (``challenge/README``), qui porte la situation et la mission depuis
+    que ``scenario`` a quitté le contrat (2026-11-19), n'est PAS repris ici :
+    ``challenge`` l'affiche, et le montrer aussi dans le cours faisait lire la
+    mission deux fois (charge d'écran du parcours démo : 57 -> 72).
+
+    Avant, ``scenario`` et ``README`` étaient complémentaires et avaient d'abord
+    été traités comme des concurrents : ``scenario`` posait la situation en quelques lignes,
     ``README`` explique les commandes et déroule les exercices. Seul le premier
     était affiché, si bien que la partie la plus riche n'était atteignable par
     aucune commande (mesuré : 10 465 lignes de code dans les README d'un seul
@@ -1607,8 +1610,7 @@ def print_lab_course(lab: LabDefinition, lang: str = "en") -> None:
 
     console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)}[/bold cyan]"))
     parties = [
-        f for f in (enonce_du_challenge(lab, lang),
-                    _localised(lab.path, "README", lang))
+        f for f in (_localised(lab.path, "README", lang),)
         if f is not None
     ]
     if parties:

@@ -888,7 +888,7 @@ Each lab declares:
                        saying it is a draft. Same for check, submit and show.
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
-                       declares them (course.yaml), otherwise brief + README.
+                       declares them (course.yaml), otherwise README.
     [dim]--section / -s[/dim]       Section to display: number or id.
     [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
     [dim]--drafts[/dim]             Show the course of a draft lab. Refused otherwise.
@@ -1219,7 +1219,7 @@ silent.
     "lab_session_ended":  "Session ended for [bold]{lab_id}[/bold]. Back to your original directory.",
     "lab_session_ended_local": "Session ended for [bold]{lab_id}[/bold]. Your work is kept: run [bold]dsoxlab check[/bold] again whenever you want.",
     "no_active_lab":      "No active lab in session. Run [bold]dsoxlab run <id>[/bold] first, or pass the lab identifier explicitly.",
-    "course_missing":      "No course for this lab: neither challenge/README.md nor README.md.",
+    "course_missing":      "No course for this lab: README.md is missing.",
     "course_tip":          "Challenge ready: dsoxlab challenge {id}",
     "course_list_title":   "Available courses",
     "course_list_col_id":  "Lab ID",

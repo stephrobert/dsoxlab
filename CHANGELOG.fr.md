@@ -59,7 +59,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `README.fr.md` portent la situation, la mission et la façon de la valider, et
   `scenario.md`, qui portait la situation à côté, disparaît.
   `validate-structure` exige `challenge/README.md` et **refuse `scenario.md`** ;
-  `dsoxlab course` affiche l'énoncé, puis le cours (`README.md`) ;
+  `dsoxlab course` affiche le cours (`README.md`) et
+  `dsoxlab challenge` l'énoncé, jamais les deux ;
   `dsoxlab new lab` écrit l'énoncé en anglais et en français, avec une tâche
   notée qui correspond au test généré. Le lab de démonstration suit la même
   disposition. **Les catalogues doivent migrer** : un lab qui garde
