@@ -26,7 +26,7 @@ from .doctor_controles.remedes import Remede, rang
 #: ``cli/diagnostic.py:_actions``).
 ACTIONS_INTERNES = frozenset({"provider", "cle_ssh", "ssh_include"})
 
-#: Les composants que `doctor --fix --clients` installe quand ils sont facultatifs.
+#: Les composants facultatifs que l'affichage de `doctor` propose par défaut.
 _CLIENTS = frozenset({"docker", "incus"})
 
 
@@ -124,8 +124,14 @@ def _regrouper(checks: list[Check], *, facultative: bool) -> list[Etape]:
     )
 
 
-def construire(report: DoctorReport) -> Plan:
-    """Range le diagnostic en étapes numérotées."""
+def construire(report: DoctorReport, facultatives: frozenset[str] = _CLIENTS) -> Plan:
+    """Range le diagnostic en étapes numérotées.
+
+    ``facultatives`` dit quels contrôles NON requis par ce catalogue entrent
+    quand même dans les étapes facultatives : Docker et Incus pour
+    l'affichage, le profil de ``--fix`` (socle KVM, ``--clients``, ``--all``)
+    pour la mise en conformité.
+    """
     plan = Plan()
     a_faire = [c for c in report.required if _a_faire(c)]
     plan.etapes = _regrouper(a_faire, facultative=False)
@@ -144,12 +150,12 @@ def construire(report: DoctorReport) -> Plan:
         c for c in report.required if c.state == STATE_UNKNOWN and c.apres is None
     ]
     plan.prets = [c for c in report.required if c.state == STATE_OK]
-    # `--clients` ne vise que les clients facultatifs, Docker et Incus
-    # (décision 1 du 2026-11-16) : un hyperviseur que ce catalogue n'utilise
-    # pas, ou qu'aucun catalogue ne demande encore, ne s'installe pas en passant.
+    # Seuls les contrôles du profil demandé entrent (brief de refonte de
+    # doctor --fix, PR #392) : un composant hors profil ne s'installe pas en
+    # passant.
     facultatifs = [
         c for c in report.optional
-        if not c.ok and c.remede is not None and c.key in _CLIENTS
+        if not c.ok and c.remede is not None and c.key in facultatives
     ]
     plan.facultatives = _regrouper(facultatifs, facultative=True)
     # Numérotées à la suite des étapes requises : `--fix --clients` les montrait

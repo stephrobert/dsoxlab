@@ -39,7 +39,7 @@ locally, per catalog.
 
 | | **Install the tool** | **Download the appliance** |
 | --- | --- | --- |
-| For | Linux, and macOS or Windows with Python at hand | Windows and macOS, or anyone who prefers a throwaway machine |
+| For | Linux, Windows 11 under WSL2 (`vm` labs included), and macOS with Python at hand | Windows and macOS, or anyone who prefers a throwaway machine |
 | You need | Python 3.11+ and `uv` or `pipx` | VirtualBox or VMware, and 8 GB of RAM to spare |
 | You get | one command, a few megabytes | a Debian 13 VM with desktop, Ansible and Terraform, ~450 MB to download |
 | Read | the section right below | **[The appliance](docs/appliance.md)** |

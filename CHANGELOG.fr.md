@@ -7,6 +7,64 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.9] - 2026-11-19
+
+### Corrigé
+
+- **`doctor --fix` n'échoue plus sur une machine neuve dont l'index APT est
+  vide.** Son playbook était généré à partir des commandes qu'affiche
+  `doctor`, et plusieurs d'entre elles (`git`, libvirt, OVMF, Incus) lançaient
+  `apt install` sans rafraîchir l'index d'abord : sur une image cloud neuve ou
+  un WSL fraîchement installé, la première installation s'arrêtait sur « No
+  package matching 'git' is available ». Le poste est désormais préparé par
+  **un seul playbook statique livré avec dsoxlab**
+  (`templates/ansible/poste.yml`), écrit avec les modules d'Ansible, qui
+  rafraîchit l'index APT avant la première installation et après l'ajout de
+  chaque dépôt. dsoxlab ne génère plus aucune commande d'installation : il
+  passe seulement à ce playbook la liste des composants et votre compte
+  (brief de la PR #392).
+- **Un seul passage de `--fix` suffit.** Le pool libvirt, les groupes de
+  virtualisation et le firmware EFI attendent libvirt : ils n'étaient pas
+  encore « à faire » au départ de `--fix`, et il fallait le relancer. Dès que
+  le playbook part, il applique désormais tout le profil ; chaque tâche étant
+  idempotente, ce qui est déjà en place n'est pas modifié.
+- **La sortie du playbook est courte.** La sortie d'Ansible ne défile plus :
+  une barre nomme la tâche en cours, et seules s'écrivent les tâches qui
+  changent quelque chose, ou qui échouent, avec le message d'Ansible. Un
+  second passage sur une machine conforme n'écrit rien. Votre mot de passe
+  sudo est demandé une fois par dsoxlab, seulement si sudo en exige un, et
+  remis à Ansible en mémoire, jamais en argument ni dans un fichier.
+- **Une machine préparée avec les commandes de la 0.9.8 est réparée, plus
+  bloquée.** Ces commandes écrivaient `/etc/apt/sources.list.d/hashicorp.list`
+  avec une clé passée par `wget` et `gpg --dearmor`. Sur une machine sans
+  `wget` (l'image cloud de Debian 13), le fichier de clé restait vide, apt
+  refusait le dépôt (« is not signed »), et chaque `apt update` suivant
+  échouait. Le playbook remplace désormais ce fichier par un
+  `hashicorp.sources` au format deb822, qui embarque sa clé. Un dépôt que
+  dsoxlab n'a pas écrit n'est jamais touché.
+- **Le Docker de la distribution est remplacé proprement.** Sur une machine
+  qui avait le `docker.io` d'Ubuntu, installer `docker-ce` par-dessus laissait
+  l'ancien `docker.socket` chargé : le nouveau `dockerd` s'arrêtait aussitôt
+  (« no sockets found via socket activation ») et Docker finissait en
+  `failed`. Comme le dit la documentation de Docker, le playbook retire
+  désormais d'abord les paquets de la distribution (`docker.io`, `containerd`,
+  `runc`…, sans purge : les images de `/var/lib/docker` restent), puis relance
+  le socket et le service.
+
+Testé sur des VM Incus, depuis plusieurs états de départ : Ubuntu 24.04 (image
+telle quelle, machine neuve, machine préparée avec les commandes de la 0.9.8,
+`docker.io` et Incus de la distribution déjà en place), Debian 13 (machine
+neuve, machine préparée avec les commandes de la 0.9.8) et AlmaLinux 10
+(machine neuve, Incus sauté avec un message). À chaque fois, un seul passage
+de `--fix` installe tout, et un second ne change rien.
+
+### Ajouté
+
+- **`doctor --fix --all`** installe tous les composants pris en charge : le
+  socle KVM, Docker et Incus (comme `--clients`), plus Terraform, Ansible et
+  ses collections. `--clients` et `--all` sont des profils de `--fix` : sans
+  lui, ils s'arrêtent désormais en erreur au lieu de ne rien faire en silence.
+
 ## [0.9.8] - 2026-11-16
 
 ### Corrigé

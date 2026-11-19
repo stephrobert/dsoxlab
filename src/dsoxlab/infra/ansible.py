@@ -150,6 +150,24 @@ def has_ansible_playbook() -> bool:
     return shutil.which("ansible-playbook") is not None
 
 
+def _identifiants(
+    vault_password_file: Path | None, become_password: str | None,
+) -> tuple[str | None, dict[str, str] | None]:
+    """La ligne de commande et les réponses aux invites de mot de passe.
+
+    Le mot de passe sudo ne figure pas dans la ligne de commande : ansible-runner
+    répond lui-même à l'invite ``BECOME password`` que ``--ask-become-pass``
+    fait apparaître.
+    """
+    morceaux: list[str] = []
+    if vault_password_file is not None:
+        morceaux.append(f"--vault-password-file={vault_password_file}")
+    if become_password is not None:
+        morceaux.append("--ask-become-pass")
+    reponses = {r"^BECOME password.*:\s*?$": become_password} if become_password is not None else None
+    return (" ".join(morceaux) if morceaux else None), reponses
+
+
 def run_playbook(
     playbook_path: Path,
     inventory: dict[str, Any] | Path,
@@ -160,6 +178,7 @@ def run_playbook(
     timeout_s: int | None = None,
     private_data_dir: Path | None = None,
     on_event: Callable[[dict[str, Any]], None] | None = None,
+    become_password: str | None = None,
 ) -> PlaybookResult:
     """Exécute un playbook via ansible-runner et retourne le résultat.
 
@@ -176,6 +195,8 @@ def run_playbook(
         timeout_s: Timeout total en secondes (None = pas de limite).
         private_data_dir: Répertoire de travail d'ansible-runner (logs,
             artifacts). Si None, un tmpdir est créé et nettoyé.
+        become_password: Le mot de passe sudo s'il en faut un (voir
+            :func:`_identifiants` : jamais en argument ni en fichier).
 
     Returns:
         ``PlaybookResult`` (rc, status, stats, stdout).
@@ -205,10 +226,7 @@ def run_playbook(
 
     import ansible_runner
 
-    cmdline_parts: list[str] = []
-    if vault_password_file is not None:
-        cmdline_parts.append(f"--vault-password-file={vault_password_file}")
-    cmdline = " ".join(cmdline_parts) if cmdline_parts else None
+    cmdline, mots_de_passe = _identifiants(vault_password_file, become_password)
 
     # ansible-runner attend playbook == nom du fichier dans
     # private_data_dir/project/. On utilise le pattern roles_path absolu
@@ -282,7 +300,7 @@ def run_playbook(
                     logger.exception("on_event callback failed")
             return True
 
-        kwargs: dict[str, Any] = {"event_handler": _safe_handler}
+        kwargs: dict[str, Any] = {"event_handler": _safe_handler, **({"passwords": mots_de_passe} if mots_de_passe else {})}
 
         def _prevenir(rang: int) -> None:
             """Fait remonter le Ctrl-C dans le flux d'events du playbook.

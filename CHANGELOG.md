@@ -7,6 +7,61 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-11-19
+
+### Fixed
+
+- **`doctor --fix` no longer fails on a fresh machine whose APT index is
+  empty.** Its playbook was generated from the commands displayed by
+  `doctor`, and several of them (`git`, libvirt, OVMF, Incus) ran
+  `apt install` without refreshing the index first: on a fresh cloud image or
+  a freshly installed WSL, the first installation stopped on "No package
+  matching 'git' is available". The workstation is now set up by **one
+  static playbook shipped with dsoxlab** (`templates/ansible/poste.yml`),
+  written with Ansible's own modules, which refreshes the APT index before
+  the first installation and after adding each repository. dsoxlab no longer
+  generates any installation command: it only passes the list of components
+  and your account to that playbook (brief of PR #392).
+- **One `--fix` run is enough.** The libvirt pool, the virtualisation groups
+  and the EFI firmware wait for libvirt, so they were not yet "to do" when
+  `--fix` started, and a second run was needed. As soon as the playbook runs,
+  it now applies the whole profile; since every task is idempotent, what is
+  already in place is left unchanged.
+- **The playbook output is short.** Ansible's own output no longer scrolls
+  by: a progress bar names the current task, and only the tasks that change
+  something, or fail with Ansible's message, are printed. A second run on a
+  compliant machine prints nothing. Your sudo password is asked once by
+  dsoxlab, only when sudo needs one, and handed to Ansible in memory, never
+  as an argument or in a file.
+- **A machine set up with the 0.9.8 commands is repaired, not blocked.**
+  Those commands wrote `/etc/apt/sources.list.d/hashicorp.list` with a key
+  piped through `wget` and `gpg --dearmor`. On a machine without `wget` (the
+  Debian 13 cloud image), the key file was empty, apt refused the repository
+  ("is not signed"), and every later `apt update` failed. The playbook now
+  replaces that file with a deb822 `hashicorp.sources` whose key is embedded.
+  A repository dsoxlab did not write is never touched.
+- **Docker from the distribution is replaced cleanly.** On a machine that had
+  Ubuntu's `docker.io`, installing `docker-ce` over it left the old
+  `docker.socket` loaded: the new `dockerd` stopped at once ("no sockets
+  found via socket activation") and Docker ended up `failed`. As Docker's own
+  documentation says, the playbook now removes the distribution packages
+  first (`docker.io`, `containerd`, `runc`…, without purging, so images in
+  `/var/lib/docker` stay), then restarts the socket and the service.
+
+Tested on Incus VMs, from several starting states: Ubuntu 24.04 (fresh image,
+fresh machine, set up with the 0.9.8 commands, with `docker.io` and Incus from
+the distribution already there), Debian 13 (fresh machine, set up with the
+0.9.8 commands) and AlmaLinux 10 (fresh machine, Incus skipped with a
+message). Each time, one `--fix` run installs everything and a second run
+changes nothing.
+
+### Added
+
+- **`doctor --fix --all`** installs every supported component: the KVM base,
+  Docker and Incus (as `--clients`), plus Terraform, Ansible and its
+  collections. `--clients` and `--all` are profiles of `--fix`: used without
+  it, they now stop with an error instead of silently doing nothing.
+
 ## [0.9.8] - 2026-11-16
 
 ### Fixed

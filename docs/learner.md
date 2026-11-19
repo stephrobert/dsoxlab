@@ -80,18 +80,36 @@ Two kinds of labs, and only the first is free. A **`shell`** lab runs in a
 directory on your own machine: the demonstration lab is one, and so is every
 lab of the Terraform catalog. A **`vm`** lab starts real virtual machines next
 to you, and for that your machine has to be able to run them. It needs
-**Linux with KVM**: the packaged hypervisors are KVM/libvirt and Incus, and
-neither exists on Windows or macOS, where `vm` labs mean
-[the appliance](./appliance.md). Inside a virtual machine, they also need
-nested virtualization, enabled on the host and not in the guest.
+**Linux with KVM**: the packaged hypervisors are KVM/libvirt and Incus. On
+macOS, neither exists, and `vm` labs mean [the appliance](./appliance.md).
+Inside a virtual machine, they also need nested virtualization, enabled on the
+host and not in the guest.
+
+**On Windows 11, dsoxlab works under WSL2**, `vm` labs included. Install a
+Linux distribution in WSL2, then dsoxlab inside it, as on any Linux machine.
+Nothing needs tuning: Windows 11 enables nested virtualization for WSL2 by
+default, so `/dev/kvm` is there, and recent WSL images start systemd, which
+libvirt needs. Tested on Windows 11 25H2 (build 26200), WSL 2.7.14 (kernel
+6.18), Ubuntu 24.04.5 and dsoxlab 0.9.8: `shell` and `vm` labs both played,
+with the `kvm` provider. Docker and Incus were not tested there. On Windows 10,
+or if you prefer not to use WSL2, take [the appliance](./appliance.md).
 
 The short way: run `dsoxlab doctor`. It lists every missing step at once,
 numbered in the order to do them, each command on its own line, for your
 distribution (read from `/etc/os-release`). Then `dsoxlab doctor --fix` shows
 the plan and runs it once you confirm: the steps without sudo by dsoxlab
-itself, the sudo steps through a single `ansible-playbook` run that asks for
-your password once. Each step is checked again right after, and the first
+itself, the sudo steps through **the workstation playbook shipped with
+dsoxlab** (`templates/ansible/poste.yml`), run once. It is written with
+Ansible's own modules, refreshes the APT index before installing anything,
+and leaves alone what is already in place, so running it twice is harmless.
+dsoxlab asks your sudo password once, only when sudo needs one, and shows a
+short progress: only what changes on your machine, and what fails with
+Ansible's message. Each step is checked again right after, and the first
 failure stops everything.
+
+`--fix` sets up the KVM base. Two options widen it: `--fix --clients` adds
+Docker and Incus, and `--fix --all` installs every supported component (KVM,
+Docker, Incus, Terraform, Ansible and its collections).
 
 The same steps by hand. On **Debian or Ubuntu**:
 

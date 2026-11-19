@@ -25,6 +25,7 @@ from dsoxlab.reporting.evenements import (
     IGNORE,
     OK,
     SuiviAnsible,
+    SuiviPoste,
     SuiviTerraform,
     SuiviTerraformInit,
     nom_court,
@@ -301,3 +302,31 @@ class TestNomCourt:
 
     def test_une_adresse_sans_point_reste_entiere(self) -> None:
         assert nom_court("web1") == "web1"
+
+
+class TestSuiviPoste:
+    """Le playbook du poste (doctor --fix) : seulement ce qui change et ce qui échoue."""
+
+    def test_une_tache_sautee_ou_conforme_n_ecrit_rien_mais_avance(self) -> None:
+        suivi = SuiviPoste(playbook="poste.yml")
+        sautee = suivi(_resultat("runner_on_skipped", hote="localhost"))
+        conforme = suivi(_resultat("runner_on_ok", hote="localhost", changed=False))
+
+        assert sautee is not None and sautee.lignes == () and sautee.fait == 1
+        assert conforme is not None and conforme.lignes == () and conforme.fait == 2
+
+    def test_une_tache_qui_change_s_ecrit_sans_l_hote(self) -> None:
+        suivi = SuiviPoste(playbook="poste.yml")
+        avancement = suivi(_resultat("runner_on_ok", hote="localhost", tache="Installer git", changed=True))
+
+        assert avancement is not None
+        assert [(ligne.marque, ligne.texte) for ligne in avancement.lignes] == [(CHANGE, "Installer git")]
+
+    def test_un_echec_dit_la_tache_et_le_message_d_ansible(self) -> None:
+        suivi = SuiviPoste(playbook="poste.yml")
+        avancement = suivi(_resultat("runner_on_failed", hote="localhost", tache="Installer git",
+                                     msg="No package matching 'git' is available"))
+
+        assert avancement is not None
+        assert [(ligne.marque, ligne.texte) for ligne in avancement.lignes] == [
+            (ECHEC, "Installer git"), (DETAIL, "No package matching 'git' is available")]

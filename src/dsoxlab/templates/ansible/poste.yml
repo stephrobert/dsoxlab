@@ -1,0 +1,315 @@
+---
+# Le playbook du poste, joué par `dsoxlab doctor --fix` : la mise en conformité
+# de la machine de l'apprenant, et RIEN d'autre que ce que ce fichier déclare.
+#
+# Statique et embarqué dans le paquet : Python ne génère plus aucune commande
+# d'installation (brief TODO/doctor-ansible.md, PR #392). Il passe seulement
+# des variables :
+#
+#   composants   la liste de ce qu'il faut mettre en place, parmi
+#                git, kvm, groupes, pool, efi, docker, incus, terraform.
+#                Le profil (--fix, --clients, --all) et les étapes que le
+#                diagnostic trouve à faire décident de cette liste.
+#   utilisateur  le compte RÉEL de l'apprenant : sous `become`, ansible_user_id
+#                vaut root, et un groupe ajouté à root ne change rien pour lui.
+#   groupes      les groupes de virtualisation manquants (défaut kvm, libvirt).
+#   pool         le nom du pool libvirt (défaut « default »).
+#
+# Idempotent : chaque tâche décrit un état, et une machine déjà conforme ne
+# change pas. L'index APT est rafraîchi avant la première installation, puis
+# après l'ajout de chaque dépôt : sur une machine neuve (image cloud, WSL
+# fraîchement installé), il est vide, et « apt install » échoue.
+- name: dsoxlab doctor --fix
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+  vars:
+    ansible_python_interpreter: auto_silent
+    composants: []
+    groupes: [kvm, libvirt]
+    pool: default
+    pool_chemin: /var/lib/libvirt/images
+    debian: "{{ ansible_facts['os_family'] == 'Debian' }}"
+    rhel: "{{ ansible_facts['os_family'] == 'RedHat' }}"
+    # Les dérivées d'Ubuntu (Pop!_OS, Mint) suivent les dépôts d'Ubuntu : leur
+    # nom de code propre n'existe pas chez Docker ni chez HashiCorp.
+    codename: >-
+      {{ (lookup('ansible.builtin.file', '/etc/os-release')
+          | regex_search('(?m)^UBUNTU_CODENAME=(.+)$', '\1') | default([], true) | first)
+         | default(ansible_facts['distribution_release'], true) }}
+    famille_docker: "{{ 'debian' if ansible_facts['distribution'] == 'Debian' else 'ubuntu' }}"
+  tasks:
+    - name: Refuser une distribution que ce playbook ne sait pas servir
+      ansible.builtin.fail:
+        msg: >-
+          {{ ansible_facts['distribution'] }} ({{ ansible_facts['os_family'] }}) n'est pas prise en
+          charge par doctor --fix : seules les familles Debian et RedHat le sont.
+      when: not (debian or rhel)
+
+    # ── Migration : l'ancien dépôt HashiCorp écrit par dsoxlab 0.9.8 ───────
+    # Les commandes affichées jusqu'à 0.9.8 écrivaient hashicorp.list avec une
+    # clé passée par « gpg --dearmor ». Sans gpg (image cloud Debian 13), la
+    # clé est vide et apt refuse le dépôt (« is not signed ») ; avec gpg, elle
+    # entre en conflit de Signed-By avec le dépôt deb822 ci-dessous. Dans les
+    # deux cas, CE fichier fait échouer le rafraîchissement de l'index, donc
+    # toute installation : il est remplacé avant, quel que soit le profil
+    # (mesuré le 2026-11-19 sur Debian 13). Un dépôt que dsoxlab n'a pas écrit
+    # n'est jamais touché.
+    - name: Lire un ancien dépôt HashiCorp écrit par dsoxlab
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/hashicorp.list
+      register: ancien_hashicorp
+      when: debian
+
+    - name: Remplacer l'ancien dépôt HashiCorp par le dépôt deb822
+      when: debian and ancien_hashicorp.stat.exists
+      block:
+        - name: Lire l'ancien dépôt HashiCorp
+          ansible.builtin.slurp:
+            src: /etc/apt/sources.list.d/hashicorp.list
+          register: ancien_hashicorp_contenu
+
+        - name: Déclarer le dépôt officiel de HashiCorp (deb822)
+          ansible.builtin.deb822_repository:
+            name: hashicorp
+            types: [deb]
+            uris: https://apt.releases.hashicorp.com
+            suites: ["{{ codename }}"]
+            components: [main]
+            signed_by: https://apt.releases.hashicorp.com/gpg
+          when: "'hashicorp-archive-keyring' in (ancien_hashicorp_contenu.content | b64decode)"
+
+        - name: Retirer l'ancien hashicorp.list de dsoxlab
+          ansible.builtin.file:
+            path: /etc/apt/sources.list.d/hashicorp.list
+            state: absent
+          when: "'hashicorp-archive-keyring' in (ancien_hashicorp_contenu.content | b64decode)"
+
+    # ── L'index APT, une fois, avant toute installation ────────────────────
+    # SANS cache_valid_time : il juge l'index d'après la date de
+    # /var/lib/apt/lists, et un index vidé (machine neuve, apt-get clean)
+    # paraît alors tout frais. Mesuré le 2026-11-19 sur Ubuntu 24.04 : tâche
+    # « ok », rien rafraîchi, puis « No package matching 'git' is available ».
+    # Rafraîchir l'index ne change pas le système : changed_when false garde
+    # lisible le second passage, qui ne doit rien changer.
+    - name: Rafraîchir l'index APT avant la première installation
+      ansible.builtin.apt:
+        update_cache: true
+      changed_when: false
+      when: debian and composants | length > 0
+
+    # ── git ────────────────────────────────────────────────────────────────
+    - name: Installer git
+      ansible.builtin.package:
+        name: git
+        state: present
+      when: "'git' in composants"
+
+    # ── KVM et libvirt ─────────────────────────────────────────────────────
+    - name: Installer KVM et libvirt (Debian, Ubuntu)
+      ansible.builtin.apt:
+        name: [libvirt-clients, libvirt-daemon-system, qemu-kvm]
+        state: present
+      when: debian and 'kvm' in composants
+
+    - name: Installer KVM et libvirt (famille RedHat)
+      ansible.builtin.dnf:
+        name: [libvirt, qemu-kvm]
+        state: present
+      when: rhel and 'kvm' in composants
+
+    # Sur AlmaLinux 10, le paquet n'active aucun démon (mesuré le 2026-11-16).
+    - name: Démarrer libvirtd et l'activer au démarrage
+      ansible.builtin.systemd_service:
+        name: libvirtd
+        state: started
+        enabled: true
+      when: "'kvm' in composants"
+
+    - name: Installer le firmware EFI des machines virtuelles
+      ansible.builtin.package:
+        name: "{{ 'ovmf' if debian else 'edk2-ovmf' }}"
+        state: present
+      when: "'efi' in composants"
+
+    - name: Donner au compte de l'apprenant les groupes de virtualisation
+      ansible.builtin.user:
+        name: "{{ utilisateur }}"
+        groups: "{{ groupes }}"
+        append: true
+      when: "'groupes' in composants"
+
+    # ── Le pool de stockage libvirt (aucun module natif : virsh, gardé) ────
+    - name: Lire le pool de stockage libvirt
+      ansible.builtin.command: virsh pool-info {{ pool }}
+      environment: {LANG: C}
+      register: pool_lu
+      changed_when: false
+      failed_when: false
+      when: "'pool' in composants"
+
+    - name: Définir et construire le pool de stockage
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - virsh pool-define-as {{ pool }} dir --target {{ pool_chemin }}
+        - virsh pool-build {{ pool }}
+      when: "'pool' in composants and pool_lu.rc != 0"
+
+    - name: Démarrer le pool de stockage
+      ansible.builtin.command: virsh pool-start {{ pool }}
+      when: "'pool' in composants and (pool_lu.rc != 0 or 'running' not in pool_lu.stdout)"
+
+    - name: Démarrer le pool avec l'hôte
+      ansible.builtin.command: virsh pool-autostart {{ pool }}
+      when: "'pool' in composants and (pool_lu.rc != 0 or not (pool_lu.stdout is search('Autostart:\\s+yes')))"
+
+    # ── Docker, depuis le dépôt officiel de Docker ─────────────────────────
+    - name: Docker (Debian, Ubuntu)
+      when: debian and 'docker' in composants
+      block:
+        - name: Déclarer le dépôt officiel de Docker
+          ansible.builtin.deb822_repository:
+            name: docker
+            types: [deb]
+            uris: "https://download.docker.com/linux/{{ famille_docker }}"
+            suites: ["{{ codename }}"]
+            components: [stable]
+            signed_by: "https://download.docker.com/linux/{{ famille_docker }}/gpg"
+          register: depot_docker
+
+        - name: Rafraîchir l'index APT après l'ajout du dépôt Docker
+          ansible.builtin.apt:
+            update_cache: true
+          when: depot_docker is changed
+
+        # Procédure officielle de Docker : retirer d'abord les paquets de la
+        # distribution. Remplacés en place par docker-ce, ils laissent leur
+        # docker.socket chargé, et le nouveau dockerd s'arrête aussitôt : « no
+        # sockets found via socket activation » (mesuré le 2026-11-19 sur
+        # Ubuntu 24.04, docker.io 29.1.3 remplacé par docker-ce 29.10.0).
+        # Retirer sans purger : /var/lib/docker et ses images restent.
+        - name: Retirer les paquets Docker de la distribution
+          ansible.builtin.apt:
+            name: [docker.io, docker-doc, docker-compose, docker-compose-v2, podman-docker, containerd, runc]
+            state: absent
+          register: docker_distribution
+
+        - name: Installer Docker Engine
+          ansible.builtin.apt:
+            name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+            state: present
+
+        - name: Relancer le socket de Docker après le remplacement
+          ansible.builtin.systemd_service:
+            name: "{{ item }}"
+            state: restarted
+            daemon_reload: true
+          loop: [docker.socket, docker.service]
+          when: docker_distribution is changed
+
+    - name: Docker (famille RedHat)
+      when: rhel and 'docker' in composants
+      block:
+        - name: Déclarer le dépôt officiel de Docker
+          ansible.builtin.get_url:
+            url: https://download.docker.com/linux/rhel/docker-ce.repo
+            dest: /etc/yum.repos.d/docker-ce.repo
+            mode: "0644"
+
+        - name: Installer Docker Engine
+          ansible.builtin.dnf:
+            name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+            state: present
+
+    - name: Démarrer Docker et l'activer au démarrage
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+      when: "'docker' in composants"
+
+    # Sans le groupe docker, le démon répond « permission denied » au compte de
+    # l'apprenant (mesuré sur Pop!_OS 24.04 le 2026-11-16).
+    - name: Donner au compte de l'apprenant le groupe docker
+      ansible.builtin.user:
+        name: "{{ utilisateur }}"
+        groups: [docker]
+        append: true
+      when: "'docker' in composants"
+
+    # ── Incus (Debian, Ubuntu seulement) ───────────────────────────────────
+    # Incus n'est dans aucun dépôt de base d'AlmaLinux 10 (mesuré le
+    # 2026-11-16) : on le dit plutôt que d'échouer sur un paquet introuvable.
+    - name: Signaler qu'Incus n'est pas installable sur cette famille
+      ansible.builtin.debug:
+        msg: >-
+          Incus n'est dans aucun dépôt de base de {{ ansible_facts['distribution'] }} :
+          doctor --fix ne l'installe pas. Le provider kvm reste disponible.
+      when: rhel and 'incus' in composants
+
+    - name: Incus (Debian, Ubuntu)
+      when: debian and 'incus' in composants
+      block:
+        - name: Installer Incus
+          ansible.builtin.apt:
+            name: incus
+            state: present
+
+        - name: Donner au compte de l'apprenant le groupe incus-admin
+          ansible.builtin.user:
+            name: "{{ utilisateur }}"
+            groups: [incus-admin]
+            append: true
+
+        - name: Lire les pools de stockage d'Incus
+          ansible.builtin.command: incus storage list --format csv
+          register: incus_pools
+          changed_when: false
+
+        # Installé seul, Incus n'a ni pool ni réseau (réévaluation du
+        # 2026-11-16, Ubuntu 24.04).
+        - name: Initialiser Incus avec ses réglages par défaut
+          ansible.builtin.command: incus admin init --auto
+          when: incus_pools.stdout | trim | length == 0
+
+    # ── Terraform, depuis le dépôt officiel de HashiCorp ───────────────────
+    - name: Terraform (Debian, Ubuntu)
+      when: debian and 'terraform' in composants
+      block:
+        - name: Déclarer le dépôt officiel de HashiCorp
+          ansible.builtin.deb822_repository:
+            name: hashicorp
+            types: [deb]
+            uris: https://apt.releases.hashicorp.com
+            suites: ["{{ codename }}"]
+            components: [main]
+            signed_by: https://apt.releases.hashicorp.com/gpg
+          register: depot_hashicorp
+
+        - name: Rafraîchir l'index APT après l'ajout du dépôt HashiCorp
+          ansible.builtin.apt:
+            update_cache: true
+          when: depot_hashicorp is changed
+
+        - name: Installer Terraform
+          ansible.builtin.apt:
+            name: terraform
+            state: present
+
+    - name: Terraform (famille RedHat)
+      when: rhel and 'terraform' in composants
+      block:
+        - name: Déclarer le dépôt officiel de HashiCorp
+          ansible.builtin.get_url:
+            url: >-
+              {{ 'https://rpm.releases.hashicorp.com/fedora/hashicorp.repo'
+                 if ansible_facts['distribution'] == 'Fedora'
+                 else 'https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo' }}
+            dest: /etc/yum.repos.d/hashicorp.repo
+            mode: "0644"
+
+        - name: Installer Terraform
+          ansible.builtin.dnf:
+            name: terraform
+            state: present

@@ -975,11 +975,14 @@ Each lab declares:
                        own line, ready to paste. A component this repo does not
                        need stays optional and never shows up as an error.
     [dim]--fix[/dim]                Show the plan, then run it once confirmed: steps
-                       without sudo by dsoxlab, sudo steps through one
-                       ansible-playbook run that asks for your password once.
+                       without sudo by dsoxlab, sudo steps through the
+                       workstation playbook shipped with dsoxlab, run once,
+                       asking for your password once.
                        Each step is checked again; the first failure stops.
     [dim]--yes[/dim]                Run the plan without asking (needed without a terminal).
     [dim]--clients[/dim]            With --fix, also install the optional Docker and Incus.
+    [dim]--all[/dim]                With --fix, install every supported component: KVM,
+                       Docker, Incus, Terraform, Ansible and its collections.
     [dim]-v[/dim]                   Every check, and the warnings on green lines.
     [dim]--json[/dim]               The diagnosis as a document, each check carrying a
                        stable key and state. Not with [bold]--fix[/bold].
@@ -1782,10 +1785,14 @@ silent.
         "--fix` to act on it.",
     "opt_doctor_yes": 'With --fix: run the plan without asking for confirmation',
     "opt_doctor_clients": 'With --fix: also install the optional components (Docker, Incus)',
+    "opt_doctor_all": 'With --fix: install every supported component (KVM, Docker, Incus, Terraform, Ansible)',
+    "doctor_profil_sans_fix": '--clients and --all only choose what --fix installs: add --fix.',
+    "fix_plan_composants": 'Playbook components: {composants} (already in place: left unchanged)',
     "opt_doctor_verbose": 'Show every check, and the warnings on green lines',
     "fix_plan_titre": 'Plan: {count} step(s). Each one is checked again right after; the first failure stops everything.',
     "fix_plan_sans_sudo": 'Without sudo, run by dsoxlab:',
-    "fix_plan_root": 'With sudo, by the workstation playbook (ansible-playbook asks for your sudo password once):',
+    "fix_plan_root": 'With sudo, by the workstation playbook (your sudo password is asked once):',
+    "fix_mot_de_passe_sudo": 'sudo password (asked once, never stored): ',
     "fix_plan_reconnexion": '(log in again afterwards)',
     "fix_plan_manuelles": 'To do yourself (never run automatically):',
     "fix_plan_a_savoir": 'Not handled: {label} (see "Good to know").',
@@ -1794,7 +1801,7 @@ silent.
     "fix_confirmer": 'Run these {count} step(s)?',
     "fix_annule": 'Nothing was run.',
     "fix_pas_d_ansible": 'ansible-playbook is not available: the sudo steps are shown below, to paste in a terminal.',
-    "fix_playbook": 'Workstation playbook written to {path}',
+    "fix_playbook": 'Workstation playbook: {path}',
     "fix_etape_ok": '{step}. {label}: done, checked again.',
     "fix_etape_ko": '{step}. {label}: failed (code {code}).',
     "fix_etape_non_verifiee": '{step}. {label}: the command succeeded, but the check is still not green.',

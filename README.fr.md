@@ -39,7 +39,7 @@ l'historique en local, par catalogue.
 
 | | **Installer l'outil** | **Télécharger l'appliance** |
 | --- | --- | --- |
-| Pour | Linux, et macOS ou Windows si Python est là | Windows et macOS, ou qui préfère une machine jetable |
+| Pour | Linux, Windows 11 dans WSL2 (labs `vm` compris), et macOS si Python est là | Windows et macOS, ou qui préfère une machine jetable |
 | Il faut | Python 3.11+ et `uv` ou `pipx` | VirtualBox ou VMware, et 8 Go de RAM disponibles |
 | On obtient | une commande, quelques mégaoctets | une VM Debian 13 avec bureau, Ansible et Terraform, ~450 Mo à télécharger |
 | À lire | la section juste en dessous | **[L'appliance](docs/appliance.fr.md)** |

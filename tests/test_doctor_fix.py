@@ -22,13 +22,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
 from dsoxlab.cli import app, diagnostic
 from dsoxlab.services import doctor as service_doctor
 from dsoxlab.services.doctor import DoctorReport, Fix, FixKind
 from dsoxlab.services.doctor_controles.remedes import Remede
+from dsoxlab.services.remediation import playbook_du_poste
 from dsoxlab.utils.shell import CommandResult
 
 runner = CliRunner()
@@ -196,7 +196,7 @@ def test_redemarrage_le_rouge_persistant_est_annonce(
     assert "after a reboot" in _texte(resultat)
 
 
-_ROOT = Remede("composant_0", ("sudo apt install libvirt-clients",), root=True, tag="libvirt")
+_ROOT = Remede("kvm", ("sudo apt install libvirt-clients",), root=True, tag="libvirt")
 
 
 def test_sans_terminal_les_etapes_root_s_affichent_a_coller(
@@ -211,10 +211,11 @@ def test_sans_terminal_les_etapes_root_s_affichent_a_coller(
     binaire.write_text("#!/bin/sh\n", encoding="utf-8")
     binaire.chmod(0o755)
     lancements: list[list[str]] = []
-    monkeypatch.setattr(diagnostic, "_commande_playbook",
-                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
-    monkeypatch.setattr(diagnostic.subprocess, "run",
-                        lambda cmd, **kw: lancements.append(cmd))
+    monkeypatch.setattr(diagnostic, "_sudo_sans_mot_de_passe", lambda: False)
+    monkeypatch.setattr(diagnostic, "_ansible_disponible", binaire.exists)
+    monkeypatch.setattr(diagnostic.getpass, "getpass", lambda invite: "secret")
+    monkeypatch.setattr(diagnostic, "_jouer_playbook",
+                        lambda chemin, variables, mdp: (lancements.append([str(chemin), variables, mdp]), 0)[1])
 
     appels, resultat = _doctor_fix(monkeypatch, Diagnostics([None], [_ROOT]), "--yes")
 
@@ -226,8 +227,8 @@ def test_sans_terminal_les_etapes_root_s_affichent_a_coller(
 def test_les_etapes_root_passent_par_le_playbook_du_poste(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Un seul ansible-playbook, aucun sudo lancé par dsoxlab, et un playbook qui
-    joue la ligne affichée, sans sudo et sans question."""
+    """Un seul ansible-playbook, aucun sudo lancé par dsoxlab, et le playbook du
+    poste embarqué, qui reçoit ses composants et le compte réel de l'apprenant."""
     binaire = tmp_path / "ansible-playbook"
     binaire.write_text("#!/bin/sh\n", encoding="utf-8")
     binaire.chmod(0o755)
@@ -238,19 +239,23 @@ def test_les_etapes_root_passent_par_le_playbook_du_poste(
 
     monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
     monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
-    monkeypatch.setattr(diagnostic, "_commande_playbook",
-                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
-    monkeypatch.setattr(diagnostic.subprocess, "run",
-                        lambda cmd, **kw: (lancements.append(cmd), Fini())[1])
+    monkeypatch.setattr(diagnostic, "_sudo_sans_mot_de_passe", lambda: False)
+    monkeypatch.setattr(diagnostic, "_ansible_disponible", binaire.exists)
+    monkeypatch.setattr(diagnostic.getpass, "getpass", lambda invite: "secret")
+    monkeypatch.setattr(diagnostic, "_jouer_playbook",
+                        lambda chemin, variables, mdp: (lancements.append([str(chemin), variables, mdp]), 0)[1])
 
     appels, resultat = _doctor_fix(monkeypatch, Diagnostics([None], [_ROOT]), "--yes")
 
     assert appels == [], "aucune commande root ne part par run_command"
-    assert len(lancements) == 1 and lancements[0][0] == str(binaire)
-    jeu = yaml.safe_load(Path(lancements[0][-1]).read_text(encoding="utf-8"))
-    script = jeu[0]["tasks"][0]["ansible.builtin.shell"]
-    assert "apt install -y libvirt-clients" in script
-    assert "sudo" not in script
+    assert len(lancements) == 1
+    # Le playbook joué est celui du paquet, statique : rien n'est généré.
+    assert lancements[0][0] == str(playbook_du_poste())
+    variables = lancements[0][1]
+    assert lancements[0][2] == "secret", "le mot de passe demandé est transmis au playbook"
+    # L'étape à faire (kvm) PLUS tout le socle : une seule passe suffit.
+    assert variables["composants"] == ["git", "kvm", "efi", "groupes", "pool"]
+    assert variables["utilisateur"] == "student"
     assert "done, checked again" in _texte(resultat)
 
 
@@ -278,20 +283,21 @@ def test_sans_ansible_fix_l_installe_avant_le_playbook(
     appels: list[list[str]] = []
     monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
     monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
-    monkeypatch.setattr(diagnostic, "_commande_playbook",
-                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
+    monkeypatch.setattr(diagnostic, "_sudo_sans_mot_de_passe", lambda: False)
+    monkeypatch.setattr(diagnostic, "_ansible_disponible", binaire.exists)
+    monkeypatch.setattr(diagnostic.getpass, "getpass", lambda invite: "secret")
     monkeypatch.setattr(diagnostic.shutil, "which",
                         lambda nom: "/usr/bin/uv" if nom == "uv" else (
                             str(binaire) if nom == "ansible-playbook" and binaire.exists() else None))
-    monkeypatch.setattr(diagnostic.subprocess, "run",
-                        lambda cmd, **kw: (lancements.append(cmd), Fini())[1])
+    monkeypatch.setattr(diagnostic, "_jouer_playbook",
+                        lambda chemin, variables, mdp: (lancements.append([str(chemin), variables, mdp]), 0)[1])
     monkeypatch.setattr(diagnostic, "run_command", faux_run_command)
     monkeypatch.setattr(diagnostic, "collect_checks", Diagnostics([None], [_ROOT]))
 
     resultat = runner.invoke(app, ["doctor", "--fix", "--yes"])
 
     assert appels == [["uv", "tool", "install", "ansible-core"]]
-    assert len(lancements) == 1 and lancements[0][0] == str(binaire)
+    assert len(lancements) == 1 and lancements[0][0] == str(playbook_du_poste())
     assert "done, checked again" in _texte(resultat)
 
 
@@ -321,9 +327,10 @@ def test_un_controle_qui_attendait_le_playbook_est_reverifie_apres(
 
     monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
     monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
-    monkeypatch.setattr(diagnostic, "_commande_playbook",
-                        lambda chemin: [str(binaire), "--ask-become-pass", str(chemin)])
-    monkeypatch.setattr(diagnostic.subprocess, "run", lambda cmd, **kw: Fini())
+    monkeypatch.setattr(diagnostic, "_sudo_sans_mot_de_passe", lambda: False)
+    monkeypatch.setattr(diagnostic, "_ansible_disponible", binaire.exists)
+    monkeypatch.setattr(diagnostic.getpass, "getpass", lambda invite: "secret")
+    monkeypatch.setattr(diagnostic, "_jouer_playbook", lambda chemin, variables, mdp: 0)
     monkeypatch.setattr(diagnostic, "collect_checks", diagnostics)
 
     sortie = _texte(runner.invoke(app, ["doctor", "--fix", "--yes"]))
@@ -360,7 +367,7 @@ def test_le_mot_de_passe_se_demande_sauf_vrai_nopasswd(
     """La sonde ignore le mot de passe gardé en mémoire (`sudo -k`).
 
     Sans `-k`, `sudo -n true` réussissait grâce au cache du terminal : dsoxlab
-    omettait `--ask-become-pass`, et le sudo d'Ansible échouait sur « il est
+    ne demandait pas le mot de passe, et le sudo d'Ansible échouait sur « il est
     nécessaire de saisir un mot de passe » (Pop!_OS 24.04, 2026-11-16).
     """
     sondes: list[list[str]] = []
@@ -372,7 +379,60 @@ def test_le_mot_de_passe_se_demande_sauf_vrai_nopasswd(
     monkeypatch.setattr(diagnostic.subprocess, "run",
                         lambda cmd, **kw: (sondes.append(cmd), Resultat())[1])
 
-    commande = diagnostic._commande_playbook(tmp_path / "poste.yml")
+    sans_mot_de_passe = diagnostic._sudo_sans_mot_de_passe()
 
     assert sondes == [["sudo", "-n", "-k", "true"]]
-    assert ("--ask-become-pass" in commande) is demande
+    assert sans_mot_de_passe is not demande
+
+
+# ── Les profils --clients et --all (brief de refonte, PR #392) ────────────────
+
+@pytest.mark.parametrize("option", ["--clients", "--all"])
+def test_un_profil_sans_fix_est_refuse(monkeypatch: pytest.MonkeyPatch, option: str) -> None:
+    """Seuls, --clients et --all ne changeraient rien : le silence tromperait."""
+    lancements: list[object] = []
+    monkeypatch.setattr(diagnostic, "collect_checks", Diagnostics([None]))
+    monkeypatch.setattr(diagnostic.subprocess, "run", lambda cmd, **kw: lancements.append(cmd))
+
+    resultat = runner.invoke(app, ["doctor", option])
+
+    assert resultat.exit_code == 1
+    assert lancements == []
+    assert "add --fix" in _texte(resultat)
+
+
+def test_all_fait_entrer_un_terraform_que_le_catalogue_n_exige_pas(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--fix seul n'installe pas Terraform facultatif ; --fix --all, si."""
+    binaire = tmp_path / "ansible-playbook"
+    binaire.write_text("#!/bin/sh\n", encoding="utf-8")
+    binaire.chmod(0o755)
+    terraform = Remede("terraform", ("sudo apt install terraform",), root=True, tag="terraform")
+
+    def diagnostics(root: Path, meta: object) -> DoctorReport:
+        report = DoctorReport()
+        report.optional.append(service_doctor._check("terraform", False, "absent", remede=terraform))
+        return report
+
+    lancements: list[list[str]] = []
+
+    class Fini:
+        returncode = 0
+
+    monkeypatch.setattr(diagnostic, "_interactif", lambda: True)
+    monkeypatch.setattr(diagnostic, "_current_user", lambda: "student")
+    monkeypatch.setattr(diagnostic, "_sudo_sans_mot_de_passe", lambda: True)
+    monkeypatch.setattr(diagnostic, "_ansible_disponible", lambda: True)
+    monkeypatch.setattr(diagnostic, "_jouer_playbook",
+                        lambda chemin, variables, mdp: (lancements.append([str(chemin), variables, mdp]), 0)[1])
+    monkeypatch.setattr(diagnostic, "collect_checks", diagnostics)
+
+    sans_all = runner.invoke(app, ["doctor", "--fix", "--yes"])
+    assert lancements == [], _texte(sans_all)
+
+    runner.invoke(app, ["doctor", "--fix", "--all", "--yes"])
+    assert len(lancements) == 1
+    assert lancements[0][2] is None, "NOPASSWD : aucun mot de passe demandé"
+    assert lancements[0][1]["composants"] == [
+        "git", "kvm", "efi", "groupes", "pool", "docker", "incus", "terraform"]

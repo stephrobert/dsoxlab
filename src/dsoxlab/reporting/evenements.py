@@ -163,6 +163,34 @@ class SuiviAnsible:
 
 
 @dataclass
+class SuiviPoste(SuiviAnsible):
+    """Le playbook du poste (``doctor --fix``), en plus léger que celui d'un lab.
+
+    Une trentaine de tâches, dont la plupart sautées selon le profil et la
+    famille : les afficher toutes noyait les deux seules informations utiles,
+    ce qui a CHANGÉ sur la machine et ce qui a ÉCHOUÉ. Les tâches sautées ou
+    déjà conformes avancent la barre sans écrire de ligne, et l'hôte, toujours
+    localhost, n'est pas répété. Un second passage sur une machine conforme
+    n'écrit donc rien : c'est la preuve visible de l'idempotence.
+    """
+
+    def _tache_passee(self, type_: str, donnees: dict[str, object]) -> Avancement:
+        self.faits += 1
+        resultat = donnees.get("res")
+        if type_ == "runner_on_ok" and isinstance(resultat, dict) and resultat.get("changed"):
+            tache = str(donnees.get("task") or self.tache_courante)
+            return Avancement(fait=self.faits, lignes=(Ligne(CHANGE, tache),))
+        return Avancement(fait=self.faits)
+
+    def _tache_en_echec(self, donnees: dict[str, object]) -> Avancement:
+        lignes = [Ligne(ECHEC, str(donnees.get("task") or self.tache_courante))]
+        message = self._message(donnees)
+        if message:
+            lignes.append(Ligne(DETAIL, message))
+        return Avancement(lignes=tuple(lignes))
+
+
+@dataclass
 class SuiviTerraformInit:
     """``terraform init -json`` : un téléchargement de provider, pas un compte.
 

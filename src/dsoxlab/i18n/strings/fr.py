@@ -996,11 +996,14 @@ Chaque lab déclare :
                        composant dont ce dépôt n'a pas besoin reste facultatif
                        et ne s'affiche jamais en erreur.
     [dim]--fix[/dim]                Affiche le plan, puis le lance une fois confirmé : les
-                       étapes sans sudo par dsoxlab, celles avec sudo par un seul
-                       ansible-playbook qui demande votre mot de passe une fois.
+                       étapes sans sudo par dsoxlab, celles avec sudo par le
+                       playbook du poste livré avec dsoxlab, joué une seule fois,
+                       qui demande votre mot de passe une fois.
                        Chaque étape est revérifiée ; le premier échec arrête tout.
     [dim]--yes[/dim]                Lance le plan sans demander (nécessaire sans terminal).
     [dim]--clients[/dim]            Avec --fix, installe aussi Docker et Incus facultatifs.
+    [dim]--all[/dim]                Avec --fix, installe tous les composants pris en charge :
+                       KVM, Docker, Incus, Terraform, Ansible et ses collections.
     [dim]-v[/dim]                   Chaque contrôle, et les mises en garde des lignes vertes.
     [dim]--json[/dim]               Le diagnostic en document, chaque contrôle portant
                        une clé et un état stables. Pas avec [bold]--fix[/bold].
@@ -1831,10 +1834,14 @@ hors ligne, elle se tait.
         "puis `dsoxlab doctor --fix` pour agir dessus.",
     "opt_doctor_yes": 'Avec --fix : lancer le plan sans demander de confirmation',
     "opt_doctor_clients": 'Avec --fix : installer aussi les composants facultatifs (Docker, Incus)',
+    "opt_doctor_all": 'Avec --fix : installer tous les composants pris en charge (KVM, Docker, Incus, Terraform, Ansible)',
+    "doctor_profil_sans_fix": '--clients et --all choisissent seulement ce que --fix installe : ajoutez --fix.',
+    "fix_plan_composants": 'Composants du playbook : {composants} (ce qui est déjà en place n\'est pas modifié)',
     "opt_doctor_verbose": 'Montrer chaque contrôle, et les mises en garde des lignes vertes',
     "fix_plan_titre": 'Plan : {count} étape(s). Chacune est revérifiée juste après ; arrêt au premier échec.',
     "fix_plan_sans_sudo": 'Sans sudo, lancées par dsoxlab :',
-    "fix_plan_root": 'Avec sudo, par le playbook du poste (ansible-playbook vous demandera votre mot de passe sudo une fois) :',
+    "fix_plan_root": 'Avec sudo, par le playbook du poste (votre mot de passe sudo est demandé une fois) :',
+    "fix_mot_de_passe_sudo": 'Mot de passe sudo (demandé une fois, jamais conservé) : ',
     "fix_plan_reconnexion": '(reconnexion nécessaire ensuite)',
     "fix_plan_manuelles": 'À faire vous-même (jamais lancé automatiquement) :',
     "fix_plan_a_savoir": 'Non traité : {label} (voir « À savoir »).',
@@ -1843,7 +1850,7 @@ hors ligne, elle se tait.
     "fix_confirmer": 'Lancer ces {count} étape(s) ?',
     "fix_annule": "Rien n'a été lancé.",
     "fix_pas_d_ansible": "ansible-playbook n'est pas disponible : les étapes avec sudo sont affichées ci-dessous, à coller dans un terminal.",
-    "fix_playbook": 'Playbook du poste écrit dans {path}',
+    "fix_playbook": 'Playbook du poste : {path}',
     "fix_etape_ok": '{step}. {label} : fait, revérifié.',
     "fix_etape_ko": '{step}. {label} : échec (code {code}).',
     "fix_etape_non_verifiee": "{step}. {label} : la commande a réussi, mais le contrôle n'est toujours pas vert.",
