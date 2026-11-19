@@ -555,7 +555,7 @@ def test_installer_incus_pose_le_groupe_et_l_initialisation(tmp_path: Path) -> N
     fichier.write_text(UBUNTU, encoding="utf-8")
     remede = remedes.remede("incus", remedes.systeme(fichier))
     assert remede is not None
-    assert remede.lignes == ("sudo apt install incus", "sudo usermod -aG incus-admin $USER",
+    assert remede.lignes == ("sudo apt install incus genisoimage qemu-system-x86 ovmf", "sudo usermod -aG incus-admin $USER",
                              "sudo incus admin init --auto")
     assert remede.reconnexion
 

@@ -237,7 +237,7 @@ def _incus(s: Systeme, v: dict[str, str]) -> Remede | None:
     # Installé seul, incus refuse le compte (« needed permissions to talk to
     # the incus daemon ») et n'a ni pool ni réseau : la même étape pose le
     # groupe et l'initialisation (réévaluation du 2026-11-16, Ubuntu 24.04).
-    return Remede("incus", ("sudo apt install incus", _GROUPE_INCUS, "sudo incus admin init --auto"),
+    return Remede("incus", ("sudo apt install incus genisoimage qemu-system-x86 ovmf", _GROUPE_INCUS, "sudo incus admin init --auto"),
                   root=True, tag="incus", reconnexion=True)
 
 
