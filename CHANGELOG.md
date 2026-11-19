@@ -7,6 +7,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.11] - 2026-11-19
+
+### Fixed
+
+- **Quitting the pager keeps the page on screen, with a system-wide
+  `PAGER=less` too.** 0.9.10 added `-F` and `-X` only when neither
+  `DSOXLAB_PAGER` nor `PAGER` was set, and left a user-chosen pager alone. But
+  `PAGER=less` is set system-wide on many machines, the one that reported the
+  bug included: the page was still cleared on `q`. dsoxlab now adds `-F` and
+  `-X` to `less` whatever its origin, unless they are already there, and only
+  `DSOXLAB_PAGER`, set on purpose for dsoxlab, is taken as is (#396).
+
 ## [0.9.10] - 2026-11-19
 
 ### Fixed
