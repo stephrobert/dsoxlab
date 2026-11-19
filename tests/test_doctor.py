@@ -95,6 +95,17 @@ def _outillage_present(monkeypatch: pytest.MonkeyPatch) -> None:
         doctor, "_check_ansible",
         lambda: doctor._check("ansible", True, "ok"),
     )
+    # L'outil ISO et l'Include SSH, requis sur un poste sans catalogue dès qu'un
+    # hyperviseur répond (0.10.1) : ils lisent eux aussi la machine. Le runner
+    # CI n'a pas genisoimage, ce poste l'a, et le test ne passait qu'ici.
+    monkeypatch.setattr(
+        doctor, "_check_iso_tool",
+        lambda: doctor._check("iso_tool", True, "genisoimage"),
+    )
+    monkeypatch.setattr(
+        doctor, "_check_ssh_include",
+        lambda: doctor._check("ssh_include", True, "~/.ssh/config"),
+    )
     # Même raison pour les prérequis matériels : /dev/kvm, platform.machine()
     # et /proc/meminfo mesurent la machine qui joue la suite, pas le classement
     # que ce module vérifie. Leur comportement propre vit dans
