@@ -11,6 +11,13 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Pas de note pour un lab que `dsoxlab clean` a défait.** `clean` remet la
+  machine dans l'état dont les autres labs ont besoin, et cet état peut
+  ressembler à la solution : sur `k8s-installer-kubectl`, il réinstalle le
+  kubectl du socle, si bien que `clean` puis `check` donnait 83/100 sans aucun
+  travail. `check` et `submit` refusent désormais un lab nettoyé (code de
+  sortie 2) tant que `dsoxlab run` ou `dsoxlab reset` ne l'a pas relancé. Un
+  lab jamais nettoyé reste notable.
 - **Quitter le pager laisse la page à l'écran, y compris avec un
   `PAGER=less` réglé pour tout le système.** La 0.9.10 n'ajoutait `-F` et `-X`
   que si ni `DSOXLAB_PAGER` ni `PAGER` n'étaient posés, et laissait intact un
