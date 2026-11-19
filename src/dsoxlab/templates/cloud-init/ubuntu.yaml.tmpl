@@ -38,6 +38,48 @@ users:
 disable_root: true
 ssh_pwauth: false
 
+# Miroir des paquets : le premier qui répond, essayé DEPUIS LA VM.
+#
+# archive.ubuntu.com et security.ubuntu.com sont tous deux servis par
+# Canonical, et tombent ensemble. Mesuré le 2026-11-19 : le ping passait,
+# HTTP et HTTPS ne répondaient plus, deux fois dans la journée. cloud-init
+# n'installait alors aucun paquet, et tout setup.yaml qui passe par apt
+# échouait ensuite sur une machine pourtant « prête ».
+#
+# Le choix se fait dans la VM et pas sur l'hôte : c'est sa route qui compte,
+# et un provider cloud ne passe pas par le réseau de l'hôte. Les miroirs de
+# secours sont des miroirs nationaux officiels hébergés HORS de Canonical
+# (gb et us, eux, pointent sur les mêmes serveurs et tombent avec eux), et
+# ils portent la poche -security. La sonde lit justement le Release de
+# -security : un miroir qui l'a sert aussi les autres poches.
+#
+# bootcmd passe AVANT apt_configure, qui régénère ubuntu.sources :
+# preserve_sources_list garde la réécriture. Si aucun miroir ne répond, rien
+# n'est touché et rien n'est noté : le démarrage suivant réessaie. Le script
+# sort en 0 dans tous les cas, pour ne jamais faire échouer le démarrage. Le
+# miroir retenu est noté dans /var/lib/dsoxlab/miroir-apt, pour le
+# diagnostic, et le choix n'est plus refait ensuite.
+apt:
+  preserve_sources_list: true
+
+bootcmd:
+  - |
+    test -e /var/lib/dsoxlab/miroir-apt && exit 0
+    mkdir -p /var/lib/dsoxlab
+    suite=$(. /etc/os-release && echo "$VERSION_CODENAME")-security
+    for m in http://archive.ubuntu.com/ubuntu http://fr.archive.ubuntu.com/ubuntu http://de.archive.ubuntu.com/ubuntu http://nl.archive.ubuntu.com/ubuntu http://ch.archive.ubuntu.com/ubuntu; do
+      if curl -fsS -m 10 -o /dev/null "$m/dists/$suite/Release"; then
+        if [ "$m" != http://archive.ubuntu.com/ubuntu ]; then
+          for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
+            [ -f "$f" ] && sed -i -E "s#https?://(archive|security)\.ubuntu\.com/ubuntu/?#$m#g" "$f"
+          done
+        fi
+        echo "$m" > /var/lib/dsoxlab/miroir-apt
+        exit 0
+      fi
+    done
+    exit 0
+
 # Outils minimum pour les labs LFCS Debian-like — diagnostic.
 package_update: true
 packages:
