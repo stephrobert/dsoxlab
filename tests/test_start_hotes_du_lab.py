@@ -320,8 +320,12 @@ def test_doctor_seul_annonce_le_total_du_catalogue(catalogue: Path) -> None:
     from dsoxlab.services.doctor import collect_checks
 
     rapport = collect_checks(catalogue, read_repo_metadata(catalogue))
-    ressources = [c for c in rapport.required if "resources" in c.key]
-    assert ressources, "le contrôle de ressources doit être requis, des hôtes sont déclarés"
+    # Requis si la machine a la mémoire, « À savoir » sinon (décision 6 du
+    # 2026-11-16) : le rangement dépend de la RAM libre de la machine qui joue
+    # la suite. Ce test porte sur le TOTAL annoncé, il cherche donc dans les
+    # deux listes (il échouait avec 7 Go libres, le 2026-11-19).
+    ressources = [c for c in [*rapport.required, *rapport.a_savoir] if "resources" in c.key]
+    assert ressources, "le contrôle de ressources doit être annoncé, des hôtes sont déclarés"
     assert "10752" in ressources[0].detail, (
         "`doctor` lancé seul doit annoncer le total du catalogue, et non 0 Mo. "
         f"Détail obtenu : {ressources[0].detail!r}"

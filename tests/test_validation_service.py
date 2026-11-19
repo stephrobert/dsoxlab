@@ -114,6 +114,7 @@ def catalogue_casse(tmp_path: Path) -> Path:
             f"# {nom}\n\nUn [lien mort](./absent.md).\n", encoding="utf-8"
         )
         (base / "scenario.md").write_text(f"# {nom}\n\nContexte.\n", encoding="utf-8")
+        (base / "challenge" / "README.md").write_text(f"# {nom}\n", encoding="utf-8")
         (base / "challenge" / "tests" / "test_functional.py").write_text(
             "def test_rien() -> None:\n    assert True\n", encoding="utf-8"
         )

@@ -1701,20 +1701,29 @@ def print_lab_welcome(lab: LabDefinition) -> None:
     )
 
 
+def enonce_du_challenge(lab: LabDefinition, lang: str = "en") -> Path | None:
+    """Le fichier qui porte l'énoncé du challenge, ou rien.
+
+    ``challenge/README.<lang>.md`` puis ``challenge/README.md`` d'abord. À
+    défaut, le ``scenario`` du lab : c'est lui qui dit ce qu'il faut obtenir.
+    Sans ce repli, 229 labs de six catalogues n'affichaient qu'un avertissement,
+    dont les 156 du catalogue Kubernetes, aucun n'ayant de
+    ``challenge/README.md`` (blog-roadmap#198, mesuré le 2026-11-19).
+    """
+    return _localised(lab.path / "challenge", "README", lang) or _localised(
+        lab.path, "scenario", lang
+    )
+
+
 def print_lab_challenge(lab: LabDefinition, lang: str = "en") -> None:
-    """Display the challenge brief (challenge/README.md or README.<lang>.md)."""
+    """Display the challenge brief (challenge/README.md, else scenario.md)."""
     from rich.markdown import Markdown
     from rich.rule import Rule
 
-    localised = lab.path / "challenge" / f"README.{lang}.md"
-    challenge_file = (
-        localised
-        if lang != "en" and localised.exists()
-        else lab.path / "challenge" / "README.md"
-    )
+    challenge_file = enonce_du_challenge(lab, lang)
     console.print(Rule(f"[bold cyan]{texte_affichable(lab.id)} · challenge[/bold cyan]"))
-    if challenge_file.exists():
-        console.print(Markdown(challenge_file.read_text()))
+    if challenge_file is not None:
+        console.print(Markdown(challenge_file.read_text(encoding="utf-8")))
     else:
         msg = _("challenge_missing")
         console.print(f"[yellow]{msg}[/yellow]")

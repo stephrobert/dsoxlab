@@ -253,7 +253,7 @@ STRINGS: dict[str, str] = {
     "course_end_body":     "You have read all [bold]{total}[/bold] sections.\n\nTime to test your skills: run [bold cyan]dsoxlab challenge {id}[/bold cyan] to tackle the challenge.",
     "course_section_not_found": "Section '{name}' not found. Use [bold]dsoxlab course {id}[/bold] to list available sections.",
     "course_section_file_missing": "Section file not found: {file}",
-    "cmd_challenge_help": "Display the challenge mission for this lab (challenge/README.md).",
+    "cmd_challenge_help": "Display the challenge mission for this lab (challenge/README.md, else scenario.md).",
     "cmd_challenge_arg":  "Lab identifier (optional if a lab is active in session)",
     "cmd_hint_help":     "Show the next challenge hint (deducts points from final score).",
     "cmd_hint_arg":      "Lab identifier (optional if a lab is active in session)",
@@ -905,7 +905,7 @@ Each lab declares:
                        command does by default.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
-  [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md).
+  [cyan]challenge[/cyan] [dim][<id>][/dim]     Display the challenge mission (challenge/README.md, else scenario.md).
     [dim]--no-pager[/dim]           Print everything at once, without paging.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
@@ -1225,7 +1225,7 @@ silent.
     "course_list_col_id":  "Lab ID",
     "course_list_col_title": "Title",
     "course_list_col_status": "Course",
-    "challenge_missing":   "No challenge/README.md file found for this lab.",
+    "challenge_missing":   "This lab has no brief: neither challenge/README.md nor scenario.md.",
     "challenge_workdir":   "Working directory: {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────

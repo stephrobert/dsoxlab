@@ -51,6 +51,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `runc`…, sans purge : les images de `/var/lib/docker` restent), puis relance
   le socket et le service.
 
+- **`dsoxlab challenge` affiche un énoncé pour chaque lab.** La commande ne
+  lisait que `challenge/README.md`, absent de 229 labs de six catalogues, dont
+  les 156 labs Kubernetes : pour eux, elle n'affichait qu'un avertissement.
+  Sans ce fichier, elle affiche désormais le `scenario.md` du lab, qui dit ce
+  que l'apprenant doit obtenir et que `validate-structure` exige. `run` profite
+  du même repli pour les labs `vm`, où il affiche l'énoncé avant d'ouvrir la
+  session SSH. Signalé par un lecteur (blog-roadmap#198).
+- **`validate-structure` exige désormais `challenge/README.md`**, et
+  `dsoxlab new lab` l'écrit, en anglais et en français, avec une tâche notée
+  qui correspond au test généré. Rien ne l'exigeait jusqu'ici, et c'est ainsi
+  que 229 labs sont sortis sans lui. Un catalogue qui ne l'a pas échoue à sa
+  validation à partir de cette version ; le repli ci-dessus le garde jouable
+  en attendant.
+
 Testé sur des VM Incus, depuis plusieurs états de départ : Ubuntu 24.04 (image
 telle quelle, machine neuve, machine préparée avec les commandes de la 0.9.8,
 `docker.io` et Incus de la distribution déjà en place), Debian 13 (machine

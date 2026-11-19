@@ -33,7 +33,7 @@ my-training/
         ├── cleanup.yaml        ← required for runtime vm (Ansible), optional for shell
         ├── fixtures/           ← optional, for runtime shell
         └── challenge/
-            ├── README.md       ← the mission shown by `dsoxlab challenge`
+            ├── README.md       ← required: the mission shown by `dsoxlab challenge`
             ├── hints.yaml      ← optional: the hints and their cost
             └── tests/
                 └── test_functional.py   ← required, exact name
@@ -55,12 +55,12 @@ Three Markdown files, and the engine reads each at a different moment:
 | `scenario.md` | `dsoxlab course` | the situation: where the learner is and what is wrong — not the steps that fix it |
 | `challenge/README.md` | `dsoxlab challenge`; printed by `run` before the SSH session of a `vm` lab opens, since the host has no dsoxlab; read by `validate-structure` for the scale | the mission, as a list of graded tasks |
 
-Only the first two are required by the structure validator. Without
-`challenge/README.md`, `dsoxlab challenge` prints *No challenge/README.md file
-found for this lab*. `dsoxlab new lab` does not create it — it writes
-`lab.yaml`, `README.md`, `scenario.md`, `test_functional.py` and, for a `vm` lab,
-`setup.yaml` and `cleanup.yaml` — so that
-file is yours to add.
+All three are required by the structure validator (`challenge/README.md` since
+0.9.9). `dsoxlab new lab` writes all three, in English and French, with
+`lab.yaml`, `test_functional.py` and, for a `vm` lab, `setup.yaml` and
+`cleanup.yaml`. A catalog validated by an older version may still lack
+`challenge/README.md`: `dsoxlab challenge` then prints `scenario.md`, which
+says what the learner must obtain.
 
 **The scale.** dsoxlab grades **per test**: five `def test_` in
 `test_functional.py` means twenty points each, hints deducted afterwards. The
@@ -170,7 +170,7 @@ This stays declarative: a playbook, never a script. The refusal of
 
 Three families, all local and offline by default:
 
-**Structure.** `lab.yaml`, `README.md`, `scenario.md`, `challenge/tests/` and
+**Structure.** `lab.yaml`, `README.md`, `scenario.md`, `challenge/README.md`, `challenge/tests/` and
 `challenge/tests/test_functional.py`. A `vm` lab also needs `setup.yaml` and
 `cleanup.yaml`, a non-empty `runtime.targets[]`, and a `runtime.default` that
 matches one of those targets. A `shell` lab needs a non-empty `runtime.workdir`.

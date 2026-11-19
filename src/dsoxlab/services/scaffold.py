@@ -224,6 +224,31 @@ c'est le travail de l'apprenant de la trouver.
 À remplir.
 """
 
+#: L'énoncé du challenge, exigé par `validate-structure` depuis 0.9.9. Les
+#: tâches portent leurs points : `validators/content.py` confronte alors leur
+#: somme et leur nombre à la note réellement calculée.
+_CHALLENGE = """\
+# Challenge: {id}
+
+TO FILL IN: the mission, as graded tasks. One task per test of
+`tests/test_functional.py`.
+
+### Task 1: TO FILL IN (100 pts)
+
+TO FILL IN: the observable result expected, not the commands to type.
+"""
+
+_CHALLENGE_FR = """\
+# Challenge : {id}
+
+À remplir : la mission, sous forme de tâches notées. Une tâche par test de
+`tests/test_functional.py`.
+
+### Tâche 1 : à remplir (100 pts)
+
+À remplir : le résultat observable attendu, pas les commandes à taper.
+"""
+
 #: Le test généré ÉCHOUE, il n'est pas `skip`. Un test sauté ne dit rien : ni
 #: que le travail reste à faire, ni qu'il est fait. Un test rouge dit la
 #: première chose, et c'est celle qui compte pour qui vient d'écrire un
@@ -442,6 +467,8 @@ def creer_lab(identifiant: str, racine_catalogue: Path, *, runtime: str) -> Crea
         _ecrire(base / "README.fr.md", _README_FR.format(id=identifiant)),
         _ecrire(base / "scenario.fr.md", _SCENARIO_FR),
         _ecrire(base / "lab.fr.yaml", _LAB_FR.format(id=identifiant)),
+        _ecrire(base / "challenge" / "README.md", _CHALLENGE.format(id=identifiant)),
+        _ecrire(base / "challenge" / "README.fr.md", _CHALLENGE_FR.format(id=identifiant)),
         _ecrire(base / "challenge" / "tests" / "test_functional.py",
                 _TEST.format(id=identifiant)),
     ]
