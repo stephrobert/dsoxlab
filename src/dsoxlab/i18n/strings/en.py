@@ -174,7 +174,7 @@ STRINGS: dict[str, str] = {
         "Name a lab to replay it, or widen the context with `dsoxlab use`.",
     "cmd_run_help":      "Prepare and start the lab environment.",
     "cmd_run_arg":       "Lab identifier",
-    "cmd_course_help":    "Display a course section, or the table of contents if no section is given.",
+    "cmd_course_help":    "Display the whole course; --section, --next or --prev show one section at a time.",
     "cmd_course_arg":    "Lab identifier (optional if a lab is active in session)",
     "cmd_course_opt_section": "Section to display: number (1, 2 …) or id (navigation, permissions …).",
     "cmd_course_list":   "List all labs and show whether a course (README.md) is available.",
@@ -244,7 +244,7 @@ STRINGS: dict[str, str] = {
         "Write a review dossier (course, mission, tests) to this file.",
     "course_section_ouverture": "Opening",
     "cmd_course_opt_all":
-        "Show the whole course at once, without splitting it into sections.",
+        "Show the whole course at once (the default since 0.9.10; kept for scripts).",
     "cmd_course_opt_prev": "Go to the previous section (decrements saved position).",
     "course_nav_progress": "Section {pos}/{total}",
     "course_nav_prev":     "← [bold]dsoxlab course {id} --prev[/bold]",
@@ -887,8 +887,8 @@ Each lab declares:
                        A draft lab runs too, named by its id, with a line
                        saying it is a draft. Same for check, submit and show.
 
-  [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
-                       declares them (course.yaml), otherwise README.
+  [cyan]course[/cyan] [dim][<id>][/dim]        Display the whole course (README). Sections, from
+                       course.yaml or the headings, only when asked for.
     [dim]--section / -s[/dim]       Section to display: number or id.
     [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
     [dim]--drafts[/dim]             Show the course of a draft lab. Refused otherwise.

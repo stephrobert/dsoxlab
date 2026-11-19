@@ -213,7 +213,7 @@ base repository of the RHEL family.
 | 1 | `dsoxlab list-labs` | Browse the catalog. `--section`, `--level`, `--type`, `--bloc` narrow it down |
 | 2 | `dsoxlab use <section>/<level>` | Pin an active context, so the next commands stop asking |
 | 3 | `dsoxlab show <id>` | Skills, runtime, estimated time, status |
-| 4 | `dsoxlab course <id>` | The lesson, one section at a time when the lab declares them |
+| 4 | `dsoxlab course <id>` | The whole lesson; `--next` serves it one section at a time |
 | 5 | `dsoxlab run <id>` | Prepare the environment and open a session in it |
 | 6 | `dsoxlab challenge <id>` | The mission you have to accomplish |
 | 7 | `dsoxlab hint <id>` | The next hint, at a cost in points |
@@ -254,7 +254,7 @@ the scrollback. Pipes and redirections are never paged: they receive the full
 text.
 
 ```bash
-DSOXLAB_PAGER='bat --plain' dsoxlab course   # pick your pager (default: less -R)
+DSOXLAB_PAGER='bat --plain' dsoxlab course   # pick your pager (default: less -RFX)
 dsoxlab course --no-pager                    # dump everything at once
 dsoxlab course > course.txt                  # never paged: plain text
 ```

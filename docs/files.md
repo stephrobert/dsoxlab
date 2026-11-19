@@ -100,7 +100,7 @@ looks for them again:
 | `DSOXLAB_LANG` | Display language (`en` / `fr`), wins over the context file |
 | `DSOXLAB_PROVIDER` | Infrastructure provider, wins over `dsoxlab use --provider` |
 | `DSOXLAB_TARGET` | Default target of a `vm` lab, when the session sets none |
-| `DSOXLAB_PAGER` | Pager for `course` and `challenge` (then `PAGER`, default `less -R`) |
+| `DSOXLAB_PAGER` | Pager for `course` and `challenge` (then `PAGER`, default `less -RFX`) |
 | `DSOXLAB_LOG` | `DSOXLAB_LOG=debug` is the same as `-vv` |
 | `DSOXLAB_HOST_READY_TIMEOUT` | Seconds to wait for a provisioned host to answer (default 180) |
 | `DSOXLAB_NO_UPDATE_CHECK` | Set to `1` to silence the daily PyPI version check |

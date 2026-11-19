@@ -280,10 +280,16 @@ def course(
         _dire_si_brouillon(lab)
 
 
-    manifest = _manifeste_du_cours(lab, lang, tout=tout)
+    # Tout le cours par défaut : un cours fait d'exercices se lit d'un trait,
+    # chacun s'appuie sur le précédent, et le servir section par section
+    # obligeait à relancer la commande onze fois (issue #396, 2026-11-19). Le
+    # découpage n'intervient que si l'apprenant le demande. `--all` reste
+    # accepté pour ne casser aucun script, mais il est désormais le défaut.
+    decoupe_demande = bool(section) or next_section or prev_section
+    manifest = _manifeste_du_cours(lab, lang, tout=tout or not decoupe_demande)
     if manifest is None:
-        # Soit l'apprenant a demandé tout le cours (`--all`), soit les
-        # documents ne portent aucun titre exploitable : 3 labs sur 310.
+        # Soit le cours entier (le défaut, ou `--all`), soit les documents ne
+        # portent aucun titre exploitable : 3 labs sur 310.
         with paged(enabled=not no_pager):
             print_lab_course(lab, lang=lang)
         return

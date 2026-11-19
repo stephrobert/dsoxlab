@@ -219,7 +219,7 @@ aucun dépôt de base de la famille RHEL.
 | 1 | `dsoxlab list-labs` | Parcourir le catalogue. `--section`, `--level`, `--type`, `--bloc` le réduisent |
 | 2 | `dsoxlab use <section>/<niveau>` | Fixer un contexte actif, pour que les commandes suivantes cessent de demander |
 | 3 | `dsoxlab show <id>` | Compétences, runtime, durée estimée, statut |
-| 4 | `dsoxlab course <id>` | La leçon, section par section quand le lab les déclare |
+| 4 | `dsoxlab course <id>` | Toute la leçon ; `--next` la sert section par section |
 | 5 | `dsoxlab run <id>` | Préparer l'environnement et y ouvrir une session |
 | 6 | `dsoxlab challenge <id>` | La mission à accomplir |
 | 7 | `dsoxlab hint <id>` | L'indice suivant, au prix de quelques points |
@@ -261,7 +261,7 @@ sans dépendre du scrollback. Les tubes et les redirections ne sont jamais
 paginés, ils reçoivent le texte entier.
 
 ```bash
-DSOXLAB_PAGER='bat --plain' dsoxlab course   # choisir son pagineur (défaut : less -R)
+DSOXLAB_PAGER='bat --plain' dsoxlab course   # choisir son pagineur (défaut : less -RFX)
 dsoxlab course --no-pager                    # tout afficher d'un coup
 dsoxlab course > cours.txt                   # jamais paginé : texte brut
 ```

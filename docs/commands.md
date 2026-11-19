@@ -27,7 +27,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab clean` | Remove all resources created by the lab. |
 | `dsoxlab completion install` | Install completion for the current shell (zsh, bash). |
 | `dsoxlab completion show` | Print the completion script on stdout, writing nothing. |
-| `dsoxlab course` | Display a course section, or the table of contents if no section is given. |
+| `dsoxlab course` | Display the whole course; --section, --next or --prev show one section at a time. |
 | `dsoxlab demo` | Install a demonstration catalog and play a first lab, with nothing to clone and nothing to provision. |
 | `dsoxlab destroy` | Destroy the lab infrastructure (terraform destroy), including machines left outside the state. |
 | `dsoxlab doctor` | Diagnose the environment (runtimes, tools, detected labs). |

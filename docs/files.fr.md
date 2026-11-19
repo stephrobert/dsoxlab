@@ -103,7 +103,7 @@ ne les cherche à nouveau :
 | `DSOXLAB_LANG` | Langue d'affichage (`en` / `fr`), prioritaire sur le fichier de contexte |
 | `DSOXLAB_PROVIDER` | Provider d'infrastructure, prioritaire sur `dsoxlab use --provider` |
 | `DSOXLAB_TARGET` | Cible par défaut d'un lab `vm`, quand la session n'en fixe aucune |
-| `DSOXLAB_PAGER` | Pagineur de `course` et `challenge` (puis `PAGER`, défaut `less -R`) |
+| `DSOXLAB_PAGER` | Pagineur de `course` et `challenge` (puis `PAGER`, défaut `less -RFX`) |
 | `DSOXLAB_LOG` | `DSOXLAB_LOG=debug` équivaut à `-vv` |
 | `DSOXLAB_HOST_READY_TIMEOUT` | Secondes d'attente d'un hôte fraîchement provisionné (défaut 180) |
 | `DSOXLAB_NO_UPDATE_CHECK` | À `1`, coupe l'avis quotidien de nouvelle version |

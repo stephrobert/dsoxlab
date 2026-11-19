@@ -91,11 +91,16 @@ def _pager_command() -> list[str]:
 
     ``DSOXLAB_PAGER`` prime sur ``PAGER`` pour qu'un apprenant puisse régler
     la lecture des cours sans toucher au pager de tout son système. Faute
-    des deux, ``less -R`` : sans ``-R``, les couleurs de Rich s'affichent en
+    des deux, ``less -FXR`` ; ``-R`` est toujours ajouté : sans lui, les couleurs de Rich s'affichent en
     séquences d'échappement brutes et le cours devient illisible.
     """
     raw = os.environ.get("DSOXLAB_PAGER") or os.environ.get("PAGER") or ""
-    parts = shlex.split(raw) if raw.strip() else ["less"]
+    # Faute de réglage, `less -RFX` : `-X` laisse le texte lu dans le terminal
+    # quand on quitte avec `q` (sans lui, `less` l'affiche dans un écran
+    # secondaire qu'il efface en sortant, et l'apprenant perd la commande qu'il
+    # allait taper), et `-F` rend la main tout de suite si tout tient sur un
+    # écran (issue #396). Un pager choisi par l'utilisateur ne reçoit que `-R`.
+    parts = shlex.split(raw) if raw.strip() else ["less", "-F", "-X"]
     if Path(parts[0]).name == "less" and not any(
         arg in ("-R", "-r", "--RAW-CONTROL-CHARS", "--raw-control-chars")
         for arg in parts[1:]
