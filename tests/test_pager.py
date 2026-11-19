@@ -36,6 +36,14 @@ def test_defaults_to_less_with_raw_control_chars(
     """
     monkeypatch.delenv("DSOXLAB_PAGER", raising=False)
     monkeypatch.delenv("PAGER", raising=False)
+    # `-F` rend la main si tout tient sur un écran, `-X` laisse la page lue
+    # dans le terminal après `q` (issue #396).
+    assert _pager_command() == ["less", "-F", "-X", "-R"]
+
+
+def test_un_pager_choisi_ne_recoit_que_r(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`-F` et `-X` sont un défaut, pas une contrainte imposée à l'utilisateur."""
+    monkeypatch.setenv("DSOXLAB_PAGER", "less")
     assert _pager_command() == ["less", "-R"]
 
 

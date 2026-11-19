@@ -7,6 +7,24 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.10] - 2026-11-19
+
+### Corrigé
+
+- **`dsoxlab course` affiche tout le cours.** Il découpait le cours selon ses
+  titres et n'en servait qu'une section à la fois : un cours de onze sections
+  demandait de relancer `--next` dix fois, alors qu'un cours fait d'exercices
+  se lit d'un trait, chaque exercice s'appuyant sur le précédent. Le cours
+  entier est désormais le défaut ; `--section`, `--next` et `--prev` servent
+  toujours une section à la fois et retiennent la position. `--all` est gardé,
+  pour les scripts (#396).
+- **Quitter le pager laisse la page à l'écran.** `less` affichait le cours dans
+  l'écran secondaire du terminal et l'effaçait au `q` : l'apprenant perdait la
+  commande qu'il allait taper. Sans `DSOXLAB_PAGER` ni `PAGER`, dsoxlab lance
+  désormais `less -RFX` : `-X` laisse dans le terminal ce qui a été lu, `-F`
+  rend la main tout de suite si tout tient sur un écran. Un pager choisi par
+  l'utilisateur ne reçoit que `-R`, comme avant (#396).
+
 ## [0.9.9] - 2026-11-19
 
 ### Corrigé

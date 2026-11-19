@@ -383,9 +383,10 @@ playbooks d'un lab doivent viser) et un `lab_<role>` par entrée de `roles`.
 Les fichiers de base portent l'anglais, puisque l'anglais est la langue par
 défaut de l'outil.
 
-`course.yaml` est ce qui permet à `dsoxlab course` d'afficher **une section à la
-fois**, avec `--next`, `--prev` et `--section`, et de retenir où l'apprenant
-s'est arrêté :
+`dsoxlab course` affiche **tout le cours** par défaut (0.9.10). L'apprenant
+peut demander **une section à la fois** avec `--next`, `--prev` et `--section`,
+et l'outil retient où il s'est arrêté. `course.yaml` est ce qui déclare
+soi-même ces sections :
 
 ```yaml
 sections:
@@ -394,9 +395,7 @@ sections:
     file: course/01-navigation.md
 ```
 
-Sans lui, `course` découpe `README.md` selon ses titres, ou l'affiche d'un
-bloc,
-ce qui explique la longueur des cours longs.
+Sans lui, `--next` et `--section` découpent `README.md` selon ses titres.
 
 ---
 

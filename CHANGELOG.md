@@ -7,6 +7,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-11-19
+
+### Fixed
+
+- **`dsoxlab course` shows the whole course.** It split the course on its
+  headings and served one section at a time: an eleven-section course meant
+  running `--next` ten times, while a course made of exercises reads in one
+  go, each exercise building on the previous one. The whole course is now the
+  default; `--section`, `--next` and `--prev` still serve one section at a
+  time and remember the position. `--all` is kept, for scripts (#396).
+- **Quitting the pager keeps the page on screen.** `less` showed the course on
+  the terminal's alternate screen and cleared it on `q`, so the learner lost
+  the command they were about to type. Without `DSOXLAB_PAGER` or `PAGER`,
+  dsoxlab now runs `less -RFX`: `-X` leaves what was read in the terminal,
+  `-F` returns at once when everything fits on one screen. A pager you chose
+  yourself only gets `-R`, as before (#396).
+
 ## [0.9.9] - 2026-11-19
 
 ### Fixed

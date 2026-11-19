@@ -177,7 +177,7 @@ STRINGS: dict[str, str] = {
         "« dsoxlab use ».",
     "cmd_run_help":       "Prépare et démarre l'environnement du lab.",
     "cmd_run_arg":        "Identifiant du lab",
-    "cmd_course_help":    "Affiche une section du cours, ou le sommaire si aucune section n'est précisée.",
+    "cmd_course_help":    "Affiche tout le cours ; --section, --next ou --prev en servent une section à la fois.",
     "cmd_course_arg":    "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_course_opt_section": "Section à afficher : numéro (1, 2 …) ou identifiant (navigation, permissions …).",
     "cmd_course_list":   "Liste tous les labs et indique si un cours (README.md) est disponible.",
@@ -248,7 +248,7 @@ STRINGS: dict[str, str] = {
         "Écrit un dossier de relecture (cours, mission, tests) dans ce fichier.",
     "course_section_ouverture": "Ouverture",
     "cmd_course_opt_all":
-        "Affiche tout le cours d'un bloc, sans le découper en sections.",
+        "Affiche tout le cours d'un bloc (le défaut depuis la 0.9.10 ; gardé pour les scripts).",
     "cmd_course_opt_prev": "Revenir à la section précédente (décrémente la position sauvegardée).",
     "course_nav_progress": "Section {pos}/{total}",
     "course_nav_prev":     "← [bold]dsoxlab course {id} --prev[/bold]",
@@ -905,12 +905,10 @@ Chaque lab déclare :
                        avec une ligne qui dit que c'est un brouillon. Idem pour
                        check, submit et show.
 
-  [cyan]course[/cyan] [dim][<id>][/dim]        Affiche le cours, une section à la fois. Le découpage vient
-                       du course.yaml du lab s'il en déclare un ; sinon il est
-                       déduit des titres du cours.
+  [cyan]course[/cyan] [dim][<id>][/dim]        Affiche tout le cours (README). Les sections, tirées du
+                       course.yaml ou des titres, seulement sur demande.
     [dim]--section / -s[/dim]       Section à afficher : numéro ou identifiant.
     [dim]--next    / -n[/dim]       Section suivante.  [dim]--prev / -p[/dim] : précédente.
-    [dim]--all[/dim]                Tout le cours d'un bloc, sans découpage.
     [dim]--drafts[/dim]             Affiche le cours d'un lab brouillon. Refusé sinon.
     [dim]--no-pager[/dim]           Sans pagination.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.

@@ -28,7 +28,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab clean` | Supprime toutes les ressources créées par le lab. |
 | `dsoxlab completion install` | Installe l'auto-complétion pour le shell courant (zsh, bash). |
 | `dsoxlab completion show` | Imprime le script de complétion sur la sortie standard, sans rien écrire. |
-| `dsoxlab course` | Affiche une section du cours, ou le sommaire si aucune section n'est précisée. |
+| `dsoxlab course` | Affiche tout le cours ; --section, --next ou --prev en servent une section à la fois. |
 | `dsoxlab demo` | Installe un catalogue de démonstration et joue un premier lab, sans rien cloner ni provisionner. |
 | `dsoxlab destroy` | Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises. |
 | `dsoxlab doctor` | Diagnostique l'environnement (runtimes, outils, labs détectés). |
