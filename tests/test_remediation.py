@@ -5,28 +5,38 @@ Ce que ce module prouve :
 - le plan range chaque étape là où elle doit aller : lancée par dsoxlab (sans
   sudo), confiée au playbook (root), ou seulement nommée (manuelle) ; Docker
   et Incus facultatifs n'y entrent qu'avec ``--clients`` ;
-- le playbook joue exactement les lignes affichées, à trois transformations
-  près : ``sudo`` retiré, ``-y`` ajouté aux installations, ``$USER`` remplacé
-  par le compte de l'apprenant (sous ``become``, il vaudrait root) ;
+- les profils s'emboîtent (socle, ``--clients``, ``--all``), et chaque étape
+  root devient un composant du playbook du poste, statique et embarqué ;
+- le playbook ne joue aucun shell, rafraîchit l'index APT avant toute
+  installation, et couvre chaque remède root de la table ;
 - une étape n'est réussie que si le contrôle, refait, est vert, ou n'attend
   plus qu'une reconnexion.
 """
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+
 import pytest
 import yaml
 
 from dsoxlab.services.doctor import DoctorReport, Fix, FixKind, _check
+from dsoxlab.services.doctor_controles import remedes
 from dsoxlab.services.doctor_controles.modele import STATE_UNKNOWN
 from dsoxlab.services.doctor_controles.remedes import Remede
 from dsoxlab.services.doctor_etapes import construire
 from dsoxlab.services.remediation import (
+    _COMPOSANTS,
+    PROFILS,
     Application,
+    composants,
+    composants_du_profil,
     etape_verifiee,
-    lignes_root,
     planifier,
     playbook_du_poste,
+    profil_de,
+    variables_du_poste,
 )
 
 
@@ -87,77 +97,131 @@ class TestPlanifier:
         assert [e.cle for e in planifier(report).root] == ["kvm", "libvirt_pool"]
 
 
-class TestLignesRoot:
-    def test_sudo_est_retire_partout_y_compris_apres_un_tube(self) -> None:
-        jouees = lignes_root((
-            "wget -O - https://x/gpg | sudo gpg --dearmor -o /k.gpg",
-            "sudo apt update && sudo apt install terraform",
-        ), "bob")
+class TestProfils:
+    def test_le_socle_entre_sans_option_mais_pas_docker(self) -> None:
+        """Le profil par défaut installe le socle KVM, même facultatif ici."""
+        report = _rapport(optional=(
+            _check("kvm", False, "absent", remede=_ROOT),
+            _check("docker", False, "absent", remede=_DOCKER),
+        ))
+        assert [e.cle for e in planifier(report).root] == ["kvm"]
 
-        assert "sudo" not in jouees
-        assert "| gpg --dearmor" in jouees
-        assert "apt update && apt install -y terraform" in jouees
+    def test_all_contient_clients_qui_contient_le_socle(self) -> None:
+        assert PROFILS["socle"] < PROFILS["clients"] < PROFILS["tout"]
+        assert {"docker", "incus"} <= PROFILS["clients"]
+        assert {"terraform", "ansible", "collections"} <= PROFILS["tout"]
 
-    def test_une_installation_ne_pose_jamais_de_question(self) -> None:
-        jouees = lignes_root((
-            "sudo apt install git", "sudo dnf install -y yum-utils", "sudo dnf -y install terraform",
-        ), "bob")
+    def test_all_fait_entrer_terraform(self) -> None:
+        tf = Remede("terraform", ("sudo apt install terraform",), root=True, tag="terraform")
+        report = _rapport(optional=(_check("terraform", False, "absent", remede=tf),))
+        assert planifier(report, profil="clients").vide
+        assert [e.cle for e in planifier(report, profil="tout").root] == ["terraform"]
 
-        assert "apt install -y git" in jouees
-        assert "dnf install -y yum-utils" in jouees
-        assert "-y -y" not in jouees
-        assert "dnf -y install terraform" in jouees
+    def test_les_options_donnent_le_profil(self) -> None:
+        assert profil_de(clients=False, tout=False) == "socle"
+        assert profil_de(clients=True, tout=False) == "clients"
+        assert profil_de(clients=False, tout=True) == "tout"
+        assert profil_de(clients=True, tout=True) == "tout"
 
-    def test_user_vise_l_apprenant_et_pas_root(self) -> None:
-        """Sous `become`, `$USER` vaut root : le groupe irait au mauvais compte."""
-        jouees = lignes_root(("sudo usermod -aG kvm,libvirt $USER",), "student")
-        assert "usermod -aG kvm,libvirt student" in jouees
-        assert "$USER" not in jouees
 
-    def test_le_script_s_arrete_a_la_premiere_ligne_en_echec(self) -> None:
-        assert lignes_root(("sudo true",), "bob").startswith("set -e\n")
+class TestComposants:
+    def test_les_etapes_root_deviennent_des_composants_dans_l_ordre_du_playbook(self) -> None:
+        etapes = construire(_rapport(
+            _check("docker", False, "absent", remede=_DOCKER),
+            _check("kvm", False, "absent", remede=_ROOT),
+            _check("libvirtd", False, "arrêté",
+                   remede=Remede("libvirtd", ("sudo systemctl enable --now libvirtd",), root=True)),
+        ), facultatives=frozenset()).etapes
+        # libvirtd est réalisé par le composant kvm : pas de doublon.
+        assert composants(etapes) == ["kvm", "docker"]
+
+    def test_une_etape_root_sans_composant_est_une_erreur(self) -> None:
+        inconnu = Remede("nouveau", ("sudo x",), root=True)
+        etapes = construire(_rapport(_check("nouveau", False, "absent", remede=inconnu))).etapes
+        with pytest.raises(ValueError, match="without a playbook component"):
+            composants(etapes)
+
+    def test_chaque_remede_root_de_la_table_a_son_composant(self) -> None:
+        """Une entrée root ajoutée à la table sans composant casserait --fix."""
+        for famille in ("ubuntu", "almalinux"):
+            sys_ = remedes.Systeme(remedes.Famille.RHEL if famille == "almalinux" else remedes.Famille.DEBIAN,
+                                   famille, famille)
+            for cle in remedes.TABLE:
+                remede = remedes.remede(cle, sys_)
+                if remede is not None and remede.root:
+                    assert remede.cle in _COMPOSANTS, (famille, cle)
+
+
+class TestVariables:
+    def test_le_pool_et_les_groupes_viennent_du_diagnostic(self) -> None:
+        pool = Remede("libvirt_pool", ("sudo virsh pool-define-as labs dir --target /x",), root=True)
+        groupes = Remede("groupes", ("sudo usermod -aG libvirt $USER",), root=True, reconnexion=True)
+        docker = Remede("docker", ("sudo usermod -aG docker $USER",), root=True)
+        etapes = construire(_rapport(
+            _check("docker", False, "absent", remede=docker),
+            _check("groupes", False, "absent", remede=groupes),
+            _check("libvirt_pool", False, "absent", remede=pool),
+        )).etapes
+        variables = variables_du_poste(etapes, "bob")
+
+        assert variables["utilisateur"] == "bob"
+        assert variables["pool"] == "labs"
+        # Le groupe docker n'est pas un groupe de virtualisation : il ne fuit pas.
+        assert variables["groupes"] == ["libvirt"]
+        # Les étapes à faire, plus tout le socle (profil par défaut).
+        assert variables["composants"] == ["git", "kvm", "efi", "groupes", "pool", "docker"]
+
+    def test_le_profil_entier_part_au_playbook_en_une_passe(self) -> None:
+        """Un pool qui « attend libvirt » n'est pas encore à faire : sans le
+        profil, il fallait relancer --fix (banc Ubuntu 24.04 du 2026-11-19)."""
+        etapes = construire(_rapport(_check("kvm", False, "absent", remede=_ROOT)),
+                            facultatives=frozenset()).etapes
+        assert variables_du_poste(etapes, "bob")["composants"] == ["git", "kvm", "efi", "groupes", "pool"]
+        assert variables_du_poste(etapes, "bob", "clients")["composants"][-2:] == ["docker", "incus"]
+        assert composants_du_profil("tout")[-1] == "terraform"
 
     @pytest.mark.parametrize("compte", ["bob; rm -rf /", "$(id)", "Bob Smith", ""])
     def test_un_nom_de_compte_inhabituel_est_refuse(self, compte: str) -> None:
         with pytest.raises(ValueError, match="unusual account name"):
-            lignes_root(("sudo usermod -aG kvm $USER",), compte)
+            variables_du_poste([], compte)
 
 
-class TestPlaybook:
-    def test_une_tache_par_etape_dans_l_ordre_du_plan(self) -> None:
-        pool = Remede("libvirt_pool", ("sudo virsh pool-build default",), root=True, tag="pool")
-        report = _rapport(
-            _check("libvirt_pool", False, "absent", remede=pool),
-            _check("kvm", False, "absent", remede=_ROOT),
-        )
-        etapes = planifier(report).root
-        jeu = yaml.safe_load(playbook_du_poste(etapes, "bob"))
-
+class TestPlaybookEmbarque:
+    def test_le_playbook_est_embarque_et_vise_le_poste(self) -> None:
+        chemin = playbook_du_poste()
+        jeu = yaml.safe_load(chemin.read_text(encoding="utf-8"))
         assert jeu[0]["hosts"] == "localhost"
         assert jeu[0]["become"] is True
-        taches = jeu[0]["tasks"]
-        # L'ordre est celui des dépendances (libvirt avant son pool), pas
-        # celui du rapport.
-        assert [t["tags"] for t in taches] == [["libvirt"], ["pool"]]
-        assert "apt install -y libvirt-clients" in taches[0]["ansible.builtin.shell"]
-        assert taches[0]["environment"] == {"DEBIAN_FRONTEND": "noninteractive"}
+        assert jeu[0]["connection"] == "local"
 
-    def test_un_heredoc_survit_au_yaml(self) -> None:
-        """Le dépôt Docker s'écrit par un heredoc : ses lignes restent entières."""
-        heredoc = Remede("docker", (
-            "sudo tee /etc/apt/sources.list.d/docker.sources <<EOF",
-            "Types: deb",
-            "Suites: $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\")",
-            "EOF",
-        ), root=True, tag="docker")
-        etapes = planifier(_rapport(), clients=True).root + planifier(
-            _rapport(optional=(_check("docker", False, "absent", remede=heredoc),)), clients=True,
-        ).root
-        script = yaml.safe_load(playbook_du_poste(etapes, "bob"))[0]["tasks"][0][
-            "ansible.builtin.shell"]
+    def test_aucune_commande_shell_n_est_jouee(self) -> None:
+        """Le principe du brief : des modules natifs, pas de shell généré."""
+        texte = playbook_du_poste().read_text(encoding="utf-8")
+        assert "ansible.builtin.shell" not in texte
+        assert "ansible.builtin.raw" not in texte
 
-        assert "tee /etc/apt/sources.list.d/docker.sources <<EOF\nTypes: deb\n" in script
-        assert "${UBUNTU_CODENAME:-$VERSION_CODENAME}" in script
+    def test_chaque_composant_a_ses_taches(self) -> None:
+        texte = playbook_du_poste().read_text(encoding="utf-8")
+        for composant in set(_COMPOSANTS.values()):
+            assert f"'{composant}' in composants" in texte, composant
+
+    def test_l_index_apt_est_rafraichi_avant_la_premiere_installation(self) -> None:
+        taches = yaml.safe_load(playbook_du_poste().read_text(encoding="utf-8"))[0]["tasks"]
+        premiere_install = next(i for i, t in enumerate(taches)
+                                if any(m in t for m in ("ansible.builtin.package", "ansible.builtin.apt"))
+                                and "name" in (t.get("ansible.builtin.package") or t.get("ansible.builtin.apt") or {}))
+        rafraichi = next(i for i, t in enumerate(taches)
+                         if (t.get("ansible.builtin.apt") or {}).get("update_cache"))
+        assert rafraichi < premiere_install
+
+    @pytest.mark.skipif(shutil.which("ansible-playbook") is None, reason="ansible-playbook absent")
+    def test_le_playbook_se_charge(self) -> None:
+        res = subprocess.run(
+            ["ansible-playbook", "--syntax-check", "-i", "localhost,", str(playbook_du_poste()),
+             "-e", '{"composants": ["git"], "utilisateur": "bob"}'],
+            capture_output=True, text=True, check=False,
+        )
+        assert res.returncode == 0, res.stderr
 
 
 class TestVerification:

@@ -32,6 +32,7 @@ from ..reporting.evenements import (
     IGNORE,
     OK,
     SuiviAnsible,
+    SuiviPoste,
     SuiviTerraform,
     SuiviTerraformInit,
 )
@@ -113,6 +114,20 @@ def _run_ansible_with_progress(
         tache = progress.add_task(f"Running {playbook_path.name}…", total=None)
         runner(lambda evenement: _appliquer(progress, tache, suivi(evenement)))
         _appliquer(progress, tache, suivi.fin())
+
+
+def _run_poste_with_progress(playbook_path: Path, runner: Callable[[EventCallback], Any]) -> Any:
+    """Le playbook du poste : une barre, et seulement ce qui change ou échoue.
+
+    Rend ce que ``runner`` rend (le résultat du playbook), pour que l'appelant
+    décide de la suite sans relire la sortie d'Ansible.
+    """
+    suivi = SuiviPoste(playbook=playbook_path.name)
+    with _barre_comptee() as progress:
+        tache = progress.add_task(f"{playbook_path.name}…", total=None)
+        resultat = runner(lambda evenement: _appliquer(progress, tache, suivi(evenement)))
+        _appliquer(progress, tache, suivi.fin())
+    return resultat
 
 
 def _run_terraform_init_with_spinner(runner: Callable[[EventCallback], Any]) -> None:

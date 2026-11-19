@@ -82,18 +82,38 @@ joue dans un répertoire de votre machine : le lab de démonstration en est un,
 et tout le catalogue Terraform aussi. Un lab **`vm`** démarre de vraies
 machines virtuelles à côté de vous, et votre machine doit donc pouvoir les
 faire tourner. Il lui faut **Linux avec KVM** : les hyperviseurs packagés sont
-KVM/libvirt et Incus, et aucun des deux n'existe sous Windows ou macOS, où les
-labs `vm` passent par [l'appliance](./appliance.fr.md). Dans une machine
-virtuelle, ils réclament en plus la virtualisation imbriquée, qui s'active sur
-l'hôte et non dans l'invité.
+KVM/libvirt et Incus. Sous macOS, aucun des deux n'existe, et les labs `vm`
+passent par [l'appliance](./appliance.fr.md). Dans une machine virtuelle, ils
+réclament en plus la virtualisation imbriquée, qui s'active sur l'hôte et non
+dans l'invité.
+
+**Sous Windows 11, dsoxlab fonctionne dans WSL2**, labs `vm` compris.
+Installez une distribution Linux dans WSL2, puis dsoxlab dedans, comme sur
+n'importe quelle machine Linux. Aucun réglage n'est nécessaire : Windows 11
+active par défaut la virtualisation imbriquée pour WSL2, donc `/dev/kvm` est
+présent, et les images WSL récentes démarrent systemd, dont libvirt a besoin.
+Testé sur Windows 11 25H2 (build 26200), WSL 2.7.14 (noyau 6.18), Ubuntu
+24.04.5 et dsoxlab 0.9.8 : labs `shell` et `vm` joués, avec le provider `kvm`.
+Docker et Incus n'y ont pas été testés. Sous Windows 10, ou si vous préférez
+éviter WSL2, prenez [l'appliance](./appliance.fr.md).
 
 Le chemin court : lancez `dsoxlab doctor`. Il liste d'un coup toutes les
 étapes qui manquent, numérotées dans l'ordre où les faire, chaque commande
 seule sur sa ligne, pour votre distribution (lue dans `/etc/os-release`).
 Ensuite, `dsoxlab doctor --fix` affiche le plan et le lance une fois que vous
 l'avez confirmé : les étapes sans sudo par dsoxlab lui-même, celles avec sudo
-par un seul `ansible-playbook`, qui vous demande votre mot de passe une fois.
-Chaque étape est revérifiée juste après, et le premier échec arrête tout.
+par **le playbook du poste livré avec dsoxlab** (`templates/ansible/poste.yml`),
+joué une seule fois. Il est écrit avec les modules d'Ansible, rafraîchit
+l'index APT avant toute installation et laisse tel quel ce qui est déjà en
+place : le relancer ne fait pas de mal. dsoxlab vous demande votre mot de passe
+sudo une fois, seulement si sudo en exige un, et affiche un avancement court :
+seulement ce qui change sur votre machine, et ce qui échoue avec le message
+d'Ansible. Chaque étape est revérifiée juste après, et le premier échec arrête
+tout.
+
+`--fix` installe le socle KVM. Deux options l'élargissent : `--fix --clients`
+ajoute Docker et Incus, et `--fix --all` installe tous les composants pris en
+charge (KVM, Docker, Incus, Terraform, Ansible et ses collections).
 
 Les mêmes étapes à la main. Sur **Debian ou Ubuntu** :
 

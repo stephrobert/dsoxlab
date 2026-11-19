@@ -198,30 +198,57 @@ _README_FR = """\
 - À remplir.
 """
 
-_SCENARIO = """\
-# Scenario
+#: L'énoncé du lab, exigé par `validate-structure` depuis 0.9.9 : la situation
+#: et la mission, dans le seul fichier qui les porte (`scenario.md` a quitté le
+#: contrat le 2026-11-19). Les tâches portent leurs points :
+#: `validators/content.py` confronte alors leur somme et leur nombre à la note
+#: réellement calculée.
+_CHALLENGE = """\
+# Challenge: {id}
 
-TO FILL IN: the situation, as the learner would meet it.
+## The situation
 
-A scenario says **where we are and what is wrong**, not the steps to take:
-finding those is the learner's work.
+TO FILL IN: the situation, as the learner would meet it. Say **where we are
+and what is wrong**, not the steps to take: finding those is the learner's
+work.
 
-## Mission
+## What you must obtain
 
-TO FILL IN.
+One graded task per test of `tests/test_functional.py`.
+
+### Task 1: TO FILL IN (100 pts)
+
+TO FILL IN: the observable result expected, not the commands to type.
+
+## Check your work
+
+```bash
+dsoxlab check {id}
+```
 """
 
-_SCENARIO_FR = """\
-# Scénario
+_CHALLENGE_FR = """\
+# Challenge : {id}
 
-À remplir : la situation, telle que l'apprenant la rencontrerait.
+## La situation
 
-Un scénario dit **où on est et ce qui ne va pas**, pas la marche à suivre :
-c'est le travail de l'apprenant de la trouver.
+À remplir : la situation, telle que l'apprenant la rencontrerait. Dites **où
+on est et ce qui ne va pas**, pas la marche à suivre : c'est le travail de
+l'apprenant de la trouver.
 
-## Mission
+## Ce que vous devez obtenir
 
-À remplir.
+Une tâche notée par test de `tests/test_functional.py`.
+
+### Tâche 1 : à remplir (100 pts)
+
+À remplir : le résultat observable attendu, pas les commandes à taper.
+
+## Valider votre travail
+
+```bash
+dsoxlab check {id}
+```
 """
 
 #: Le test généré ÉCHOUE, il n'est pas `skip`. Un test sauté ne dit rien : ni
@@ -434,14 +461,14 @@ def creer_lab(identifiant: str, racine_catalogue: Path, *, runtime: str) -> Crea
     fichiers = [
         _ecrire(base / "lab.yaml", _LAB_COMMUN.format(id=identifiant) + corps),
         _ecrire(base / "README.md", _README.format(id=identifiant)),
-        _ecrire(base / "scenario.md", _SCENARIO),
         # Les versions françaises : la règle du projet veut tout ce qui
         # s'affiche en deux langues, et `validators/content.py` signale un
         # document traduit d'un seul côté. Un lab créé sans elles était donc
         # immédiatement non conforme.
         _ecrire(base / "README.fr.md", _README_FR.format(id=identifiant)),
-        _ecrire(base / "scenario.fr.md", _SCENARIO_FR),
         _ecrire(base / "lab.fr.yaml", _LAB_FR.format(id=identifiant)),
+        _ecrire(base / "challenge" / "README.md", _CHALLENGE.format(id=identifiant)),
+        _ecrire(base / "challenge" / "README.fr.md", _CHALLENGE_FR.format(id=identifiant)),
         _ecrire(base / "challenge" / "tests" / "test_functional.py",
                 _TEST.format(id=identifiant)),
     ]

@@ -219,14 +219,14 @@ def test_le_verdict_ne_depend_pas_de_la_forme(poste: Poste, catalogue: Path) -> 
     remis en état, pour que la comparaison porte sur un cas non trivial.
     """
     lab = catalogue / "labs" / "demo" / LAB_DEMO
-    scenario = lab / "scenario.md"
-    garde = scenario.read_text(encoding="utf-8")
-    scenario.unlink()
+    enonce = lab / "challenge" / "README.md"
+    garde = enonce.read_text(encoding="utf-8")
+    enonce.unlink()
     try:
         terminal = poste.lance("validate-structure", cwd=catalogue)
         machine = poste.lance("validate-structure", "--json", cwd=catalogue)
     finally:
-        scenario.write_text(garde, encoding="utf-8")
+        enonce.write_text(garde, encoding="utf-8")
 
     assert terminal.returncode == 1, terminal.stdout[-2000:]
     assert machine.returncode == 1, machine.stdout[-2000:]

@@ -84,7 +84,7 @@ def _catalogue(racine: Path, *, portail: bool = True) -> Path:
     (racine / "meta.yml").write_text(_META + (_SYNC if portail else ""), encoding="utf-8")
     (lab / "lab.yaml").write_text(_LAB, encoding="utf-8")
     (lab / "README.md").write_text("# lab-a\n", encoding="utf-8")
-    (lab / "scenario.md").write_text("scenario\n", encoding="utf-8")
+    (lab / "challenge" / "README.md").write_text("challenge\n", encoding="utf-8")
     (lab / "challenge" / "tests" / "test_functional.py").write_text(
         "def test_ok():\n    assert True\n", encoding="utf-8"
     )

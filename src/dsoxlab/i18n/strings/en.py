@@ -177,7 +177,7 @@ STRINGS: dict[str, str] = {
     "cmd_course_help":    "Display a course section, or the table of contents if no section is given.",
     "cmd_course_arg":    "Lab identifier (optional if a lab is active in session)",
     "cmd_course_opt_section": "Section to display: number (1, 2 …) or id (navigation, permissions …).",
-    "cmd_course_list":   "List all labs and show whether a course (scenario.md) is available.",
+    "cmd_course_list":   "List all labs and show whether a course (README.md) is available.",
     "course_toc_title":  "Course: {title}",
     "course_toc_col_n":  "#",
     "course_toc_col_id": "Section ID",
@@ -201,7 +201,7 @@ STRINGS: dict[str, str] = {
         "The test file is not valid Python, so nothing could be counted and "
         "pytest will not load it either: {raison}",
     "audit_cours_absent":
-        "No course (scenario.md or README.md): the mission arrives with nothing to prepare it.",
+        "No course (README.md): the mission arrives with nothing to prepare it.",
     "audit_cours_indivisible":
         "{lignes} lines of course that even automatic splitting cannot open: "
         "add headings, or a course.yaml.",
@@ -458,7 +458,7 @@ STRINGS: dict[str, str] = {
         "written:\n"
         "  dsoxlab list-labs\n"
         "  dsoxlab validate-structure\n"
-        "Then fill scenario.md, and challenge/tests/test_functional.py.",
+        "Then fill challenge/README.md, and challenge/tests/test_functional.py.",
     "scaffold_id_invalide":
         "'{name}' cannot be used as an id: lowercase letters, digits, dot, "
         "dash and underscore only.",
@@ -888,7 +888,7 @@ Each lab declares:
                        saying it is a draft. Same for check, submit and show.
 
   [cyan]course[/cyan] [dim][<id>][/dim]        Display the course: one section at a time when the lab
-                       declares them (course.yaml), otherwise scenario + README.
+                       declares them (course.yaml), otherwise README.
     [dim]--section / -s[/dim]       Section to display: number or id.
     [dim]--next    / -n[/dim]       Next section.  [dim]--prev / -p[/dim]: previous one.
     [dim]--drafts[/dim]             Show the course of a draft lab. Refused otherwise.
@@ -975,11 +975,14 @@ Each lab declares:
                        own line, ready to paste. A component this repo does not
                        need stays optional and never shows up as an error.
     [dim]--fix[/dim]                Show the plan, then run it once confirmed: steps
-                       without sudo by dsoxlab, sudo steps through one
-                       ansible-playbook run that asks for your password once.
+                       without sudo by dsoxlab, sudo steps through the
+                       workstation playbook shipped with dsoxlab, run once,
+                       asking for your password once.
                        Each step is checked again; the first failure stops.
     [dim]--yes[/dim]                Run the plan without asking (needed without a terminal).
     [dim]--clients[/dim]            With --fix, also install the optional Docker and Incus.
+    [dim]--all[/dim]                With --fix, install every supported component: KVM,
+                       Docker, Incus, Terraform, Ansible and its collections.
     [dim]-v[/dim]                   Every check, and the warnings on green lines.
     [dim]--json[/dim]               The diagnosis as a document, each check carrying a
                        stable key and state. Not with [bold]--fix[/bold].
@@ -1216,13 +1219,13 @@ silent.
     "lab_session_ended":  "Session ended for [bold]{lab_id}[/bold]. Back to your original directory.",
     "lab_session_ended_local": "Session ended for [bold]{lab_id}[/bold]. Your work is kept: run [bold]dsoxlab check[/bold] again whenever you want.",
     "no_active_lab":      "No active lab in session. Run [bold]dsoxlab run <id>[/bold] first, or pass the lab identifier explicitly.",
-    "course_missing":      "No scenario.md file found for this lab.",
+    "course_missing":      "No course for this lab: README.md is missing.",
     "course_tip":          "Challenge ready: dsoxlab challenge {id}",
     "course_list_title":   "Available courses",
     "course_list_col_id":  "Lab ID",
     "course_list_col_title": "Title",
     "course_list_col_status": "Course",
-    "challenge_missing":   "No challenge/README.md file found for this lab.",
+    "challenge_missing":   "This lab has no brief: challenge/README.md is missing.",
     "challenge_workdir":   "Working directory: {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────
@@ -1331,6 +1334,9 @@ silent.
     "struct_forbidden_shell_sh":
         "runtime/shell.sh is not allowed. Preparation is declared through "
         "runtime.workdir and runtime.fixtures.",
+    "struct_forbidden_scenario":
+        "scenario.md is no longer part of a lab: the situation and the mission "
+        "both go in challenge/README.md (and README.fr.md).",
     "struct_forbidden_makefile":
         "A Makefile is not allowed in a lab: dsoxlab drives everything.",
 
@@ -1782,10 +1788,14 @@ silent.
         "--fix` to act on it.",
     "opt_doctor_yes": 'With --fix: run the plan without asking for confirmation',
     "opt_doctor_clients": 'With --fix: also install the optional components (Docker, Incus)',
+    "opt_doctor_all": 'With --fix: install every supported component (KVM, Docker, Incus, Terraform, Ansible)',
+    "doctor_profil_sans_fix": '--clients and --all only choose what --fix installs: add --fix.',
+    "fix_plan_composants": 'Playbook components: {composants} (already in place: left unchanged)',
     "opt_doctor_verbose": 'Show every check, and the warnings on green lines',
     "fix_plan_titre": 'Plan: {count} step(s). Each one is checked again right after; the first failure stops everything.',
     "fix_plan_sans_sudo": 'Without sudo, run by dsoxlab:',
-    "fix_plan_root": 'With sudo, by the workstation playbook (ansible-playbook asks for your sudo password once):',
+    "fix_plan_root": 'With sudo, by the workstation playbook (your sudo password is asked once):',
+    "fix_mot_de_passe_sudo": 'sudo password (asked once, never stored): ',
     "fix_plan_reconnexion": '(log in again afterwards)',
     "fix_plan_manuelles": 'To do yourself (never run automatically):',
     "fix_plan_a_savoir": 'Not handled: {label} (see "Good to know").',
@@ -1794,7 +1804,7 @@ silent.
     "fix_confirmer": 'Run these {count} step(s)?',
     "fix_annule": 'Nothing was run.',
     "fix_pas_d_ansible": 'ansible-playbook is not available: the sudo steps are shown below, to paste in a terminal.',
-    "fix_playbook": 'Workstation playbook written to {path}',
+    "fix_playbook": 'Workstation playbook: {path}',
     "fix_etape_ok": '{step}. {label}: done, checked again.',
     "fix_etape_ko": '{step}. {label}: failed (code {code}).',
     "fix_etape_non_verifiee": '{step}. {label}: the command succeeded, but the check is still not green.',

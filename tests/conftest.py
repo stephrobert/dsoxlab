@@ -129,7 +129,7 @@ def _poser_lab(racine: Path, ident: str, titre: str) -> Path:
         _LAB.format(ident=ident, titre=titre), encoding="utf-8"
     )
     (lab / "README.md").write_text(f"# {titre}\n", encoding="utf-8")
-    (lab / "scenario.md").write_text("Faites la chose.\n", encoding="utf-8")
+    (lab / "challenge" / "README.md").write_text("# Challenge\n", encoding="utf-8")
     (lab / "challenge" / "tests" / "test_functional.py").write_text(
         "def test_la_chose_est_faite() -> None:\n    assert True\n", encoding="utf-8"
     )

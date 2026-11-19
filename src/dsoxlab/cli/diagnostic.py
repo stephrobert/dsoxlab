@@ -21,9 +21,9 @@ au-dessus d'un message déjà écrit pour lui. Partout ailleurs, on chaîne.
 
 from __future__ import annotations
 
+import getpass
 import logging
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -64,10 +64,11 @@ from ..services.remediation import (
     Action,
     Application,
     PlanCorrection,
-    chemin_du_playbook,
     etape_verifiee,
     planifier,
     playbook_du_poste,
+    profil_de,
+    variables_du_poste,
 )
 from ..utils.shell import CommandError, run_command
 from ._commun import (
@@ -237,6 +238,7 @@ def doctor(
     strict: Annotated[bool, typer.Option("--strict", help=_("opt_doctor_strict"))] = False,
     oui: Annotated[bool, typer.Option("--yes", "-y", help=_("opt_doctor_yes"))] = False,
     clients: Annotated[bool, typer.Option("--clients", help=_("opt_doctor_clients"))] = False,
+    tout: Annotated[bool, typer.Option("--all", help=_("opt_doctor_all"))] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help=_("opt_doctor_verbose"))] = False,
 ) -> None:
     root = _root(lab_home)
@@ -265,7 +267,13 @@ def doctor(
         return
 
     print_doctor(report, verbose=verbose)
-    joue = _reparer(report, root, oui=oui, clients=clients) if fix else False
+    if (clients or tout) and not fix:
+        # Ce sont des profils de --fix : seuls, ils ne changeraient rien, et le
+        # silence laisserait croire que Docker ou Terraform ont été installés.
+        error(_("doctor_profil_sans_fix"))
+        raise typer.Exit(1)
+    profil = profil_de(clients=clients, tout=tout)
+    joue = _reparer(report, root, oui=oui, profil=profil) if fix else False
 
     if strict:
         # Après des correctifs, l'état de la machine a changé : juger sur le
@@ -317,7 +325,9 @@ def _commande_de(etape: Etape) -> str:
     return titre_etape(etape)
 
 
-def _afficher_plan(plan: PlanCorrection, report: DoctorReport, ansible: list[str]) -> None:
+def _afficher_plan(
+    plan: PlanCorrection, report: DoctorReport, chemin: Path, liste: list[str],
+) -> None:
     console.print()
     info(_("fix_plan_titre", count=plan.executables))
     if plan.sans_sudo:
@@ -331,8 +341,10 @@ def _afficher_plan(plan: PlanCorrection, report: DoctorReport, ansible: list[str
             if etape.remede is not None and etape.remede.reconnexion:
                 ligne += "   " + _("fix_plan_reconnexion")
             console.print(Text(ligne), soft_wrap=True)
-        console.print(Text("      " + shlex.join(ansible), style="dim"), soft_wrap=True)
-        if not _playbook_jouable(ansible[0]) and shutil.which("uv"):
+        console.print(Text("  " + _("fix_plan_composants", composants=", ".join(liste))),
+                      soft_wrap=True)
+        console.print(Text("      " + str(chemin), style="dim"), soft_wrap=True)
+        if not _ansible_disponible() and shutil.which("uv"):
             console.print(Text("  " + _("fix_plan_ansible_d_abord")), soft_wrap=True)
     _liste_du_plan("fix_plan_reverifiees", [e for e in plan.manuelles if _attend_une_etape(e)])
     _liste_du_plan("fix_plan_manuelles", [e for e in plan.manuelles if not _attend_une_etape(e)])
@@ -348,21 +360,51 @@ def _liste_du_plan(cle: str, etapes: list[Etape]) -> None:
         console.print(Text(f"  {etape.numero:>2}. {titre_etape(etape)}"), soft_wrap=True)
 
 
-def _commande_playbook(chemin: Path) -> list[str]:
-    """L'appel d'ansible-playbook, avec la demande de mot de passe si sudo en exige un."""
-    binaire = shutil.which("ansible-playbook") or str(Path.home() / ".local/bin/ansible-playbook")
-    commande = [binaire, "-i", "localhost,", "-c", "local", str(chemin)]
-    # `-k` : sudo ignore le mot de passe tapé récemment dans ce terminal. Sans
-    # lui, `sudo -n true` réussissait grâce à ce cache, dsoxlab omettait
-    # `--ask-become-pass`, et le sudo d'Ansible, qui ne voit pas ce cache,
-    # échouait sur « il est nécessaire de saisir un mot de passe » (Pop!_OS
-    # 24.04, 2026-11-16). Avec `-k`, seul un vrai NOPASSWD passe.
-    sans_mot_de_passe = subprocess.run(
-        ["sudo", "-n", "-k", "true"], capture_output=True, check=False,
-    ).returncode == 0 if shutil.which("sudo") else False
-    if not sans_mot_de_passe:
-        commande.insert(1, "--ask-become-pass")
-    return commande
+def _sudo_sans_mot_de_passe() -> bool:
+    """Sudo répond-il sans mot de passe (NOPASSWD) ?
+
+    ``-k`` : sudo ignore le mot de passe tapé récemment dans ce terminal. Sans
+    lui, ``sudo -n true`` réussissait grâce à ce cache, et le sudo d'Ansible,
+    qui ne voit pas ce cache, échouait sur « il est nécessaire de saisir un mot
+    de passe » (Pop!_OS 24.04, 2026-11-16). Avec ``-k``, seul un vrai NOPASSWD
+    passe.
+    """
+    if not shutil.which("sudo"):
+        return False
+    return subprocess.run(["sudo", "-n", "-k", "true"], capture_output=True, check=False).returncode == 0
+
+
+def _ansible_disponible() -> bool:
+    """ansible-playbook est-il joignable, dans le PATH ou là où uv tool le pose ?"""
+    return shutil.which("ansible-playbook") is not None or _playbook_jouable(
+        str(Path.home() / ".local/bin/ansible-playbook"))
+
+
+def _jouer_playbook(chemin: Path, variables: dict[str, object], mot_de_passe: str | None) -> int:
+    """Joue le playbook du poste par ansible-runner, et rend son code de retour.
+
+    La sortie d'Ansible ne s'affiche pas : ses événements alimentent une barre
+    qui n'écrit que ce qui change et ce qui échoue (``SuiviPoste``). Isolé pour
+    que les tests le remplacent sans lancer Ansible.
+    """
+    from ..infra.ansible import AnsibleNotInstalled, run_playbook
+    from ._barres import _run_poste_with_progress
+
+    # uv tool install pose ansible-playbook dans ~/.local/bin, qu'un shell neuf
+    # n'a pas toujours dans son PATH : ansible-runner le cherche là.
+    local_bin = str(Path.home() / ".local/bin")
+    if local_bin not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = local_bin + os.pathsep + os.environ.get("PATH", "")
+    inventaire = {"all": {"hosts": {"localhost": {"ansible_connection": "local"}}}}
+    try:
+        resultat = _run_poste_with_progress(chemin, lambda on_event: run_playbook(
+            chemin, inventaire, extra_vars=dict(variables), on_event=on_event,
+            become_password=mot_de_passe,
+        ))
+    except AnsibleNotInstalled as exc:
+        error(str(exc))
+        return 127
+    return 0 if resultat.ok else (resultat.rc or 1)
 
 
 def _interactif() -> bool:
@@ -383,21 +425,23 @@ def _confirmer(plan: PlanCorrection, *, oui: bool) -> bool:
     return False
 
 
-def _reparer(report: DoctorReport, root: Path, *, oui: bool, clients: bool) -> bool:
+def _reparer(report: DoctorReport, root: Path, *, oui: bool, profil: str) -> bool:
     """Joue le plan de `--fix`, et dit si la machine a changé.
 
     Le booléen rendu décide de la remesure de `--strict` : sans étape jouée,
     remesurer coûterait un diagnostic complet pour un rapport identique.
     """
     actions = _actions(root, report)
-    plan = planifier(report, clients=clients, actions=actions)
+    plan = planifier(report, profil=profil, actions=actions)
     if not plan.executables:
         info(_("fix_rien_a_lancer") if plan.manuelles else _("fix_nothing"))
         return False
 
-    chemin = chemin_du_playbook()
-    ansible = _commande_playbook(chemin) if plan.root else []
-    _afficher_plan(plan, report, ansible)
+    chemin = playbook_du_poste()
+    variables = variables_du_poste(plan.root, _current_user(), profil) if plan.root else {}
+    composants_vises = variables.get("composants", [])
+    _afficher_plan(plan, report, chemin,
+                   list(composants_vises) if isinstance(composants_vises, list) else [])
     if not _confirmer(plan, oui=oui):
         return False
 
@@ -408,7 +452,7 @@ def _reparer(report: DoctorReport, root: Path, *, oui: bool, clients: bool) -> b
     if (
         _jouer_sans_sudo(plan.sans_sudo, actions, remesurer, restantes)
         and plan.root
-        and _jouer_root(plan.root, ansible, chemin, remesurer, restantes)
+        and _jouer_root(plan.root, chemin, variables, remesurer, restantes)
     ):
         _dire_les_attendues([e for e in plan.manuelles if _attend_une_etape(e)], remesurer())
     return True
@@ -447,23 +491,25 @@ def _jouer_sans_sudo(
 
 
 def _jouer_root(
-    etapes: list[Etape], ansible: list[str], chemin: Path,
+    etapes: list[Etape], chemin: Path, variables: dict[str, object],
     remesurer: Callable[[], DoctorReport], restantes: list[Etape],
 ) -> bool:
     """Les étapes root, toutes par le playbook du poste, puis revérifiées une à une."""
-    if not _interactif() and "--ask-become-pass" in ansible:
+    besoin_mot_de_passe = not _sudo_sans_mot_de_passe()
+    if besoin_mot_de_passe and not _interactif():
         # Sans terminal, personne ne peut taper le mot de passe : les étapes
         # root s'affichent en bloc à coller (décision 2).
         _bloc_root(etapes)
         return False
-    if not _playbook_jouable(ansible[0]) and not _installer_ansible():
+    if not _ansible_disponible() and not _installer_ansible():
         warn(_("fix_pas_d_ansible"))
         _bloc_root(etapes)
         return False
-    chemin.parent.mkdir(parents=True, exist_ok=True)
-    chemin.write_text(playbook_du_poste(etapes, _current_user()), encoding="utf-8")
+    # Demandé une seule fois, gardé en mémoire le temps du playbook : ni
+    # argument, ni fichier, ni journal (brief de la PR #392).
+    mot_de_passe = getpass.getpass(_("fix_mot_de_passe_sudo")) if besoin_mot_de_passe else None
     info(_("fix_playbook", path=str(chemin)))
-    code = subprocess.run(ansible, check=False).returncode
+    code = _jouer_playbook(chemin, variables, mot_de_passe)
     apres = remesurer()
     for etape in etapes:
         application = Application(etape, code, code == 0 and etape_verifiee(etape, apres))
@@ -493,8 +539,7 @@ def _installer_ansible() -> bool:
     info(_("fix_installe_ansible"))
     if _executer_correctif(Fix((("uv", "tool", "install", "ansible-core"),))) != 0:
         return False
-    return _playbook_jouable(shutil.which("ansible-playbook")
-                             or str(Path.home() / ".local/bin/ansible-playbook"))
+    return _ansible_disponible()
 
 
 def _jouer(etape: Etape, actions: dict[str, Action]) -> tuple[int, str | None]:

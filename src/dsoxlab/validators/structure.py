@@ -61,7 +61,17 @@ def validate_structure(lab: LabDefinition) -> StructureReport:
     # ── Fichiers communs à tous les types de runtime ─────────────────
     _require_file(base / "lab.yaml", report)
     _require_file(base / "README.md", report)
-    _require_file(base / "scenario.md", report)
+    # L'énoncé du challenge : ce que `dsoxlab challenge` affiche, ce que
+    # `course` montre avant le cours, et ce que `run` montre avant d'ouvrir la
+    # session SSH d'un lab `vm`. Il n'était pas exigé, et 229 labs de six
+    # catalogues sont sortis sans lui (blog-roadmap#198, mesuré le 2026-11-19).
+    _require_file(base / "challenge" / "README.md", report)
+    # `scenario.md` portait la situation, à côté de l'énoncé qui portait la
+    # mission : deux fichiers pour un même propos, et 156 labs où ils étaient
+    # identiques. L'énoncé est désormais seul (décision du 2026-11-19), et un
+    # scénario restant serait un texte qu'aucune commande n'affiche plus.
+    _forbid_file(base / "scenario.md", report, "struct_forbidden_scenario")
+    _forbid_file(base / "scenario.fr.md", report, "struct_forbidden_scenario")
     _require_dir(base / "challenge" / "tests", report)
     _require_file(base / "challenge" / "tests" / "test_functional.py", report)
 

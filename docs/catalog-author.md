@@ -28,12 +28,11 @@ my-training/
     └── my-domain/l1/first-lab/
         ├── lab.yaml            ← required
         ├── README.md           ← required
-        ├── scenario.md         ← required
         ├── setup.yaml          ← required for runtime vm (Ansible), optional for shell
         ├── cleanup.yaml        ← required for runtime vm (Ansible), optional for shell
         ├── fixtures/           ← optional, for runtime shell
         └── challenge/
-            ├── README.md       ← the mission shown by `dsoxlab challenge`
+            ├── README.md       ← required: the mission shown by `dsoxlab challenge`
             ├── hints.yaml      ← optional: the hints and their cost
             └── tests/
                 └── test_functional.py   ← required, exact name
@@ -47,20 +46,20 @@ directory.
 
 ## What each file holds
 
-Three Markdown files, and the engine reads each at a different moment:
+Two Markdown files, and the engine reads each at a different moment:
 
 | File | Read by | Holds |
 | --- | --- | --- |
-| `README.md` | `dsoxlab course`, in one block with `scenario.md` unless a `course.yaml` splits it | the lesson: what the lab teaches, and what it assumes known |
-| `scenario.md` | `dsoxlab course` | the situation: where the learner is and what is wrong — not the steps that fix it |
-| `challenge/README.md` | `dsoxlab challenge`; printed by `run` before the SSH session of a `vm` lab opens, since the host has no dsoxlab; read by `validate-structure` for the scale | the mission, as a list of graded tasks |
+| `README.md` | `dsoxlab course`, split by a `course.yaml` or by its own headings | the lesson: what the lab teaches, and what it assumes known |
+| `challenge/README.md` | `dsoxlab challenge`; printed by `run` before the SSH session of a `vm` lab opens, since the host has no dsoxlab; read by `validate-structure` for the scale | the brief: the situation (where the learner is and what is wrong, not the steps that fix it), then the mission, as a list of graded tasks, and how to check it |
 
-Only the first two are required by the structure validator. Without
-`challenge/README.md`, `dsoxlab challenge` prints *No challenge/README.md file
-found for this lab*. `dsoxlab new lab` does not create it — it writes
-`lab.yaml`, `README.md`, `scenario.md`, `test_functional.py` and, for a `vm` lab,
-`setup.yaml` and `cleanup.yaml` — so that
-file is yours to add.
+Both are required by the structure validator, in English and French
+(`README.fr.md`, `challenge/README.fr.md`). **`scenario.md` is no longer part of
+a lab** (0.9.9): it held the situation next to a brief that held the mission,
+two files for one purpose, and the validator now refuses it. Its content goes
+at the top of `challenge/README.md`. `dsoxlab new lab` writes both files, with
+`lab.yaml`, `test_functional.py` and, for a `vm` lab, `setup.yaml` and
+`cleanup.yaml`.
 
 **The scale.** dsoxlab grades **per test**: five `def test_` in
 `test_functional.py` means twenty points each, hints deducted afterwards. The
@@ -170,7 +169,7 @@ This stays declarative: a playbook, never a script. The refusal of
 
 Three families, all local and offline by default:
 
-**Structure.** `lab.yaml`, `README.md`, `scenario.md`, `challenge/tests/` and
+**Structure.** `lab.yaml`, `README.md`, `challenge/README.md`, `challenge/tests/` and
 `challenge/tests/test_functional.py`. A `vm` lab also needs `setup.yaml` and
 `cleanup.yaml`, a non-empty `runtime.targets[]`, and a `runtime.default` that
 matches one of those targets. A `shell` lab needs a non-empty `runtime.workdir`.
@@ -385,8 +384,8 @@ sections:
     file: course/01-navigation.md
 ```
 
-Without it, `course` falls back to `scenario.md` + `README.md` shown in one
-block — which is why long courses are long.
+Without it, `course` splits `README.md` on its own headings, or shows it in
+one block — which is why long courses are long.
 
 ---
 

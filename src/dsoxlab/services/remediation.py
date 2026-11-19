@@ -6,9 +6,12 @@ règles portent le module, et chacune vient d'un défaut mesuré :
 1. **Le plan se lit en entier avant toute action**, et rien ne part sans
    ``[y/N]`` ou ``--yes``. Sans terminal et sans ``--yes``, rien n'est lancé.
 2. **Une étape root n'est jamais lancée en silence.** Elles passent toutes par
-   un playbook généré depuis la table des remèdes, joué par ``ansible-playbook
-   --ask-become-pass -c local`` : une seule demande de mot de passe, faite par
-   Ansible. Sans terminal, elles s'affichent en bloc à coller (décision 2).
+   LE playbook du poste, statique et embarqué (``templates/ansible/poste.yml``,
+   brief de la PR #392), joué par ``ansible-playbook --ask-become-pass -c
+   local`` : une seule demande de mot de passe, faite par Ansible. Python ne
+   lui passe que des variables (les composants, le compte de l'apprenant) et
+   ne génère plus aucune commande d'installation. Sans terminal, les étapes
+   s'affichent en bloc à coller (décision 2).
 3. **Chaque étape est revérifiée juste après, et la première qui échoue
    arrête tout.** L'ancienne règle (« un échec n'arrête pas la cascade »)
    lançait des étapes qui dépendaient de celle qui venait d'échouer : un pool
@@ -17,19 +20,17 @@ règles portent le module, et chacune vient d'un défaut mesuré :
    qu'après une reconnexion : sans ce message, le ``doctor`` suivant ressemble
    à un échec.
 
-Docker et Incus, quand le catalogue ne les exige pas, n'entrent dans le plan
-qu'avec ``--clients`` (décision 1).
+Trois profils décident de ce qui entre au plan quand le catalogue ne l'exige
+pas : le socle KVM (``--fix``), plus Docker et Incus (``--fix --clients``),
+plus Terraform, Ansible et ses collections (``--fix --all``).
 """
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import yaml
 
 from .doctor import DoctorReport, Fix, FixKind
 from .doctor_controles.modele import STATE_OK, Check
@@ -83,14 +84,31 @@ def _est_manuelle(etape: Etape, actions: dict[str, Action]) -> bool:
     return etape.cle not in actions and correctif is None
 
 
+#: Les profils de ``--fix`` : les contrôles qu'un profil fait entrer au plan
+#: même quand ce catalogue ne les exige pas (brief TODO/doctor-ansible.md).
+#: Chaque profil contient le précédent.
+PROFILS: dict[str, frozenset[str]] = {
+    "socle": frozenset({"git", "kvm", "groupes", "libvirt_pool", "efi"}),
+}
+PROFILS["clients"] = PROFILS["socle"] | {"docker", "incus"}
+PROFILS["tout"] = PROFILS["clients"] | {"terraform", "ansible", "collections"}
+
+
+def profil_de(*, clients: bool, tout: bool) -> str:
+    """Le profil que demandent les options : ``--all`` contient ``--clients``."""
+    return "tout" if tout else ("clients" if clients else "socle")
+
+
 def planifier(
-    report: DoctorReport, *, clients: bool = False, actions: dict[str, Action] | None = None,
+    report: DoctorReport, *, clients: bool = False, profil: str | None = None,
+    actions: dict[str, Action] | None = None,
 ) -> PlanCorrection:
     """Partage les étapes du diagnostic entre « à lancer », « au playbook », « à dire »."""
     actions = actions or {}
-    etapes = construire(report)
+    nom = profil or profil_de(clients=clients, tout=False)
+    etapes = construire(report, facultatives=PROFILS[nom])
     plan = PlanCorrection()
-    toutes = etapes.etapes + (etapes.facultatives if clients else [])
+    toutes = etapes.etapes + etapes.facultatives
     for etape in toutes:
         if _est_manuelle(etape, actions):
             plan.manuelles.append(etape)
@@ -103,73 +121,96 @@ def planifier(
 
 # ── le playbook du poste ──────────────────────────────────────────────────────
 
-#: ``sudo`` en tête de commande, ou après un tube ou un ``&&`` : le playbook
-#: tourne déjà en root (``become``), le préfixe n'a plus d'objet.
-_SUDO = re.compile(r"(^|[|&;]\s*|\s)sudo\s+")
-
-#: ``apt install`` ou ``dnf install`` sans ``-y`` attend une réponse qu'aucun
-#: playbook ne donnera : le paquet n'est jamais installé.
-_INSTALL = re.compile(r"\b(apt|apt-get|dnf|yum)\s+install\b(?!\s+-y)")
-
-#: Un nom de compte, tel que ``useradd`` l'accepte : rien d'autre n'entre
-#: dans une commande jouée en root.
+#: Un nom de compte, tel que ``useradd`` l'accepte : rien d'autre ne part au
+#: playbook comme compte à qui donner des groupes.
 _COMPTE = re.compile(r"^[a-z_][a-z0-9_-]*[$]?$")
 
+#: La clé de remède d'une étape root, vers le composant du playbook qui la
+#: réalise. Deux étapes peuvent tomber sur le même composant (libvirtd est
+#: démarré par le composant kvm, le groupe docker par le composant docker).
+_COMPOSANTS: dict[str, str] = {
+    "git": "git",
+    "kvm": "kvm",
+    "libvirtd": "kvm",
+    "groupes": "groupes",
+    "libvirt_pool": "pool",
+    "efi": "efi",
+    "docker": "docker",
+    "incus": "incus",
+    "terraform": "terraform",
+}
 
-def lignes_root(lignes: tuple[str, ...], utilisateur: str) -> str:
-    """Les lignes d'un remède, telles que le playbook les joue en root.
+#: Ordre du playbook, pour un affichage stable.
+_ORDRE = ("git", "kvm", "efi", "groupes", "pool", "docker", "incus", "terraform")
 
-    Trois transformations, et aucune autre : ``sudo`` retiré (le playbook est
-    déjà root), ``-y`` ajouté aux installations, et ``$USER`` remplacé par le
-    compte de l'apprenant. Sous ``become``, ``$USER`` vaudrait ``root`` :
-    ``usermod -aG libvirt $USER`` ajouterait root au groupe, et rien ne
-    changerait pour l'apprenant.
+
+def playbook_du_poste() -> Path:
+    """Le playbook du poste, statique, embarqué dans le paquet.
+
+    Python ne génère plus aucune commande d'installation (brief
+    TODO/doctor-ansible.md, PR #392) : ce fichier est la seule source de ce
+    que ``--fix`` installe, et il se lit avant d'être joué.
+    """
+    return Path(__file__).resolve().parents[1] / "templates" / "ansible" / "poste.yml"
+
+
+def composants(etapes: list[Etape]) -> list[str]:
+    """Les composants du playbook que réalisent ces étapes root, dans l'ordre du playbook.
+
+    Une étape root sans composant connu est une erreur de programmation : la
+    table des remèdes a gagné une entrée que le playbook ne sait pas servir.
+    """
+    trouves = set()
+    for etape in etapes:
+        cle = etape.remede.cle if etape.remede is not None else etape.cle
+        if cle not in _COMPOSANTS:
+            msg = f"root step without a playbook component: {cle!r}"
+            raise ValueError(msg)
+        trouves.add(_COMPOSANTS[cle])
+    return [c for c in _ORDRE if c in trouves]
+
+
+def _valeur(etapes: list[Etape], cle: str, motif: str) -> str | None:
+    """Une valeur que le diagnostic a déjà calculée, lue dans les lignes de l'étape ``cle``."""
+    expression = re.compile(motif)
+    for etape in etapes:
+        if etape.remede is None or etape.remede.cle != cle:
+            continue
+        for ligne in etape.remede.lignes:
+            if (m := expression.search(ligne)) is not None:
+                return m.group(1)
+    return None
+
+
+def composants_du_profil(profil: str) -> list[str]:
+    """Les composants du playbook que couvre un profil, dans l'ordre du playbook."""
+    return [c for c in _ORDRE if c in {_COMPOSANTS[k] for k in PROFILS[profil] if k in _COMPOSANTS}]
+
+
+def variables_du_poste(etapes: list[Etape], utilisateur: str, profil: str = "socle") -> dict[str, object]:
+    """Les variables passées au playbook : ses composants, et le compte de l'apprenant.
+
+    Les composants sont ceux des étapes à faire PLUS tout le profil : un pool
+    ou des groupes qui « attendent libvirt » ne comptent pas encore comme à
+    faire, et sans le profil il fallait relancer --fix (mesuré le 2026-11-19 sur
+    Ubuntu 24.04 : playbook joué avec git et kvm seulement). Le playbook étant
+    idempotent, ce qui est déjà en place n'est pas modifié.
+
+    Le pool et les groupes ne sont pas redevinés : ce sont ceux que le
+    diagnostic a calculés pour ce poste et ce catalogue, et qu'il affiche.
     """
     if not _COMPTE.match(utilisateur):
-        msg = f"refusing an unusual account name in a root command: {utilisateur!r}"
+        msg = f"refusing an unusual account name for the workstation playbook: {utilisateur!r}"
         raise ValueError(msg)
-    jouees = []
-    for ligne in lignes:
-        sans_sudo = _SUDO.sub(lambda m: m.group(1), ligne)
-        sans_question = _INSTALL.sub(lambda m: f"{m.group(0)} -y", sans_sudo)
-        jouees.append(sans_question.replace("$USER", utilisateur))
-    return "\n".join(["set -e", *jouees]) + "\n"
-
-
-def playbook_du_poste(etapes: list[Etape], utilisateur: str) -> str:
-    """Le playbook qui joue les étapes root, une tâche par étape, dans l'ordre.
-
-    Généré depuis la table des remèdes, jamais écrit à la main : ce qu'il joue
-    est exactement ce que ``doctor`` affiche, aux trois transformations près de
-    :func:`lignes_root`.
-    """
-    taches = []
-    for etape in etapes:
-        assert etape.remede is not None
-        taches.append({
-            "name": f"{etape.numero}. {etape.cle}",
-            "ansible.builtin.shell": lignes_root(etape.remede.lignes, utilisateur),
-            "args": {"executable": "/bin/bash"},
-            "environment": {"DEBIAN_FRONTEND": "noninteractive"},
-            "tags": [etape.remede.tag or etape.cle],
-        })
-    jeu = [{
-        "name": "dsoxlab doctor --fix",
-        "hosts": "localhost",
-        "gather_facts": False,
-        "become": True,
-        # Sans cette variable, Ansible avertit qu'il a « découvert » python3 :
-        # vrai, sans objet ici, et c'est la seule ligne jaune que l'apprenant
-        # voyait (réévaluation du 2026-11-16 sur AlmaLinux 10).
-        "vars": {"ansible_python_interpreter": "auto_silent"},
-        "tasks": taches,
-    }]
-    return yaml.safe_dump(jeu, sort_keys=False, allow_unicode=True, width=1000)
-
-
-def chemin_du_playbook() -> Path:
-    base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    return base / "dsoxlab" / "poste.yml"
+    voulus = set(composants(etapes)) | set(composants_du_profil(profil))
+    variables: dict[str, object] = {
+        "composants": [c for c in _ORDRE if c in voulus], "utilisateur": utilisateur,
+    }
+    if (pool := _valeur(etapes, "libvirt_pool", r"pool-define-as\s+(\S+)")) is not None:
+        variables["pool"] = pool
+    if (groupes := _valeur(etapes, "groupes", r"usermod -aG\s+(\S+)\s+\$USER")) is not None:
+        variables["groupes"] = groupes.split(",")
+    return variables
 
 
 # ── revérification ────────────────────────────────────────────────────────────

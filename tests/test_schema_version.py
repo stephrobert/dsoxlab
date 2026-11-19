@@ -73,7 +73,7 @@ def _catalogue(racine: Path, lab: str = LAB_VALIDE, meta: str = META_VALIDE) -> 
     tests.mkdir(parents=True)
     (dossier / "lab.yaml").write_text(lab, encoding="utf-8")
     (dossier / "README.md").write_text("# Demo\n", encoding="utf-8")
-    (dossier / "scenario.md").write_text("# Scenario\n", encoding="utf-8")
+    (dossier / "challenge" / "README.md").write_text("# Challenge\n", encoding="utf-8")
     (tests / "test_functional.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
     return dossier
 

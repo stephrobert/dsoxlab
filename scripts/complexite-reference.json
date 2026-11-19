@@ -27,7 +27,7 @@
       "lignes": 121
     },
     "src/dsoxlab/infra/ansible.py::run_playbook": {
-      "cognitive": 49,
+      "cognitive": 48,
       "profondeur": 4,
       "lignes": 202
     },

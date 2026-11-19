@@ -180,7 +180,7 @@ STRINGS: dict[str, str] = {
     "cmd_course_help":    "Affiche une section du cours, ou le sommaire si aucune section n'est précisée.",
     "cmd_course_arg":    "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_course_opt_section": "Section à afficher : numéro (1, 2 …) ou identifiant (navigation, permissions …).",
-    "cmd_course_list":   "Liste tous les labs et indique si un cours (scenario.md) est disponible.",
+    "cmd_course_list":   "Liste tous les labs et indique si un cours (README.md) est disponible.",
     "course_toc_title":  "Cours : {title}",
     "course_toc_col_n":  "#",
     "course_toc_col_id": "ID section",
@@ -204,7 +204,7 @@ STRINGS: dict[str, str] = {
         "Le fichier de tests n'est pas du Python valide : rien n'a pu être compté, "
         "et pytest ne le chargera pas davantage : {raison}",
     "audit_cours_absent":
-        "Aucun cours (scenario.md ou README.md) : la mission arrive sans rien pour la préparer.",
+        "Aucun cours (README.md) : la mission arrive sans rien pour la préparer.",
     "audit_cours_indivisible":
         "{lignes} lignes de cours que même le découpage automatique n'ouvre pas : "
         "ajouter des titres, ou un course.yaml.",
@@ -464,7 +464,7 @@ STRINGS: dict[str, str] = {
         "écrits :\n"
         "  dsoxlab list-labs\n"
         "  dsoxlab validate-structure\n"
-        "Remplis ensuite scenario.md, puis challenge/tests/test_functional.py.",
+        "Remplis ensuite challenge/README.md, puis challenge/tests/test_functional.py.",
     "scaffold_id_invalide":
         "« {name} » ne peut pas servir d'identifiant : minuscules, chiffres, "
         "point, tiret et souligné seulement.",
@@ -996,11 +996,14 @@ Chaque lab déclare :
                        composant dont ce dépôt n'a pas besoin reste facultatif
                        et ne s'affiche jamais en erreur.
     [dim]--fix[/dim]                Affiche le plan, puis le lance une fois confirmé : les
-                       étapes sans sudo par dsoxlab, celles avec sudo par un seul
-                       ansible-playbook qui demande votre mot de passe une fois.
+                       étapes sans sudo par dsoxlab, celles avec sudo par le
+                       playbook du poste livré avec dsoxlab, joué une seule fois,
+                       qui demande votre mot de passe une fois.
                        Chaque étape est revérifiée ; le premier échec arrête tout.
     [dim]--yes[/dim]                Lance le plan sans demander (nécessaire sans terminal).
     [dim]--clients[/dim]            Avec --fix, installe aussi Docker et Incus facultatifs.
+    [dim]--all[/dim]                Avec --fix, installe tous les composants pris en charge :
+                       KVM, Docker, Incus, Terraform, Ansible et ses collections.
     [dim]-v[/dim]                   Chaque contrôle, et les mises en garde des lignes vertes.
     [dim]--json[/dim]               Le diagnostic en document, chaque contrôle portant
                        une clé et un état stables. Pas avec [bold]--fix[/bold].
@@ -1238,13 +1241,13 @@ hors ligne, elle se tait.
     "lab_session_ended":  "Session terminée pour [bold]{lab_id}[/bold]. Retour à votre répertoire d'origine.",
     "lab_session_ended_local": "Session terminée pour [bold]{lab_id}[/bold]. Votre travail est conservé : relancez [bold]dsoxlab check[/bold] quand vous voulez.",
     "no_active_lab":      "Aucun lab actif en session. Exécutez [bold]dsoxlab run <id>[/bold] d'abord, ou passez l'identifiant explicitement.",
-    "course_missing":      "Aucun fichier scenario.md trouvé pour ce lab.",
+    "course_missing":      "Aucun cours pour ce lab : README.md manque.",
     "course_tip":          "Challenge prêt : dsoxlab challenge {id}",
     "course_list_title":   "Cours disponibles",
     "course_list_col_id":  "Lab ID",
     "course_list_col_title": "Titre",
     "course_list_col_status": "Cours",
-    "challenge_missing":   "Aucun fichier challenge/README.md trouvé pour ce lab.",
+    "challenge_missing":   "Ce lab n’a pas d’énoncé : challenge/README.md manque.",
     "challenge_workdir":   "Répertoire de travail : {path}",
 
     # ── hint ──────────────────────────────────────────────────────────────────
@@ -1356,6 +1359,9 @@ hors ligne, elle se tait.
     "struct_forbidden_shell_sh":
         "runtime/shell.sh interdit. La préparation se déclare par "
         "runtime.workdir et runtime.fixtures.",
+    "struct_forbidden_scenario":
+        "scenario.md ne fait plus partie d'un lab : la situation et la mission "
+        "vont toutes deux dans challenge/README.md (et README.fr.md).",
     "struct_forbidden_makefile":
         "Makefile interdit dans un lab : dsoxlab pilote tout.",
 
@@ -1831,10 +1837,14 @@ hors ligne, elle se tait.
         "puis `dsoxlab doctor --fix` pour agir dessus.",
     "opt_doctor_yes": 'Avec --fix : lancer le plan sans demander de confirmation',
     "opt_doctor_clients": 'Avec --fix : installer aussi les composants facultatifs (Docker, Incus)',
+    "opt_doctor_all": 'Avec --fix : installer tous les composants pris en charge (KVM, Docker, Incus, Terraform, Ansible)',
+    "doctor_profil_sans_fix": '--clients et --all choisissent seulement ce que --fix installe : ajoutez --fix.',
+    "fix_plan_composants": 'Composants du playbook : {composants} (ce qui est déjà en place n\'est pas modifié)',
     "opt_doctor_verbose": 'Montrer chaque contrôle, et les mises en garde des lignes vertes',
     "fix_plan_titre": 'Plan : {count} étape(s). Chacune est revérifiée juste après ; arrêt au premier échec.',
     "fix_plan_sans_sudo": 'Sans sudo, lancées par dsoxlab :',
-    "fix_plan_root": 'Avec sudo, par le playbook du poste (ansible-playbook vous demandera votre mot de passe sudo une fois) :',
+    "fix_plan_root": 'Avec sudo, par le playbook du poste (votre mot de passe sudo est demandé une fois) :',
+    "fix_mot_de_passe_sudo": 'Mot de passe sudo (demandé une fois, jamais conservé) : ',
     "fix_plan_reconnexion": '(reconnexion nécessaire ensuite)',
     "fix_plan_manuelles": 'À faire vous-même (jamais lancé automatiquement) :',
     "fix_plan_a_savoir": 'Non traité : {label} (voir « À savoir »).',
@@ -1843,7 +1853,7 @@ hors ligne, elle se tait.
     "fix_confirmer": 'Lancer ces {count} étape(s) ?',
     "fix_annule": "Rien n'a été lancé.",
     "fix_pas_d_ansible": "ansible-playbook n'est pas disponible : les étapes avec sudo sont affichées ci-dessous, à coller dans un terminal.",
-    "fix_playbook": 'Playbook du poste écrit dans {path}',
+    "fix_playbook": 'Playbook du poste : {path}',
     "fix_etape_ok": '{step}. {label} : fait, revérifié.',
     "fix_etape_ko": '{step}. {label} : échec (code {code}).',
     "fix_etape_non_verifiee": "{step}. {label} : la commande a réussi, mais le contrôle n'est toujours pas vert.",

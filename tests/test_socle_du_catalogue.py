@@ -230,15 +230,15 @@ def test_un_lab_cree_est_bilingue(catalogue: Path) -> None:
     creer_lab("premier", catalogue, runtime="shell")
     base = catalogue / "labs" / "premier"
 
-    for nom in ("README.md", "README.fr.md", "scenario.md", "scenario.fr.md",
-                "lab.yaml", "lab.fr.yaml"):
+    for nom in ("README.md", "README.fr.md", "challenge/README.md",
+                "challenge/README.fr.md", "lab.yaml", "lab.fr.yaml"):
         assert (base / nom).is_file(), f"{nom} manque"
 
 
 def test_le_fichier_sans_suffixe_est_en_anglais(catalogue: Path) -> None:
     """La convention réserve le fichier sans suffixe à l'anglais.
 
-    Les gabarits étaient écrits en FRANÇAIS dans `README.md` et `scenario.md` :
+    Les gabarits étaient écrits en FRANÇAIS dans `README.md` et l'énoncé :
     un auteur qui remplissait les blancs produisait un catalogue dont l'anglais
     était du français.
     """
@@ -247,8 +247,9 @@ def test_le_fichier_sans_suffixe_est_en_anglais(catalogue: Path) -> None:
 
     assert "TO FILL IN" in (base / "README.md").read_text(encoding="utf-8")
     assert "À remplir" in (base / "README.fr.md").read_text(encoding="utf-8")
-    assert "TO FILL IN" in (base / "scenario.md").read_text(encoding="utf-8")
-    assert "À remplir" in (base / "scenario.fr.md").read_text(encoding="utf-8")
+    assert "TO FILL IN" in (base / "challenge" / "README.md").read_text(encoding="utf-8")
+    assert "À remplir" in (base / "challenge" / "README.fr.md").read_text(encoding="utf-8")
+    assert not (base / "scenario.md").exists(), "scenario.md a quitté le contrat"
 
 
 def test_un_lab_cree_entre_dans_une_section(catalogue: Path) -> None:

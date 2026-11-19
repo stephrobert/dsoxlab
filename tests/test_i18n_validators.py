@@ -91,7 +91,7 @@ def _catalogue_casse(racine: Path) -> Path:
     """Un dépôt qui rate tout ce que `validate-structure` sait voir.
 
     `skills` vide et `lab_type` hors énuméré pour les métadonnées, un
-    `scenario.md` absent pour la structure, un lien relatif mort et une
+    `challenge/README.md` absent pour la structure, un lien relatif mort et une
     traduction orpheline pour le contenu.
     """
     (racine / "meta.yml").write_text(META, encoding="utf-8")
@@ -134,7 +134,7 @@ def test_les_trois_familles_de_controles_suivent_la_langue(
     francais = _valide(tmp_path, "fr", monkeypatch)
 
     for cle in (
-        "struct_missing_file",          # scenario.md absent
+        "struct_missing_file",          # challenge/README.md absent
         "metadata_list_empty",          # skills: []
         "metadata_lab_type_invalid",    # lab_type: inconnu
         "content_broken_links",         # ./absent.md

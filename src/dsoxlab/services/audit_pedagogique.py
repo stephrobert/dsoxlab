@@ -349,9 +349,11 @@ class RapportPedagogique:
 def _mission(lab: LabDefinition, lang: str) -> str:
     """Ce qui dit à l'apprenant quel travail produire, où qu'il soit écrit.
 
-    Deux dispositions coexistent dans les catalogues, et le contrat les permet
-    toutes les deux : il exige `README.md`, `scenario.md` et les tests, **pas**
-    `challenge/README.md`. `ansible` et `linux` écrivent la mission dans ce
+    Depuis le 2026-11-19, le contrat exige `challenge/README.md` et refuse
+    `scenario.md` : la mission n'a plus qu'un endroit. Le repli sur le cours
+    reste pour un catalogue pas encore migré. Avant, deux dispositions
+    coexistaient : le contrat exigeait `README.md`, `scenario.md` et les tests,
+    **pas** `challenge/README.md`. `ansible` et `linux` écrivent la mission dans ce
     dernier ; `kubernetes` l'écrit dans son `scenario.md`, sous « What is
     expected of you », et ses labs sont parmi les mieux tenus du lot.
 
@@ -374,7 +376,10 @@ def _tests(lab: LabDefinition) -> str:
 
 def _cours(lab: LabDefinition, lang: str) -> str:
     morceaux: list[str] = []
-    for nom in ("scenario.md", "README.md"):
+    # La leçon seule : la mission vit dans `challenge/README.md` et se lit à
+    # part (`_mission`). `scenario.md`, qui tenait la situation, a quitté le
+    # contrat le 2026-11-19.
+    for nom in ("README.md",):
         tige, suffixe = nom.rsplit(".", 1)
         for candidat in (f"{tige}.{lang}.{suffixe}", nom):
             chemin = lab.path / candidat

@@ -503,7 +503,7 @@ Before a lab is merged:
 ## Everything user-facing is bilingual
 
 The statement exists in English and in French: `README.md` and `README.fr.md`,
-`scenario.md` and `scenario.fr.md`, `lab.yaml` and `lab.fr.yaml`.
+`challenge/README.md` and `challenge/README.fr.md`, `lab.yaml` and `lab.fr.yaml`.
 
 Assertion messages are a special case: the contract imposes a single file name,
 `challenge/tests/test_functional.py`, so there is no English version by
@@ -554,7 +554,7 @@ Avant qu'un lab soit fusionné :
 ## Tout ce qui s'affiche est bilingue
 
 L'énoncé existe en anglais et en français : `README.md` et `README.fr.md`,
-`scenario.md` et `scenario.fr.md`, `lab.yaml` et `lab.fr.yaml`.
+`challenge/README.md` et `challenge/README.fr.md`, `lab.yaml` et `lab.fr.yaml`.
 
 Les messages d'assertion sont un cas à part : le contrat impose un nom de
 fichier unique, `challenge/tests/test_functional.py`, donc il n'y a pas de
@@ -1350,7 +1350,7 @@ def test_parite_des_langues() -> None:
     boiteux = []
     for lab in _labs():
         base = lab.parent
-        for nom in ("README", "scenario"):
+        for nom in ("README", "challenge/README"):
             en = base / f"{nom}.md"
             fr = base / f"{nom}.fr.md"
             if en.is_file() != fr.is_file():
@@ -1384,7 +1384,7 @@ import sys
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent.parent
 CADRATIN = "\\u2014"
-MOTIFS = ("README.fr.md", "scenario.fr.md", "lab.fr.yaml", "hints.yaml")
+MOTIFS = ("README.fr.md", "lab.fr.yaml", "hints.yaml")
 
 
 def main() -> int:
