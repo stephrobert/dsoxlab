@@ -158,6 +158,17 @@ infra_app = typer.Typer(
 )
 app.add_typer(infra_app, name="infra")
 
+# ── Sous-application 'vm' ─────────────────────────────────────────────────────
+
+vm_app = typer.Typer(
+    name="vm",
+    help=_("cmd_vm_help"),
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+    cls=_I18nGroup,
+)
+app.add_typer(vm_app, name="vm")
+
 # ── Sous-application 'new' ────────────────────────────────────────────────────
 
 new_app = typer.Typer(

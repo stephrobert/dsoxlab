@@ -61,6 +61,10 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab support` | Produit un rapport de diagnostic anonymisé, à coller dans une issue. |
 | `dsoxlab use` | Définit le contexte actif (section et/ou niveau par défaut). Utilisez --reset pour l'effacer. |
 | `dsoxlab validate-structure` | Vérifie la structure et les métadonnées de tous les labs. |
+| `dsoxlab vm create` | Crée une VM et rend la main quand elle répond en SSH. Aucun fichier à écrire. |
+| `dsoxlab vm destroy` | Détruit une VM et tout ce qui a été créé pour elle. |
+| `dsoxlab vm list` | Les VM créées par vm create, avec leur taille et leur adresse. |
+| `dsoxlab vm ssh` | Ouvre une session SSH sur une VM. |
 
 <!-- END COMMANDES -->
 

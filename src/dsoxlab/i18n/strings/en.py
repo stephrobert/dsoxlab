@@ -1060,6 +1060,18 @@ Each lab declares:
 
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
 
+  [cyan]vm create <name>[/cyan]     A VM in one command, without a meta.yml: dsoxlab writes
+                       the one-host stack itself, picks a free subnet, creates
+                       the key, then provisions. Returns once the VM answers
+                       over SSH.
+    [dim]--distro[/dim]             ubuntu24 by default; alma10, debian13, ubuntu26…
+    [dim]--ram --cpu --disk[/dim]   Size: 2048 MB, 2 vCPU, 20 GB by default.
+    [dim]--extra-disk[/dim]         A second empty disk (/dev/vdb), in GB.
+    [dim]--provider[/dim]           kvm or incus; kvm if available, else incus.
+  [cyan]vm ssh <name>[/cyan]        Open a session on the VM.
+  [cyan]vm list[/cyan]              The VMs created this way, with their size and address.
+  [cyan]vm destroy <name>[/cyan]    Destroy the VM, then remove its files: nothing is left.
+
   [cyan]destroy[/cyan]              Tear down the infrastructure for vm labs (terraform destroy),
                        then remove, after confirmation, the machines a failed
                        provisioning left defined outside the Terraform state.
@@ -2372,4 +2384,79 @@ silent.
     'sync_corps_trop_gros':
         'The request body weighs {taille} bytes, above the {max} allowed.',
 
+    # ── vm : une VM en une commande (#401) ─────────────────────────────────
+    'cmd_vm_help':
+        'One-command VMs, without a meta.yml: create, ssh, list, destroy.',
+    'cmd_vm_create_help':
+        'Create a VM and return once it answers over SSH. No file to write.',
+    'cmd_vm_ssh_help':
+        'Open an SSH session on a VM.',
+    'cmd_vm_list_help':
+        'The VMs created by vm create, with their size and address.',
+    'cmd_vm_destroy_help':
+        'Destroy a VM and everything created for it.',
+    'arg_vm_nom':
+        'VM name: lowercase letters, digits and dashes. It becomes <name>.lab.',
+    'opt_vm_distro':
+        'Distribution.',
+    'opt_vm_ram':
+        'Memory, in MB.',
+    'opt_vm_cpu':
+        'Number of vCPUs.',
+    'opt_vm_disk':
+        'System disk size, in GB.',
+    'opt_vm_extra_disk':
+        'Size of a second empty disk (/dev/vdb), in GB. 0: none.',
+    'opt_vm_provider':
+        'kvm or incus. Default: kvm if available, else incus.',
+    'vm_nom_refuse':
+        '« {nom} » cannot be a VM name: lowercase letters, digits and dashes only, starting with a letter, 32 characters at most.',
+    'vm_inconnue':
+        'No VM named « {nom} ».',
+    'vm_connues':
+        'Known VMs: {noms}',
+    'vm_distro_inconnue':
+        'Unknown distribution « {distro} ». Available: {distros}.',
+    'vm_aucun_hyperviseur':
+        'No hypervisor found on this machine: neither KVM (virsh and /dev/kvm) nor Incus.',
+    'vm_aucun_hyperviseur_suite':
+        'dsoxlab doctor --fix installs KVM and libvirt.',
+    'vm_provider_inconnu':
+        'Provider « {provider} » cannot create a VM here. Available: {providers}.',
+    'vm_existe_deja':
+        'A VM named « {nom} » already exists ({dossier}).',
+    'vm_existe_deja_suite':
+        'To connect: dsoxlab vm ssh {nom}. To start over: dsoxlab vm destroy {nom}.',
+    'vm_machine_deja_la':
+        'A machine named « {machine} » already exists in {provider}, created by something else (a catalog?). Pick another name.',
+    'vm_aucun_sous_reseau':
+        'No free subnet left between 10.10.100.0/24 and 10.10.199.0/24.',
+    'vm_cle_echouee':
+        'The VM SSH key could not be created: {sortie}',
+    'vm_creation':
+        'VM {nom}: {distro}, {ram} MB, {cpu} vCPU, {disk} GB, on {provider}, network {cidr}.',
+    'vm_echec_suite':
+        'Some resources may already exist. To remove them: dsoxlab vm destroy {nom}',
+    'vm_prete':
+        'VM {nom} is ready ({ip}).',
+    'vm_prete_suite':
+        'Connect: dsoxlab vm ssh {nom}, or ssh {fqdn}.',
+    'vm_aucune':
+        'No VM created with dsoxlab vm create.',
+    'vm_titre_liste':
+        'VMs',
+    'vm_col_nom':
+        'Name',
+    'vm_col_provider':
+        'Provider',
+    'vm_col_distro':
+        'Distribution',
+    'vm_col_taille':
+        'Size',
+    'vm_col_adresse':
+        'Address',
+    'vm_taille':
+        '{ram} MB · {cpu} vCPU · {disk} GB',
+    'vm_detruite':
+        'VM {nom} destroyed, and its files removed.',
 }
