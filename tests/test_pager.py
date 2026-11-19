@@ -41,10 +41,32 @@ def test_defaults_to_less_with_raw_control_chars(
     assert _pager_command() == ["less", "-F", "-X", "-R"]
 
 
-def test_un_pager_choisi_ne_recoit_que_r(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`-F` et `-X` sont un défaut, pas une contrainte imposée à l'utilisateur."""
+def test_un_pager_choisi_pour_dsoxlab_ne_recoit_que_r(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`DSOXLAB_PAGER` est un choix fait pour dsoxlab : il est pris tel quel."""
     monkeypatch.setenv("DSOXLAB_PAGER", "less")
     assert _pager_command() == ["less", "-R"]
+
+
+def test_un_pager_less_du_systeme_recoit_f_et_x(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le cas de la machine qui a signalé le défaut : `PAGER=less`, `LESS=-R`.
+
+    La 0.9.10 ne lui ajoutait que `-R`, et la page s'effaçait encore au `q`.
+    """
+    monkeypatch.delenv("DSOXLAB_PAGER", raising=False)
+    monkeypatch.setenv("PAGER", "less")
+    assert _pager_command() == ["less", "-F", "-X", "-R"]
+
+
+def test_une_option_deja_donnee_n_est_pas_doublee(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DSOXLAB_PAGER", raising=False)
+    monkeypatch.setenv("PAGER", "less --no-init -R")
+    assert _pager_command() == ["less", "--no-init", "-R", "-F"]
+
+
+def test_un_autre_pager_que_less_est_pris_tel_quel(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DSOXLAB_PAGER", raising=False)
+    monkeypatch.setenv("PAGER", "bat --plain")
+    assert _pager_command() == ["bat", "--plain"]
 
 
 def test_pager_env_is_honoured(monkeypatch: pytest.MonkeyPatch) -> None:

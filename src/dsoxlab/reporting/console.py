@@ -90,20 +90,34 @@ def _pager_command() -> list[str]:
     """La commande de pagination, dans l'ordre des préférences déclarées.
 
     ``DSOXLAB_PAGER`` prime sur ``PAGER`` pour qu'un apprenant puisse régler
-    la lecture des cours sans toucher au pager de tout son système. Faute
-    des deux, ``less -FXR`` ; ``-R`` est toujours ajouté : sans lui, les couleurs de Rich s'affichent en
+    la lecture des cours sans toucher au pager de tout son système. ``-R`` est
+    toujours ajouté à ``less`` : sans lui, les couleurs de Rich s'affichent en
     séquences d'échappement brutes et le cours devient illisible.
+
+    ``-F`` et ``-X`` sont ajoutés à ``less`` sauf si la commande vient de
+    ``DSOXLAB_PAGER`` : `-X` laisse le texte lu dans le terminal quand on quitte
+    avec `q` (sans lui, `less` l'affiche dans un écran secondaire qu'il efface
+    en sortant, et l'apprenant perd la commande qu'il allait taper), `-F` rend
+    la main tout de suite si tout tient sur un écran (issue #396).
+
+    Un ``PAGER=less`` vaut pour tout le système : ce n'est pas un choix fait
+    pour lire les cours. La 0.9.10 le respectait à la lettre, et c'était le cas
+    de la machine même qui avait signalé le défaut : la page s'effaçait encore.
+    Seul ``DSOXLAB_PAGER``, réglé exprès pour dsoxlab, est pris tel quel.
     """
-    raw = os.environ.get("DSOXLAB_PAGER") or os.environ.get("PAGER") or ""
-    # Faute de réglage, `less -RFX` : `-X` laisse le texte lu dans le terminal
-    # quand on quitte avec `q` (sans lui, `less` l'affiche dans un écran
-    # secondaire qu'il efface en sortant, et l'apprenant perd la commande qu'il
-    # allait taper), et `-F` rend la main tout de suite si tout tient sur un
-    # écran (issue #396). Un pager choisi par l'utilisateur ne reçoit que `-R`.
-    parts = shlex.split(raw) if raw.strip() else ["less", "-F", "-X"]
-    if Path(parts[0]).name == "less" and not any(
+    propre = os.environ.get("DSOXLAB_PAGER") or ""
+    raw = propre or os.environ.get("PAGER") or ""
+    parts = shlex.split(raw) if raw.strip() else ["less"]
+    if Path(parts[0]).name != "less":
+        return parts
+    options = parts[1:]
+    if not propre:
+        for option, longues in (("-F", ("--quit-if-one-screen",)), ("-X", ("--no-init",))):
+            if option not in options and not any(o in options for o in longues):
+                parts.append(option)
+    if not any(
         arg in ("-R", "-r", "--RAW-CONTROL-CHARS", "--raw-control-chars")
-        for arg in parts[1:]
+        for arg in options
     ):
         parts.append("-R")
     return parts
