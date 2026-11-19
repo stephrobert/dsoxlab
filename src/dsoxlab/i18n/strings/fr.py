@@ -1300,6 +1300,10 @@ hors ligne, elle se tait.
     "confirm_clean": "Supprimer les ressources du lab {lab_id} ?",
     "confirm_reset": "Réinitialiser le lab {lab_id} ? Le travail en cours est perdu.",
     "cleaning":      "Nettoyage de [bold]{lab_id}[/bold]…",
+    "check_lab_nettoye":
+        "{lab_id} a été nettoyé : dsoxlab clean a remis la machine dans l'état "
+        "dont les autres labs ont besoin, il n'y a donc plus de travail à "
+        "noter. Relancez d'abord le lab : dsoxlab run {lab_id}",
     "clean_done":    "Nettoyage terminé.",
 
     # ── validate-structure ────────────────────────────────────────────────────

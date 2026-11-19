@@ -1278,6 +1278,10 @@ silent.
     "confirm_clean": "Delete resources for lab {lab_id}?",
     "confirm_reset": "Reset lab {lab_id}? Your work in progress is lost.",
     "cleaning":      "Cleaning [bold]{lab_id}[/bold]…",
+    "check_lab_nettoye":
+        "{lab_id} has been cleaned: dsoxlab clean put the machine back in the "
+        "state the other labs need, so there is no work left to grade. Start "
+        "the lab again first: dsoxlab run {lab_id}",
     "clean_done":    "Clean complete.",
 
     # ── validate-structure ────────────────────────────────────────────────────

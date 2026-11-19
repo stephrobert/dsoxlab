@@ -89,6 +89,19 @@ logger = logging.getLogger(__name__)
 
 # ── check ─────────────────────────────────────────────────────────────────────
 
+def _refuser_si_nettoye(root: Path, lab: LabDefinition) -> None:
+    """Pas de note pour un lab que `clean` a défait (voir `marquer_nettoye`).
+
+    Sort en 2, comme un `run` qui n'a pas pu préparer le lab : rien n'a été
+    mesuré, et ce n'est pas un échec de l'apprenant.
+    """
+    from ..services.lab_state import est_nettoye
+
+    if est_nettoye(root, lab.id):
+        error(_("check_lab_nettoye", lab_id=texte_affichable(lab.id)))
+        raise typer.Exit(2)
+
+
 @app.command("check", help=_("cmd_check_help"))
 def check(
     lab_id: Annotated[str | None, typer.Argument(help=_("cmd_check_arg"), autocompletion=_complete_lab_id)] = None,
@@ -99,6 +112,7 @@ def check(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
+    _refuser_si_nettoye(root, lab)
     _dire_si_brouillon(lab, quiet=as_json)
     try:
         result, score, max_score = _run_check(root, lab, target, quiet=as_json)
@@ -299,6 +313,7 @@ def submit(
 ) -> None:
     root = _root(lab_home)
     lab = _resolve_lab(root, lab_id, _lang(root))
+    _refuser_si_nettoye(root, lab)
     _dire_si_brouillon(lab)
     try:
         result, score, max_score = _run_check(root, lab, target)
@@ -778,6 +793,12 @@ def reset(
         else:
             reset_lab(lab, target_name=target)
         reset_hints(root, lab.id)
+        # `reset` repart d'un lab neuf : c'est un nouveau départ, qui efface
+        # aussi la marque d'un `clean` antérieur. Sans lui, `clean` puis
+        # `reset` laissait `check` refuser un lab pourtant prêt.
+        from ..services.lab_state import enregistrer_depart
+
+        enregistrer_depart(root, lab)
         success(_("lab_reset"))
     except Interrupted as exc:
         _interrompu(exc, f"dsoxlab reset {lab.id}")
@@ -818,6 +839,9 @@ def clean(
         else:
             clean_lab(lab, target_name=target)
         _stop_services(lab, root)
+        from ..services.lab_state import marquer_nettoye
+
+        marquer_nettoye(root, lab.id)
         success(_("clean_done"))
     except Interrupted as exc:
         _interrompu(exc, f"dsoxlab clean {lab.id}")

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No grade for a lab that `dsoxlab clean` undid.** `clean` puts the machine
+  back in the state the other labs need, and that state can look like the
+  solution: on `k8s-installer-kubectl`, it reinstalls the base kubectl, so
+  `clean` then `check` gave 83/100 with no work done. `check` and `submit` now
+  refuse a cleaned lab (exit code 2) until `dsoxlab run` or `dsoxlab reset`
+  starts it again. A lab never cleaned stays gradable.
 - **Quitting the pager keeps the page on screen, with a system-wide
   `PAGER=less` too.** 0.9.10 added `-F` and `-X` only when neither
   `DSOXLAB_PAGER` nor `PAGER` was set, and left a user-chosen pager alone. But
