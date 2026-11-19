@@ -60,6 +60,10 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab support` | Produce an anonymised diagnostic report, ready to paste into an issue. |
 | `dsoxlab use` | Sets the active context (section and/or default level). Use --reset to clear it. |
 | `dsoxlab validate-structure` | Check structure and metadata of all labs. |
+| `dsoxlab vm create` | Create a VM and return once it answers over SSH. No file to write. |
+| `dsoxlab vm destroy` | Destroy a VM and everything created for it. |
+| `dsoxlab vm list` | The VMs created by vm create, with their size and address. |
+| `dsoxlab vm ssh` | Open an SSH session on a VM. |
 
 <!-- END COMMANDES -->
 

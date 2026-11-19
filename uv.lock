@@ -331,7 +331,7 @@ wheels = [
 
 [[package]]
 name = "dsoxlab"
-version = "0.9.12"
+version = "0.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "ansible-core" },

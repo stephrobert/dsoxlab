@@ -51,6 +51,34 @@ dsoxlab ssh db.lab       # a shell on a node
 dsoxlab destroy          # including machines left outside the state
 ```
 
+## A single VM, in one command
+
+For a single machine, there is not even a `meta.yml` to write:
+
+```bash
+dsoxlab vm create essai --distro debian13 --ram 4096
+dsoxlab vm ssh essai
+dsoxlab vm list
+dsoxlab vm destroy essai
+```
+
+`vm create` writes the one-host stack of the previous section itself, under
+`~/.local/share/dsoxlab/vms/<name>/`, with its SSH key. It picks a free subnet
+between `10.10.100.0/24` and `10.10.199.0/24`, looking at the host routes and at
+the libvirt and Incus networks, stopped ones included. It then calls the same
+`provision` as for a hand-written `meta.yml`. The VM is named `<name>.lab`, and
+`ssh <name>.lab` also works without dsoxlab.
+
+No option is required: Ubuntu 24.04, 2048 MB, 2 vCPU and 20 GB by default, on
+kvm if it is installed, otherwise on incus. `vm destroy` removes the machine,
+its network and its SSH fragment, then deletes its files. It deletes them only
+if the destruction succeeded, because that directory is then the only handle on
+a VM left running.
+
+The network is named after its subnet (`vm-137` for `10.10.137.0/24`), not after
+the VM: under kvm, the bridge is called `virbr-<network>` and the kernel refuses
+more than 15 characters.
+
 ## What applies, and what does not
 
 | Command | On a stack with no lab |

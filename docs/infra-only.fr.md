@@ -52,6 +52,34 @@ dsoxlab ssh db.lab       # un shell sur un nœud
 dsoxlab destroy          # machines restées hors du state comprises
 ```
 
+## Une seule VM, en une commande
+
+Pour une seule machine, il n'y a même pas de `meta.yml` à écrire :
+
+```bash
+dsoxlab vm create essai --distro debian13 --ram 4096
+dsoxlab vm ssh essai
+dsoxlab vm list
+dsoxlab vm destroy essai
+```
+
+`vm create` écrit lui-même la stack d'un seul hôte, celle de la section
+précédente, sous `~/.local/share/dsoxlab/vms/<nom>/`, avec sa clé SSH. Il choisit
+un sous-réseau libre entre `10.10.100.0/24` et `10.10.199.0/24`, en regardant
+les routes du poste et les réseaux libvirt et Incus, éteints compris. Il appelle
+ensuite le même `provision` que pour un `meta.yml` écrit à la main. La VM
+s'appelle `<nom>.lab`, et `ssh <nom>.lab` marche aussi sans dsoxlab.
+
+Aucune option n'est obligatoire : Ubuntu 24.04, 2048 Mo, 2 vCPU et 20 Go par
+défaut, sur kvm s'il est installé, sinon sur incus. `vm destroy` retire la
+machine, son réseau et son fragment SSH, puis efface ses fichiers. Il ne les
+efface que si la destruction a réussi, parce que ce dossier est alors la seule
+poignée sur une VM restée debout.
+
+Le réseau porte le numéro de son sous-réseau (`vm-137` pour `10.10.137.0/24`),
+et pas le nom de la VM : sous kvm, le pont s'appelle `virbr-<réseau>` et le
+noyau refuse plus de 15 caractères.
+
 ## Ce qui s'applique, et ce qui n'a pas d'objet
 
 | Commande | Sur une stack sans lab |

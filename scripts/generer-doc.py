@@ -154,6 +154,7 @@ from dsoxlab.services import (
     lab_state,
     provenance,
     update_check,
+    vm,
 )
 from dsoxlab.sessions import store
 from dsoxlab.templates import template_root
@@ -215,6 +216,8 @@ with tempfile.TemporaryDirectory() as tmp:
         # Le marqueur du socle : dérivé du code comme les autres, jamais
         # recopié. `meta` porte le `repo.id`, qui namespace ce fichier.
         bootstrap._fichier_etat(meta),
+        # Le dossier d'une VM de `dsoxlab vm create` (#401).
+        vm.dossier_des_vm() / SENTINELLE,
     ))
 
 rendus.update(str(p) for p in maison.rglob("*"))

@@ -55,6 +55,7 @@ from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
     instructeur,
     parcours,
     progression,
+    vm,
 )
 from ._commun import (
     _complete_lab_id,
@@ -95,7 +96,7 @@ _ORDRE_COMMANDES = (
 )
 
 #: Même chose pour les sous-applications.
-_ORDRE_GROUPES = ("new", "instructor", "completion", "catalog", "infra")
+_ORDRE_GROUPES = ("new", "instructor", "completion", "catalog", "infra", "vm")
 
 
 def _rang(nom: str | None, ordre: tuple[str, ...]) -> int:

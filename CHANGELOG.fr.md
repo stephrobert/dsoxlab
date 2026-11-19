@@ -7,6 +7,26 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.10.0] - 2026-11-19
+
+### Ajouté
+
+- **Une VM en une commande, sans `meta.yml` : `dsoxlab vm`** (#401).
+  `dsoxlab vm create essai` crée une VM et rend la main quand elle répond en
+  SSH ; `dsoxlab vm ssh essai` s'y connecte ; `vm list` les montre ;
+  `vm destroy essai` la retire avec tout ce qui a été créé pour elle. Aucune
+  option n'est obligatoire (Ubuntu 24.04, 2048 Mo, 2 vCPU, 20 Go, sur kvm s'il
+  est là, sinon incus), et `--distro`, `--ram`, `--cpu`, `--disk`,
+  `--extra-disk` et `--provider` changent ces valeurs. dsoxlab écrit lui-même
+  la stack d'un seul hôte qu'il fallait écrire à la main
+  (`docs/infra-only.fr.md`), sous `~/.local/share/dsoxlab/vms/<nom>/`, choisit
+  un sous-réseau libre entre `10.10.100.0/24` et `10.10.199.0/24` (routes du
+  poste, réseaux libvirt et Incus éteints compris), puis appelle le même
+  `provision`. Un nom déjà pris, ou déjà porté par une machine de
+  l'hyperviseur, est refusé avant toute création. `vm destroy` n'efface les
+  fichiers de la VM que si la destruction a réussi : ce dossier reste sinon la
+  seule poignée sur une VM restée debout.
+
 ## [0.9.12] - 2026-11-19
 
 ### Corrigé

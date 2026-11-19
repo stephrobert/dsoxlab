@@ -1079,6 +1079,18 @@ Chaque lab déclare :
 
   [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
 
+  [cyan]vm create <nom>[/cyan]      Une VM en une commande, sans meta.yml : dsoxlab écrit
+                       lui-même la stack d'un seul hôte, choisit un sous-réseau
+                       libre, crée la clé, puis provisionne. Rend la main quand
+                       la VM répond en SSH.
+    [dim]--distro[/dim]             ubuntu24 par défaut ; alma10, debian13, ubuntu26…
+    [dim]--ram --cpu --disk[/dim]   Taille : 2048 Mo, 2 vCPU, 20 Go par défaut.
+    [dim]--extra-disk[/dim]         Un second disque vide (/dev/vdb), en Go.
+    [dim]--provider[/dim]           kvm ou incus ; kvm s'il est là, sinon incus.
+  [cyan]vm ssh <nom>[/cyan]         Ouvre une session sur la VM.
+  [cyan]vm list[/cyan]              Les VM créées ainsi, avec leur taille et leur adresse.
+  [cyan]vm destroy <nom>[/cyan]     Détruit la VM, puis efface ses fichiers : rien ne reste.
+
   [cyan]destroy[/cyan]              Détruit l'infrastructure des labs vm (terraform destroy),
                        puis retire, après confirmation, les machines qu'un
                        provisionnement échoué a laissées hors du state
@@ -2429,4 +2441,79 @@ hors ligne, elle se tait.
     'sync_corps_trop_gros':
         'Le corps de la requête pèse {taille} octets, au-delà des {max} permis.',
 
+    # ── vm : une VM en une commande (#401) ─────────────────────────────────
+    'cmd_vm_help':
+        'Des VM en une commande, sans meta.yml : create, ssh, list, destroy.',
+    'cmd_vm_create_help':
+        'Crée une VM et rend la main quand elle répond en SSH. Aucun fichier à écrire.',
+    'cmd_vm_ssh_help':
+        'Ouvre une session SSH sur une VM.',
+    'cmd_vm_list_help':
+        'Les VM créées par vm create, avec leur taille et leur adresse.',
+    'cmd_vm_destroy_help':
+        'Détruit une VM et tout ce qui a été créé pour elle.',
+    'arg_vm_nom':
+        'Nom de la VM : minuscules, chiffres et tirets. Il devient <nom>.lab.',
+    'opt_vm_distro':
+        'Distribution.',
+    'opt_vm_ram':
+        'Mémoire, en Mo.',
+    'opt_vm_cpu':
+        'Nombre de vCPU.',
+    'opt_vm_disk':
+        'Taille du disque système, en Go.',
+    'opt_vm_extra_disk':
+        "Taille d'un second disque vide (/dev/vdb), en Go. 0 : aucun.",
+    'opt_vm_provider':
+        "kvm ou incus. Par défaut : kvm s'il est là, sinon incus.",
+    'vm_nom_refuse':
+        '« {nom} » ne peut pas être un nom de VM : minuscules, chiffres et tirets seulement, en commençant par une lettre, 32 caractères au plus.',
+    'vm_inconnue':
+        "Aucune VM ne s'appelle « {nom} ».",
+    'vm_connues':
+        'VM connues : {noms}',
+    'vm_distro_inconnue':
+        'Distribution « {distro} » inconnue. Disponibles : {distros}.',
+    'vm_aucun_hyperviseur':
+        'Aucun hyperviseur sur ce poste : ni KVM (virsh et /dev/kvm), ni Incus.',
+    'vm_aucun_hyperviseur_suite':
+        'dsoxlab doctor --fix installe KVM et libvirt.',
+    'vm_provider_inconnu':
+        'Le provider « {provider} » ne crée pas de VM ici. Disponibles : {providers}.',
+    'vm_existe_deja':
+        'Une VM « {nom} » existe déjà ({dossier}).',
+    'vm_existe_deja_suite':
+        "Pour s'y connecter : dsoxlab vm ssh {nom}. Pour repartir de zéro : dsoxlab vm destroy {nom}.",
+    'vm_machine_deja_la':
+        'Une machine « {machine} » existe déjà dans {provider}, créée par autre chose (un catalogue ?). Choisissez un autre nom.',
+    'vm_aucun_sous_reseau':
+        'Plus aucun sous-réseau libre entre 10.10.100.0/24 et 10.10.199.0/24.',
+    'vm_cle_echouee':
+        "La clé SSH de la VM n'a pas pu être créée : {sortie}",
+    'vm_creation':
+        'VM {nom} : {distro}, {ram} Mo, {cpu} vCPU, {disk} Go, sur {provider}, réseau {cidr}.',
+    'vm_echec_suite':
+        'Des ressources existent peut-être déjà. Pour les retirer : dsoxlab vm destroy {nom}',
+    'vm_prete':
+        'La VM {nom} est prête ({ip}).',
+    'vm_prete_suite':
+        "Pour s'y connecter : dsoxlab vm ssh {nom}, ou ssh {fqdn}.",
+    'vm_aucune':
+        'Aucune VM créée par dsoxlab vm create.',
+    'vm_titre_liste':
+        'VM',
+    'vm_col_nom':
+        'Nom',
+    'vm_col_provider':
+        'Provider',
+    'vm_col_distro':
+        'Distribution',
+    'vm_col_taille':
+        'Taille',
+    'vm_col_adresse':
+        'Adresse',
+    'vm_taille':
+        '{ram} Mo · {cpu} vCPU · {disk} Go',
+    'vm_detruite':
+        'VM {nom} détruite, et ses fichiers retirés.',
 }
