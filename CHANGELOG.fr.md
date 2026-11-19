@@ -7,6 +7,23 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.9.12] - 2026-11-19
+
+### Corrigé
+
+- **Une machine Ubuntu reçoit ses paquets même quand `archive.ubuntu.com` ne
+  répond plus.** Ce serveur et `security.ubuntu.com` sont tenus par Canonical
+  et tombent ensemble : le 2026-11-19, deux fois dans la journée, ils ne
+  répondaient plus en HTTP alors que le ping passait. cloud-init n'installait
+  alors aucun paquet, et tout `setup.yaml` qui passe par apt échouait sur une
+  machine annoncée prête. Le cloud-init Ubuntu essaie désormais, depuis la
+  machine et au premier démarrage, `archive.ubuntu.com` puis des miroirs
+  nationaux officiels hébergés hors de Canonical (`fr`, `de`, `nl`, `ch`), et
+  fait passer les sources des paquets et de sécurité sur le premier qui
+  répond. Le miroir retenu est noté dans `/var/lib/dsoxlab/miroir-apt`. Si
+  aucun ne répond, rien n'est touché. Les machines déjà provisionnées ne
+  changent pas : il faut les recréer.
+
 ## [0.9.11] - 2026-11-19
 
 ### Corrigé

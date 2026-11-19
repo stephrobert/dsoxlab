@@ -7,6 +7,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.12] - 2026-11-19
+
+### Fixed
+
+- **An Ubuntu machine gets its packages even when `archive.ubuntu.com` stops
+  answering.** That server and `security.ubuntu.com` are run by Canonical and
+  go down together: on 2026-11-19, twice in the day, they no longer answered
+  over HTTP while ping still worked. cloud-init then installed no package, and
+  any `setup.yaml` that goes through apt failed on a machine reported ready.
+  The Ubuntu cloud-init now tries, from the machine and at first boot,
+  `archive.ubuntu.com` then official national mirrors hosted outside
+  Canonical (`fr`, `de`, `nl`, `ch`), and points the package and security
+  sources to the first one that answers. The chosen mirror is written to
+  `/var/lib/dsoxlab/miroir-apt`. If none answers, nothing is changed. Machines
+  already provisioned do not change: they must be recreated.
+
 ## [0.9.11] - 2026-11-19
 
 ### Fixed
