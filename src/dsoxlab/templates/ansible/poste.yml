@@ -251,9 +251,14 @@
     - name: Incus (Debian, Ubuntu)
       when: debian and 'incus' in composants
       block:
-        - name: Installer Incus
+        # Le paquet `incus` seul fait tourner des conteneurs, pas des VM : une
+        # VM Incus démarre sous QEMU, avec le firmware OVMF, et l'agent reçoit
+        # sa configuration sur un disque ISO que fabrique genisoimage. Sans lui,
+        # « Neither mkisofs nor genisoimage could be found » au démarrage de
+        # la première VM (mesuré le 2026-11-19, Ubuntu 24.04, dsoxlab 0.10.0).
+        - name: Installer Incus, et ce qu'il faut pour ses VM
           ansible.builtin.apt:
-            name: incus
+            name: [incus, genisoimage, qemu-system-x86, ovmf]
             state: present
 
         - name: Donner au compte de l'apprenant le groupe incus-admin

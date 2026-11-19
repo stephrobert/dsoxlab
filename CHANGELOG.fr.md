@@ -7,6 +7,23 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.10.1] - 2026-11-19
+
+### Corrigé
+
+- **Une VM Incus démarre après `doctor --fix`.** Le playbook du poste installait
+  le seul paquet `incus`, qui fait tourner des conteneurs : la première VM
+  refusait de démarrer (« Neither mkisofs nor genisoimage could be found »),
+  alors que `doctor` venait d'annoncer Incus « fait, revérifié ». Il installe
+  désormais aussi `genisoimage`, `qemu-system-x86` et `ovmf`, et le remède
+  affiché dit les mêmes paquets.
+  Et `doctor` vérifie l'outil ISO dès qu'Incus répond, même sans catalogue :
+  le démon répondait, et rien ne voyait qu'aucune VM ne pourrait démarrer.
+- **Sans catalogue, `doctor` prépare le poste de `dsoxlab vm`.** Dès qu'un
+  hyperviseur local répond, Terraform et la ligne `Include` de
+  `~/.ssh/config` sont requis : `doctor --fix` les pose, au lieu de laisser
+  `vm create` découvrir après coup que `ssh <nom>.lab` ne marchera pas.
+
 ## [0.10.0] - 2026-11-19
 
 ### Ajouté

@@ -137,6 +137,10 @@ _COMPOSANTS: dict[str, str] = {
     "efi": "efi",
     "docker": "docker",
     "incus": "incus",
+    # L'outil ISO des VM Incus : le composant `incus` du playbook installe
+    # genisoimage. Sans cette entrée, `doctor --fix` levait « root step without a
+    # playbook component » dès que le contrôle était rouge (2026-11-19).
+    "iso_tool": "incus",
     "terraform": "terraform",
 }
 

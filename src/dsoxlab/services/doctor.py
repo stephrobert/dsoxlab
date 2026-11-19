@@ -520,6 +520,18 @@ def collect_checks(
     report.provider = ctx.active if ctx.needs_vm else ""
     if ctx.needs_vm:
         _ranger_outillage_vm(report, ctx, hypervisors)
+    elif repo_meta is None and any(hypervisors[h].ok for h in _LOCAL_HYPERVISORS):
+        # Sans catalogue, un hyperviseur qui marche, c'est le poste de `dsoxlab
+        # vm` (#401) : `vm create` provisionne par Terraform et écrit un fragment
+        # SSH. Sans ces deux contrôles, `doctor --fix` laissait Terraform absent
+        # et `ssh <nom>.lab` muet, et `vm create` le découvrait après coup.
+        report.required.append(_check_terraform())
+        report.required.append(_check_ssh_include())
+        # Le démon Incus répond avec le seul paquet `incus`, mais une VM ne
+        # démarre pas sans outil ISO : sans ce contrôle, `doctor --fix --all`
+        # jugeait Incus vert et ne posait jamais genisoimage (2026-11-19).
+        if hypervisors["incus"].ok:
+            report.required.append(_check_iso_tool())
 
     report.required.append(_check_labs(
         root, labs, compter_fichiers_labs(root), infra_declaree=declare_des_hotes,

@@ -7,6 +7,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-11-19
+
+### Fixed
+
+- **An Incus VM starts after `doctor --fix`.** The workstation playbook
+  installed the `incus` package alone, which runs containers: the first VM
+  refused to start ("Neither mkisofs nor genisoimage could be found"), right
+  after `doctor` had reported Incus "done, checked again". It now also installs
+  `genisoimage`, `qemu-system-x86` and `ovmf`, and the remedy shown names the
+  same packages.
+  And `doctor` checks the ISO tool as soon as Incus answers, even without a
+  catalog: the daemon answered, and nothing saw that no VM could start.
+- **Without a catalog, `doctor` prepares the `dsoxlab vm` workstation.** As
+  soon as a local hypervisor answers, Terraform and the `Include` line of
+  `~/.ssh/config` are required: `doctor --fix` sets them up, instead of letting
+  `vm create` find out afterwards that `ssh <name>.lab` will not work.
+
 ## [0.10.0] - 2026-11-19
 
 ### Added
