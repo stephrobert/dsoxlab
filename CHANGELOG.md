@@ -7,6 +7,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-11-21
+
+### Added
+
+- **`infra stop`, `infra pause` and `infra start`: stop a catalog's machines
+  without destroying them** (issue #405). dsoxlab could create machines
+  (`provision`) and delete them with their disks (`destroy`), but not stop
+  them: freeing the host's memory meant a hand-written `virsh` loop, or a
+  `destroy` followed by a full `provision`.
+  - `infra stop` shuts the guests down cleanly and waits for them (120 s by
+    default, `--timeout`). Disks are kept and memory is freed. A machine still
+    running after the timeout is reported and the command exits with 1;
+    `--force` then cuts its power (`virsh destroy`, `incus stop --force`),
+    which deletes nothing.
+  - `infra pause` freezes the machines: the CPU is freed, the memory is not.
+  - `infra start` starts stopped machines and resumes frozen ones.
+  - Only the hosts this `meta.yml` declares (common and optional) and that
+    exist are touched, never another machine of the hypervisor. The machines
+    are named with `--host` (repeatable, FQDN or short name such as `web` for
+    `web.lab`), or all targeted with `--all`: a bare command is refused, since
+    shutting the whole fleet down is something you ask for. Running the same
+    command twice does nothing more.
+  - `kvm` and `incus` only: `outscale` has no local hypervisor and is refused
+    with exit code 2. An unreachable hypervisor exits with 1 and is never
+    reported as "no machine".
+
 ## [0.10.1] - 2026-11-19
 
 ### Fixed
