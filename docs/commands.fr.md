@@ -37,7 +37,10 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab guide` | Affiche l'URL du guide en ligne du lab. |
 | `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
 | `dsoxlab infra origin` | D'où vient une ressource provisionnée : quel catalogue, et depuis quel répertoire. Lecture seule. |
+| `dsoxlab infra pause` | Gèle les machines du catalogue : le CPU est rendu, la mémoire reste occupée. |
+| `dsoxlab infra start` | Relance les machines arrêtées du catalogue, et reprend celles qui sont gelées. |
 | `dsoxlab infra status` | Vérifie la connectivité SSH des hôtes déclarés dans meta.yml, et nomme la cause quand l'un reste muet. |
+| `dsoxlab infra stop` | Arrête proprement les machines du catalogue, sans les détruire : disques gardés, mémoire rendue. |
 | `dsoxlab install` | Déprécié : utilise « dsoxlab completion install ». Installe l'auto-complétion. |
 | `dsoxlab instructor audit` | Ce qu'un apprenant ne trouvera pas tout seul dans ce catalogue. |
 | `dsoxlab instructor bootstrap` | Génère la clé SSH du lab (si absente) et vérifie que terraform/ansible-runner sont installés. |

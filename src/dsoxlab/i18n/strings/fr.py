@@ -601,6 +601,67 @@ STRINGS: dict[str, str] = {
     "cmd_fullhelp_help":  "Affiche le guide complet de la plateforme (concepts, workflow, commandes).",
     "cmd_provision_help": "Provisionne l'infrastructure du lab (terraform apply sur le provider courant).",
     "cmd_destroy_help":   "Détruit l'infrastructure du lab (terraform destroy), machines restées hors du state comprises.",
+    # ── infra stop / pause / start : sans détruire (issue #405) ──────────────
+    "cmd_infra_stop_help":
+        "Arrête proprement les machines du catalogue, sans les détruire : disques gardés, mémoire rendue.",
+    "cmd_infra_pause_help":
+        "Gèle les machines du catalogue : le CPU est rendu, la mémoire reste occupée.",
+    "cmd_infra_start_help":
+        "Relance les machines arrêtées du catalogue, et reprend celles qui sont gelées.",
+    "opt_alim_host":
+        "Ne vise que cette machine (un nom de infra.hosts). Répétable.",
+    "opt_alim_force":
+        "Coupe l'alimentation d'une machine qui ne s'est pas arrêtée dans le délai. Ne supprime rien.",
+    "opt_alim_timeout":
+        "Délai accordé à l'arrêt propre, en secondes.",
+    "alim_provider_non_pris_en_charge":
+        "Le provider {provider} n'a pas d'hyperviseur local à piloter : arrêter, geler et relancer ne valent que pour kvm et incus.",
+    "alim_hote_inconnu":
+        "Hôte non déclaré dans ce catalogue : {hosts}. Hôtes déclarés : {declared}.",
+    "alim_hyperviseur_injoignable":
+        "L'hyperviseur {provider} ne répond pas, l'état des machines est inconnu : {cause}",
+    "alim_aucune_machine":
+        "Aucune machine de {repo} n'existe sur l'hyperviseur : rien à faire.",
+    "alim_debut_stop":
+        "Arrêt de {count} machine(s) {provider}…",
+    "alim_debut_pause":
+        "Gel de {count} machine(s) {provider}…",
+    "alim_debut_start":
+        "Démarrage de {count} machine(s) {provider}…",
+    "alim_fait_stop":
+        "{host} : arrêtée",
+    "alim_fait_pause":
+        "{host} : gelée",
+    "alim_fait_start":
+        "{host} : démarrée",
+    "alim_deja_stop":
+        "{host} : déjà arrêtée",
+    "alim_deja_pause":
+        "{host} : déjà gelée",
+    "alim_deja_start":
+        "{host} : déjà en marche",
+    "alim_ignoree_pause":
+        "{host} : ne tourne pas, rien à geler",
+    "alim_coupee":
+        "{host} : ne s'est pas arrêtée en {delai} s, alimentation coupée (disques intacts)",
+    "alim_echec":
+        "{host} : {cause}",
+    "alim_echec_delai":
+        "{host} : ne s'est pas arrêtée en {delai} s",
+    "alim_conseil_force":
+        "Pour couper l'alimentation de ces machines : dsoxlab infra stop --force. Les disques ne sont pas touchés.",
+    "alim_conseil_stop":
+        "Disques gardés. Pour relancer : dsoxlab infra start.",
+    "alim_conseil_pause":
+        "La mémoire reste occupée. Pour la rendre : dsoxlab infra stop. Pour reprendre : dsoxlab infra start.",
+    "alim_conseil_start":
+        "dsoxlab infra status dit quand elles répondent en SSH.",
+    "opt_alim_all":
+        "Vise toutes les machines du catalogue. Sans --all, il faut nommer au moins une machine avec --host.",
+    "alim_cible_requise":
+        "Quelles machines ? Nommez-les avec --host (répétable), ou visez-les toutes avec --all : dsoxlab infra {action} --all",
+    "alim_cible_ambigue":
+        "--host et --all s'excluent : nommez des machines, ou visez-les toutes, pas les deux.",
     # ── infra origin : d'ou vient une machine (issue #345) ────────────────────
     "cmd_infra_origin_help":
         "D'où vient une ressource provisionnée : quel catalogue, et depuis quel répertoire. Lecture seule.",
@@ -1076,6 +1137,19 @@ Chaque lab déclare :
     [dim]--all[/dim]                Tout ce qui est consigné sur cette machine, tous catalogues.
     [dim]--provider[/dim]           Restreint à kvm ou incus, quand un nom existe des deux côtés.
     [dim]--json[/dim]               La même chose, en document.
+
+  [cyan]infra stop[/cyan]           Arrête proprement les machines du catalogue, sans les
+                       détruire : disques gardés, mémoire rendue. Seuls les
+                       hôtes que ce meta.yml déclare sont visés (kvm, incus).
+    [dim]--host <nom>[/dim]          Cette machine (FQDN ou nom court). Répétable.
+    [dim]--all[/dim]                Toutes les machines du catalogue. L'un des deux est requis.
+    [dim]--timeout <s>[/dim]         Délai accordé à l'arrêt propre (120 s).
+    [dim]--force[/dim]              Coupe l'alimentation d'une machine encore en marche
+                       après le délai. Ne supprime rien.
+  [cyan]infra pause[/cyan]          Gèle les machines : le CPU est rendu, [bold]pas[/bold] la mémoire.
+  [cyan]infra start[/cyan]          Relance les machines arrêtées et reprend les gelées.
+                       infra status dit ensuite quand elles répondent en SSH.
+                       pause et start prennent aussi --host ou --all.
 
   [cyan]ssh <hote>[/cyan]           Ouvre une session interactive sur un hôte du lab.
 
