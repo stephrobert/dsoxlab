@@ -42,6 +42,7 @@ from ..sessions.store import get_best_scores
 # et aucune langue ne serait initialisée.
 from . import (  # noqa: F401  (importés pour leur effet d'enregistrement)
     _amorcage,
+    alimentation,
     auteur,
     catalogues,
     compte,

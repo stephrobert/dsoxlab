@@ -590,6 +590,67 @@ STRINGS: dict[str, str] = {
     "cmd_fullhelp_help":  "Show the complete platform guide (concepts, workflow, commands).",
     "cmd_provision_help": "Provision the lab infrastructure (terraform apply on the current provider).",
     "cmd_destroy_help":   "Destroy the lab infrastructure (terraform destroy), including machines left outside the state.",
+    # ── infra stop / pause / start : sans détruire (issue #405) ──────────────
+    "cmd_infra_stop_help":
+        "Shut the catalogue's machines down cleanly, without destroying them: disks kept, memory freed.",
+    "cmd_infra_pause_help":
+        "Freeze the catalogue's machines: the CPU is freed, the memory stays in use.",
+    "cmd_infra_start_help":
+        "Start the catalogue's stopped machines again, and resume the frozen ones.",
+    "opt_alim_host":
+        "Only target this machine (a name from infra.hosts). Repeatable.",
+    "opt_alim_force":
+        "Cut the power of a machine that did not shut down in time. Deletes nothing.",
+    "opt_alim_timeout":
+        "Time allowed for a clean shutdown, in seconds.",
+    "alim_provider_non_pris_en_charge":
+        "Provider {provider} has no local hypervisor to drive: stop, pause and start only apply to kvm and incus.",
+    "alim_hote_inconnu":
+        "Host not declared in this catalogue: {hosts}. Declared hosts: {declared}.",
+    "alim_hyperviseur_injoignable":
+        "The {provider} hypervisor does not answer, the machines' state is unknown: {cause}",
+    "alim_aucune_machine":
+        "No machine of {repo} exists on the hypervisor: nothing to do.",
+    "alim_debut_stop":
+        "Stopping {count} {provider} machine(s)…",
+    "alim_debut_pause":
+        "Freezing {count} {provider} machine(s)…",
+    "alim_debut_start":
+        "Starting {count} {provider} machine(s)…",
+    "alim_fait_stop":
+        "{host}: stopped",
+    "alim_fait_pause":
+        "{host}: frozen",
+    "alim_fait_start":
+        "{host}: started",
+    "alim_deja_stop":
+        "{host}: already stopped",
+    "alim_deja_pause":
+        "{host}: already frozen",
+    "alim_deja_start":
+        "{host}: already running",
+    "alim_ignoree_pause":
+        "{host}: not running, nothing to freeze",
+    "alim_coupee":
+        "{host}: did not shut down in {delai} s, power cut (disks intact)",
+    "alim_echec":
+        "{host}: {cause}",
+    "alim_echec_delai":
+        "{host}: did not shut down in {delai} s",
+    "alim_conseil_force":
+        "To cut the power of these machines: dsoxlab infra stop --force. Disks are not touched.",
+    "alim_conseil_stop":
+        "Disks kept. To start again: dsoxlab infra start.",
+    "alim_conseil_pause":
+        "Memory stays in use. To free it: dsoxlab infra stop. To resume: dsoxlab infra start.",
+    "alim_conseil_start":
+        "dsoxlab infra status tells when they answer over SSH.",
+    "opt_alim_all":
+        "Target every machine of the catalogue. Without --all, name at least one machine with --host.",
+    "alim_cible_requise":
+        "Which machines? Name them with --host (repeatable), or target them all with --all: dsoxlab infra {action} --all",
+    "alim_cible_ambigue":
+        "--host and --all exclude each other: name machines, or target them all, not both.",
     # ── infra origin : d'ou vient une machine (issue #345) ────────────────────
     "cmd_infra_origin_help":
         "Where a provisioned resource comes from: which catalog, and the directory it was provisioned from. Read-only.",
@@ -1057,6 +1118,19 @@ Each lab declares:
     [dim]--all[/dim]                Everything recorded on this machine, all catalogs.
     [dim]--provider[/dim]           Narrow to kvm or incus, when a name is held by both.
     [dim]--json[/dim]               The same, as a document.
+
+  [cyan]infra stop[/cyan]           Shuts the catalogue's machines down cleanly, without
+                       destroying them: disks kept, memory freed. Only the
+                       hosts this meta.yml declares are touched (kvm, incus).
+    [dim]--host <name>[/dim]         This machine (FQDN or short name). Repeatable.
+    [dim]--all[/dim]                Every machine of the catalogue. One of the two is required.
+    [dim]--timeout <s>[/dim]         Time allowed for the clean shutdown (120 s).
+    [dim]--force[/dim]              Cuts the power of a machine still running after
+                       the timeout. Deletes nothing.
+  [cyan]infra pause[/cyan]          Freezes the machines: the CPU is freed, [bold]not[/bold] the memory.
+  [cyan]infra start[/cyan]          Starts stopped machines again and resumes frozen ones.
+                       infra status then tells when they answer over SSH.
+                       pause and start also take --host or --all.
 
   [cyan]ssh <host>[/cyan]           Open an interactive session on a lab host.
 

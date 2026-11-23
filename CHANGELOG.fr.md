@@ -7,6 +7,32 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.11.0] - 2026-11-21
+
+### Ajouté
+
+- **`infra stop`, `infra pause` et `infra start` : arrêter les machines d'un
+  catalogue sans les détruire** (issue #405). dsoxlab savait créer les machines
+  (`provision`) et les supprimer avec leurs disques (`destroy`), mais pas les
+  arrêter : rendre la mémoire de l'hôte demandait une boucle `virsh` écrite à
+  la main, ou un `destroy` suivi d'un `provision` complet.
+  - `infra stop` arrête proprement les systèmes invités et attend qu'ils
+    soient éteints (120 s par défaut, `--timeout`). Les disques restent, la
+    mémoire est rendue. Une machine encore en marche après le délai est
+    signalée et la commande sort en 1 ; `--force` coupe alors son
+    alimentation (`virsh destroy`, `incus stop --force`), sans rien supprimer.
+  - `infra pause` gèle les machines : le CPU est rendu, pas la mémoire.
+  - `infra start` relance les machines arrêtées et reprend les machines gelées.
+  - Seuls les hôtes que ce `meta.yml` déclare (communs et optionnels) et qui
+    existent sont visés, jamais une autre machine de l'hyperviseur. On nomme
+    les machines avec `--host` (répétable, FQDN ou nom court comme `web` pour
+    `web.lab`), ou on les vise toutes avec `--all` : une commande nue est
+    refusée, car éteindre tout le parc se demande. Relancer la même commande
+    ne fait rien de plus.
+  - `kvm` et `incus` seulement : `outscale` n'a pas d'hyperviseur local et
+    est refusé avec le code 2. Un hyperviseur qui ne répond pas sort en 1, et
+    n'est jamais présenté comme « aucune machine ».
+
 ## [0.10.1] - 2026-11-19
 
 ### Corrigé
