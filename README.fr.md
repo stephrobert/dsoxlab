@@ -124,9 +124,9 @@ leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
 
 | Catalogue | Labs | Ce qu'il enseigne |
 |---|---:|---|
-| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 166 | Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS |
+| [`kubernetes-dsoxlab-training`](https://github.com/stephrobert/kubernetes-dsoxlab-training) | 171 | Kubernetes sur cluster kubeadm, pour CKA, CKAD et CKS |
 | [`ansible-training`](https://github.com/stephrobert/ansible-training) | 113 | Ansible, du premier playbook aux collections |
-| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 93 | Les conteneurs, Docker, Compose et Swarm |
+| [`containers-dsoxlab-training`](https://github.com/stephrobert/containers-dsoxlab-training) | 95 | Les conteneurs, Docker, Compose et Swarm |
 | [`terraform-dsoxlab-training`](https://github.com/stephrobert/terraform-dsoxlab-training) | 91 | Terraform et l'infrastructure as code |
 | [`linux-dsoxlab-training`](https://github.com/stephrobert/linux-dsoxlab-training) | 89 | Administration Linux, RHCSA et LFCS |
 | [`publier-service-dsoxlab-training`](https://github.com/stephrobert/publier-service-dsoxlab-training) | 63 | Publier un service web derrière un reverse proxy, avec des certificats automatiques |
@@ -144,7 +144,7 @@ leurs sujets : chacun déclare tout dans son propre `meta.yml` et ses
 | [`cicd-dsoxlab-training`](https://github.com/stephrobert/cicd-dsoxlab-training) | 5 | Les pipelines CI/CD, sur une forge locale et sans compte en ligne |
 | [`github-actions-training`](https://github.com/stephrobert/github-actions-training) | 1 | GitHub Actions, des workflows rejoués en local |
 
-_768 labs dans 19 catalogues, comptés sur les dépôts publiés (`labs/**/lab.yaml` de leur branche par défaut). Cette table est générée par `scripts/gen-catalogues.py` depuis `src/dsoxlab/templates/catalogues.yml`, le manifeste que lit `dsoxlab catalog list` ; aucun chiffre n'y est écrit à la main._
+_775 labs dans 19 catalogues, comptés sur les dépôts publiés (`labs/**/lab.yaml` de leur branche par défaut). Cette table est générée par `scripts/gen-catalogues.py` depuis `src/dsoxlab/templates/catalogues.yml`, le manifeste que lit `dsoxlab catalog list` ; aucun chiffre n'y est écrit à la main._
 
 <!-- CATALOGUES:END -->
 
