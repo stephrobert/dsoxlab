@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..config import read_context
 from ..discovery.repo import find_meta_yml
 from ..discovery.scanner import discover_labs
-from ..i18n import _
+from ..i18n import _, langue_a_transmettre
 from ..interrupt import Interrupted, Stage
 from ..models.hint import HintFile
 from ..models.lab import LabDefinition
@@ -699,6 +700,10 @@ def check_lab(
     from .lab_state import repertoire_etat
 
     env["LAB_STATE_DIR"] = str(repertoire_etat(repo_root, lab.id))
+
+    # Les messages d'un test suivent la langue choisie par l'apprenant, qu'elle
+    # vienne de son contexte, de sa locale ou de la variable.
+    env["DSOXLAB_LANG"] = langue_a_transmettre(read_context(repo_root).lang)
 
     # Expose aux tests le FQDN de la target choisie. Sans ça, un lab
     # multi-distrib ne peut que coder son hôte en dur : la target Ubuntu

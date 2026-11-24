@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 _strings: dict[str, str] | None = None
+_langue: str | None = None
 _CONTEXT_FILE = ".dsoxlab-context.json"
 
 
@@ -59,8 +60,25 @@ def set_lang(lang: str) -> None:
 
     À appeler une fois en début de CLI, après lecture du contexte.
     """
-    global _strings  # noqa: PLW0603 — table de traduction, un cache de processus
+    global _strings, _langue  # noqa: PLW0603 — table de traduction, un cache de processus
     _strings = _load(lang)
+    _langue = lang
+
+
+def langue_a_transmettre(ctx_lang: str | None = None) -> str:
+    """La langue à poser dans ``DSOXLAB_LANG`` pour un processus enfant.
+
+    Les tests d'un catalogue et ses playbooks choisissent leur langue par cette
+    variable. Jusqu'à la 0.11.0, dsoxlab ne la posait pas : un apprenant qui avait
+    choisi le français par ``dsoxlab use --lang fr``, ou par sa locale, lisait
+    une interface française et des messages d'échec anglais. Seul ``DSOXLAB_LANG``
+    posé à la main passait, par simple héritage.
+
+    ``ctx_lang`` est la langue du contexte d'un dépôt précis, quand l'appelant le
+    connaît. Sans elle, c'est celle que la CLI a retenue à son amorçage.
+    """
+    retenue = get_lang(ctx_lang=ctx_lang or _langue)
+    return "fr" if retenue.startswith("fr") else "en"
 
 
 def _load(lang: str = "en") -> dict[str, str]:

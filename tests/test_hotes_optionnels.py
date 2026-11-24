@@ -420,7 +420,7 @@ def espion_start(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(parcours, "run", lambda **kw: None)
     monkeypatch.setattr(
         doctor, "collect_checks",
-        lambda root, meta, hosts=None: doctor.DoctorReport(
+        lambda root, meta, hosts=None, lab=None: doctor.DoctorReport(
             required=[doctor._check("python", True, "3.13")]
         ),
     )

@@ -111,7 +111,7 @@ def etapes_simulees(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(parcours_cli, "run", _faux_run)
     monkeypatch.setattr(
         doctor, "collect_checks",
-        lambda _root, _meta, hosts=None: doctor.DoctorReport(
+        lambda _root, _meta, hosts=None, lab=None: doctor.DoctorReport(
             required=[doctor._check("python", True, "3.13")],
         ),
     )
@@ -145,7 +145,7 @@ def test_un_echec_nomme_l_etape_et_sa_commande(
 
     monkeypatch.setattr(
         doctor, "collect_checks",
-        lambda _root, _meta, hosts=None: doctor.DoctorReport(
+        lambda _root, _meta, hosts=None, lab=None: doctor.DoctorReport(
             required=[doctor._check("terraform", False, "introuvable")],
         ),
     )
