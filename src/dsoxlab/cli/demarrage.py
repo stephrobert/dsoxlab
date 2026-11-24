@@ -320,6 +320,10 @@ def _verifier_les_dependances(situation: _Situation) -> None:
         situation.root,
         _read_repo(situation.root),
         hosts=_hotes_a_monter(situation.root, _hotes_du_lab(situation)),
+        # Les prérequis sont ceux de CE lab : sans cela, le premier lab `shell`
+        # d'un catalogue fraîchement cloné était refusé faute de provider et de
+        # clé SSH, dont il ne se sert pas (0.11.1).
+        lab=situation.lab,
     )
     manquants = rapport.failing()
     if manquants:

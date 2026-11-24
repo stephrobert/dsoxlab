@@ -152,7 +152,7 @@ def espion(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     def _faux_run(**kw: Any) -> None:
         vu["run"].append(kw)
 
-    def _faux_collect(root: Path, meta: Any, hosts: list[str] | None = None) -> Any:
+    def _faux_collect(root: Path, meta: Any, hosts: list[str] | None = None, lab=None) -> Any:
         vu["doctor_hosts"] = hosts
         return doctor.DoctorReport(required=[doctor._check("python", True, "3.13")])
 

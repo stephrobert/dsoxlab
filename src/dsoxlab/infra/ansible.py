@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ..i18n import _
+from ..i18n import _, langue_a_transmettre
 from ..interrupt import EVENT_INTERRUPT, Interrupted, SignalRelay, Stage
 
 logger = logging.getLogger(__name__)
@@ -449,10 +449,13 @@ def _env_overrides() -> dict[str, str]:
     - ``ANSIBLE_HOST_KEY_CHECKING=False`` : les VMs lab sont jetables, pas
       de prompt sur la clé host à chaque provision.
     - ``ANSIBLE_STDOUT_CALLBACK=default`` : sortie stable lisible.
+    - ``DSOXLAB_LANG`` : la langue de l'apprenant, que les playbooks lisent pour
+      déposer l'énoncé sur la machine du lab.
     """
     overrides = {
         "ANSIBLE_HOST_KEY_CHECKING": "False",
         "ANSIBLE_STDOUT_CALLBACK": "default",
+        "DSOXLAB_LANG": langue_a_transmettre(),
     }
     # Conserve les overrides déjà posés dans l'env utilisateur
     for key, value in os.environ.items():

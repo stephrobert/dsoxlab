@@ -7,6 +7,23 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.11.1] - 2026-11-24
+
+### Corrigé
+
+- **Les tests et les playbooks d'un lab suivent la langue choisie par
+  l'apprenant.** Avec `dsoxlab use --lang fr`, ou une locale française,
+  l'interface était en français et les messages d'échec de `check` restaient en
+  anglais : seul `DSOXLAB_LANG` posé à la main leur parvenait. dsoxlab transmet
+  désormais la langue qu'il a retenue, par `DSOXLAB_LANG`, à pytest et aux
+  playbooks qu'il joue.
+- **`start` juge les prérequis du lab qu'il démarre, plus ceux de tout le
+  catalogue.** Sur un clone neuf, le premier lab `shell` d'un catalogue qui a
+  aussi des labs `vm` était refusé faute de provider d'infrastructure et de clé
+  SSH du catalogue, dont il ne se sert pas. De même, un lab sans
+  `runtime.services` n'exige plus docker parce qu'un autre lab en déclare.
+  `doctor` lancé seul continue de porter sur tout le catalogue.
+
 ## [0.11.0] - 2026-11-21
 
 ### Ajouté

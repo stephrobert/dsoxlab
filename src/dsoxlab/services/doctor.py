@@ -467,8 +467,27 @@ def _ranger_outillage_vm(
         report.required.append(_check_ssh_include())
 
 
+def _labs_juges(
+    labs: list[LabDefinition], lab: LabDefinition | None,
+) -> list[LabDefinition]:
+    """Les labs dont dépend le classement : celui qu'on joue, ou tous."""
+    return labs if lab is None else [lab]
+
+
+def _exige_des_machines(
+    juges: list[LabDefinition], lab: LabDefinition | None, declare_des_hotes: bool,
+) -> bool:
+    """Un hôte déclaré n'engage que le diagnostic du catalogue entier.
+
+    Pour un lab précis, seul compte son runtime : les hôtes du ``meta.yml`` sont
+    ceux des autres labs.
+    """
+    return uses_vm(juges) or (lab is None and declare_des_hotes)
+
+
 def collect_checks(
     root: Path, repo_meta: RepoMetadata | None, hosts: list[str] | None = None,
+    *, lab: LabDefinition | None = None,
 ) -> DoctorReport:
     """Construit le diagnostic pour le dépôt de labs situé en ``root``.
 
@@ -484,8 +503,15 @@ def collect_checks(
     est l'information utile hors d'un lab : « monter tout le catalogue demande
     tant ». Le reste du diagnostic ne dépend pas des hôtes retenus, et n'est
     donc pas restreint.
+
+    ``lab`` restreint le CLASSEMENT à ce lab : ``start <lab>`` le passe. Un lab
+    ``shell`` n'exige ni provider, ni clé SSH, ni hyperviseur, même dans un
+    catalogue qui a par ailleurs des labs ``vm`` ; un lab sans service n'exige
+    pas docker. ``hosts`` ne peut pas le dire : sa liste est vide aussi pour un
+    lab ``vm`` dont les machines tournent déjà.
     """
     labs = get_all_labs(root)
+    juges = _labs_juges(labs, lab)
     declare_des_hotes = bool(repo_meta and repo_meta.infra.hosts)
     ctx = _CeQueLeDepotDemande(
         root=root,
@@ -495,7 +521,7 @@ def collect_checks(
         # aucun bloc `infra:`, tous ses labs `shell`, donc aucun hyperviseur
         # requis. `doctor --strict` y sortait en 0 sur un environnement
         # incapable de monter quoi que ce soit (issue #230).
-        needs_vm=uses_vm(labs) or declare_des_hotes,
+        needs_vm=_exige_des_machines(juges, lab, declare_des_hotes),
         active=repo_meta.infra.provider if repo_meta else "",
         candidates=list(repo_meta.infra.providers_available) if repo_meta else [],
         hotes_demandes=list(hosts) if hosts is not None else None,
@@ -511,7 +537,7 @@ def collect_checks(
     # git sert au parcours d'accueil (`catalog add` clone), quel que soit le
     # domaine du dépôt : il est requis partout.
     report.required.append(_check_git())
-    _ranger_docker(report, labs)
+    _ranger_docker(report, juges)
     _ranger_sortie_reseau(report, ctx)
     _ranger_hyperviseurs(report, ctx, hypervisors)
     if ctx.needs_vm and not ctx.active and report.provider_a_confirmer:
