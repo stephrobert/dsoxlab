@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import getpass
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -96,9 +97,12 @@ def test_le_rapport_ne_porte_aucun_chemin_personnel(catalogue: Path) -> None:
         "un chemin absolu dans un rapport destiné à une issue publie le HOME"
     )
 
+    # Le nom se cherche comme un mot entier. `ubuntu` ou `root` sont aussi des
+    # mots ordinaires du rapport (« OpenSSH … Ubuntu-3ubuntu13 »), et ne disent
+    # rien de la personne : le test échouait sur toute VM Ubuntu par défaut.
     utilisateur = getpass.getuser()
-    if len(utilisateur) > 2:
-        assert utilisateur not in rendu
+    if len(utilisateur) > 2 and utilisateur not in {"root", "ubuntu", "debian"}:
+        assert not re.search(rf"\b{re.escape(utilisateur)}\b", rendu)
 
 
 def test_le_rapport_nomme_les_outils_manquants_sans_en_faire_une_erreur(

@@ -35,7 +35,7 @@ complet de la plateforme dans le terminal, `dsoxlab fullhelp`.
 | `dsoxlab export` | Exporter tous les résultats en un document JSON, pour les relire ailleurs |
 | `dsoxlab fullhelp` | Affiche le guide complet de la plateforme (concepts, workflow, commandes). |
 | `dsoxlab guide` | Affiche l'URL du guide en ligne du lab. |
-| `dsoxlab hint` | Affiche le prochain indice du challenge (déduit des points au score final). |
+| `dsoxlab hint` | Affiche le prochain indice du challenge (son coût réduit le maximum de points atteignable). |
 | `dsoxlab infra origin` | D'où vient une ressource provisionnée : quel catalogue, et depuis quel répertoire. Lecture seule. |
 | `dsoxlab infra pause` | Gèle les machines du catalogue : le CPU est rendu, la mémoire reste occupée. |
 | `dsoxlab infra start` | Relance les machines arrêtées du catalogue, et reprend celles qui sont gelées. |

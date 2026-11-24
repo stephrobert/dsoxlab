@@ -255,7 +255,7 @@ STRINGS: dict[str, str] = {
     "course_section_file_missing": "Section file not found: {file}",
     "cmd_challenge_help": "Display the challenge mission for this lab (challenge/README.md).",
     "cmd_challenge_arg":  "Lab identifier (optional if a lab is active in session)",
-    "cmd_hint_help":     "Show the next challenge hint (deducts points from final score).",
+    "cmd_hint_help":     "Show the next challenge hint (its cost lowers the maximum score you can reach).",
     "cmd_hint_arg":      "Lab identifier (optional if a lab is active in session)",
     "cmd_check_help":    "Run tests, calculate score (hints deducted) and record result.",
     "cmd_check_arg":     "Lab identifier (optional if a lab is active in session)",
@@ -971,11 +971,11 @@ Each lab declares:
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]hint[/cyan] [dim][<id>][/dim]          Display the next hint.
-                       Each hint [yellow]deducts points[/yellow] from your final score.
+                       Each hint [yellow]lowers the maximum[/yellow] score you can reach.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 
   [cyan]check[/cyan] [dim][<id>][/dim]         Run tests, compute score, save to history.
-                       Score = 100 − (hints used × cost per hint).
+                       Score = share of tests passed × (100 − cost of hints).
     [dim]--json[/dim]               The result as a document. Same exit code.
                        [dim]<id>[/dim] is optional if a lab is active in the session.
 

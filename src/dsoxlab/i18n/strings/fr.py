@@ -259,7 +259,7 @@ STRINGS: dict[str, str] = {
     "course_section_file_missing": "Fichier de section introuvable : {file}",
     "cmd_challenge_help": "Affiche la mission du challenge (challenge/README.md).",
     "cmd_challenge_arg":  "Identifiant du lab (optionnel si un lab est actif en session)",
-    "cmd_hint_help":      "Affiche le prochain indice du challenge (déduit des points au score final).",
+    "cmd_hint_help":      "Affiche le prochain indice du challenge (son coût réduit le maximum de points atteignable).",
     "cmd_hint_arg":       "Identifiant du lab (optionnel si un lab est actif en session)",
     "cmd_check_help":     "Exécute les tests, calcule le score (hints déduits) et enregistre le résultat.",
     "cmd_check_arg":      "Identifiant du lab (optionnel si un lab est actif en session)",
@@ -989,11 +989,11 @@ Chaque lab déclare :
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]hint[/cyan] [dim][<id>][/dim]          Affiche le prochain indice.
-                       Chaque indice [yellow]déduit des points[/yellow] du score final.
+                       Chaque indice [yellow]réduit le maximum[/yellow] de points atteignable.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
   [cyan]check[/cyan] [dim][<id>][/dim]         Joue les tests, calcule le score, sauvegarde dans l'historique.
-                       Score = 100 − (indices utilisés × coût par indice).
+                       Score = part de tests réussis × (100 − coût des indices).
     [dim]--json[/dim]               Le résultat en document. Même code de retour.
                        [dim]<id>[/dim] est optionnel si un lab est actif en session.
 
