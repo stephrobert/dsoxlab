@@ -67,7 +67,7 @@ repo:
   category: {id}
   title: {id}
   description: |
-    À remplir : ce que ce catalogue apprend, et à qui.
+    To fill in: what this catalog teaches, and to whom.
 
 # Où remettre une preuve d'apprentissage, si ce catalogue a un portail. En
 # `https` : le lien porte les résultats d'un apprenant. dsoxlab n'envoie rien :
@@ -89,8 +89,8 @@ repo:
 
 sections:
   - id: premiers-pas
-    title: Premiers pas
-    description: À remplir.
+    title: First steps
+    description: To fill in.
     labs: []
 """
 
@@ -122,9 +122,9 @@ _LAB_COMMUN = """\
 # Lab {id}. Les champs marqués REQUIS sont exigés par le validator : sans eux,
 # le lab est refusé, ou pire, disparaît du catalogue sans un mot.
 id: {id}                      # REQUIS
-title: "À remplir"            # REQUIS
+title: "To fill in"           # REQUIS
 level: l1                     # REQUIS
-description: "À remplir : ce que l'apprenant saura faire à la fin."
+description: "To fill in: what the learner will be able to do at the end."
 skills:                       # REQUIS, non vide
   - a-remplir
 distros:                      # REQUIS, non vide

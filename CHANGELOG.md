@@ -7,6 +7,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-11-24
+
+### Fixed
+
+- **A generated catalog no longer grades the learner's own machine.** The
+  `conftest.py` of `dsoxlab new catalog` had no `host` fixture, so a `vm` lab's
+  test used testinfra's, which targets the local machine when no host is given.
+  `host` is now the lab's target machine; a `shell` lab keeps the local machine.
+  Catalogs created earlier must copy the fixture.
+- **`new catalog` and `new lab` write English in the base files.** `meta.yml`
+  and `lab.yaml` held French text, while the contract puts French in
+  `meta.fr.yml` and `lab.fr.yaml`.
+- **The help of `hint` and `check` describes the real score.** A hint lowers the
+  maximum score, before the share of passed tests is applied; it is not deducted
+  from the final score. The calculation does not change.
+- The test suite no longer depends on docker being installed, nor on the name of
+  the account that runs it.
+
 ## [0.11.1] - 2026-11-24
 
 ### Fixed

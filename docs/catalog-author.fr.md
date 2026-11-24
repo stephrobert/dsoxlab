@@ -103,11 +103,14 @@ l'autre n'est nécessaire dans un lab neuf.
 `conftest.py` posé là est collecté pour tous les labs : c'est là que va
 l'import de `build_inventory` décrit plus bas, et là qu'un catalogue de labs
 `shell` résout `<lab>/challenge/work` depuis l'emplacement du fichier de test.
-`dsoxlab new catalog` en écrit un qui ne porte que l'aide
-`message(en=…, fr=…)`, et à dessein aucun `from dsoxlab… import` : les tests
-d'un lab doivent rester jouables par un simple `pytest`. Un catalogue de labs
-`vm` ajoute lui-même l'import de `build_inventory` ; le catalogue Linux en porte
-un exemple complet à sa racine, le catalogue Terraform un pour des labs `shell`.
+`dsoxlab new catalog` en écrit un qui porte l'aide `message(en=…, fr=…)` et une
+fixture `host`, et à dessein aucun `from dsoxlab… import` en tête : les tests
+d'un lab doivent rester jouables par un simple `pytest`. Pour un lab `vm`,
+`host` est la machine que nomme `DSOXLAB_TARGET_HOST`, ou la cible par défaut du
+`lab.yaml` ; pour un lab `shell`, le poste local. Elle remplace la fixture `host`
+de testinfra, qui vise le poste local quand aucun hôte n'est donné. Les
+catalogues créés avant la 0.11.2 ne l'ont pas : copiez-la depuis un catalogue
+neuf, ou écrivez la vôtre.
 
 
 ## `validate-structure` voit les labs qu'il ne peut pas charger

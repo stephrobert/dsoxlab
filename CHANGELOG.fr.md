@@ -7,6 +7,24 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.11.2] - 2026-11-24
+
+### Corrigé
+
+- **Un catalogue généré ne note plus le poste de l'apprenant.** Le `conftest.py`
+  de `dsoxlab new catalog` n'avait pas de fixture `host` : le test d'un lab `vm`
+  prenait celle de testinfra, qui vise le poste local quand aucun hôte n'est
+  donné. `host` est maintenant la machine cible du lab ; un lab `shell` garde le
+  poste local. Les catalogues créés avant doivent copier la fixture.
+- **`new catalog` et `new lab` écrivent de l'anglais dans les fichiers de base.**
+  `meta.yml` et `lab.yaml` portaient du français, que le contrat place dans
+  `meta.fr.yml` et `lab.fr.yaml`.
+- **L'aide de `hint` et de `check` décrit le vrai calcul.** Un indice réduit le
+  maximum atteignable, avant d'appliquer la part de tests réussis ; il n'est pas
+  déduit du score final. Le calcul ne change pas.
+- La suite de tests ne dépend plus d'un docker installé, ni du nom du compte qui
+  la joue.
+
 ## [0.11.1] - 2026-11-24
 
 ### Corrigé

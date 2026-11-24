@@ -102,11 +102,13 @@ hint does not surface in a `git grep`; neither is needed in a new lab.
 is collected for every lab: that is where the `build_inventory` import below
 belongs, and where a catalog of `shell` labs resolves `<lab>/challenge/work`
 from the location of the test file. `dsoxlab new catalog` writes one that
-carries only the `message(en=…, fr=…)` helper, and on purpose no
-`from dsoxlab… import`: a lab's tests must stay playable by a plain `pytest`.
-A catalog with `vm` labs adds the `build_inventory` import itself; the Linux
-catalog carries a complete example at its root, the Terraform catalog one for
-`shell` labs.
+carries the `message(en=…, fr=…)` helper and a `host` fixture, and on purpose no
+`from dsoxlab… import` at module level: a lab's tests must stay playable by a
+plain `pytest`. For a `vm` lab, `host` is the machine named by
+`DSOXLAB_TARGET_HOST`, or the default target of the `lab.yaml`; for a `shell`
+lab, the local machine. It replaces testinfra's own `host`, which targets the
+local machine when no host is given. Catalogs created before 0.11.2 do not have
+it: copy it from a new catalog, or write your own.
 
 
 ## `validate-structure` sees the labs it cannot load

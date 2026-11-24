@@ -34,7 +34,7 @@ guide in the terminal, `dsoxlab fullhelp`.
 | `dsoxlab export` | Export every result as a JSON document, for reading elsewhere |
 | `dsoxlab fullhelp` | Show the complete platform guide (concepts, workflow, commands). |
 | `dsoxlab guide` | Show the URL of the lab's online guide. |
-| `dsoxlab hint` | Show the next challenge hint (deducts points from final score). |
+| `dsoxlab hint` | Show the next challenge hint (its cost lowers the maximum score you can reach). |
 | `dsoxlab infra origin` | Where a provisioned resource comes from: which catalog, and the directory it was provisioned from. Read-only. |
 | `dsoxlab infra pause` | Freeze the catalogue's machines: the CPU is freed, the memory stays in use. |
 | `dsoxlab infra start` | Start the catalogue's stopped machines again, and resume the frozen ones. |

@@ -25,6 +25,7 @@ les labs sont valides ».
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -326,3 +327,49 @@ def test_une_premiere_section_vide_recoit_le_lab(tmp_path: Path) -> None:
     assert annoncee == "premiere"
     assert sections["premiere"] == ["nouveau-lab"]
     assert sections["seconde"] in ([], None)
+
+
+# ── 0.11.2 : la langue des fichiers de base, et la machine que l'on note ─────
+
+def test_les_fichiers_de_base_sont_en_anglais(tmp_path: Path) -> None:
+    racine = scaffold.creer_catalogue("essai", tmp_path).racine
+    scaffold.creer_lab("demo", racine, runtime="shell")
+    for relatif in ("meta.yml", "labs/demo/lab.yaml"):
+        valeurs = "\n".join(
+            ligne.split("#")[0]
+            for ligne in (racine / relatif).read_text(encoding="utf-8").splitlines()
+            if not ligne.lstrip().startswith("#")
+        )
+        assert "remplir" not in valeurs.replace("a-remplir", ""), relatif
+        assert "Premiers pas" not in valeurs, relatif
+    assert "Premiers pas" in (racine / "meta.fr.yml").read_text(encoding="utf-8")
+
+
+def _jouer_un_test_de_host(racine: Path, lab: str) -> subprocess.CompletedProcess[str]:
+    (racine / "labs" / lab / "challenge" / "tests" / "test_functional.py").write_text(
+        "def test_machine(host):\n    print('BACKEND', host.backend.NAME)\n",
+        encoding="utf-8",
+    )
+    env = {k: v for k, v in os.environ.items() if not k.startswith("DSOXLAB_")}
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-s", "-q", f"labs/{lab}/challenge/tests"],
+        cwd=racine, env=env, capture_output=True, text=True, check=False,
+    )
+
+
+def test_le_test_d_un_lab_vm_ne_vise_jamais_le_poste_local(tmp_path: Path) -> None:
+    """Sans la fixture du catalogue, testinfra rendait `local` et notait le poste."""
+    racine = scaffold.creer_catalogue("essai", tmp_path).racine
+    scaffold.creer_lab("demo", racine, runtime="vm")
+    joue = _jouer_un_test_de_host(racine, "demo")
+    assert "BACKEND" not in joue.stdout, joue.stdout
+    assert joue.returncode == 1, joue.stdout + joue.stderr
+    assert "hote.lab" in joue.stdout
+
+
+def test_le_test_d_un_lab_shell_vise_le_poste_local(tmp_path: Path) -> None:
+    racine = scaffold.creer_catalogue("essai", tmp_path).racine
+    scaffold.creer_lab("demo", racine, runtime="shell")
+    joue = _jouer_un_test_de_host(racine, "demo")
+    assert joue.returncode == 0, joue.stdout + joue.stderr
+    assert "BACKEND local" in joue.stdout

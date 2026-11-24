@@ -382,6 +382,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -433,6 +434,74 @@ def exiger_workdir(workdir: Path, lab_id: str) -> None:
         pytest.skip(
             f"le lab {lab_id} n'a pas été démarré : joue `dsoxlab run {lab_id}`"
         )
+
+
+def _lab_du_test(fichier_test: Path) -> dict[str, Any]:
+    """Le `lab.yaml` du lab auquel appartient un fichier de test, ou vide."""
+    import yaml
+
+    for parent in fichier_test.resolve().parents:
+        if (parent / "lab.yaml").is_file():
+            return yaml.safe_load((parent / "lab.yaml").read_text(encoding="utf-8")) or {}
+    return {}
+
+
+def lab_host(fqdn: str) -> Any:
+    """Une connexion testinfra à une machine du catalogue, par SSH et avec sudo.
+
+    Les imports sont ici et pas en tête : un lab `shell` n'a besoin ni de
+    testinfra ni de dsoxlab pour se jouer par un simple `pytest`.
+    """
+    import testinfra
+    from dsoxlab.discovery.repo import read_repo_metadata
+    from dsoxlab.infra.inventory import (
+        build_inventory,
+        read_terraform_outputs,
+        write_ssh_config,
+    )
+
+    depot = read_repo_metadata(Path(__file__).parent.resolve())
+    if depot is None:
+        raise RuntimeError("meta.yml est illisible : aucun hôte à joindre.")
+    inventaire = build_inventory(depot, terraform_outputs=read_terraform_outputs(depot))
+    hotes = inventaire["all"]["children"]["labenv"]["hosts"]
+    if fqdn not in hotes:
+        raise RuntimeError(
+            message(
+                en=f"{fqdn} is not in the inventory ({sorted(hotes)}). Run `dsoxlab provision`.",
+                fr=f"{fqdn} n'est pas dans l'inventaire ({sorted(hotes)}). Joue `dsoxlab provision`.",
+            )
+        )
+    config = write_ssh_config(inventaire, depot)
+    return testinfra.get_host(f"ssh://{fqdn}?ssh_config={config}&sudo=true")
+
+
+@pytest.fixture(scope="module")
+def host(request: pytest.FixtureRequest) -> Any:
+    """La machine que le lab note. Remplace la fixture `host` de testinfra.
+
+    Sans ce remplacement, testinfra vise le POSTE LOCAL quand aucun hôte n'est
+    donné : le test d'un lab `vm` noterait la machine de l'apprenant.
+    `dsoxlab check` exporte `DSOXLAB_TARGET_HOST` ; un `pytest` nu prend la
+    cible par défaut du `lab.yaml`. Un lab `shell` garde le poste local.
+    """
+    runtime = _lab_du_test(request.path).get("runtime") or {}
+    if runtime.get("type", "shell") == "shell":
+        import testinfra
+
+        return testinfra.get_host("local://")
+    cible = os.environ.get("DSOXLAB_TARGET_HOST")
+    if not cible:
+        cibles = {c["name"]: c["host"] for c in runtime.get("targets") or []}
+        cible = cibles.get(runtime.get("default", ""), next(iter(cibles.values()), ""))
+    if not cible:
+        pytest.fail(
+            message(
+                en="This vm lab declares no target: add runtime.targets to its lab.yaml.",
+                fr="Ce lab vm ne déclare aucune cible : ajoute runtime.targets à son lab.yaml.",
+            )
+        )
+    return lab_host(cible)
 '''
 
 

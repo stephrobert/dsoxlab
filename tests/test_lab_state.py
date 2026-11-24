@@ -170,6 +170,9 @@ def test_un_service_tombe_rend_le_lab_degrade(
 
     from dsoxlab.runtimes import services as svc
 
+    # Le client se cherche dans le PATH avant le moteur : sans lui, le test
+    # dépendait d'un Docker installé sur le poste.
+    monkeypatch.setattr(lab_state.shutil, "which", lambda nom: f"/usr/bin/{nom}")
     monkeypatch.setattr(svc, "docker_available", lambda: True)
     monkeypatch.setattr(svc, "status", lambda service, repo: svc.ServiceStatus(
         name=service.name, container="c", running=False, detail="stopped"))
@@ -200,6 +203,9 @@ def test_un_service_jamais_demarre_n_est_pas_une_degradation(
 
     from dsoxlab.runtimes import services as svc
 
+    # Le client se cherche dans le PATH avant le moteur : sans lui, le test
+    # dépendait d'un Docker installé sur le poste.
+    monkeypatch.setattr(lab_state.shutil, "which", lambda nom: f"/usr/bin/{nom}")
     monkeypatch.setattr(svc, "docker_available", lambda: True)
     monkeypatch.setattr(svc, "status", lambda service, repo: svc.ServiceStatus(
         name=service.name, container="c", running=False, detail="absent"))
