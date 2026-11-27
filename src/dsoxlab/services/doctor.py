@@ -300,19 +300,25 @@ def _ranger_sortie_reseau(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> No
 
 
 def provider_recommande(candidates: list[str]) -> str:
-    """Le provider que le diagnostic prend quand le catalogue en laisse plusieurs.
+    """Recommande un candidat compatible, sans imposer un hyperviseur local.
 
-    kvm sur un Linux qui expose ``/dev/kvm`` : c'est le provider que les
-    catalogues éprouvent. Sinon le premier hyperviseur local déclaré, puis le
-    premier candidat. Rien n'est enregistré : le choix reste une étape du plan,
-    confirmée par l'utilisateur (décision 4 du 2026-11-16).
+    Un hyperviseur déjà opérationnel prime sur une installation nouvelle.
+    Sans virtualisation matérielle, seuls les candidats distants sont proposés.
+    Le choix explicite du catalogue reste prioritaire dans collect_checks.
     """
-    if "kvm" in candidates and platform.system() == "Linux" and _kvm_present():
-        return "kvm"
-    for nom in candidates:
-        if nom in _LOCAL_HYPERVISORS:
+    local_possible = platform.system() == "Linux" and _kvm_present()
+    locaux = [
+        nom for nom in candidates
+        if nom in _LOCAL_HYPERVISORS
+        and (nom != "kvm" or platform.machine().lower() in _PROVIDER_IMAGE_ARCHS["kvm"])
+    ] if local_possible else []
+    for nom in locaux:
+        controle = _check_kvm() if nom == "kvm" else _check_incus()
+        if controle.ok and os.access(_KVM_DEVICE, os.R_OK | os.W_OK):
             return nom
-    return candidates[0] if candidates else "kvm"
+    if locaux:
+        return locaux[0]
+    return next((nom for nom in candidates if nom not in _LOCAL_HYPERVISORS), "")
 
 
 def _kvm_present() -> bool:
@@ -370,7 +376,7 @@ def _ranger_hyperviseurs(
     report.required.append(_check(
         "provider", False,
         _("detail_provider_unresolved", candidates=", ".join(ctx.candidates) or "?"),
-        hint=f"dsoxlab use --provider {recommande}",
+        hint=f"dsoxlab use --provider {recommande}" if recommande else None,
         forced_state=STATE_CHOICE_REQUIRED,
     ))
     report.provider_a_confirmer = True
