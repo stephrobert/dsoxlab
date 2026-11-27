@@ -147,7 +147,10 @@ def test_fix_ne_lance_rien_quand_aucun_provider_ne_convient(
     report = doctor.collect_checks(tmp_path, _catalogue_vm(["kvm", "incus"]))
     plan = planifier(report, actions={"provider": lambda: None})
 
-    assert plan.executables == 0
+    # Seules ces deux étapes sont en jeu : le reste du plan dépend du poste
+    # (un runner sans Terraform y ajoute son installation).
+    lancees = {e.cle for e in [*plan.sans_sudo, *plan.root]}
+    assert not lancees & {"provider", "hw_virt"}
     assert {e.cle for e in plan.manuelles} >= {"provider", "hw_virt"}
 
 
