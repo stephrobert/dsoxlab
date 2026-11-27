@@ -1244,10 +1244,18 @@ def print_criteres_a_revoir(
     for ligne in lignes:
         libelle = neutraliser(ligne.libelle)
         if ligne.etat == "not_evaluated":
-            console.print(
-                f"  [yellow]?[/yellow] {libelle} "
-                f"[dim]({_('check_critere_non_evalue')})[/dim]"
+            # Avec le message de l'auteur, la cause est connue : la préparation
+            # du test a échoué, et le message dit pourquoi. Sans lui, « la
+            # vérification est impossible » reste tout ce qu'on sait.
+            cle = (
+                "check_critere_non_evalue_cause" if ligne.message
+                else "check_critere_non_evalue"
             )
+            console.print(
+                f"  [yellow]?[/yellow] {libelle} [dim]({_(cle)})[/dim]"
+            )
+            if ligne.message:
+                console.print(Padding(Text(ligne.message, style="dim"), (0, 0, 0, 6)))
             continue
         console.print(
             f"  [red]✘[/red] {libelle} [dim]({_('check_critere_non_satisfait')})[/dim]"

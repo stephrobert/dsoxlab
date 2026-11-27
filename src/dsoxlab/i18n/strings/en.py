@@ -404,6 +404,7 @@ STRINGS: dict[str, str] = {
         'This is an exam: the test detail is not available, only the verdict per criterion.',
     "check_critere_non_satisfait": "not met",
     "check_critere_non_evalue": "not evaluated: check impossible",
+    "check_critere_non_evalue_cause": "not evaluated: the test setup failed",
     "check_sortie_complete":
         "The full test output: dsoxlab -v check {lab_id}",
     "check_rien_mesure":

@@ -12,7 +12,10 @@ l'échec ; une épreuve ne dit que le verdict. Trois politiques, déclarées par
 - ``verdict`` : le libellé et le verdict, aucun message.
 
 Un critère NON ÉVALUÉ (fixture en erreur, erreur de collecte) s'affiche comme
-tel, jamais comme non satisfait : l'apprenant n'a rien raté.
+tel, jamais comme non satisfait : l'apprenant n'a rien raté. Quand la fixture a
+échoué sur un message écrit par l'auteur (``pytest.fail``, assertion
+commentée), ce message s'affiche selon la même politique : entier, première
+ligne, ou rien. Un message technique ne s'affiche jamais.
 
 Ce module ne décide que de ce qui se MONTRE. Le texte reste entier dans la base
 locale de l'apprenant et dans ``check.output`` du mode machine.
@@ -86,7 +89,10 @@ def lignes_a_afficher(
             critere.identifiant
         )
         message = None
-        if critere.etat == "unsatisfied" and politique == "first-line":
+        if politique == "first-line":
+            # Un critère non évalué porte le message de sa fixture quand
+            # l'auteur l'a écrit : c'est la cause du blocage. Même coupe que
+            # pour un critère raté, donc rien de plus que ce que le lab montre.
             message = premiere_ligne(critere.message_auteur)
         etat: Literal["unsatisfied", "not_evaluated"] = (
             "not_evaluated" if critere.etat == "not_evaluated" else "unsatisfied"
@@ -136,10 +142,13 @@ def separer_les_non_evalues(
     for critere in result.criteres:
         if critere.etat != "not_evaluated":
             continue
+        # `full` montre le message entier, comme pour un critère raté : sans
+        # lui, l'apprenant ne voyait la cause du blocage qu'avec `-v`.
         lignes.append(LigneDeCritere(
             lab.libelle_de_critere(critere.identifiant)
             or libelle_du_test(critere.identifiant),
             "not_evaluated",
+            critere.message_auteur,
         ))
         noms_bloques.update(_tests_du_critere(lab, critere))
     if not noms_bloques:

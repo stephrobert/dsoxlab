@@ -410,6 +410,7 @@ STRINGS: dict[str, str] = {
         "C'est une épreuve : le détail des tests n'est pas disponible, seul le verdict par critère l'est.",
     "check_critere_non_satisfait": "non satisfait",
     "check_critere_non_evalue": "non évalué : vérification impossible",
+    "check_critere_non_evalue_cause": "non évalué : la préparation du test a échoué",
     "check_sortie_complete":
         "La sortie complète des tests : dsoxlab -v check {lab_id}",
     "check_rien_mesure":

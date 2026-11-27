@@ -202,8 +202,15 @@ def _un_critere(
         # `mark.skip` / `skipif` jouent en phase setup : le test ne s'applique pas.
         return ResultatDeCritere(identifiant, nodeid, "setup", "skipped")
     if setup is not None and setup["issue"] != "passed":
-        # Une fixture en erreur : la vérification n'a pas pu avoir lieu.
-        return ResultatDeCritere(identifiant, nodeid, "setup", "not_evaluated")
+        # Une fixture en erreur : la vérification n'a pas pu avoir lieu. Son
+        # message est gardé quand l'auteur l'a écrit (`pytest.fail`, assertion
+        # commentée) : c'est souvent la seule phrase qui dit à l'apprenant ce
+        # qui bloque. Le jeter laissait « vérification impossible » sans cause,
+        # et le lab bloqué tant que l'apprenant ne pensait pas à `-v`.
+        origine, message = _origine_et_message(setup)
+        return ResultatDeCritere(
+            identifiant, nodeid, "setup", "not_evaluated", origine, message
+        )
     appel = phases.get("call")
     teardown = phases.get("teardown")
     teardown_rate = teardown is not None and teardown["issue"] == "failed"
@@ -271,7 +278,7 @@ def _critere_declare(
     mention = next((m.mention for m in membres if m.mention), None)
     origine: OrigineDeMessage | None = None
     message: str | None = None
-    if etat == "unsatisfied":
+    if etat in ("unsatisfied", "not_evaluated"):
         origine, message = determinant.origine_message, determinant.message_auteur
     return ResultatDeCritere(
         identifiant, determinant.nodeid, determinant.phase, etat, origine, message, mention
