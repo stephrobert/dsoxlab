@@ -714,3 +714,106 @@ def test_les_lecons_se_traduisent_mais_pas_les_tests(tmp_path: Path) -> None:
     chemins = " ".join(str(i.params) for i in validate_unknown_keys(racine).issues)
     assert "criteria[].lessons" not in chemins
     assert "criteria[].tests" in chemins
+
+
+# ── 0.11.3 : une fixture qui échoue sur un message de l'auteur le montre ───
+#
+# Mesuré sur terraform-dsoxlab-training le 2026-11-27 : 63 tentatives bloquées
+# sur 4 090 avaient un critère « non évalué » sans aucune cause à l'écran. Le
+# message que l'auteur avait écrit dans sa fixture (`pytest.fail`) existait
+# dans le rapport du plugin, et le moteur le jetait. L'apprenant ne le voyait
+# qu'avec `-v`, s'il y pensait.
+
+CAUSE = "Etape 3, la migration a echoue."
+SUITE_DE_LA_CAUSE = "Terraform repond : Invalid expression, path = ???"
+
+TESTS_FIXTURE_AUTEUR = f'''\
+import pytest
+
+@pytest.fixture
+def migration():
+    pytest.fail({(CAUSE + chr(10) + SUITE_DE_LA_CAUSE)!r})
+
+def test_lineage(migration):
+    assert True
+
+def test_backend(migration):
+    assert True
+
+@pytest.fixture
+def technique():
+    raise RuntimeError("detail technique SECRET")
+
+def test_bloque(technique):
+    assert True
+
+def test_ok():
+    assert True
+'''
+
+
+def test_le_rapport_garde_le_message_d_une_fixture_ecrit_par_l_auteur(
+    tmp_path: Path,
+) -> None:
+    racine = _catalogue(tmp_path / "d", tests=TESTS_FIXTURE_AUTEUR)
+    criteres = {c.identifiant: c for c in check_lab(_lab(racine)).criteres or ()}
+
+    assert criteres["test_lineage"].etat == "not_evaluated"
+    assert criteres["test_lineage"].origine_message == "author"
+    assert criteres["test_lineage"].message_auteur == f"{CAUSE}\n{SUITE_DE_LA_CAUSE}"
+    # Le sens inverse : une exception technique ne laisse toujours rien.
+    assert criteres["test_bloque"].etat == "not_evaluated"
+    assert criteres["test_bloque"].message_auteur is None
+
+
+def test_un_lab_guide_montre_la_cause_entiere_d_un_critere_bloque(tmp_path: Path) -> None:
+    _, ecran = _ecran(_catalogue(tmp_path / "d", tests=TESTS_FIXTURE_AUTEUR))
+
+    cause = EN.STRINGS["check_critere_non_evalue_cause"]
+    assert f"? lineage ({cause})" in ecran
+    assert CAUSE in ecran and SUITE_DE_LA_CAUSE in ecran
+    # Sans message de l'auteur, la mention d'avant, et rien de technique.
+    assert f"? bloque ({EN.STRINGS['check_critere_non_evalue']})" in ecran
+    assert "SECRET" not in ecran
+    assert "✘ lineage" not in ecran
+
+
+def test_un_challenge_ne_montre_que_la_premiere_ligne_de_la_cause(tmp_path: Path) -> None:
+    _, ecran = _ecran(_catalogue(
+        tmp_path / "d", tests=TESTS_FIXTURE_AUTEUR, extra="lab_type: challenge\n"
+    ))
+
+    assert CAUSE in ecran
+    assert SUITE_DE_LA_CAUSE not in ecran
+    assert "SECRET" not in ecran
+
+
+def test_une_epreuve_ne_montre_aucune_cause(tmp_path: Path) -> None:
+    racine = _catalogue(tmp_path / "d", tests=TESTS_FIXTURE_AUTEUR, extra="lab_type: capstone\n")
+    _, ecran = _ecran(racine)
+    _, sortie, _ = _invoquer(racine, "--json")
+
+    for texte in (ecran, sortie):
+        assert CAUSE not in texte and SUITE_DE_LA_CAUSE not in texte
+    assert f"? lineage ({EN.STRINGS['check_critere_non_evalue']})" in ecran
+
+
+def test_l_export_d_un_lab_porte_la_premiere_ligne_de_la_cause(tmp_path: Path) -> None:
+    _, sortie, _ = _invoquer(_catalogue(tmp_path / "d", tests=TESTS_FIXTURE_AUTEUR), "--json")
+    etats = {c["id"]: (c["state"], c["observation"]) for c in json.loads(sortie)["check"]["criteria"]}
+
+    assert etats["test_lineage"] == ("not_evaluated", CAUSE)
+    assert etats["test_bloque"] == ("not_evaluated", None)
+
+
+def test_un_critere_declare_bloque_garde_la_cause_de_son_premier_membre() -> None:
+    membres = (
+        ResultatDeCritere("test_lineage", "f::test_lineage", "setup", "not_evaluated",
+                          "author", CAUSE),
+        ResultatDeCritere("test_backend", "f::test_backend", "setup", "not_evaluated",
+                          "author", CAUSE),
+    )
+    regroupe = regrouper_par_declaration(membres, [("migration", ("test_lineage", "test_backend"))])
+
+    assert regroupe is not None and len(regroupe) == 1
+    assert (regroupe[0].etat, regroupe[0].message_auteur) == ("not_evaluated", CAUSE)
