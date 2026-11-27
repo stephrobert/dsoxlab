@@ -37,7 +37,7 @@ from __future__ import annotations
 # (`doctor.shutil.which`, `doctor.subprocess.run`...), ce qui vise le module
 # lui-même et atteint donc les familles. Le découpage de l'issue #199 ne devait
 # réécrire aucun test.
-import os  # noqa: F401
+import os
 import platform
 import shutil  # noqa: F401
 import subprocess  # noqa: F401
@@ -299,26 +299,67 @@ def _ranger_sortie_reseau(report: DoctorReport, ctx: _CeQueLeDepotDemande) -> No
     report.optional.append(_check_tf_providers(ctx.repo_meta))
 
 
-def provider_recommande(candidates: list[str]) -> str:
-    """Recommande un candidat compatible, sans imposer un hyperviseur local.
+def provider_recommande(
+    candidates: list[str], hypervisors: dict[str, Check] | None = None
+) -> str:
+    """Le candidat que ce poste peut faire marcher, ou ``""`` s'il n'y en a aucun.
 
-    Un hyperviseur déjà opérationnel prime sur une installation nouvelle.
-    Sans virtualisation matérielle, seuls les candidats distants sont proposés.
-    Le choix explicite du catalogue reste prioritaire dans collect_checks.
+    Rien n'est enregistré : le choix reste une étape du plan, confirmée par
+    l'utilisateur (décision 4 du 2026-11-16). L'ordre :
+
+    1. un hyperviseur local déjà opérationnel, dans l'ordre du catalogue. Un
+       Incus qui marche prime sur un KVM à installer : avant, KVM était
+       recommandé d'office dès que ``/dev/kvm`` existait ;
+    2. sinon un hyperviseur local que ce poste peut faire tourner (``/dev/kvm``
+       présent, et pour KVM une architecture que ses images servent) : KVM s'il
+       en fait partie, c'est le provider que les catalogues éprouvent ; sinon le
+       premier du catalogue ;
+    3. sinon le premier candidat distant (outscale…) ;
+    4. sinon ``""`` : aucun candidat ne marchera ici. Le poste n'a pas de
+       virtualisation matérielle (WSL ou VM sans virtualisation imbriquée,
+       typiquement) et le catalogue ne déclare aucun provider distant. Avant,
+       KVM était proposé quand même, et ``--fix`` l'installait pour rien.
+
+    ``hypervisors`` : les sondes déjà jouées par ``collect_checks``, pour ne pas
+    relancer ``virsh`` et ``incus`` une seconde fois.
     """
-    local_possible = platform.system() == "Linux" and _kvm_present()
-    locaux = [
+    locaux = _hyperviseurs_possibles(candidates)
+    if locaux:
+        sondes = hypervisors if hypervisors is not None else _hypervisor_checks()
+        operationnel = next((nom for nom in locaux if _marche(nom, sondes)), None)
+        if operationnel:
+            return operationnel
+        # Rien ne marche encore : KVM s'il est possible, c'est le provider que
+        # les catalogues éprouvent ; sinon le premier du catalogue.
+        return "kvm" if "kvm" in locaux else locaux[0]
+    return next((nom for nom in candidates if nom not in _LOCAL_HYPERVISORS), "")
+
+
+def _hyperviseurs_possibles(candidates: list[str]) -> list[str]:
+    """Les hyperviseurs locaux candidats que ce poste peut faire tourner.
+
+    Aucun sans ``/dev/kvm`` sur Linux. KVM est en plus écarté sur une
+    architecture que ses images ne servent pas.
+    """
+    if platform.system() != "Linux" or not _kvm_present():
+        return []
+    arch = platform.machine().lower()
+    return [
         nom for nom in candidates
         if nom in _LOCAL_HYPERVISORS
-        and (nom != "kvm" or platform.machine().lower() in _PROVIDER_IMAGE_ARCHS["kvm"])
-    ] if local_possible else []
-    for nom in locaux:
-        controle = _check_kvm() if nom == "kvm" else _check_incus()
-        if controle.ok and os.access(_KVM_DEVICE, os.R_OK | os.W_OK):
-            return nom
-    if locaux:
-        return locaux[0]
-    return next((nom for nom in candidates if nom not in _LOCAL_HYPERVISORS), "")
+        and (nom != "kvm" or arch in _PROVIDER_IMAGE_ARCHS["kvm"])
+    ]
+
+
+def _marche(nom: str, sondes: dict[str, Check]) -> bool:
+    """L'hyperviseur répond, et l'utilisateur peut s'en servir.
+
+    Le droit sur /dev/kvm ne compte que pour KVM, que qemu ouvre sous le compte
+    de l'utilisateur. Incus l'ouvre par son démon, en root.
+    """
+    if not sondes[nom].ok:
+        return False
+    return nom != "kvm" or os.access(_KVM_DEVICE, os.R_OK | os.W_OK)
 
 
 def _kvm_present() -> bool:
@@ -372,7 +413,7 @@ def _ranger_hyperviseurs(
     # et l'apprenant découvrait le chemin une commande à la fois. Seul
     # l'hyperviseur recommandé passe en requis : `--fix` n'installe donc pas
     # kvm ET incus.
-    recommande = provider_recommande(ctx.candidates)
+    recommande = provider_recommande(ctx.candidates, hypervisors)
     report.required.append(_check(
         "provider", False,
         _("detail_provider_unresolved", candidates=", ".join(ctx.candidates) or "?"),
@@ -385,6 +426,16 @@ def _ranger_hyperviseurs(
         report.optional.extend(
             _sort_hypervisors([n for n in _LOCAL_HYPERVISORS if n != recommande])
         )
+        return
+    if not recommande:
+        # Aucun candidat ne marchera sur ce poste. Le contrôle de
+        # virtualisation reste en requis : c'est LUI qui dit pourquoi (poste
+        # physique, VM sans virtualisation imbriquée, droit manquant), avec la
+        # consigne utile. Sans lui, `doctor` taisait la seule cause qui compte.
+        # Pas d'invite à choisir : aucun choix ne marcherait ici.
+        report.required.append(_check_hw_virt())
+        report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
+        report.notes.append(_("doctor_note_aucun_provider_compatible"))
         return
     report.optional.extend(_sort_hypervisors(list(_LOCAL_HYPERVISORS)))
     report.optional_title_key = "doctor_choose_title"
@@ -547,7 +598,7 @@ def collect_checks(
     _ranger_sortie_reseau(report, ctx)
     _ranger_hyperviseurs(report, ctx, hypervisors)
     if ctx.needs_vm and not ctx.active and report.provider_a_confirmer:
-        ctx = replace(ctx, active=provider_recommande(ctx.candidates))
+        ctx = replace(ctx, active=provider_recommande(ctx.candidates, hypervisors))
     # Un catalogue sans machine n'a pas de provider à annoncer.
     report.provider = ctx.active if ctx.needs_vm else ""
     if ctx.needs_vm:

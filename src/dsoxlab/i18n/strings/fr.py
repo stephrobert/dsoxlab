@@ -1911,6 +1911,12 @@ hors ligne, elle se tait.
     "doctor_note_remote_provider":
         "Le provider {provider} tourne dans le cloud : aucun hyperviseur "
         "local n'est nécessaire.",
+    "doctor_note_aucun_provider_compatible":
+        "Les labs VM de ce dépôt ne peuvent pas tourner sur ce poste : il n'a "
+        "pas de virtualisation matérielle, et le catalogue ne déclare aucun "
+        "provider distant. Les labs shell restent jouables. Pour les labs VM, "
+        "activez la virtualisation (voir ci-dessus) ou utilisez un autre poste.",
+
     "doctor_note_provider_unresolved":
         "Ce dépôt a des labs qui exigent une VM, et aucun provider n'est "
         "choisi. Choisissez-en un avec [bold]dsoxlab use --provider <nom>"

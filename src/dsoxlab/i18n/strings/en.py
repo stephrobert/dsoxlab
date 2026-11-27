@@ -1864,6 +1864,12 @@ silent.
         "Active provider: {provider}. The other hypervisors are informational.",
     "doctor_note_remote_provider":
         "Provider {provider} runs in the cloud: no local hypervisor needed.",
+    "doctor_note_aucun_provider_compatible":
+        "This repo's VM labs cannot run on this machine: it has no hardware "
+        "virtualization, and the catalog declares no remote provider. Shell "
+        "labs still work. For VM labs, enable virtualization (see above) or "
+        "use another machine.",
+
     "doctor_note_provider_unresolved":
         "This repo has labs that require a VM, and no provider is selected. "
         "Pick one with [bold]dsoxlab use --provider <name>[/bold]: until then, "

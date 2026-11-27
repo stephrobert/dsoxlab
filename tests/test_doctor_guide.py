@@ -411,7 +411,10 @@ def test_un_provider_a_choisir_n_arrete_plus_le_diagnostic(
 @pytest.mark.parametrize(("candidats", "kvm_present", "attendu"), [
     (["kvm", "incus"], True, "kvm"),
     (["incus", "kvm"], True, "kvm"),
-    (["kvm", "incus"], False, "kvm"),
+    # Sans /dev/kvm, aucun hyperviseur local ne marchera : on ne propose plus
+    # KVM pour que `--fix` l'installe en vain (#411).
+    (["kvm", "incus"], False, ""),
+    (["kvm", "incus", "outscale"], False, "outscale"),
     (["outscale", "incus"], True, "incus"),
     (["outscale"], True, "outscale"),
 ])
@@ -419,11 +422,15 @@ def test_le_provider_recommande(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     candidats: list[str], kvm_present: bool, attendu: str,
 ) -> None:
+    """Rien d'installé : les sondes sont passées, jamais jouées sur le poste."""
     device = tmp_path / "kvm"
     if kvm_present:
         device.touch()
     monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
-    assert doctor.provider_recommande(candidats) == attendu
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(doctor.platform, "machine", lambda: "x86_64")
+    rien = {h: doctor._check(h, False, "absent") for h in ("kvm", "incus")}
+    assert doctor.provider_recommande(candidats, rien) == attendu
 
 
 def test_les_collections_attendent_ansible_avec_leur_commande(
