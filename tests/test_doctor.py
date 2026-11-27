@@ -134,6 +134,17 @@ def _labs(monkeypatch: pytest.MonkeyPatch, labs: list[LabDefinition]) -> None:
     monkeypatch.setattr(doctor, "get_all_labs", lambda root: labs)
 
 
+def _rien_ne_marche_encore(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ni KVM ni Incus opérationnels : le chemin recommandé est alors KVM.
+
+    `stub_hypervisors` simule un Incus qui marche, et depuis #411 un hyperviseur
+    déjà opérationnel passe avant un KVM à installer.
+    """
+    sondes = doctor._hypervisor_checks()
+    sondes["incus"] = doctor._check("incus", False, "not found")
+    monkeypatch.setattr(doctor, "_hypervisor_checks", lambda: sondes)
+
+
 def _labels(checks: list[doctor.Check]) -> set[str]:
     return {c.label for c in checks}
 
@@ -232,6 +243,7 @@ def test_unresolved_provider_is_a_decision_not_a_failure(
     device.touch()
     monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
+    _rien_ne_marche_encore(monkeypatch)
     report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
 
     provider = next(c for c in report.required if c.key == "provider")
@@ -255,6 +267,7 @@ def test_unresolved_provider_checks_the_recommended_path_only(
     device.touch()
     monkeypatch.setattr(doctor, "_KVM_DEVICE", device)
     _labs(monkeypatch, [_lab("a", RuntimeType.VM)])
+    _rien_ne_marche_encore(monkeypatch)
     report = doctor.collect_checks(tmp_path, _repo(candidates=["kvm", "incus"]))
 
     requis = {c.key for c in report.required}
