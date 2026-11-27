@@ -7,6 +7,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.3] - 2026-11-27
+
+### Fixed
+
+- **A criterion that could not be evaluated now shows why.** When a test
+  fixture failed with a message written by the lab author (`pytest.fail`, or an
+  assertion with a message), `check` only displayed "not evaluated: check
+  impossible". The message was recorded, then dropped. It now follows the lab's
+  feedback policy, like a failed criterion: in full with `full`, first line with
+  `first-line`, nothing with `verdict`. The line then reads "not evaluated: the
+  test setup failed", with the cause below it. Without an author message,
+  nothing changes, and the text of a technical exception is never shown. On
+  `terraform-dsoxlab-training`, 63 of 68 blocked attempts had a not-evaluated
+  criterion with no cause on screen.
+- **`doctor` no longer forces KVM.** A local hypervisor that already works now
+  comes before one that must be installed. For KVM, "works" also requires read
+  and write access to `/dev/kvm`. When nothing is installed, KVM stays the first
+  choice. KVM is skipped on an architecture its images do not serve. Without
+  `/dev/kvm` (WSL, a VM without nested virtualization), only a declared remote
+  provider is proposed. If there is none, `doctor` makes no recommendation: the
+  provider step says why, and the hardware virtualization step becomes required.
+  Before, such a machine got 10 steps, including installing libvirt and QEMU for
+  nothing; it now gets 4, and `--fix` runs neither step (#411).
+
 ## [0.11.2] - 2026-11-24
 
 ### Fixed

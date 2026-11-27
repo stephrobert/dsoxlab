@@ -7,6 +7,31 @@ Toutes les modifications notables du projet sont documentées dans ce fichier.
 Le format s'appuie sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.11.3] - 2026-11-27
+
+### Corrigé
+
+- **Un critère qui n'a pas pu être évalué dit pourquoi.** Quand une fixture de
+  test échouait sur un message écrit par l'auteur du lab (`pytest.fail`, ou une
+  assertion avec message), `check` affichait seulement « non évalué :
+  vérification impossible ». Le message était enregistré, puis jeté. Il suit
+  désormais la politique d'affichage du lab, comme un critère raté : entier en
+  `full`, première ligne en `first-line`, rien en `verdict`. La ligne dit alors
+  « non évalué : la préparation du test a échoué », avec la cause en dessous.
+  Sans message de l'auteur, rien ne change, et le texte d'une exception
+  technique ne s'affiche jamais. Sur `terraform-dsoxlab-training`, 63 des 68
+  tentatives bloquées avaient un critère non évalué sans cause à l'écran.
+- **`doctor` n'impose plus KVM.** Un hyperviseur local qui marche déjà passe
+  avant un hyperviseur à installer. Pour KVM, « marche » demande aussi l'accès
+  en lecture et écriture à `/dev/kvm`. Quand rien n'est installé, KVM reste le
+  premier choix. KVM est écarté sur une architecture que ses images ne servent
+  pas. Sans `/dev/kvm` (WSL, VM sans virtualisation imbriquée), seul un provider
+  distant déclaré est proposé. S'il n'y en a pas, `doctor` ne recommande rien :
+  l'étape provider dit pourquoi, et l'étape de virtualisation matérielle passe
+  en requis. Avant, un tel poste recevait 10 étapes, dont l'installation de
+  libvirt et QEMU pour rien ; il en reçoit 4, et `--fix` ne lance aucune des
+  deux (#411).
+
 ## [0.11.2] - 2026-11-24
 
 ### Corrigé
