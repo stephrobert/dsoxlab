@@ -1763,6 +1763,10 @@ hors ligne, elle se tait.
     "detail_pytest_bundled": "embarqué avec dsoxlab",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "candidats déclarés : {candidates}, aucun choisi",
+    "detail_provider_aucun_compatible":
+        "candidats déclarés : {candidates}, aucun ne peut tourner sur ce poste "
+        "sans virtualisation matérielle (voir l'étape « Virtualisation "
+        "matérielle »). Les labs shell restent jouables.",
     # ── git et docker : deux outils que rien ne déclarait ───────────────────
     "check_git": "git",
     "check_docker": "Docker",

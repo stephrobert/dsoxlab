@@ -414,9 +414,15 @@ def _ranger_hyperviseurs(
     # l'hyperviseur recommandé passe en requis : `--fix` n'installe donc pas
     # kvm ET incus.
     recommande = provider_recommande(ctx.candidates, hypervisors)
+    candidats = ", ".join(ctx.candidates) or "?"
+    # Sans recommandation, l'étape ne peut pas se résoudre par un choix : son
+    # détail le dit, puisque l'écran sans `-v` ne montre aucune note.
+    detail = (
+        _("detail_provider_unresolved", candidates=candidats) if recommande
+        else _("detail_provider_aucun_compatible", candidates=candidats)
+    )
     report.required.append(_check(
-        "provider", False,
-        _("detail_provider_unresolved", candidates=", ".join(ctx.candidates) or "?"),
+        "provider", False, detail,
         hint=f"dsoxlab use --provider {recommande}" if recommande else None,
         forced_state=STATE_CHOICE_REQUIRED,
     ))

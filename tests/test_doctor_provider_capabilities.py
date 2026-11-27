@@ -125,6 +125,11 @@ def test_le_diagnostic_dit_pourquoi_aucun_provider_ne_convient(
     assert "hw_virt" in requis and not requis["hw_virt"].ok
     # Aucune invite à choisir un provider qui ne marcherait pas.
     assert requis["provider"].hint is None
+    # L'écran sans `-v` ne montre pas les notes : l'étape le dit elle-même.
+    assert "kvm, incus" in requis["provider"].detail
+    assert requis["provider"].detail != doctor._(
+        "detail_provider_unresolved", candidates="kvm, incus"
+    )
     assert "kvm" not in requis and "incus" not in requis
     assert report.provider == ""
     assert doctor._("doctor_note_aucun_provider_compatible") in report.notes

@@ -1731,6 +1731,10 @@ silent.
     "detail_pytest_bundled": "bundled with dsoxlab",
     "detail_pytest_via":     "via {cmd}",
     "detail_provider_unresolved": "declared candidates: {candidates}, none selected",
+    "detail_provider_aucun_compatible":
+        "declared candidates: {candidates}, none can run on this machine "
+        "without hardware virtualization (see the \"Hardware virtualization\" "
+        "step). Shell labs still work.",
     # ── git and docker: two tools nothing declared ──────────────────────────
     "check_git": "git",
     "check_docker": "Docker",
