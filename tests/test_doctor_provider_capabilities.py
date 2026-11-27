@@ -136,6 +136,21 @@ def test_le_diagnostic_dit_pourquoi_aucun_provider_ne_convient(
     assert doctor._("doctor_note_provider_unresolved") not in report.notes
 
 
+def test_fix_ne_lance_rien_quand_aucun_provider_ne_convient(
+    tmp_path: Path, poste_sans_virtualisation: None
+) -> None:
+    """L'étape provider a une action dsoxlab (`use --provider`). Lancée ici,
+    elle écrirait un provider vide dans le contexte : elle reste à faire à la
+    main, avec la virtualisation qui en donne la cause."""
+    from dsoxlab.services.remediation import planifier
+
+    report = doctor.collect_checks(tmp_path, _catalogue_vm(["kvm", "incus"]))
+    plan = planifier(report, actions={"provider": lambda: None})
+
+    assert plan.executables == 0
+    assert {e.cle for e in plan.manuelles} >= {"provider", "hw_virt"}
+
+
 def test_un_provider_distant_declare_reste_la_voie_proposee(
     tmp_path: Path, poste_sans_virtualisation: None
 ) -> None:
